@@ -2,31 +2,39 @@
 
 ## 1. Doel
 
-We bouwen drie zelfstandig inzetbare systemen:
+We bouwen vier zelfstandig inzetbare systemen:
 
 1. **Software Factory** — voert softwarestories uit: refinen, plannen, ontwikkelen, reviewen,
    testen, documenteren, mergen en deployen.
 2. **Product Factory** — onderzoekt wat een product nodig heeft, maakt product- en UX-beslissingen,
    schrijft stories, beantwoordt productvragen en evalueert het resultaat.
-3. **HKH-app** — het eerste product dat door deze combinatie wordt ontwikkeld.
+3. **HKH** — de variant waarvan de productontwikkeling na de gezamenlijke baseline door de eigenaar
+   wordt gestuurd.
+4. **HKH Autopilot** — de variant waarvan de productontwikkeling na diezelfde baseline autonoom door
+   Product Factory en Software Factory wordt uitgevoerd.
 
-HKH is de eerste praktijktest, maar Product Factory bevat geen HKH-specifieke businesslogica. Een
-volgend product moet via configuratie en productdata kunnen worden toegevoegd, zonder nieuwe
-Product Factory-code te schrijven.
+Beide HKH-varianten starten vanaf inhoudelijk en technisch dezelfde baseline: backend,
+gebruikersfrontend, adminfrontend, database, CI, APK en OpenShift-deployment. Alleen identifiers die
+moeten verschillen om beide varianten naast elkaar te draaien — namespace, image, URL, database,
+OAuth-configuratie en Android-package-id — mogen afwijken.
+
+HKH Autopilot is de eerste praktijktest voor autonome productontwikkeling, maar Product Factory
+bevat geen HKH-specifieke businesslogica. Een volgend product moet via configuratie en productdata
+kunnen worden toegevoegd, zonder nieuwe Product Factory-code te schrijven.
 
 ## 2. Volgorde op hoofdlijnen
 
 | Fase | Resultaat |
 |---|---|
-| 0 | Beide repositories zijn veilig bouwbaar door Software Factory |
-| 1 | HKH heeft een lege maar volledig werkende technische basis |
+| 0 | Product Factory en beide HKH-repositories zijn veilig bouwbaar door Software Factory |
+| 1 | HKH en HKH Autopilot hebben aantoonbaar dezelfde werkende technische basis |
 | 2 | Product Factory heeft een zelfstandige technische basis |
 | 3 | Product Factory kan stories aanbieden en volgen via een stabiele API |
 | 4 | Product Factory ondersteunt meerdere configureerbare producten |
 | 5 | Productagents doen onderzoek en ontwerpen in shadow mode |
 | 6 | Product Factory maakt en begeleidt autonoom kleine stories |
-| 7 | HKH krijgt via die cyclus een eerste bruikbare verticale functionaliteit |
-| 8 | De cyclus wordt op bewijs, kwaliteit en meerdere producten doorontwikkeld |
+| 7 | De gelijke baseline wordt bevroren en de twee ontwikkelpaden worden gesplitst |
+| 8 | De eigenaar ontwikkelt HKH; Product Factory ontwikkelt HKH Autopilot en vergelijkt resultaten |
 
 Elke fase moet aantoonbaar werken voordat de volgende autonomie krijgt. Technische autonomie wordt
 stapsgewijs vrijgegeven; het productdoel blijft vanaf het begin algemeen.
@@ -70,18 +78,20 @@ Factory-storykey en de voor monitoring noodzakelijke snapshots.
 > ontwikkeld op basis van onderzoek, beschikbare bronnen en gebruik.
 
 Deze tekst stuurt de Product Factory, maar schrijft nog geen kaart, camera, AR, chatbot, route of
-andere specifieke oplossing voor.
+andere specifieke oplossing voor. Dezelfde visie geldt na de splitsing voor zowel `hkh` als
+`hkh-autopilot`, zodat het verschil in ontwikkeling niet door een andere beginopdracht wordt
+veroorzaakt.
 
 ## 5. Fase 0 — repositories bouwbaar maken
 
 ### Doel
 
-Zowel `hkh` als `product-factory` kan veilig als targetrepository door Software Factory worden
-gebruikt.
+`hkh`, `hkh-autopilot` en `product-factory` kunnen veilig als zelfstandige targetrepositories door
+Software Factory worden gebruikt.
 
 ### Werk
 
-Voor beide repositories:
+Voor alle drie repositories:
 
 - basisdocumentatie en repositoryconventies toevoegen;
 - `.factory/verification.yaml` toevoegen met revisiongebonden verificatiecommando's;
@@ -104,16 +114,17 @@ Voor beide repositories:
 > toegevoegd niet als vereiste check accepteert, moet alleen de eerste bootstrap-PR handmatig
 > worden gemerged. Vanaf de daaropvolgende story is de normale automatische poort actief.
 
-## 6. Fase 1 — technische basis HKH
+## 6. Fase 1 — gelijke technische basis voor HKH en HKH Autopilot
 
 ### Doel
 
-Een lege maar end-to-end werkende applicatie die technisch als basis voor HKH dient.
+Een lege maar end-to-end werkende applicatiebasis die als hetzelfde vertrekpunt in `hkh` en
+`hkh-autopilot` staat voordat de productontwikkeling uiteen gaat lopen.
 
 ### Gewenste structuur
 
 ```text
-hkh/
+hkh/ en hkh-autopilot/
 ├── backend/                 Kotlin, Spring Boot, JDK 21
 ├── app/                     Flutter gebruikersapp: web en Android
 ├── admin/                   Flutter web-admin
@@ -159,18 +170,37 @@ hkh/
    - configuratie en secrets buiten Git;
    - ArgoCD/Kustomize-structuur;
    - live- en versiecontrole.
+8. **Baseline overzetten naar HKH Autopilot**
+   - dezelfde bronstructuur, versies, tests en verificatie overnemen;
+   - alleen noodzakelijke runtime-identiteit aanpassen;
+   - geen productfunctionaliteit of autonome optimalisatie toevoegen.
+9. **Baseline-pariteit aantonen**
+   - dezelfde functionele contracttests tegen beide deployments draaien;
+   - dependency- en toolchainversies vergelijken;
+   - afwijkingen documenteren en beperken tot runtime-identiteit;
+   - in beide repositories dezelfde tag `comparison-baseline-v1` zetten.
 
 ### Definition of done
 
-- Backend, gebruikerswebapp en adminwebapp draaien onafhankelijk op OpenShift.
-- De gebruikersapp is als APK te downloaden en te installeren.
-- Admin is alleen na geldige Google-authenticatie bereikbaar.
-- Database-migraties zijn herhaalbaar.
+- Beide varianten hebben een backend, gebruikerswebapp en adminwebapp op afzonderlijke OpenShift-
+  resources.
+- Beide gebruikersapps zijn als afzonderlijke APK te downloaden en naast elkaar te installeren.
+- Beide admins zijn alleen na geldige Google-authenticatie bereikbaar.
+- Database-migraties zijn gelijkwaardig en herhaalbaar.
+- Dezelfde baseline-acceptatietests zijn voor beide varianten groen.
+- Verschillen zijn beperkt tot gedocumenteerde runtime-identiteit.
 - Een wijziging aan één component bouwt niet onnodig alle andere componenten.
 - Software Factory kan build, merge en deploy betrouwbaar volgen.
 
-Na deze fase worden de definitieve HKH-deploydoelen, livecomponenten, APK-packagegegevens en
-release-retentie in de lokale `projects.yaml` van Software Factory geconfigureerd.
+Na deze fase worden de definitieve deploydoelen, livecomponenten, APK-packagegegevens en
+release-retentie voor zowel `hkh` als `hkh-autopilot` in de lokale `projects.yaml` van Software
+Factory geconfigureerd.
+
+### Baseline-regel na de splitsing
+
+Na tag `comparison-baseline-v1` worden productfeatures niet automatisch tussen beide repositories
+gekopieerd. Alleen een kritieke beveiligings-, platform- of compliancefix mag bewust op beide
+worden toegepast; zo'n gedeelde fix wordt in het vergelijkingslogboek gemarkeerd.
 
 ## 7. Fase 2 — technische basis Product Factory
 
@@ -282,7 +312,7 @@ GET  /api/integrations/v1/events?after=<cursor>
 
 ### Doel
 
-HKH wordt configuratie en data, geen hardgecodeerde uitzondering.
+Beide HKH-varianten worden configuratie en data, geen hardgecodeerde uitzonderingen.
 
 ### Productdefinitie
 
@@ -293,6 +323,7 @@ Elk product bevat minimaal:
 - Software Factory-projectkey en targetrepositorynaam;
 - optionele live- en preview-URL's;
 - status `draft`, `active`, `paused` of `archived`;
+- ontwikkelmodus `manual`, `autonomous` of `observe-only`;
 - iteratieschema en tijdzone;
 - maximaal aantal stories per cyclus;
 - WIP-limiet;
@@ -305,7 +336,8 @@ Elk product bevat minimaal:
 
 - generieke producttabellen en repositories;
 - productbeheer in het dashboard;
-- HKH als eerste seed/productconfiguratie;
+- `hkh` als handmatig/observe-only vergelijkingsproduct;
+- `hkh-autopilot` als eerste autonoom gestuurd product;
 - productcontext strikt scheiden in iedere query en agentrun;
 - pauzeren per product zonder de hele runtime stil te leggen;
 - template voor het toevoegen van een volgend product;
@@ -315,7 +347,9 @@ Elk product bevat minimaal:
 
 - Een tweede fictief product kan zonder codewijziging worden toegevoegd.
 - Runs, kennis, kandidaten en stories van producten lekken niet naar elkaar.
-- HKH kan zelfstandig worden gepauzeerd en hervat.
+- Iedere variant kan zelfstandig worden gepauzeerd en hervat.
+- Product Factory kan voor `hkh` geen story publiceren zolang de ontwikkelmodus niet `autonomous`
+  is.
 
 ## 10. Fase 5 — productonderzoek en UX in shadow mode
 
@@ -353,7 +387,8 @@ Software Factory.
 
 ### Doel
 
-Product Factory mag zelf onderbouwde stories laten uitvoeren en begeleidt ze tot na deployment.
+Product Factory mag uitsluitend voor producten met ontwikkelmodus `autonomous` zelf onderbouwde
+stories laten uitvoeren en begeleidt ze tot na deployment.
 
 ### Cyclus
 
@@ -372,6 +407,7 @@ Product Factory mag zelf onderbouwde stories laten uitvoeren en begeleidt ze tot
 
 - maximaal drie nieuwe stories per product per etmaal, geen verplicht quotum;
 - WIP-limiet één per targetrepository;
+- de runtime weigert storypublicatie voor producten met ontwikkelmodus `manual` of `observe-only`;
 - geen nieuwe story bij een open fout of mislukte deployment;
 - dagelijks en maandelijks AI-kostenplafond;
 - stop na herhaalde identieke fouten;
@@ -393,35 +429,68 @@ Alleen een `HumanAction` bij:
 Een HumanAction bevat exacte stappen, reden, eventuele kosten, blokkadestatus en een automatische
 controle waarmee Product Factory kan vaststellen dat de handeling klaar is.
 
-## 12. Fase 7 — eerste werkende HKH-functionaliteit
+## 12. Fase 7 — baseline bevriezen en ontwikkelpaden splitsen
 
 ### Doel
 
-De volledige product-naar-softwarelus bewijzen met een zeer kleine verticale functionaliteit.
+Een eerlijk en reproduceerbaar beginpunt vastleggen. Vanaf dit moment stuurt de eigenaar de
+productontwikkeling van `hkh`, terwijl Product Factory uitsluitend de productontwikkeling van
+`hkh-autopilot` bestuurt.
 
-De Product Factory bepaalt op basis van onderzoek de precieze UX. Een aannemelijk klein
-validatiescenario is:
+### Werk
 
-- admin kan één historische locatie met titel, tekst, bron en rechteninformatie vastleggen;
-- gebruikersapp kan beschikbare locaties tonen;
-- een gebruiker kan een detail met verhaal, afbeelding en bronverwijzing openen;
-- basiszoeken op titel of plaats werkt;
-- onbekende of onbevestigde informatie wordt niet als feit gepresenteerd.
-
-Dit scenario is geen definitieve productspecificatie. Het is een minimale verticale doorsnede die
-database, admin, API, app, bronverantwoording, deployment en autonome storybegeleiding tegelijk
-bewijst.
+- dezelfde algemene productvisie in beide repositories vastleggen;
+- beide baseline-tags en commit-SHA's registreren;
+- technische verschillen automatisch rapporteren;
+- twee zelfstandige databases, deployments, URL's en APK's bevestigen;
+- Product Factory voor `hkh` op `observe-only` zetten;
+- Product Factory voor `hkh-autopilot` op `autonomous` zetten;
+- splitsingsdatum en vergelijkingsregels vastleggen;
+- voorkomen dat Product Factory stories voor `hkh` kan indienen.
 
 ### Definition of done
 
-- De functionaliteit is door Product Factory onderzocht en als hypothese vastgelegd.
-- De stories zijn automatisch via Software Factory gebouwd en gedeployed.
-- Product Factory heeft vragen zelfstandig beantwoord.
-- Het resultaat is in webapp en APK aantoonbaar bruikbaar.
-- Bronnen en rechten zijn zichtbaar en machineleesbaar opgeslagen.
-- De evaluatie heeft een concrete volgende keuze opgeleverd.
+- Beide varianten slagen voor dezelfde baseline-acceptatietests.
+- Beide varianten hebben de tag `comparison-baseline-v1`.
+- Het dashboard toont duidelijk wie ieder productpad bestuurt.
+- Autonome storypublicatie voor `hkh` wordt technisch geweigerd.
+- HKH Autopilot kan zelfstandig zijn eerste productiteratie starten.
 
-## 13. Fase 8 — leren en opschalen
+## 13. Fase 8 — parallelle productontwikkeling en vergelijking
+
+### Verdeling
+
+- **`hkh`** — productkeuzes en nieuwe stories worden door de eigenaar bepaald.
+- **`hkh-autopilot`** — Product Factory onderzoekt, kiest, schrijft stories, beantwoordt vragen en
+  evalueert; Software Factory bouwt en deployt.
+
+Een aannemelijke eerste verticale functionaliteit voor beide paden is het kunnen beheren, vinden en
+bekijken van één historische locatie met verhaal, afbeelding, bron en rechteninformatie. Dit is
+geen gedeelde verplichte backlog: beide productpaden mogen vanuit dezelfde visie tot een andere
+eerste oplossing komen.
+
+### Vergelijkingssignalen
+
+- doorlooptijd van idee tot werkende deployment;
+- aantal herstelrondes, regressies en mislukte deployments;
+- AI-, infrastructuur- en menselijke tijd/kosten;
+- kwaliteit van tests, toegankelijkheid, privacy en bronverantwoording;
+- samenhang en begrijpelijkheid van UX;
+- hoeveelheid daadwerkelijk gebruikte functionaliteit;
+- onderhoudbaarheid en snelheid van latere wijzigingen.
+
+De vergelijking is informatief, geen wedstrijd op aantallen features of regels code. Verschillen
+in scope en gemaakte aannames worden naast de cijfers vastgelegd.
+
+### Definition of done
+
+- De eigenaar kan onafhankelijk stories voor `hkh` laten uitvoeren of zelf ontwikkelen.
+- Product Factory doorloopt zonder productinput een volledige iteratie voor `hkh-autopilot`.
+- Product Factory beantwoordt productvragen voor HKH Autopilot zelfstandig.
+- Resultaten en beslissingen zijn per variant gescheiden en vergelijkbaar.
+- Alleen echte HumanActions worden aan de eigenaar gemeld.
+
+## 14. Daarna — leren en opschalen
 
 Na de eerste verticale slice:
 
@@ -430,11 +499,11 @@ Na de eerste verticale slice:
 - onderzoek en productbeslissingen laten reageren op echte signalen;
 - bronconnectors voor publiek erfgoed gefaseerd toevoegen;
 - eventuele camera-, locatie-, audio-, route-, tijdlijn- of AR-concepten alleen als hypothese testen;
-- een tweede echt product onboarden om generiek gedrag te bewijzen;
+- na HKH Autopilot een ander echt product onboarden om generiek gedrag te bewijzen;
 - budget, scheduler en WIP per product verfijnen;
 - herstel, back-up, retentie en incidentrunbooks voltooien.
 
-## 14. Eerste uitvoerbare storyvolgorde
+## 15. Eerste uitvoerbare storyvolgorde
 
 Deze volgorde is bedoeld als startbacklog voor Software Factory. Iedere regel wordt een afzonderlijke,
 kleine story; combineer ze niet tot één grote bootstrapstory.
@@ -448,22 +517,25 @@ kleine story; combineer ze niet tot één grote bootstrapstory.
 | 5 | HKH | Flutter-adminbasis en Google-tokenverificatieseam |
 | 6 | HKH | Componentgerichte CI, images en downloadbare APK |
 | 7 | HKH | OpenShift/Kustomize/ArgoCD-basis en deployverificatie |
-| 8 | Product Factory | Repositoryconventies, docs, verificatieconfig en required GitHub-check |
-| 9 | Product Factory | Zelfstandige Maven/Spring Boot/Modulith-basis |
-| 10 | Product Factory | Eigen PostgreSQL/Flyway en product-/iteratieskeleton |
-| 11 | Product Factory | Eigen agentworker en duurzaam resultaatcontract |
-| 12 | Product Factory | Dashboard-backend, Flutter-dashboard en Google-loginbasis |
-| 13 | Product Factory | OpenShift-deployment en versie/deployverificatie |
-| 14 | Software Factory | Versievaste idempotente Product Factory-integratie-API |
-| 15 | Product Factory | Software Factory-client en story/statusreconciliatie |
-| 16 | Product Factory | Generiek multi-productmodel met HKH als eerste product |
-| 17 | Product Factory | Researcher en bronmodel in shadow mode |
-| 18 | Product Factory | Product Owner, UX Designer, Critic en Story Writer in shadow mode |
-| 19 | Product Factory | Autonome vraagbeantwoording en HumanAction-beleid |
-| 20 | Product Factory | Begrensde autonome storypublicatie met WIP één |
-| 21 | HKH via Product Factory | Eerste kleine verticale productfunctionaliteit |
+| 8 | HKH Autopilot | Repositorybootstrap en gecontroleerde overname van de volledige HKH-basis |
+| 9 | Beide HKH-varianten | Pariteitstest, identiteitsverschillen vastleggen en baseline taggen |
+| 10 | Product Factory | Repositoryconventies, docs, verificatieconfig en required GitHub-check |
+| 11 | Product Factory | Zelfstandige Maven/Spring Boot/Modulith-basis |
+| 12 | Product Factory | Eigen PostgreSQL/Flyway en product-/iteratieskeleton |
+| 13 | Product Factory | Eigen agentworker en duurzaam resultaatcontract |
+| 14 | Product Factory | Dashboard-backend, Flutter-dashboard en Google-loginbasis |
+| 15 | Product Factory | OpenShift-deployment en versie/deployverificatie |
+| 16 | Software Factory | Versievaste idempotente Product Factory-integratie-API |
+| 17 | Product Factory | Software Factory-client en story/statusreconciliatie |
+| 18 | Product Factory | Multi-productmodel met ontwikkelmodus en beide HKH-varianten |
+| 19 | Product Factory | Researcher en bronmodel in shadow mode |
+| 20 | Product Factory | Product Owner, UX Designer, Critic en Story Writer in shadow mode |
+| 21 | Product Factory | Autonome vraagbeantwoording en HumanAction-beleid |
+| 22 | Product Factory | Begrensde autonome storypublicatie met WIP één |
+| 23 | Beide HKH-varianten | Baseline bevriezen en handmatig/autonoom ontwikkelpad activeren |
+| 24 | HKH Autopilot via Product Factory | Eerste autonome productiteratie en verticale functionaliteit |
 
-## 15. Beslispunten die geen productinput vereisen
+## 16. Beslispunten die geen productinput vereisen
 
 De agents mogen zelfstandig beslissen over:
 
