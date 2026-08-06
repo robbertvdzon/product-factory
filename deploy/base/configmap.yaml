@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-factory-config
+  namespace: product-factory
+data:
+  PF_DB_URL: jdbc:postgresql://postgres:5432/productfactory
+  PF_DB_USERNAME: productfactory
+  PF_RUNTIME_BASE_URL: http://runtime:8080
+  PF_WORKSPACE_PATH: /workspace
+  PF_WORKSPACE_REPOSITORY: https://github.com/robbertvdzon/product-factory-workspace.git
+  PF_WORKSPACE_MAIN_BRANCH: main
+  PF_WORKSPACE_REMOTE_PUBLICATION: "true"
+  PF_DASHBOARD_AUTH_REQUIRED: "true"
+  PF_DASHBOARD_ORIGIN: https://product-factory.vdzonsoftware.nl

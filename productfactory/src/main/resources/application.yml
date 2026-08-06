@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: product-factory
+  datasource:
+    url: ${PF_DB_URL}
+    username: ${PF_DB_USERNAME}
+    password: ${PF_DB_PASSWORD}
+  flyway:
+    enabled: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+server:
+  port: ${PF_RUNTIME_PORT:8080}
+product-factory:
+  workspace:
+    path: ${PF_WORKSPACE_PATH}
+    repository: ${PF_WORKSPACE_REPOSITORY}
+    main-branch: ${PF_WORKSPACE_MAIN_BRANCH:main}
+    remote-publication: ${PF_WORKSPACE_REMOTE_PUBLICATION:false}

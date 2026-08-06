@@ -1,0 +1,23 @@
+version: 1
+commands:
+  - id: repository-maven-verify
+    pathPrefixes: [productfactory-contracts/, productfactory-common/, productfactory/, agentworker/, dashboard-backend/, pom.xml, Dockerfile.agent, .factory/verification.yaml]
+    argv: [mvn, -B, --no-transfer-progress, clean, verify]
+    workingDirectory: .
+    timeoutSeconds: 1800
+  - id: dashboard-flutter-analyze
+    pathPrefixes: [dashboard-frontend/]
+    argv: [flutter, analyze]
+    workingDirectory: dashboard-frontend
+    timeoutSeconds: 900
+  - id: dashboard-flutter-test
+    pathPrefixes: [dashboard-frontend/]
+    argv: [flutter, test]
+    workingDirectory: dashboard-frontend
+    timeoutSeconds: 900
+  - id: agent-image-build
+    agentRunnable: false
+    pathPrefixes: [Dockerfile.agent, agentworker/, productfactory-common/, productfactory-contracts/, pom.xml]
+    argv: [docker, build, --target, build, -f, Dockerfile.agent, .]
+    workingDirectory: .
+    timeoutSeconds: 1800

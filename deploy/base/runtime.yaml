@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runtime
+  namespace: product-factory
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: runtime}
+  template:
+    metadata:
+      labels: {app: runtime}
+    spec:
+      initContainers:
+        - name: workspace-checkout
+          image: alpine/git:2.49.1
+          command: [/bin/sh, -c]
+          args:
+            - git clone "$PF_WORKSPACE_REPOSITORY" /workspace && chown -R 10001:10001 /workspace
+          envFrom:
+            - configMapRef: {name: product-factory-config}
+          env:
+            - name: GIT_CONFIG_COUNT
+              value: "1"
+            - name: GIT_CONFIG_KEY_0
+              value: http.extraHeader
+            - name: GIT_CONFIG_VALUE_0
+              valueFrom: {secretKeyRef: {name: product-factory-secrets, key: PF_GIT_AUTH_HEADER}}
+          volumeMounts: [{name: workspace, mountPath: /workspace}]
+      containers:
+        - name: runtime
+          image: ghcr.io/robbertvdzon/product-factory-runtime:main
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef: {name: product-factory-config}
+            - secretRef: {name: product-factory-secrets}
+          ports: [{containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /actuator/health, port: 8080}, initialDelaySeconds: 15, periodSeconds: 10}
+          resources:
+            requests: {cpu: 100m, memory: 384Mi}
+            limits: {memory: 1Gi}
+          volumeMounts: [{name: workspace, mountPath: /workspace}]
+      volumes: [{name: workspace, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runtime
+  namespace: product-factory
+spec:
+  selector: {app: runtime}
+  ports: [{port: 8080, targetPort: 8080}]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: runtime
+  namespace: product-factory
+spec:
+  host: product-factory-runtime.apps.sno.vdzonsoftware.nl
+  to: {kind: Service, name: runtime}
+  port: {targetPort: 8080}
+  tls: {termination: edge, insecureEdgeTerminationPolicy: Redirect}

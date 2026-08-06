@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: product-factory-dashboard
+server:
+  port: ${PF_DASHBOARD_BACKEND_PORT:8081}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+product-factory:
+  runtime-base-url: ${PF_RUNTIME_BASE_URL:http://localhost:8080}
+  dashboard:
+    auth-required: ${PF_DASHBOARD_AUTH_REQUIRED:false}
+    google-client-id: ${PF_GOOGLE_CLIENT_ID:}
+    allowed-emails: ${PF_ADMIN_EMAILS:}

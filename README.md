@@ -31,3 +31,15 @@ onafhankelijk kunnen worden toegevoegd.
 
 Zie [docs/stappenplan.md](docs/stappenplan.md) voor de gefaseerde realisatie, afhankelijkheden,
 eerste stories en kwaliteits- en autonomieregels.
+
+## Fase-2-runtime
+
+De zelfstandige technische basis bestaat uit een Maven-reactor, Spring Modulith-runtime,
+PostgreSQL/Flyway, agentworker, Google OIDC-dashboard en een begrensde workspace-publisher. Start
+lokaal met `./product-factory up` en controleer alles met `./product-factory verify`.
+
+- [Architectuurreferentie](docs/architecture/reference-baseline.md)
+- [Modulegrenzen](docs/architecture/modules.md)
+- [Lokale ontwikkeling](docs/development/local-development.md)
+- [OpenShift-deployment](docs/deployment/openshift.md)
+- [Workspace-security](docs/security/workspace-credential.md)
