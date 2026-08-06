@@ -24,15 +24,16 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgres:17-alpine
+          # SCLOrg images are prepared for OpenShift's arbitrary runtime UID.
+          image: quay.io/sclorg/postgresql-16-c9s:latest
           env:
-            - {name: POSTGRES_DB, value: productfactory}
-            - {name: POSTGRES_USER, value: productfactory}
-            - name: POSTGRES_PASSWORD
+            - {name: POSTGRESQL_DATABASE, value: productfactory}
+            - {name: POSTGRESQL_USER, value: productfactory}
+            - name: POSTGRESQL_PASSWORD
               valueFrom: {secretKeyRef: {name: product-factory-secrets, key: PF_DB_PASSWORD}}
           ports: [{containerPort: 5432}]
           readinessProbe: {exec: {command: [pg_isready, -U, productfactory]}, initialDelaySeconds: 5, periodSeconds: 5}
-          volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+          volumeMounts: [{name: data, mountPath: /var/lib/pgsql/data}]
       volumes: [{name: data, persistentVolumeClaim: {claimName: postgres-data}}]
 ---
 apiVersion: v1
