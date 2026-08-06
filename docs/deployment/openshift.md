@@ -1,7 +1,10 @@
 # OpenShift en secrets
 
-De deployment gebruikt namespace `product-factory`, een eigen PostgreSQL-PVC en losse deployments
-voor runtime, dashboard-backend en dashboard-frontend. De agentimage is beschikbaar voor latere
+De deployment gebruikt namespace `product-factory` en losse deployments voor PostgreSQL, runtime,
+dashboard-backend en dashboard-frontend. Net als de HKH-fase-1-basis gebruikt PostgreSQL voorlopig
+een `emptyDir`: de lokale SNO `local-path`-provisioner relabelt PVC's niet voor OpenShift SELinux.
+Kies vóór productie een SELinux-compatibele StorageClass of beheerde PostgreSQL-dienst; een
+podvervanging wist tot die tijd de dashboarddata. De agentimage is beschikbaar voor latere
 run-jobs, maar fase 2 plant nog geen autonome runs.
 
 Maak `product-factory-secrets` buiten Git. Het GitHub-token moet een fine-grained token zijn met
