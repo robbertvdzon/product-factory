@@ -10,8 +10,11 @@ RUN mvn -B --no-transfer-progress -pl productfactory -am package -DskipTests
 FROM eclipse-temurin:21-jre
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN useradd --uid 10001 --create-home productfactory
+RUN useradd --uid 10001 --create-home productfactory \
+ && chgrp -R 0 /home/productfactory \
+ && chmod -R g=u /home/productfactory
 USER 10001
+WORKDIR /home/productfactory
 COPY --from=build /src/productfactory/target/productfactory-app-*.jar /app.jar
 EXPOSE 8080
 ENTRYPOINT ["java","-jar","/app.jar"]
