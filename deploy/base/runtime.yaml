@@ -16,7 +16,7 @@ spec:
           image: alpine/git:2.49.1
           command: [/bin/sh, -c]
           args:
-            - git clone "$PF_WORKSPACE_REPOSITORY" /workspace && chown -R 10001:10001 /workspace
+            - git clone "$PF_WORKSPACE_REPOSITORY" /workspace && chgrp -R 0 /workspace && chmod -R g+rwX /workspace
           envFrom:
             - configMapRef: {name: product-factory-config}
           env:

@@ -8,8 +8,11 @@ COPY productfactory/pom.xml productfactory/pom.xml
 COPY agentworker/pom.xml agentworker/pom.xml
 RUN mvn -B --no-transfer-progress -pl dashboard-backend -am package -DskipTests
 FROM eclipse-temurin:21-jre
-RUN useradd --uid 10001 --create-home productfactory
+RUN useradd --uid 10001 --create-home productfactory \
+ && chgrp -R 0 /home/productfactory \
+ && chmod -R g=u /home/productfactory
 USER 10001
+WORKDIR /home/productfactory
 COPY --from=build /src/dashboard-backend/target/productfactory-dashboard-backend-*.jar /app.jar
 EXPOSE 8081
 ENTRYPOINT ["java","-jar","/app.jar"]
