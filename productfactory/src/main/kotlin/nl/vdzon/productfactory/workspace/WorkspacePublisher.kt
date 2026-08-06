@@ -11,8 +11,14 @@ import org.springframework.web.server.ResponseStatusException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.Base64
 
 data class PublishArtifactRequest(val runId: String, val productSlug: String, val relativePath: String, val content: String)
+
+internal fun gitAuthorizationHeader(token: String): String {
+    val credentials = Base64.getEncoder().encodeToString("x-access-token:$token".toByteArray())
+    return "Authorization: Basic $credentials"
+}
 
 class WorkspaceRepositoryGuard(private val configuredRepository: String) {
     fun requireWorkspaceRepository(candidate: String) {
@@ -101,7 +107,7 @@ class WorkspacePublisher(
         if (tokenRequired) {
             process.environment()["GIT_CONFIG_COUNT"] = "1"
             process.environment()["GIT_CONFIG_KEY_0"] = "http.extraHeader"
-            process.environment()["GIT_CONFIG_VALUE_0"] = "Authorization: Bearer $workspaceToken"
+            process.environment()["GIT_CONFIG_VALUE_0"] = gitAuthorizationHeader(workspaceToken)
         }
         val running = process.start()
         val output = running.inputStream.bufferedReader().readText()

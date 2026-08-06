@@ -19,4 +19,10 @@ class DashboardAuthenticationFilterTest {
         DashboardAuthenticationFilter(verifier, true).doFilter(request, response, MockFilterChain())
         assertEquals(200, response.status)
     }
+    @Test fun `cors preflight reaches api without bearer token`() {
+        val request = MockHttpServletRequest("OPTIONS", "/api/session")
+        val response = MockHttpServletResponse()
+        DashboardAuthenticationFilter(verifier, true).doFilter(request, response, MockFilterChain())
+        assertEquals(200, response.status)
+    }
 }
