@@ -16,7 +16,13 @@ spec:
           image: alpine/git:2.49.1
           command: [/bin/sh, -c]
           args:
-            - git clone "$PF_WORKSPACE_REPOSITORY" /workspace && chgrp -R 0 /workspace && chmod -R g+rwX /workspace
+            - |
+              set -eu
+              if [ -d /workspace/.git ]; then
+                echo "Workspace is already initialized"
+              else
+                git clone "$PF_WORKSPACE_REPOSITORY" /workspace
+              fi
           envFrom:
             - configMapRef: {name: product-factory-config}
           env:
