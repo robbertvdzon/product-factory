@@ -1,0 +1,63 @@
+name: Build container images
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.filter.outputs.runtime }}
+      agent: ${{ steps.filter.outputs.agent }}
+      dashboard_backend: ${{ steps.filter.outputs.dashboard_backend }}
+      dashboard_frontend: ${{ steps.filter.outputs.dashboard_frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            runtime: ['pom.xml', 'productfactory/**', 'productfactory-common/**', 'productfactory-contracts/**']
+            agent: ['pom.xml', 'agentworker/**', 'productfactory-common/**', 'productfactory-contracts/**', 'Dockerfile.agent']
+            dashboard_backend: ['pom.xml', 'dashboard-backend/**', 'productfactory-common/**', 'productfactory-contracts/**']
+            dashboard_frontend: ['dashboard-frontend/**']
+  runtime:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true'
+    uses: ./.github/workflows/reusable-image.yml
+    with: {image: product-factory-runtime, context: '.', dockerfile: productfactory/Dockerfile}
+    secrets: inherit
+  agent:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.agent == 'true'
+    uses: ./.github/workflows/reusable-image.yml
+    with: {image: product-factory-agent, context: '.', dockerfile: Dockerfile.agent}
+    secrets: inherit
+  dashboard-backend:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.dashboard_backend == 'true'
+    uses: ./.github/workflows/reusable-image.yml
+    with: {image: product-factory-dashboard-backend, context: '.', dockerfile: dashboard-backend/Dockerfile}
+    secrets: inherit
+  dashboard-frontend:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.dashboard_frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
+      - uses: docker/build-push-action@v6
+        with:
+          context: dashboard-frontend
+          file: dashboard-frontend/Dockerfile
+          push: true
+          tags: ghcr.io/robbertvdzon/product-factory-dashboard-frontend:main,ghcr.io/robbertvdzon/product-factory-dashboard-frontend:sha-${{ github.sha }}
+          build-args: |
+            API_BASE_URL=https://product-factory-api.vdzonsoftware.nl
+            GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+          cache-from: type=gha,scope=product-factory-dashboard-frontend
+          cache-to: type=gha,mode=max,scope=product-factory-dashboard-frontend

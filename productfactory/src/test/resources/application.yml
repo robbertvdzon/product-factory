@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:productfactory;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  flyway:
+    enabled: true
+product-factory:
+  workspace:
+    path: ${java.io.tmpdir}/product-factory-test-workspace
+    repository: git@github.com:robbertvdzon/product-factory-workspace.git
+    main-branch: main
+    remote-publication: false

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+mvn -B --no-transfer-progress clean verify
+(cd dashboard-frontend && flutter pub get && flutter analyze && flutter test && flutter build web --release --dart-define=AUTH_REQUIRED=false)
+python3 ../product-factory-workspace/tools/validate_workspace.py
+if command -v kubectl >/dev/null 2>&1; then kubectl kustomize deploy/sno-local >/dev/null; fi

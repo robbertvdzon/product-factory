@@ -1,0 +1,18 @@
+name: product_factory_dashboard
+description: Dashboard voor autonome productontwikkeling.
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: ^3.9.0
+dependencies:
+  flutter:
+    sdk: flutter
+  google_sign_in: ^6.2.1
+  google_sign_in_web: ^0.12.4
+  http: ^1.5.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true
