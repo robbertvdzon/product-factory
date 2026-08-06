@@ -7,5 +7,4 @@ build/
 **/build/
 properties.env
 secrets.env
-deploy/secrets-cluster.env
 workspace-checkout/

@@ -25,13 +25,6 @@ spec:
               fi
           envFrom:
             - configMapRef: {name: product-factory-config}
-          env:
-            - name: GIT_CONFIG_COUNT
-              value: "1"
-            - name: GIT_CONFIG_KEY_0
-              value: http.extraHeader
-            - name: GIT_CONFIG_VALUE_0
-              valueFrom: {secretKeyRef: {name: product-factory-secrets, key: PF_GIT_AUTH_HEADER}}
           volumeMounts: [{name: workspace, mountPath: /workspace}]
       containers:
         - name: runtime

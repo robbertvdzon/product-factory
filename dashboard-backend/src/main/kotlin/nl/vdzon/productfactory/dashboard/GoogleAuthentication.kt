@@ -8,6 +8,7 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.http.HttpMethod
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
@@ -47,7 +48,11 @@ class DashboardAuthenticationFilter(
     private val verifier: GoogleTokenVerifier,
     @Value("\${product-factory.dashboard.auth-required:false}") private val authRequired: Boolean,
 ) : OncePerRequestFilter() {
-    override fun shouldNotFilter(request: HttpServletRequest) = !authRequired || !request.requestURI.startsWith("/api/") || request.requestURI == "/api/version"
+    override fun shouldNotFilter(request: HttpServletRequest) =
+        !authRequired ||
+            request.method == HttpMethod.OPTIONS.name() ||
+            !request.requestURI.startsWith("/api/") ||
+            request.requestURI == "/api/version"
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         val token = request.getHeader("Authorization")?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")
         if (token == null) {
