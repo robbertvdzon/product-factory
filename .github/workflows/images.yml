@@ -20,10 +20,10 @@ jobs:
         id: filter
         with:
           filters: |
-            runtime: ['pom.xml', 'productfactory/**', 'productfactory-common/**', 'productfactory-contracts/**']
-            agent: ['pom.xml', 'agentworker/**', 'productfactory-common/**', 'productfactory-contracts/**', 'Dockerfile.agent']
-            dashboard_backend: ['pom.xml', 'dashboard-backend/**', 'productfactory-common/**', 'productfactory-contracts/**']
-            dashboard_frontend: ['dashboard-frontend/**']
+            runtime: ['pom.xml', 'productfactory/**', 'productfactory-common/**', 'productfactory-contracts/**', '.github/workflows/images.yml', '.github/workflows/reusable-image.yml']
+            agent: ['pom.xml', 'agentworker/**', 'productfactory-common/**', 'productfactory-contracts/**', 'Dockerfile.agent', '.github/workflows/images.yml', '.github/workflows/reusable-image.yml']
+            dashboard_backend: ['pom.xml', 'dashboard-backend/**', 'productfactory-common/**', 'productfactory-contracts/**', '.github/workflows/images.yml', '.github/workflows/reusable-image.yml']
+            dashboard_frontend: ['dashboard-frontend/**', '.github/workflows/images.yml']
   runtime:
     needs: changes
     if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true'
