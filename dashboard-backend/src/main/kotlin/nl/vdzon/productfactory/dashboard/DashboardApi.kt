@@ -37,6 +37,18 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
     @GetMapping("/shadow-iterations")
     fun shadowIterations(): Any = runtime.products().flatMap { product -> runtime.shadowIterations(product["slug"].toString()) }
 
+    @GetMapping("/shadow-iterations/{id}")
+    fun shadowIteration(@PathVariable id: String, @RequestParam productSlug: String): Any =
+        runtime.shadowIteration(productSlug, id)
+
+    @GetMapping("/shadow-iterations/{id}/steps")
+    fun shadowIterationSteps(@PathVariable id: String, @RequestParam productSlug: String): Any =
+        runtime.shadowIterationSteps(productSlug, id)
+
+    @GetMapping("/shadow-iterations/{id}/artifacts")
+    fun shadowIterationArtifacts(@PathVariable id: String, @RequestParam productSlug: String): Any =
+        runtime.shadowIterationArtifacts(productSlug, id)
+
     @GetMapping("/autonomy/deliveries")
     fun deliveries(): Any = runtime.products().flatMap { product -> runtime.deliveries(product["slug"].toString()) }
 

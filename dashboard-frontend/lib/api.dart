@@ -15,6 +15,35 @@ class DashboardApi {
   Future<List<dynamic>> shadowIterations() => _list('/api/shadow-iterations');
   Future<List<dynamic>> deliveries() => _list('/api/autonomy/deliveries');
   Future<List<dynamic>> humanActions() => _list('/api/autonomy/human-actions');
+  Future<Map<String, dynamic>> shadowIterationSession(
+    String productSlug,
+    String iterationId,
+  ) async {
+    final query = 'productSlug=${Uri.encodeQueryComponent(productSlug)}';
+    final base = '/api/shadow-iterations/${Uri.encodeComponent(iterationId)}';
+    final result = await Future.wait<dynamic>([
+      _object('$base?$query'),
+      _list('$base/steps?$query'),
+      _list('$base/artifacts?$query'),
+    ]);
+    final iteration = result[0] as Map<String, dynamic>;
+    String? dossier;
+    final workspaceRunId = iteration['workspaceRunId'];
+    if (workspaceRunId != null && '$workspaceRunId'.isNotEmpty) {
+      try {
+        dossier = await artifact(productSlug, '$workspaceRunId');
+      } catch (_) {
+        // Een gemergde workspace-publicatie kan kort na de iteratie beschikbaar komen.
+      }
+    }
+    return {
+      'iteration': iteration,
+      'steps': result[1] as List<dynamic>,
+      'artifacts': result[2] as List<dynamic>,
+      'dossier': dossier,
+    };
+  }
+
   Future<String> artifact(String productSlug, String runId) async {
     final response = await http.get(
       Uri.parse(
@@ -101,5 +130,16 @@ class DashboardApi {
       throw StateError('Dashboard API gaf ${response.statusCode}.');
     }
     return jsonDecode(response.body) as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> _object(String path) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl$path'),
+      headers: headers,
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Dashboard API gaf ${response.statusCode}.');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 }

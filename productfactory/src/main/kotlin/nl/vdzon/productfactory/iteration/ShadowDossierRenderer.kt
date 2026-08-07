@@ -45,7 +45,7 @@ internal object ShadowDossierRenderer {
         appendLine("sources:")
         sources.forEach { appendLine("  - ${it.url}") }
         appendLine("---")
-        appendLine("# Shadow-iteratie ${iteration.sequenceNumber}")
+        appendLine(if (iteration.mode == "autonomous") "# Autonome productcyclus ${iteration.sequenceNumber}" else "# Shadow-iteratie ${iteration.sequenceNumber}")
         appendLine()
         appendLine("**Focus:** ${iteration.focus}")
         appendLine()
@@ -127,7 +127,13 @@ internal object ShadowDossierRenderer {
             if (candidate.risks.isNotEmpty()) appendLine("\nRisico's: ${candidate.risks.joinToString()}")
         }
         appendLine()
-        appendLine("_Dit dossier is in shadow mode gemaakt. Er is geen story naar Software Factory gestuurd._")
+        appendLine(
+            if (iteration.mode == "autonomous") {
+                "_Dit dossier is in autonomous mode gemaakt. Geaccepteerde stories mogen na workspace-merge naar Software Factory worden gestuurd._"
+            } else {
+                "_Dit dossier is in shadow mode gemaakt. Er is geen story naar Software Factory gestuurd._"
+            },
+        )
     }
 
     private fun table(value: String) = value.replace("|", "\\|").replace("\n", " ")

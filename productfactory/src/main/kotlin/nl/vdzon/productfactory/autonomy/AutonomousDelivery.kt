@@ -235,7 +235,9 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
         databaseTimestamp(date.plusDays(1).atStartOfDay(zone).toInstant()),
     ) ?: 0) > 0
     fun openHumanActions(productSlug: String): Int = jdbc.queryForObject(
-        "select count(*) from human_action where product_slug = ? and status = 'OPEN'", Int::class.java, productSlug,
+        "select count(*) from human_action where product_slug = ? and category = 'ACCESS_TOKEN' and status = 'OPEN'",
+        Int::class.java,
+        productSlug,
     ) ?: 0
     fun unevaluatedDone(productSlug: String): List<StoryDeliveryView> = list(productSlug).filter { it.status == "DONE" }.filter { delivery ->
         (jdbc.queryForObject("select count(*) from story_delivery where id = ? and evaluated_at is null", Int::class.java, delivery.id) ?: 0) > 0
@@ -259,7 +261,7 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
 
     fun humanActions(productSlug: String): List<HumanActionView> = jdbc.query(
         """select id, product_slug, delivery_id, category, title, reason, instructions, status, created_at
-            from human_action where product_slug = ? order by id desc""".trimIndent(),
+            from human_action where product_slug = ? and category = 'ACCESS_TOKEN' order by id desc""".trimIndent(),
         { row, _ -> HumanActionView(
             row.getLong(1), row.getString(2), row.getObject(3, java.lang.Long::class.java)?.toLong(), row.getString(4),
             row.getString(5), row.getString(6), row.getString(7), row.getString(8), row.getTimestamp(9).toInstant(),
@@ -272,12 +274,30 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
                 "insert into story_question(delivery_id, external_target_key, phase, question, status) values (?, ?, ?, ?, 'NEW')",
                 deliveryId, targetKey, phase, question,
             )
-        } catch (_: DuplicateKeyException) { /* dezelfde vraagfase is al afgehandeld of in behandeling */ }
-        return jdbc.query(
+        } catch (_: DuplicateKeyException) { /* hieronder bepalen we of de inhoud inmiddels is veranderd */ }
+        var record = jdbc.query(
             "select id, delivery_id, external_target_key, phase, question, status from story_question where delivery_id = ? and external_target_key = ? and phase = ?",
             { row, _ -> StoryQuestionRecord(row.getLong(1), row.getLong(2), row.getString(3), row.getString(4), row.getString(5), row.getString(6)) },
             deliveryId, targetKey, phase,
         ).single()
+        if (record.question != question || record.status == "ERROR") {
+            jdbc.update(
+                "update human_action set status = 'COMPLETED', completed_at = current_timestamp where question_id = ? and status = 'OPEN'",
+                record.id,
+            )
+            jdbc.update(
+                """update story_question set question = ?, status = 'NEW', answer = null, agent_run_id = null,
+                    error_message = null, created_at = current_timestamp, answered_at = null where id = ?""".trimIndent(),
+                question,
+                record.id,
+            )
+            record = jdbc.query(
+                "select id, delivery_id, external_target_key, phase, question, status from story_question where id = ?",
+                { row, _ -> StoryQuestionRecord(row.getLong(1), row.getLong(2), row.getString(3), row.getString(4), row.getString(5), row.getString(6)) },
+                record.id,
+            ).single()
+        }
+        return record
     }
 
     fun startQuestion(id: Long, runId: String): Boolean = jdbc.update(
@@ -307,21 +327,6 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
         )
         jdbc.update("update story_question set status = 'HUMAN_ACTION' where id = ?", questionId)
         jdbc.update("update story_delivery set status = 'WAITING_HUMAN' where id = ?", deliveryId)
-    }
-
-    fun registerSoftwareFactoryHumanAction(delivery: StoryDeliveryView, targetKey: String, reason: String) {
-        val title = "Handmatige Software Factory-actie voor $targetKey"
-        val exists = (jdbc.queryForObject(
-            "select count(*) from human_action where delivery_id = ? and title = ? and status = 'OPEN'",
-            Int::class.java, delivery.id, title,
-        ) ?: 0) > 0
-        if (!exists) {
-            jdbc.update(
-                "insert into human_action(product_slug, delivery_id, category, title, reason, instructions) values (?, ?, 'MANUAL_ACTION', ?, ?, ?)",
-                delivery.productSlug, delivery.id, title, reason, "Open ${delivery.externalStoryKey} in Software Factory en rond de handmatige subtaak af.",
-            )
-        }
-        jdbc.update("update story_delivery set status = 'WAITING_HUMAN' where id = ?", delivery.id)
     }
 
     fun closeSoftwareFactoryHumanActions(deliveryId: Long) {
@@ -415,9 +420,15 @@ class AutonomousQuestionResolver(
                     prompt = """
                         Je bent de autonome Product Owner voor ${fullProduct.name}. Beantwoord een uitvoeringsvraag
                         uitsluitend vanuit de productvisie, guardrails en de aangeleverde storycontext. Kies ANSWER
-                        wanneer je zelf een veilig, omkeerbaar productbesluit kunt nemen. Kies HUMAN_ACTION uitsluitend
-                        voor: account/toestemming, OAuth of API-key, betaalde keuze, juridische toestemming, DNS/secret,
-                        of een onomkeerbare handeling. Een normale product-, UX- of technische keuze is altijd ANSWER.
+                        voor iedere product-, UX-, technische, test-, juridische, betaalde, account-, DNS- of andere
+                        uitvoeringskeuze. Kies zelf een veilig, omkeerbaar alternatief waarmee de Software Factory
+                        zelfstandig verder kan. Claim nooit dat apparatuur, een account of een handeling beschikbaar
+                        of uitgevoerd is wanneer dat niet uit de context blijkt.
+
+                        Kies HUMAN_ACTION uitsluitend wanneer een concreet extern access token, API-key, OAuth-secret
+                        of vergelijkbaar credential werkelijk noodzakelijk is en niet door de agents kan worden gemaakt
+                        of vermeden. De categorie is dan ACCESS_TOKEN. Alle andere vragen zijn altijd ANSWER; vraag de
+                        eigenaar dus niet om handmatige tests, productbesluiten, accounts, betalingen of infrastructuurwerk.
 
                         MISSIE: ${fullProduct.mission}
                         GUARDRAILS: ${fullProduct.guardrails}
@@ -462,13 +473,13 @@ class AutonomousQuestionResolver(
     }
 
     companion object {
-        private val HUMAN_CATEGORIES = setOf("ACCOUNT", "OAUTH_API_KEY", "PAID", "LEGAL", "DNS_SECRET", "IRREVERSIBLE")
+        private val HUMAN_CATEGORIES = setOf("ACCESS_TOKEN")
         private val QUESTION_SCHEMA = """{
           "type":"object","additionalProperties":false,
           "required":["decision","answer","category","title","reason","instructions"],
           "properties":{
             "decision":{"enum":["ANSWER","HUMAN_ACTION"]},"answer":{"type":["string","null"]},
-            "category":{"type":["string","null"]},"title":{"type":["string","null"]},
+            "category":{"enum":["ACCESS_TOKEN",null]},"title":{"type":["string","null"]},
             "reason":{"type":"string"},"instructions":{"type":["string","null"]}
           }
         }"""
@@ -644,15 +655,9 @@ class AutonomousCoordinator(
         }
         val done = issue.path("status").asText().lowercase() in setOf("done", "finished", "closed") ||
             (detail.path("subtasks").size() > 0 && detail.path("subtasks").all { subtaskDone(it.path("fields").path("subtaskPhase").asText()) })
-        val status = when { hasError -> "ERROR"; done -> "DONE"; awaitingHuman != null -> "WAITING_HUMAN"; else -> "RUNNING" }
+        val status = when { hasError -> "ERROR"; done -> "DONE"; awaitingHuman != null -> "WAITING_FOR_ANSWER"; else -> "RUNNING" }
         deliveries.updateRemote(delivery.id, status, phase)
-        if (awaitingHuman != null) {
-            val targetKey = awaitingHuman.path("key").asText(delivery.externalStoryKey)
-            val reason = detail.path("agentQuestions").path(targetKey).asText().ifBlank { "Software Factory wacht op een handmatige actie." }
-            deliveries.registerSoftwareFactoryHumanAction(delivery, targetKey, reason)
-        } else {
-            deliveries.closeSoftwareFactoryHumanActions(delivery.id)
-        }
+        deliveries.closeSoftwareFactoryHumanActions(delivery.id)
         if (!hasError && !done) questionResolver.inspectAndResolve(delivery, detail)
     }
 
@@ -694,7 +699,7 @@ class AutonomousDeliveryController(
         humanActionService.complete(id, request.result)
 }
 
-private fun answerPhase(phase: String): String? = mapOf(
+internal fun answerPhase(phase: String): String? = mapOf(
     "refined-with-questions" to "questions-answered",
     "planned-with-questions" to "planning-questions-answered",
     "developed-with-questions" to "development-questions-answered",
@@ -702,6 +707,7 @@ private fun answerPhase(phase: String): String? = mapOf(
     "tested-with-questions" to "test-questions-answered",
     "summary-with-questions" to "summary-questions-answered",
     "documentation-with-questions" to "documentation-questions-answered",
+    "awaiting-human" to "manual-action-done",
 )[phase]
 
 internal fun databaseTimestamp(instant: Instant): Timestamp = Timestamp.from(instant)

@@ -55,6 +55,8 @@ class ShadowIterationEngineTest(
         engine.run(accepted.id)
         assertEquals("ACCEPTED", repository.require("hkh-autopilot", accepted.id).status)
         assertEquals(5, repository.steps("hkh-autopilot", accepted.id).size)
+        assertEquals(5, repository.artifacts("hkh-autopilot", accepted.id).size)
+        assertTrue(repository.artifacts("hkh-autopilot", accepted.id).any { it.artifactType == "product_owner" })
         assertEquals(1, workspace.artifacts.size)
         assertTrue(workspace.artifacts.single().content.contains("Rechtenindicatie"))
         assertTrue(workspace.artifacts.single().content.contains("run_id: ${accepted.id}"))
@@ -88,15 +90,22 @@ class ShadowIterationEngineTest(
         assertEquals(7, repository.steps("hkh-autopilot", selfCorrected.id).size)
         assertEquals(2, workspace.artifacts.size)
 
+        bridge.scenario = Scenario.AUTONOMY_REVISE_THEN_ACCEPT
+        val autonomousCorrection = repository.create("hkh-autopilot", "Verwijder handmatige afhankelijkheden", "autonomous")
+        engine.run(autonomousCorrection.id)
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", autonomousCorrection.id).status)
+        assertEquals(7, repository.steps("hkh-autopilot", autonomousCorrection.id).size)
+        assertEquals(3, workspace.artifacts.size)
+
         bridge.scenario = Scenario.WARNING_ONLY_REVISE
         val warningOnly = repository.create("hkh-autopilot", "Laat waarschuwingen de levering niet blokkeren")
         engine.run(warningOnly.id)
         assertEquals("ACCEPTED", repository.require("hkh-autopilot", warningOnly.id).status)
         assertEquals("ACCEPT", repository.require("hkh-autopilot", warningOnly.id).criticVerdict)
         assertEquals(5, repository.steps("hkh-autopilot", warningOnly.id).size)
-        assertEquals(3, workspace.artifacts.size)
+        assertEquals(4, workspace.artifacts.size)
 
-        assertEquals(10, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
+        assertEquals(12, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
         assertEquals(
             0,
             jdbc.queryForObject(
@@ -109,7 +118,7 @@ class ShadowIterationEngineTest(
         )
     }
 
-    enum class Scenario { ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE }
+    enum class Scenario { ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE }
 
     class FakeShadowAgentBridge : ShadowAgentBridge {
         var scenario = Scenario.ACCEPT
@@ -146,6 +155,8 @@ class ShadowIterationEngineTest(
                       "title":"${when {
                           different -> "Brede erfgoedportal"
                           scenario == Scenario.REVISE_THEN_ACCEPT -> "Herziene bronnenkaart voor één locatie"
+                          scenario == Scenario.AUTONOMY_REVISE_THEN_ACCEPT && firstAttempt -> "Handmatig geteste bronnenkaart"
+                          scenario == Scenario.AUTONOMY_REVISE_THEN_ACCEPT -> "Automatisch geteste bronnenkaart"
                           scenario == Scenario.WARNING_ONLY_REVISE -> "Toegankelijke bronnenkaart met waarschuwing"
                           else -> "Bronnenkaart voor één locatie"
                       }}",
@@ -155,7 +166,11 @@ class ShadowIterationEngineTest(
                           scenario == Scenario.WARNING_ONLY_REVISE -> "Toon één historische locatie en bewaar een niet-blokkerende toegankelijkheidswaarschuwing."
                           else -> "Toon voor één historische locatie een verhaal met herleidbare bron- en rechteninformatie."
                       }}",
-                      "acceptanceCriteria":["De gebruiker ziet de bron-URL", "De rechtenindicatie staat naast de bron"],
+                      "acceptanceCriteria":[${if (scenario == Scenario.AUTONOMY_REVISE_THEN_ACCEPT && firstAttempt) {
+                          "\"Een handmatige toets met VoiceOver wordt door de eigenaar uitgevoerd\", \"De rechtenindicatie staat naast de bron\""
+                      } else {
+                          "\"De gebruiker ziet de bron-URL\", \"De rechtenindicatie staat naast de bron\""
+                      }}],
                       "sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Bronrechten kunnen per object verschillen"]
                     }]
                 }"""
