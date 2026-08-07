@@ -31,7 +31,7 @@ spec:
   host: product-factory-api.vdzonsoftware.nl
   to: {kind: Service, name: dashboard-backend}
   port: {targetPort: 8081}
-  tls: {termination: edge, insecureEdgeTerminationPolicy: Redirect}
+  tls: {termination: edge, insecureEdgeTerminationPolicy: Allow}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -63,4 +63,4 @@ spec:
   host: product-factory.vdzonsoftware.nl
   to: {kind: Service, name: dashboard-frontend}
   port: {targetPort: 8080}
-  tls: {termination: edge, insecureEdgeTerminationPolicy: Redirect}
+  tls: {termination: edge, insecureEdgeTerminationPolicy: Allow}
