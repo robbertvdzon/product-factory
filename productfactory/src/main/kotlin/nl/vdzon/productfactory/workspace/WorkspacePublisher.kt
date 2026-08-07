@@ -23,6 +23,12 @@ internal fun gitAuthorizationHeader(token: String): String {
     return "Authorization: Basic $credentials"
 }
 
+internal fun workspaceGitCommand(directory: Path, vararg args: String): List<String> = listOf(
+    "git",
+    "-c",
+    "safe.directory=${directory.toAbsolutePath().normalize()}",
+) + args
+
 class WorkspaceRepositoryGuard(private val configuredRepository: String) {
     fun requireWorkspaceRepository(candidate: String) {
         val canonical = candidate.removeSuffix("/").removeSuffix(".git")
@@ -75,7 +81,7 @@ class WorkspacePublisher(
         var status = "COMMITTED_LOCAL"
         if (remotePublication) {
             require(workspaceToken.isNotBlank()) { "PF_WORKSPACE_GITHUB_TOKEN ontbreekt" }
-            command(root, listOf("git", "push", "--force-with-lease", "-u", "origin", branch), true)
+            command(root, workspaceGitCommand(root, "push", "--force-with-lease", "-u", "origin", branch), true)
             pullRequest = createPullRequest(branch, artifact.runId)
             status = "PULL_REQUEST"
         }
@@ -138,7 +144,7 @@ class WorkspacePublisher(
     }
 
     private fun readOriginOrConfigured(): String = runCatching { git(Path.of(workspacePath), "remote", "get-url", "origin").trim() }.getOrDefault(repository)
-    private fun git(directory: Path, vararg args: String) = command(directory, listOf("git") + args)
+    private fun git(directory: Path, vararg args: String) = command(directory, workspaceGitCommand(directory, *args))
     private fun command(directory: Path, args: List<String>, tokenRequired: Boolean = false): String {
         val process = ProcessBuilder(args).directory(directory.toFile()).redirectErrorStream(true)
         process.environment().remove("GH_TOKEN")
