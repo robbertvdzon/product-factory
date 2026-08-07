@@ -28,6 +28,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.ZoneId
+import java.sql.Timestamp
 
 data class StoryDeliveryView(
     val id: Long,
@@ -213,7 +214,9 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
     ) ?: 0
     fun deliveredToday(productSlug: String, date: LocalDate, zone: ZoneId): Int = jdbc.queryForObject(
         "select count(*) from story_delivery where product_slug = ? and delivered_at >= ? and delivered_at < ?",
-        Int::class.java, productSlug, date.atStartOfDay(zone).toInstant(), date.plusDays(1).atStartOfDay(zone).toInstant(),
+        Int::class.java, productSlug,
+        databaseTimestamp(date.atStartOfDay(zone).toInstant()),
+        databaseTimestamp(date.plusDays(1).atStartOfDay(zone).toInstant()),
     ) ?: 0
     fun workspaceRunsToRefresh(productSlug: String): List<String> = jdbc.queryForList(
         """select distinct i.workspace_run_id from shadow_iteration i join workspace_publication w on w.run_id = i.workspace_run_id
@@ -222,7 +225,9 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
     )
     fun autonomousIterationToday(productSlug: String, date: LocalDate, zone: ZoneId): Boolean = (jdbc.queryForObject(
         "select count(*) from shadow_iteration where product_slug = ? and mode = 'autonomous' and created_at >= ? and created_at < ?",
-        Int::class.java, productSlug, date.atStartOfDay(zone).toInstant(), date.plusDays(1).atStartOfDay(zone).toInstant(),
+        Int::class.java, productSlug,
+        databaseTimestamp(date.atStartOfDay(zone).toInstant()),
+        databaseTimestamp(date.plusDays(1).atStartOfDay(zone).toInstant()),
     ) ?: 0) > 0
     fun openHumanActions(productSlug: String): Int = jdbc.queryForObject(
         "select count(*) from human_action where product_slug = ? and status = 'OPEN'", Int::class.java, productSlug,
@@ -693,3 +698,5 @@ private fun answerPhase(phase: String): String? = mapOf(
     "summary-with-questions" to "summary-questions-answered",
     "documentation-with-questions" to "documentation-questions-answered",
 )[phase]
+
+internal fun databaseTimestamp(instant: Instant): Timestamp = Timestamp.from(instant)
