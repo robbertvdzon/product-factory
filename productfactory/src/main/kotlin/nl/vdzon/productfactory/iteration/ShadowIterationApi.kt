@@ -165,6 +165,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
 
     fun completeStep(iterationId: String, role: String, attempt: Int, outputJson: String) {
         require(outputJson.length <= MAX_AGENT_OUTPUT_CHARS) { "Agentoutput is te groot" }
+        val artifactType = role.lowercase() + if (attempt == 1) "" else "-$attempt"
         jdbc.update(
             "update shadow_iteration_step set status = 'COMPLETED', output_json = ?, completed_at = current_timestamp where iteration_id = ? and role = ? and attempt = ?",
             outputJson,
@@ -174,7 +175,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         )
         jdbc.update(
             "insert into shadow_iteration_artifact(iteration_id, product_slug, artifact_type, content_json) select id, product_slug, ?, ? from shadow_iteration where id = ?",
-            role.lowercase(),
+            artifactType,
             outputJson,
             iterationId,
         )
