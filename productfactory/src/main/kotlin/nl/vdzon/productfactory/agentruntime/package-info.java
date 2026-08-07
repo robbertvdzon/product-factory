@@ -1,2 +1,2 @@
-@org.springframework.modulith.ApplicationModule(allowedDependencies = {})
+@org.springframework.modulith.ApplicationModule(allowedDependencies = {"contracts", "product :: api"})
 package nl.vdzon.productfactory.agentruntime;

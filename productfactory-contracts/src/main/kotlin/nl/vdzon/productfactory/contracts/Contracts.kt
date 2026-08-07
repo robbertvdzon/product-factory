@@ -41,6 +41,16 @@ data class AgentTaskStatus(
     val updatedAt: Instant = Instant.now(),
 )
 
+data class AgentRunView(
+    val runId: String,
+    val productSlug: String,
+    val taskType: String,
+    val status: String,
+    val resultReference: String?,
+    val startedAt: Instant,
+    val completedAt: Instant?,
+)
+
 data class AgentWorkerStatus(
     val connected: Boolean,
     val workerId: String? = null,
@@ -50,8 +60,47 @@ data class AgentWorkerStatus(
     val activeRuns: Int = 0,
 )
 
-data class ProductView(val slug: String, val name: String, val mission: String, val guardrails: String, val createdAt: Instant)
+data class ProductView(
+    val id: String,
+    val slug: String,
+    val name: String,
+    val mission: String,
+    val description: String,
+    val guardrails: String,
+    val softwareFactoryProjectKey: String,
+    val targetRepositoryName: String,
+    val workspaceDirectory: String,
+    val allowedWritePaths: List<String>,
+    val workspaceOwnership: String,
+    val liveUrl: String?,
+    val previewUrlPattern: String?,
+    val status: String,
+    val developmentMode: String,
+    val iterationSchedule: String,
+    val timezone: String,
+    val maxStoriesPerCycle: Int,
+    val wipLimit: Int,
+    val aiProvider: String,
+    val aiModel: String,
+    val dailyBudgetCents: Int,
+    val monthlyBudgetCents: Int,
+    val escalationPolicy: String,
+    val sourceRules: String,
+    val privacyRules: String,
+    val accessibilityRules: String,
+    val qualityRules: String,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
 data class StoryCandidateView(val id: Long, val productSlug: String, val title: String, val description: String, val status: String, val createdAt: Instant)
+data class ProductRecordView(
+    val id: Long,
+    val productSlug: String,
+    val title: String,
+    val content: String,
+    val sourceUrl: String? = null,
+    val createdAt: Instant,
+)
 data class WorkspacePublicationView(
     val runId: String,
     val productSlug: String,

@@ -847,6 +847,22 @@ Elk product bevat minimaal:
 - Product Factory kan voor `hkh` geen story publiceren zolang de ontwikkelmodus niet `autonomous`
   is.
 
+### Status fase 5 — afgerond op 7 augustus 2026
+
+- Flyway beheert een generieke productdefinitie met stabiele ID, planning, budgetten, regels,
+  repositorykoppeling, ontwikkelmodus en workspacebeleid; onderzoek, geheugen en beslissingen zijn
+  afzonderlijke productgebonden tabellen;
+- `hkh` en `hkh-autopilot` zijn uitsluitend initiële data: dezelfde API kan zonder codewijziging
+  volgende producten registreren;
+- iedere query voor runs, kennis, storykandidaten en workspace-publicaties vereist expliciet een
+  productcontext; integratietests met `castle-guide` en `archive-explorer` bewaken isolatie;
+- de centrale productpolicy blokkeert een gepauzeerd product, story-publicatie buiten
+  `autonomous`, workspace-publicatie bij eigenaarschap `owner` en ieder pad buiten de allowlist;
+- het dashboard toont de belangrijkste instellingen, kan generieke producten toevoegen en kan
+  ieder product onafhankelijk pauzeren of hervatten;
+- [docs/product-template.md](product-template.md) beschrijft het volledige contract en de veilige
+  ingebruikname van een volgend product.
+
 ## 11. Fase 6 — productonderzoek en UX in shadow mode
 
 ### Doel
