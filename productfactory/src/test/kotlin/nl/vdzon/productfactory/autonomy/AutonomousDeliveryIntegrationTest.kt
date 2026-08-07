@@ -100,6 +100,17 @@ class AutonomousDeliveryIntegrationTest(
         assertEquals("NEW", changedQuestion.status)
         assertEquals("Kunnen twee externe testomgevingen beschikbaar worden gesteld?", changedQuestion.question)
         assertEquals(1, jdbc.queryForObject("select count(*) from story_question where id = ? and answer is null", Int::class.java, changedQuestion.id))
+
+        repository.startQuestion(changedQuestion.id, "question-stalled")
+        val recoveredQuestion = repository.registerQuestion(
+            delivery.id,
+            "SF-RECOVERY-TEST",
+            "tested-with-questions",
+            "Kunnen twee externe testomgevingen beschikbaar worden gesteld?",
+        )
+        assertEquals(changedQuestion.id, recoveredQuestion.id)
+        assertEquals("NEW", recoveredQuestion.status)
+        assertEquals(1, jdbc.queryForObject("select count(*) from story_question where id = ? and agent_run_id is null", Int::class.java, recoveredQuestion.id))
         assertEquals("manual-action-done", answerPhase("awaiting-human"))
     }
 
