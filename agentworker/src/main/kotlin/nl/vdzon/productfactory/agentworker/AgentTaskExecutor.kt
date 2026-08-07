@@ -35,6 +35,7 @@ class ProcessAgentCommandRunner : AgentCommandRunner {
                 environment().putAll(safe)
             }
             .start()
+        process.outputStream.close()
         val output = StringBuilder()
         val reader = Thread({
             process.inputStream.bufferedReader().useLines { lines ->
