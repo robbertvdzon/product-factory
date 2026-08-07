@@ -3,6 +3,8 @@ package nl.vdzon.productfactory.autonomy
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.beans.factory.annotation.Autowired
@@ -19,6 +21,15 @@ class AutonomousDeliveryIntegrationTest(
     @Autowired private val service: AutonomousDeliveryService,
     @Autowired private val fake: FakeSoftwareFactory,
 ) {
+    @Test
+    fun `null and missing remote errors are not treated as failures`() {
+        val mapper = jacksonObjectMapper()
+        assertFalse(mapper.readTree("null").hasNonBlankTextValue())
+        assertFalse(mapper.createObjectNode().path("error").hasNonBlankTextValue())
+        assertFalse(mapper.readTree("\"   \"").hasNonBlankTextValue())
+        assertTrue(mapper.readTree("\"deploy failed\"").hasNonBlankTextValue())
+    }
+
     @Test
     fun `accepted candidate with merged workspace becomes one real start-next story`() {
         jdbc.update(
