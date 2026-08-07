@@ -211,6 +211,9 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
     }
 
     fun active(productSlug: String): List<StoryDeliveryView> = list(productSlug).filter { it.status in ACTIVE_STATUSES }
+    fun toReconcile(productSlug: String): List<StoryDeliveryView> = list(productSlug).filter {
+        it.externalStoryKey != null && (it.status in ACTIVE_STATUSES || it.status == "ERROR")
+    }
     fun errors(productSlug: String): Int = jdbc.queryForObject(
         "select count(*) from story_delivery where product_slug = ? and status = 'ERROR'", Int::class.java, productSlug,
     ) ?: 0
@@ -606,7 +609,7 @@ class AutonomousCoordinator(
     }
 
     fun reconcile(product: ProductView) {
-        deliveries.active(product.slug).filter { it.externalStoryKey != null }.forEach { delivery ->
+        deliveries.toReconcile(product.slug).forEach { delivery ->
             runCatching { reconcileStory(delivery) }.onFailure {
                 deliveries.recordReconcileError(delivery.id, it.message ?: it.javaClass.simpleName)
             }

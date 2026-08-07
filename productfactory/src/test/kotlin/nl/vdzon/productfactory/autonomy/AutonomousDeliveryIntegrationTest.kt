@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Import
 class AutonomousDeliveryIntegrationTest(
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val service: AutonomousDeliveryService,
+    @Autowired private val repository: AutonomousDeliveryRepository,
     @Autowired private val fake: FakeSoftwareFactory,
 ) {
     @Test
@@ -56,6 +57,35 @@ class AutonomousDeliveryIntegrationTest(
         assertEquals("start-next", fake.requests.single().first.deliveryMode)
         assertEquals("SF-4242", jdbc.queryForObject("select external_story_key from story_delivery where candidate_id = ?", String::class.java, candidateId))
         assertEquals("PUBLISHED", jdbc.queryForObject("select status from story_candidate where id = ?", String::class.java, candidateId))
+    }
+
+    @Test
+    fun `delivery with a remote story remains eligible for reconciliation after an error`() {
+        jdbc.update(
+            """insert into shadow_iteration(id, product_slug, sequence_number, focus, mode, status, workspace_run_id)
+                values ('auto-test-recovery', 'hkh-autopilot', 992, 'test recovery', 'autonomous', 'ACCEPTED', 'auto-test-recovery')""".trimIndent(),
+        )
+        jdbc.update(
+            """insert into workspace_publication(run_id, product_slug, artifact_path, content_hash, status, commit_sha)
+                values ('auto-test-recovery', 'hkh-autopilot', 'research/auto-test-recovery.md', 'recovery-hash', 'MERGED', 'fedcba7654321')""".trimIndent(),
+        )
+        jdbc.update(
+            """insert into story_candidate(product_slug, title, description, status, iteration_id, fingerprint,
+                acceptance_criteria, critic_status, critic_reason)
+                values ('hkh-autopilot', 'Herstel synchronisatie', 'Controleer een mislukte synchronisatie opnieuw.', 'INTERNAL',
+                'auto-test-recovery', 'fingerprint-auto-test-recovery', '- status herstelt', 'ACCEPT', 'Testbaar')""".trimIndent(),
+        )
+        val candidateId = jdbc.queryForObject(
+            "select id from story_candidate where fingerprint = 'fingerprint-auto-test-recovery'",
+            Long::class.java,
+        )!!
+        val candidate = repository.eligible("hkh-autopilot", candidateId)!!
+        val delivery = repository.reserve(candidate)!!
+        repository.markDelivered(delivery.id, candidateId, "SF-RECOVERY")
+        repository.markDeliveryError(delivery.id, "tijdelijke fout")
+
+        assertTrue(repository.toReconcile("hkh-autopilot").any { it.id == delivery.id })
+        assertFalse(repository.active("hkh-autopilot").any { it.id == delivery.id })
     }
 
     @TestConfiguration
