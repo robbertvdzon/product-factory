@@ -55,7 +55,8 @@ spec:
                   pg_dump --format=custom --compress=6 --file="${temporary}"
                   pg_restore --list "${temporary}" >/dev/null
                   mv "${temporary}" "${final}"
-                  sha256sum "${final}" > "${final}.sha256"
+                  cd /backups
+                  sha256sum "${filename}" > "${filename}.sha256"
                   find /backups -type f \( -name 'product-factory-*.dump' -o -name 'product-factory-*.dump.sha256' \) -mtime +30 -delete
               env:
                 - {name: PGHOST, value: postgres}
