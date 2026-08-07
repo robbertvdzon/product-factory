@@ -2,6 +2,8 @@ package nl.vdzon.productfactory.workspace
 
 import nl.vdzon.productfactory.contracts.WorkspacePublicationView
 import nl.vdzon.productfactory.product.api.ProductCatalog
+import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
+import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
@@ -40,13 +42,13 @@ class WorkspacePublisher(
     @Value("\${product-factory.workspace.main-branch:main}") private val mainBranch: String,
     @Value("\${product-factory.workspace.remote-publication:false}") private val remotePublication: Boolean,
     @Value("\${PF_WORKSPACE_GITHUB_TOKEN:}") private val workspaceToken: String,
-) {
-    fun publish(request: PublishArtifactRequest): WorkspacePublicationView {
-        validate(request)
-        val product = products.requireWorkspacePublication(request.productSlug, request.relativePath)
-        val hash = sha256(request.content)
-        findByRunId(request.runId)?.let { existing ->
-            if (existing.contentHash != hash || existing.productSlug != request.productSlug || existing.artifactPath != request.relativePath) {
+) : WorkspacePublicationPort {
+    override fun publish(artifact: WorkspaceArtifact): WorkspacePublicationView {
+        validate(artifact)
+        val product = products.requireWorkspacePublication(artifact.productSlug, artifact.relativePath)
+        val hash = sha256(artifact.content)
+        findByRunId(artifact.runId)?.let { existing ->
+            if (existing.contentHash != hash || existing.productSlug != artifact.productSlug || existing.artifactPath != artifact.relativePath) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Run-ID is al voor andere inhoud gebruikt")
             }
             return existing
@@ -56,29 +58,29 @@ class WorkspacePublisher(
         val root = Path.of(workspacePath).toAbsolutePath().normalize()
         require(Files.isDirectory(root.resolve(".git"))) { "PF_WORKSPACE_PATH moet een Git-checkout zijn" }
         val productDirectory = root.resolve(product.workspaceDirectory).normalize()
-        require(productDirectory == root.resolve("products").resolve(request.productSlug).normalize()) { "Ongeldige productdirectory" }
-        val artifact = productDirectory.resolve(request.relativePath).normalize()
-        require(artifact.startsWith(productDirectory)) { "Artefactpad verlaat productdirectory" }
+        require(productDirectory == root.resolve("products").resolve(artifact.productSlug).normalize()) { "Ongeldige productdirectory" }
+        val artifactPath = productDirectory.resolve(artifact.relativePath).normalize()
+        require(artifactPath.startsWith(productDirectory)) { "Artefactpad verlaat productdirectory" }
 
         git(root, "checkout", mainBranch)
         if (remotePublication) git(root, "pull", "--ff-only", "origin", mainBranch)
-        val branch = "product-factory/${request.productSlug}/${safe(request.runId)}"
+        val branch = "product-factory/${artifact.productSlug}/${safe(artifact.runId)}"
         git(root, "checkout", "-B", branch, mainBranch)
-        Files.createDirectories(artifact.parent)
-        Files.writeString(artifact, request.content)
-        git(root, "add", root.relativize(artifact).toString())
-        git(root, "-c", "user.name=Product Factory", "-c", "user.email=product-factory@vdzonsoftware.nl", "commit", "-m", "product(${request.productSlug}): publish ${request.runId}")
+        Files.createDirectories(artifactPath.parent)
+        Files.writeString(artifactPath, artifact.content)
+        git(root, "add", root.relativize(artifactPath).toString())
+        git(root, "-c", "user.name=Product Factory", "-c", "user.email=product-factory@vdzonsoftware.nl", "commit", "-m", "product(${artifact.productSlug}): publish ${artifact.runId}")
         val commitSha = git(root, "rev-parse", "HEAD").trim()
         var pullRequest: String? = null
         var status = "COMMITTED_LOCAL"
         if (remotePublication) {
             require(workspaceToken.isNotBlank()) { "PF_WORKSPACE_GITHUB_TOKEN ontbreekt" }
             command(root, listOf("git", "push", "--force-with-lease", "-u", "origin", branch), true)
-            pullRequest = createPullRequest(branch, request.runId)
+            pullRequest = createPullRequest(branch, artifact.runId)
             status = "PULL_REQUEST"
         }
-        jdbc.update("insert into workspace_publication(run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha) values (?, ?, ?, ?, ?, ?, ?)", request.runId, request.productSlug, request.relativePath, hash, status, pullRequest, commitSha)
-        return find(request.productSlug, request.runId)!!
+        jdbc.update("insert into workspace_publication(run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha) values (?, ?, ?, ?, ?, ?, ?)", artifact.runId, artifact.productSlug, artifact.relativePath, hash, status, pullRequest, commitSha)
+        return find(artifact.productSlug, artifact.runId)!!
     }
 
     fun find(productSlug: String, runId: String): WorkspacePublicationView? = jdbc.query(
@@ -112,7 +114,7 @@ class WorkspacePublisher(
         return Files.readString(path)
     }
 
-    private fun validate(request: PublishArtifactRequest) {
+    private fun validate(request: WorkspaceArtifact) {
         require(request.runId.matches(Regex("[A-Za-z0-9._-]{1,120}"))) { "Ongeldig run-ID" }
         require(request.productSlug.matches(Regex("[a-z0-9]+(?:-[a-z0-9]+)*"))) { "Ongeldige productslug" }
         require(request.relativePath.endsWith(".md") && !Path.of(request.relativePath).isAbsolute) { "Alleen relatieve Markdown-artefacten zijn toegestaan" }
@@ -158,7 +160,9 @@ class WorkspacePublisher(
 @RestController
 @RequestMapping("/api/workspace/publications")
 class WorkspacePublicationController(private val publisher: WorkspacePublisher) {
-    @PostMapping @ResponseStatus(HttpStatus.CREATED) fun publish(@RequestBody request: PublishArtifactRequest) = publisher.publish(request)
+    @PostMapping @ResponseStatus(HttpStatus.CREATED) fun publish(@RequestBody request: PublishArtifactRequest) = publisher.publish(
+        WorkspaceArtifact(request.runId, request.productSlug, request.relativePath, request.content),
+    )
     @GetMapping fun list(@RequestParam productSlug: String) = publisher.list(productSlug)
     @GetMapping("/{runId}") fun get(@PathVariable runId: String, @RequestParam productSlug: String) =
         publisher.find(productSlug, runId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)

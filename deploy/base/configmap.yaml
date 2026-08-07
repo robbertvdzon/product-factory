@@ -7,6 +7,8 @@ data:
   PF_DB_URL: jdbc:postgresql://postgres:5432/productfactory
   PF_DB_USERNAME: productfactory
   PF_RUNTIME_BASE_URL: http://runtime:8080
+  PF_AGENT_BRIDGE_BASE_URL: http://dashboard-backend:8081
+  PF_AGENT_BRIDGE_POLL_INTERVAL: PT2S
   PF_WORKSPACE_PATH: /workspace
   PF_WORKSPACE_REPOSITORY: https://github.com/robbertvdzon/product-factory-workspace.git
   PF_WORKSPACE_MAIN_BRANCH: main

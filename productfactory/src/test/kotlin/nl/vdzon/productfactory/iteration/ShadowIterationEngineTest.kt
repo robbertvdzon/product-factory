@@ -1,0 +1,156 @@
+package nl.vdzon.productfactory.iteration
+
+import nl.vdzon.productfactory.contracts.AgentResult
+import nl.vdzon.productfactory.contracts.AgentTask
+import nl.vdzon.productfactory.contracts.WorkspacePublicationView
+import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
+import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
+import java.security.MessageDigest
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+@SpringBootTest
+@Import(ShadowIterationEngineTest.Fakes::class)
+class ShadowIterationEngineTest(
+    @Autowired private val repository: ShadowIterationRepository,
+    @Autowired private val engine: ShadowIterationEngine,
+    @Autowired private val bridge: FakeShadowAgentBridge,
+    @Autowired private val workspace: FakeWorkspacePublicationPort,
+    @Autowired private val jdbc: JdbcTemplate,
+) {
+    @Test
+    fun `critic accepts rejects and returns complete isolated shadow iterations`() {
+        bridge.scenario = Scenario.ACCEPT
+        val accepted = repository.create("hkh-autopilot", "Vind de beste eerste bronervaring")
+        engine.run(accepted.id)
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", accepted.id).status)
+        assertEquals(5, repository.steps("hkh-autopilot", accepted.id).size)
+        assertEquals(1, workspace.artifacts.size)
+        assertTrue(workspace.artifacts.single().content.contains("Rechtenindicatie"))
+        assertTrue(workspace.artifacts.single().content.contains("run_id: ${accepted.id}"))
+
+        bridge.scenario = Scenario.DUPLICATE
+        val duplicate = repository.create("hkh-autopilot", "Controleer een mogelijk dubbel voorstel")
+        engine.run(duplicate.id)
+        assertEquals("REJECTED", repository.require("hkh-autopilot", duplicate.id).status)
+        assertEquals(1, workspace.artifacts.size)
+        assertEquals(
+            1,
+            jdbc.queryForObject(
+                "select count(*) from story_candidate where iteration_id = ? and status = 'DUPLICATE' and duplicate_of_id is not null",
+                Int::class.java,
+                duplicate.id,
+            ),
+        )
+
+        bridge.scenario = Scenario.REVISE
+        val revision = repository.create("hkh-autopilot", "Laat de criticus een te breed voorstel terugsturen")
+        engine.run(revision.id)
+        assertEquals("NEEDS_REVISION", repository.require("hkh-autopilot", revision.id).status)
+        assertEquals("REVISE", repository.require("hkh-autopilot", revision.id).criticVerdict)
+        assertEquals(1, workspace.artifacts.size)
+
+        assertEquals(6, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
+        assertEquals(
+            0,
+            jdbc.queryForObject(
+                "select count(*) from story_candidate where iteration_id in (?, ?, ?) and status = 'PUBLISHED'",
+                Int::class.java,
+                accepted.id,
+                duplicate.id,
+                revision.id,
+            ),
+        )
+    }
+
+    enum class Scenario { ACCEPT, DUPLICATE, REVISE }
+
+    class FakeShadowAgentBridge : ShadowAgentBridge {
+        var scenario = Scenario.ACCEPT
+        override fun execute(task: AgentTask): AgentResult {
+            val today = LocalDate.now(ZoneId.of("Europe/Amsterdam"))
+            val different = scenario == Scenario.REVISE
+            val json = when (task.taskType.removePrefix("shadow-")) {
+                "researcher" -> """{
+                    "summary":"Open erfgoedbronnen kunnen een controleerbare eerste zoekervaring ondersteunen.",
+                    "findings":[{"title":"Open collecties","finding":"Noord-Hollands Archief en Rijksmuseum bieden publiek beschreven collecties met herleidbare objectpagina's.","sourceUrls":["https://noord-hollandsarchief.nl/","https://www.rijksmuseum.nl/nl/rijksstudio"]}],
+                    "sources":[
+                      {"url":"https://noord-hollandsarchief.nl/","consultedOn":"$today","rightsIndication":"Rechten verschillen per object en moeten op de objectpagina worden gecontroleerd.","rationale":"Regionale bron voor Noord-Hollandse archiefcollecties."},
+                      {"url":"https://www.rijksmuseum.nl/nl/rijksstudio","consultedOn":"$today","rightsIndication":"Beschikbaarheid en rechten staan per object vermeld.","rationale":"Voorbeeld van een doorzoekbare Nederlandse erfgoedcollectie."}
+                    ]
+                }"""
+                "product_owner" -> """{
+                    "productDirection":"Begin met een brontransparante verkenning van historische locaties.",
+                    "rationale":"Een kleine bronervaring toetst vertrouwen voordat beeldherkenning of reconstructie wordt gebouwd.",
+                    "priorities":["Herleidbare bron", "Eenvoudige locatieflow"],
+                    "decisions":[{"decision":"Toon broncontext bij ieder resultaat","rationale":"Dit ondersteunt betrouwbaarheid en vervolgonderzoek.","sourceUrls":["https://noord-hollandsarchief.nl/"]}],
+                    "rejectedOptions":["Direct een volledige 3D-reconstructie bouwen"]
+                }"""
+                "ux_designer" -> """{
+                    "flowName":"Bronnenkaart","userGoal":"Een bewoner ontdekt vanuit een locatie een controleerbaar historisch verhaal.",
+                    "steps":["Kies een locatie", "Bekijk een korte samenvatting", "Open bron en rechteninformatie"],
+                    "wireframe":"[Locatie]\n  [Verhaal]\n  [Bronnen en rechten]",
+                    "hypotheses":["Bronvermelding naast het verhaal vergroot vertrouwen."],
+                    "accessibility":["Alle onderdelen zijn met toetsenbord bereikbaar."],
+                    "privacyConsiderations":["De flow vereist geen locatiehistorie of gebruikersprofiel."]
+                }"""
+                "story_writer" -> """{
+                    "candidates":[{
+                      "title":"${if (different) "Brede erfgoedportal" else "Bronnenkaart voor één locatie"}",
+                      "description":"${if (different) "Bouw in één keer zoeken, kaarten, tijdlijnen, beeldherkenning en reconstructies voor alle bronnen." else "Toon voor één historische locatie een verhaal met herleidbare bron- en rechteninformatie."}",
+                      "acceptanceCriteria":["De gebruiker ziet de bron-URL", "De rechtenindicatie staat naast de bron"],
+                      "sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Bronrechten kunnen per object verschillen"]
+                    }]
+                }"""
+                "critic" -> if (scenario == Scenario.REVISE) """{
+                    "overallVerdict":"REVISE","summary":"Het voorstel is te breed voor één toetsbare iteratie.",
+                    "issues":[{"severity":"BLOCKING","category":"SCOPE","description":"De kandidaat combineert vijf zelfstandige productrisico's.","candidateIndex":0}],
+                    "candidateReviews":[{"candidateIndex":0,"verdict":"REVISE","reason":"Beperk tot één brontransparante locatieflow."}],
+                    "requiredChanges":["Splits het voorstel in één kleine locatieflow."]
+                }""" else """{
+                    "overallVerdict":"ACCEPT","summary":"De richting is klein, herleidbaar en behandelt rechten, privacy en toegankelijkheid.",
+                    "issues":[{"severity":"INFO","category":"RIGHTS","description":"Controleer rechten later ook per geïmporteerd object.","candidateIndex":0}],
+                    "candidateReviews":[{"candidateIndex":0,"verdict":"ACCEPT","reason":"Kleine toetsbare scope met expliciete broninformatie."}],
+                    "requiredChanges":[]
+                }"""
+                else -> error("Onbekende testrol ${task.taskType}")
+            }
+            return AgentResult(task.runId, "COMPLETED", json)
+        }
+    }
+
+    class FakeWorkspacePublicationPort : WorkspacePublicationPort {
+        val artifacts = mutableListOf<WorkspaceArtifact>()
+        override fun publish(artifact: WorkspaceArtifact): WorkspacePublicationView {
+            artifacts += artifact
+            return WorkspacePublicationView(
+                artifact.runId,
+                artifact.productSlug,
+                artifact.relativePath,
+                sha256(artifact.content),
+                "COMMITTED_LOCAL",
+                null,
+                "test-commit-${artifacts.size}",
+            )
+        }
+
+        private fun sha256(value: String) = MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
+    }
+
+    @TestConfiguration
+    class Fakes {
+        @Bean @Primary fun fakeAgentBridge() = FakeShadowAgentBridge()
+        @Bean @Primary fun fakeWorkspacePublicationPort() = FakeWorkspacePublicationPort()
+    }
+}

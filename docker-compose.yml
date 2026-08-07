@@ -23,6 +23,8 @@ services:
       PF_WORKSPACE_PATH: /workspace
       PF_WORKSPACE_REPOSITORY: ${PF_WORKSPACE_REPOSITORY:-git@github.com:robbertvdzon/product-factory-workspace.git}
       PF_WORKSPACE_REMOTE_PUBLICATION: "false"
+      PF_AGENT_BRIDGE_BASE_URL: http://dashboard-backend:8081
+      PF_AGENT_WORKER_TOKEN: ${PF_AGENT_WORKER_TOKEN:?PF_AGENT_WORKER_TOKEN is required}
     volumes:
       - ../product-factory-workspace:/workspace
     ports: ["8080:8080"]

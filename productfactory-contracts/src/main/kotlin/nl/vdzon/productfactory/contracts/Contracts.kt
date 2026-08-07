@@ -9,6 +9,7 @@ data class AgentTask(
     val prompt: String,
     val timeoutSeconds: Long = 900,
     val model: String? = null,
+    val responseSchema: String? = null,
 )
 
 data class AgentResult(
@@ -100,6 +101,34 @@ data class ProductRecordView(
     val content: String,
     val sourceUrl: String? = null,
     val createdAt: Instant,
+)
+
+data class ShadowIterationView(
+    val id: String,
+    val productSlug: String,
+    val sequenceNumber: Int,
+    val focus: String,
+    val status: String,
+    val currentRole: String?,
+    val criticVerdict: String?,
+    val candidateCount: Int,
+    val workspaceRunId: String?,
+    val workspacePullRequestUrl: String?,
+    val workspaceCommitSha: String?,
+    val errorMessage: String?,
+    val createdAt: Instant,
+    val startedAt: Instant?,
+    val completedAt: Instant?,
+)
+
+data class ShadowIterationStepView(
+    val role: String,
+    val attempt: Int,
+    val runId: String,
+    val status: String,
+    val errorMessage: String?,
+    val startedAt: Instant,
+    val completedAt: Instant?,
 )
 data class WorkspacePublicationView(
     val runId: String,

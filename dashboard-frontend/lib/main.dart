@@ -199,8 +199,12 @@ class _OverviewPageState extends State<OverviewPage> {
     _reload();
   }
 
-  void _reload() =>
-      data = Future.wait([api.products(), api.stories(), api.publications()]);
+  void _reload() => data = Future.wait([
+    api.products(),
+    api.stories(),
+    api.publications(),
+    api.shadowIterations(),
+  ]);
   Future<void> _changeStatus(String slug, String action) async {
     await api.changeProductStatus(slug, action);
     if (mounted) setState(_reload);
@@ -214,6 +218,24 @@ class _OverviewPageState extends State<OverviewPage> {
     if (created == null) return;
     await api.createProduct(created);
     if (mounted) setState(_reload);
+  }
+
+  Future<void> _startShadowIteration(String slug) async {
+    try {
+      await api.startShadowIteration(slug);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Shadow-iteratie voor $slug is gestart.')),
+        );
+        setState(_reload);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
   }
 
   @override
@@ -242,6 +264,7 @@ class _OverviewPageState extends State<OverviewPage> {
         final products = snapshot.data![0];
         final stories = snapshot.data![1];
         final publications = snapshot.data![2];
+        final iterations = snapshot.data![3];
         return ListView(
           padding: const EdgeInsets.all(24),
           children: [
@@ -257,6 +280,12 @@ class _OverviewPageState extends State<OverviewPage> {
                   onPressed: _addProduct,
                   icon: const Icon(Icons.add),
                   label: const Text('Product toevoegen'),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () => setState(_reload),
+                  tooltip: 'Vernieuwen',
+                  icon: const Icon(Icons.refresh),
                 ),
               ],
             ),
@@ -279,6 +308,11 @@ class _OverviewPageState extends State<OverviewPage> {
                   label: 'Workspace-publicaties',
                   value: '${publications.length}',
                   icon: Icons.folder_open,
+                ),
+                MetricCard(
+                  label: 'Shadow-iteraties',
+                  value: '${iterations.length}',
+                  icon: Icons.science_outlined,
                 ),
               ],
             ),
@@ -330,15 +364,70 @@ class _OverviewPageState extends State<OverviewPage> {
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          onPressed: () =>
-                              _changeStatus(slug, active ? 'pause' : 'resume'),
-                          icon: Icon(active ? Icons.pause : Icons.play_arrow),
-                          label: Text(active ? 'Pauzeren' : 'Hervatten'),
+                        child: Wrap(
+                          spacing: 8,
+                          children: [
+                            FilledButton.icon(
+                              onPressed:
+                                  active &&
+                                      product['workspaceOwnership'] ==
+                                          'product-factory'
+                                  ? () => _startShadowIteration(slug)
+                                  : null,
+                              icon: const Icon(Icons.science_outlined),
+                              label: const Text('Shadow-iteratie'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => _changeStatus(
+                                slug,
+                                active ? 'pause' : 'resume',
+                              ),
+                              icon: Icon(
+                                active ? Icons.pause : Icons.play_arrow,
+                              ),
+                              label: Text(active ? 'Pauzeren' : 'Hervatten'),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+                ),
+              );
+            }),
+            const SizedBox(height: 24),
+            Text(
+              'Shadow-iteraties',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (iterations.isEmpty)
+              const ListTile(
+                leading: Icon(Icons.hourglass_empty),
+                title: Text('Nog geen shadow-iteraties'),
+              ),
+            ...iterations.map((item) {
+              final iteration = item as Map<String, dynamic>;
+              final status = '${iteration['status']}';
+              final role = iteration['currentRole'];
+              final pr = iteration['workspacePullRequestUrl'];
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.science_outlined),
+                  title: Text(
+                    '${iteration['productSlug']} · iteratie ${iteration['sequenceNumber']}',
+                  ),
+                  subtitle: Text(
+                    [
+                      status,
+                      if (role != null) '$role',
+                      '${iteration['candidateCount']} kandidaten',
+                      if (iteration['criticVerdict'] != null)
+                        'criticus: ${iteration['criticVerdict']}',
+                    ].join(' · '),
+                  ),
+                  trailing: pr == null
+                      ? null
+                      : const Icon(Icons.call_merge_outlined),
                 ),
               );
             }),
