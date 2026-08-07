@@ -9,5 +9,11 @@ case "$command_name" in
   down) docker compose --env-file secrets.env down ;;
   runtime) mvn -pl productfactory -am spring-boot:run ;;
   dashboard) mvn -pl dashboard-backend -am spring-boot:run ;;
-  *) echo "Gebruik: ./product-factory {verify|up|down|runtime|dashboard}" ;;
+  agent-worker) exec ./agentworker-loop.sh ;;
+  agent-worker-once) mvn -q -DskipTests -pl productfactory-contracts,productfactory-common install && exec mvn -pl agentworker spring-boot:run ;;
+  agent-worker-install) exec ./tools/agent-worker-launchagent install ;;
+  agent-worker-restart) exec ./tools/agent-worker-launchagent restart ;;
+  agent-worker-status) exec ./tools/agent-worker-launchagent status ;;
+  agent-worker-uninstall) exec ./tools/agent-worker-launchagent uninstall ;;
+  *) echo "Gebruik: ./product-factory {verify|up|down|runtime|dashboard|agent-worker|agent-worker-once|agent-worker-install|agent-worker-restart|agent-worker-status|agent-worker-uninstall}" ;;
 esac

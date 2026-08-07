@@ -8,3 +8,4 @@ build/
 properties.env
 secrets.env
 workspace-checkout/
+work/

@@ -38,6 +38,12 @@ De zelfstandige technische basis bestaat uit een Maven-reactor, Spring Modulith-
 PostgreSQL/Flyway, agentworker, Google OIDC-dashboard en een begrensde workspace-publisher. Start
 lokaal met `./product-factory up` en controleer alles met `./product-factory verify`.
 
+De agentworker draait bewust als zelfstandig proces op de Mac. Hij maakt zelf een uitgaande,
+geauthenticeerde WebSocket-verbinding met de OpenShift-dashboardbackend en start `codex exec` met
+de bestaande ChatGPT/Codex-login van de macOS-gebruiker. Er worden geen OpenAI API-keys aan het
+agentproces doorgegeven. De backend kan daardoor taken aanbieden zonder een poort op de Mac te
+publiceren; tijdens slaapstand of uitschakelen rapporteert de backend de worker als offline.
+
 - [Architectuurreferentie](docs/architecture/reference-baseline.md)
 - [Modulegrenzen](docs/architecture/modules.md)
 - [Lokale ontwikkeling](docs/development/local-development.md)

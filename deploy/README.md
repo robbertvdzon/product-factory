@@ -23,6 +23,10 @@ podtemplate niet; herstart na de Argo CD-sync de deployments die environmentwaar
 oc rollout restart deployment/runtime deployment/dashboard-backend -n product-factory
 ```
 
+`PF_AGENT_WORKER_TOKEN` beveiligt daarnaast de uitgaande Mac-agentworkerverbinding. Na het
+toevoegen of roteren van deze waarde moet alleen `dashboard-backend` worden herstart; de lokale
+LaunchAgent leest bij zijn volgende start hetzelfde `secrets.env`.
+
 Cloudflare publiceert `product-factory.vdzonsoftware.nl` naar
 `http://dashboard-frontend.product-factory.svc.cluster.local:8080` en
 `product-factory-api.vdzonsoftware.nl` naar

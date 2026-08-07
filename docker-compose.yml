@@ -37,6 +37,7 @@ services:
       PF_DASHBOARD_AUTH_REQUIRED: ${PF_DASHBOARD_AUTH_REQUIRED:-false}
       PF_GOOGLE_CLIENT_ID: ${PF_GOOGLE_CLIENT_ID:-}
       PF_ADMIN_EMAILS: ${PF_ADMIN_EMAILS:-}
+      PF_AGENT_WORKER_TOKEN: ${PF_AGENT_WORKER_TOKEN:-}
     ports: ["8081:8081"]
     depends_on: [runtime]
   dashboard-frontend:

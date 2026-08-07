@@ -8,6 +8,7 @@ data class AgentTask(
     val taskType: String,
     val prompt: String,
     val timeoutSeconds: Long = 900,
+    val model: String? = null,
 )
 
 data class AgentResult(
@@ -19,6 +20,35 @@ data class AgentResult(
 )
 
 data class AgentArtifact(val relativePath: String, val mediaType: String, val content: String)
+
+data class AgentWorkerHello(
+    val type: String = "hello",
+    val token: String,
+    val workerId: String,
+    val workerVersion: String,
+    val capabilities: List<String> = listOf("codex"),
+)
+
+data class AgentWorkerTaskFrame(val type: String = "task", val task: AgentTask)
+data class AgentWorkerResultFrame(val type: String = "result", val result: AgentResult)
+
+enum class AgentTaskState { RUNNING, COMPLETED, FAILED, DISCONNECTED }
+
+data class AgentTaskStatus(
+    val runId: String,
+    val state: AgentTaskState,
+    val result: AgentResult? = null,
+    val updatedAt: Instant = Instant.now(),
+)
+
+data class AgentWorkerStatus(
+    val connected: Boolean,
+    val workerId: String? = null,
+    val workerVersion: String? = null,
+    val capabilities: List<String> = emptyList(),
+    val connectedSince: Instant? = null,
+    val activeRuns: Int = 0,
+)
 
 data class ProductView(val slug: String, val name: String, val mission: String, val guardrails: String, val createdAt: Instant)
 data class StoryCandidateView(val id: Long, val productSlug: String, val title: String, val description: String, val status: String, val createdAt: Instant)

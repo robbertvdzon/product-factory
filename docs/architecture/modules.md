@@ -11,3 +11,15 @@ fase dat nodig heeft. Zo ontstaan geen generieke lagen die latere domeinen ongem
 De contracts-module bevat uitsluitend wire-DTO's voor runtime, dashboard en agentworker. Common
 bevat alleen de zelfstandig geïmplementeerde configuratielader. Geen van beide verwijst naar
 Software Factory-artifacts.
+
+## Lokale agentruntime
+
+`dashboard-backend` bezit uitsluitend de WebSocket-transportadapter en houdt maximaal één
+geauthenticeerde Mac-workerverbinding actief. `agentworker` bezit reconnect, heartbeat,
+single-flight taakuitvoering en de Codex-CLI-procesgrens. De gedeelde frames staan in
+`productfactory-contracts`; er wordt geen Software Factory-code hergebruikt.
+
+De eerste technische snede houdt taakstatus in het geheugen van de dashboardbackend. Dit is
+geschikt om verbinding, auth en Codex-uitvoering veilig te bewijzen. Voordat nachtelijke autonome
+runs worden geactiveerd verhuist de duurzame wachtrij naar de `agentruntime`-module en PostgreSQL,
+zodat een backendrestart of slapende Mac geen taak kan verliezen.
