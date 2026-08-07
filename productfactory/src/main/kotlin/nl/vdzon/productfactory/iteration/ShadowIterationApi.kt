@@ -18,9 +18,15 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 
 data class StartShadowIterationRequest(val focus: String? = null)
 data class ShadowIterationStarted(val iterationId: String)
+data class ShadowIterationArtifactView(
+    val artifactType: String,
+    val contentJson: String,
+    val createdAt: Instant,
+)
 
 @RestController
 class ShadowIterationController(private val service: ShadowIterationService) {
@@ -43,6 +49,10 @@ class ShadowIterationController(private val service: ShadowIterationService) {
     @GetMapping("/api/shadow-iterations/{id}/steps")
     fun steps(@PathVariable id: String, @RequestParam productSlug: String): List<ShadowIterationStepView> =
         service.steps(productSlug, id)
+
+    @GetMapping("/api/shadow-iterations/{id}/artifacts")
+    fun artifacts(@PathVariable id: String, @RequestParam productSlug: String): List<ShadowIterationArtifactView> =
+        service.artifacts(productSlug, id)
 }
 
 @Service
@@ -88,6 +98,11 @@ class ShadowIterationService(
     fun steps(productSlug: String, id: String): List<ShadowIterationStepView> {
         require(productSlug, id)
         return repository.steps(productSlug, id)
+    }
+
+    fun artifacts(productSlug: String, id: String): List<ShadowIterationArtifactView> {
+        require(productSlug, id)
+        return repository.artifacts(productSlug, id)
     }
 }
 
@@ -141,6 +156,20 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
                 row.getString("role"), row.getInt("attempt"), row.getString("run_id"), row.getString("status"),
                 row.getString("error_message"), row.getTimestamp("started_at").toInstant(),
                 row.getTimestamp("completed_at")?.toInstant(),
+            )
+        },
+        productSlug,
+        iterationId,
+    )
+
+    fun artifacts(productSlug: String, iterationId: String): List<ShadowIterationArtifactView> = jdbc.query(
+        """select artifact_type, content_json, created_at from shadow_iteration_artifact
+            where product_slug = ? and iteration_id = ? order by created_at, artifact_type""".trimIndent(),
+        { row, _ ->
+            ShadowIterationArtifactView(
+                row.getString("artifact_type"),
+                row.getString("content_json"),
+                row.getTimestamp("created_at").toInstant(),
             )
         },
         productSlug,

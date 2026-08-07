@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'api.dart';
@@ -192,11 +193,21 @@ class OverviewPage extends StatefulWidget {
 class _OverviewPageState extends State<OverviewPage> {
   late Future<List<List<dynamic>>> data;
   late final DashboardApi api;
+  Timer? refreshTimer;
   @override
   void initState() {
     super.initState();
     api = DashboardApi(AppConfig.apiBaseUrl, widget.session?.token);
     _reload();
+    refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) setState(_reload);
+    });
+  }
+
+  @override
+  void dispose() {
+    refreshTimer?.cancel();
+    super.dispose();
   }
 
   void _reload() => data = Future.wait([
@@ -260,6 +271,18 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
+  Future<void> _showIteration(Map<String, dynamic> iteration) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => IterationSessionDialog(
+        api: api,
+        productSlug: '${iteration['productSlug']}',
+        iterationId: '${iteration['id']}',
+      ),
+    );
+    if (mounted) setState(_reload);
+  }
+
   Future<void> _completeHumanAction(Map<String, dynamic> action) async {
     final controller = TextEditingController();
     final result = await showDialog<String>(
@@ -271,7 +294,8 @@ class _OverviewPageState extends State<OverviewPage> {
           minLines: 3,
           maxLines: 8,
           decoration: const InputDecoration(
-            labelText: 'Wat heb je uitgevoerd en wat was het resultaat?',
+            labelText:
+                'Welke secret is ingesteld? Plak het access token zelf hier niet.',
             border: OutlineInputBorder(),
           ),
         ),
@@ -308,7 +332,8 @@ class _OverviewPageState extends State<OverviewPage> {
     body: FutureBuilder<List<List<dynamic>>>(
       future: data,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.connectionState != ConnectionState.done &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
@@ -449,7 +474,7 @@ class _OverviewPageState extends State<OverviewPage> {
                                   ? () => _startAutonomousCycle(slug)
                                   : null,
                               icon: const Icon(Icons.auto_awesome),
-                              label: const Text('Autonome cyclus nu'),
+                              label: const Text('Start productcyclus nu'),
                             ),
                             FilledButton.icon(
                               onPressed:
@@ -481,13 +506,13 @@ class _OverviewPageState extends State<OverviewPage> {
             }),
             const SizedBox(height: 24),
             Text(
-              'Shadow-iteraties',
+              'Productcycli en onderzoekssessies',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             if (iterations.isEmpty)
               const ListTile(
                 leading: Icon(Icons.hourglass_empty),
-                title: Text('Nog geen shadow-iteraties'),
+                title: Text('Nog geen productcycli of onderzoekssessies'),
               ),
             ...iterations.map((item) {
               final iteration = item as Map<String, dynamic>;
@@ -496,22 +521,27 @@ class _OverviewPageState extends State<OverviewPage> {
               final pr = iteration['workspacePullRequestUrl'];
               return Card(
                 child: ListTile(
-                  leading: const Icon(Icons.science_outlined),
+                  leading: Icon(
+                    iteration['mode'] == 'autonomous'
+                        ? Icons.auto_awesome
+                        : Icons.science_outlined,
+                  ),
                   title: Text(
                     '${iteration['productSlug']} · iteratie ${iteration['sequenceNumber']}',
                   ),
                   subtitle: Text(
                     [
                       status,
-                      if (role != null) '$role',
+                      if (role != null) 'bezig: ${_roleLabel('$role')}',
                       '${iteration['candidateCount']} kandidaten',
                       if (iteration['criticVerdict'] != null)
                         'criticus: ${iteration['criticVerdict']}',
                     ].join(' · '),
                   ),
                   trailing: pr == null
-                      ? null
+                      ? const Icon(Icons.chevron_right)
                       : const Icon(Icons.call_merge_outlined),
+                  onTap: () => _showIteration(iteration),
                 ),
               );
             }),
@@ -542,7 +572,7 @@ class _OverviewPageState extends State<OverviewPage> {
             if (humanActions.isNotEmpty) ...[
               const SizedBox(height: 24),
               Text(
-                'Menselijke acties',
+                'Benodigde access tokens',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               ...humanActions.map((item) {
@@ -551,9 +581,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   leading: const Icon(Icons.warning_amber_outlined),
                   title: Text('${action['title']}'),
                   subtitle: Text('${action['category']} · ${action['reason']}'),
-                  trailing:
-                      action['status'] == 'OPEN' &&
-                          action['category'] != 'MANUAL_ACTION'
+                  trailing: action['status'] == 'OPEN'
                       ? FilledButton(
                           onPressed: () => _completeHumanAction(action),
                           child: const Text('Gereed melden'),
@@ -619,6 +647,223 @@ class _OverviewPageState extends State<OverviewPage> {
     ),
   );
 }
+
+class IterationSessionDialog extends StatefulWidget {
+  const IterationSessionDialog({
+    required this.api,
+    required this.productSlug,
+    required this.iterationId,
+    super.key,
+  });
+
+  final DashboardApi api;
+  final String productSlug;
+  final String iterationId;
+
+  @override
+  State<IterationSessionDialog> createState() => _IterationSessionDialogState();
+}
+
+class _IterationSessionDialogState extends State<IterationSessionDialog> {
+  late Future<Map<String, dynamic>> session;
+  Timer? refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+    refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) setState(_reload);
+    });
+  }
+
+  void _reload() {
+    session = widget.api.shadowIterationSession(
+      widget.productSlug,
+      widget.iterationId,
+    );
+  }
+
+  @override
+  void dispose() {
+    refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text('Productcyclus ${widget.iterationId}'),
+    content: SizedBox(
+      width: 900,
+      height: 680,
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: session,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Text('Sessie kon niet laden: ${snapshot.error}'),
+              );
+            }
+            return const Center(child: CircularProgressIndicator());
+          }
+          final result = snapshot.data!;
+          final iteration = result['iteration'] as Map<String, dynamic>;
+          final steps = result['steps'] as List<dynamic>;
+          final artifacts = result['artifacts'] as List<dynamic>;
+          final status = '${iteration['status']}';
+          final running = status == 'QUEUED' || status == 'RUNNING';
+          final currentRole = iteration['currentRole'];
+          final dossier = result['dossier'] as String?;
+          return ListView(
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Chip(label: Text(status)),
+                  Chip(label: Text('${iteration['mode']}')),
+                  if (currentRole != null)
+                    Chip(label: Text('bezig: $currentRole')),
+                  Text('${iteration['createdAt']}'),
+                ],
+              ),
+              if (running) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+                const SizedBox(height: 8),
+                Text(
+                  currentRole == null
+                      ? 'De cyclus staat klaar om te beginnen.'
+                      : 'De agent $currentRole is nu bezig. Dit scherm wordt automatisch vernieuwd.',
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text('Opdracht', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 4),
+              SelectableText('${iteration['focus']}'),
+              const SizedBox(height: 20),
+              Text('Voortgang', style: Theme.of(context).textTheme.titleMedium),
+              if (steps.isEmpty)
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.schedule),
+                  title: Text('Nog geen agentstappen gestart'),
+                ),
+              ...steps.map((item) {
+                final step = item as Map<String, dynamic>;
+                final stepStatus = '${step['status']}';
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    stepStatus == 'COMPLETED'
+                        ? Icons.check_circle_outline
+                        : stepStatus == 'FAILED'
+                        ? Icons.error_outline
+                        : Icons.pending_outlined,
+                  ),
+                  title: Text(
+                    '${_roleLabel('${step['role']}')} · poging ${step['attempt']}',
+                  ),
+                  subtitle: Text(
+                    [
+                      stepStatus,
+                      if (step['startedAt'] != null)
+                        'start ${step['startedAt']}',
+                      if (step['completedAt'] != null)
+                        'klaar ${step['completedAt']}',
+                      if (step['errorMessage'] != null)
+                        '${step['errorMessage']}',
+                    ].join(' · '),
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
+              Text(
+                'Resultaat en onderbouwing',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (dossier != null)
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text('Volledig productdossier'),
+                  subtitle: const Text(
+                    'Onderzoek, productbesluit, UX, criticus en geaccepteerde stories',
+                  ),
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SelectableText(dossier),
+                    ),
+                  ],
+                ),
+              if (artifacts.isEmpty)
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.hourglass_empty),
+                  title: Text('Nog geen agentresultaten beschikbaar'),
+                ),
+              ...artifacts.map((item) {
+                final artifact = item as Map<String, dynamic>;
+                return ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text(_roleLabel('${artifact['artifactType']}')),
+                  subtitle: Text('${artifact['createdAt']}'),
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SelectableText(
+                        _prettyJson('${artifact['contentJson']}'),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+              if (iteration['workspacePullRequestUrl'] != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Workspace-publicatie',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                SelectableText('${iteration['workspacePullRequestUrl']}'),
+                if (iteration['workspaceCommitSha'] != null)
+                  SelectableText('Commit: ${iteration['workspaceCommitSha']}'),
+              ],
+            ],
+          );
+        },
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Sluiten'),
+      ),
+    ],
+  );
+}
+
+String _prettyJson(String value) {
+  try {
+    return const JsonEncoder.withIndent('  ').convert(jsonDecode(value));
+  } catch (_) {
+    return value;
+  }
+}
+
+String _roleLabel(String value) => switch (value.toLowerCase()) {
+  'researcher' => 'Onderzoeker',
+  'product_owner' => 'Product owner',
+  'ux_designer' => 'UX-ontwerp',
+  'story_writer' => 'Story writer',
+  'story_writer-2' => 'Story writer · revisie 2',
+  'story_writer-3' => 'Story writer · revisie 3',
+  'critic' => 'Criticus',
+  'critic-2' => 'Criticus · revisie 2',
+  'critic-3' => 'Criticus · revisie 3',
+  _ => value.replaceAll('_', ' '),
+};
 
 class AddProductDialog extends StatefulWidget {
   const AddProductDialog({super.key});
