@@ -986,6 +986,9 @@ controle waarmee Product Factory kan vaststellen dat de handeling klaar is.
   maximaal drie leveringen per etmaal en de ingestelde WIP-limiet;
 - autonome en shadow-iteraties gebruiken dezelfde vijf gecontroleerde rollen, maar zijn met een
   blijvende modus gescheiden. Alleen een autonome `ACCEPT` komt voor levering in aanmerking;
+- bij `REVISE` verwerkt de story writer de concrete criticusfeedback autonoom en beoordeelt de
+  criticus de volledige herziening opnieuw. Deze lus is begrensd op drie storypogingen; daarna blijft
+  het resultaat `NEEDS_REVISION` en wordt niets gepubliceerd;
 - de workspace-PR wordt gevolgd via GitHub en een kandidaat blijft intern totdat die PR werkelijk
   is gemerged. De merge-commit-SHA en het artefactpad gaan mee naar de story;
 - Software Factory heeft een aparte tokenbeveiligde machine-API. `Idempotency-Key` staat ook als

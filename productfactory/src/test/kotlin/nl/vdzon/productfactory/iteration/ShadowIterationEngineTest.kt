@@ -58,9 +58,17 @@ class ShadowIterationEngineTest(
         engine.run(revision.id)
         assertEquals("NEEDS_REVISION", repository.require("hkh-autopilot", revision.id).status)
         assertEquals("REVISE", repository.require("hkh-autopilot", revision.id).criticVerdict)
+        assertEquals(9, repository.steps("hkh-autopilot", revision.id).size)
         assertEquals(1, workspace.artifacts.size)
 
-        assertEquals(6, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
+        bridge.scenario = Scenario.REVISE_THEN_ACCEPT
+        val selfCorrected = repository.create("hkh-autopilot", "Verwerk criticusfeedback autonoom")
+        engine.run(selfCorrected.id)
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", selfCorrected.id).status)
+        assertEquals(7, repository.steps("hkh-autopilot", selfCorrected.id).size)
+        assertEquals(2, workspace.artifacts.size)
+
+        assertEquals(8, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
         assertEquals(
             0,
             jdbc.queryForObject(
@@ -73,13 +81,14 @@ class ShadowIterationEngineTest(
         )
     }
 
-    enum class Scenario { ACCEPT, DUPLICATE, REVISE }
+    enum class Scenario { ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT }
 
     class FakeShadowAgentBridge : ShadowAgentBridge {
         var scenario = Scenario.ACCEPT
         override fun execute(task: AgentTask): AgentResult {
             val today = LocalDate.now(ZoneId.of("Europe/Amsterdam"))
-            val different = scenario == Scenario.REVISE
+            val firstAttempt = task.runId.endsWith("-1")
+            val different = scenario == Scenario.REVISE || (scenario == Scenario.REVISE_THEN_ACCEPT && firstAttempt)
             val json = when (task.taskType.removePrefix("shadow-")) {
                 "researcher" -> """{
                     "summary":"Open erfgoedbronnen kunnen een controleerbare eerste zoekervaring ondersteunen.",
@@ -106,13 +115,21 @@ class ShadowIterationEngineTest(
                 }"""
                 "story_writer" -> """{
                     "candidates":[{
-                      "title":"${if (different) "Brede erfgoedportal" else "Bronnenkaart voor één locatie"}",
-                      "description":"${if (different) "Bouw in één keer zoeken, kaarten, tijdlijnen, beeldherkenning en reconstructies voor alle bronnen." else "Toon voor één historische locatie een verhaal met herleidbare bron- en rechteninformatie."}",
+                      "title":"${when {
+                          different -> "Brede erfgoedportal"
+                          scenario == Scenario.REVISE_THEN_ACCEPT -> "Herziene bronnenkaart voor één locatie"
+                          else -> "Bronnenkaart voor één locatie"
+                      }}",
+                      "description":"${when {
+                          different -> "Bouw in één keer zoeken, kaarten, tijdlijnen, beeldherkenning en reconstructies voor alle bronnen."
+                          scenario == Scenario.REVISE_THEN_ACCEPT -> "Toon voor één historische locatie een herzien verhaal met herleidbare bron- en rechteninformatie."
+                          else -> "Toon voor één historische locatie een verhaal met herleidbare bron- en rechteninformatie."
+                      }}",
                       "acceptanceCriteria":["De gebruiker ziet de bron-URL", "De rechtenindicatie staat naast de bron"],
                       "sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Bronrechten kunnen per object verschillen"]
                     }]
                 }"""
-                "critic" -> if (scenario == Scenario.REVISE) """{
+                "critic" -> if (scenario == Scenario.REVISE || (scenario == Scenario.REVISE_THEN_ACCEPT && firstAttempt)) """{
                     "overallVerdict":"REVISE","summary":"Het voorstel is te breed voor één toetsbare iteratie.",
                     "issues":[{"severity":"BLOCKING","category":"SCOPE","description":"De kandidaat combineert vijf zelfstandige productrisico's.","candidateIndex":0}],
                     "candidateReviews":[{"candidateIndex":0,"verdict":"REVISE","reason":"Beperk tot één brontransparante locatieflow."}],
