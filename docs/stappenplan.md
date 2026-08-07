@@ -32,12 +32,13 @@ kunnen worden toegevoegd, zonder nieuwe Product Factory-code te schrijven.
 | 0 | De drie applicatierepositories zijn veilig bouwbaar en de workspace is ingericht |
 | 1 | HKH en HKH Autopilot hebben aantoonbaar dezelfde werkende technische basis |
 | 2 | Product Factory heeft een zelfstandige technische basis en een veilige workspace-koppeling |
-| 3 | Product Factory kan stories aanbieden en volgen via een stabiele API |
-| 4 | Product Factory ondersteunt meerdere configureerbare producten |
-| 5 | Productagents doen onderzoek en ontwerpen in shadow mode |
-| 6 | Product Factory maakt en begeleidt autonoom kleine stories |
-| 7 | De gelijke baseline wordt bevroren en de twee ontwikkelpaden worden gesplitst |
-| 8 | De eigenaar ontwikkelt HKH; Product Factory ontwikkelt HKH Autopilot en vergelijkt resultaten |
+| 3 | Eén Cloudflare-wildcard routeert productie en previews; beide HKH-varianten hebben branchomgevingen, een eerste databasefeature en een gekozen opslagpad |
+| 4 | Product Factory kan stories aanbieden en volgen via een stabiele API |
+| 5 | Product Factory ondersteunt meerdere configureerbare producten |
+| 6 | Productagents doen onderzoek en ontwerpen in shadow mode |
+| 7 | Product Factory maakt en begeleidt autonoom kleine stories |
+| 8 | De gelijke baseline wordt bevroren en de twee ontwikkelpaden worden gesplitst |
+| 9 | De eigenaar ontwikkelt HKH; Product Factory ontwikkelt HKH Autopilot en vergelijkt resultaten |
 
 Elke fase moet aantoonbaar werken voordat de volgende autonomie krijgt. Technische autonomie wordt
 stapsgewijs vrijgegeven; het productdoel blijft vanaf het begin algemeen.
@@ -455,7 +456,224 @@ metadata, afhankelijkheidsrichting en testborging volgen hetzelfde patroon.
 - Er worden nog geen automatische externe stories aangemaakt.
 - Software Factory kan Product Factory als normale targetrepository bouwen.
 
-## 8. Fase 3 — koppeling met Software Factory
+## 8. Fase 3 — wildcard-routing, branchpreviews, eerste databasefeature en opslagkeuze
+
+### Doel en vaste volgorde
+
+Deze fase wordt bewust in vier opeenvolgende stappen uitgevoerd:
+
+1. gebruik één Cloudflare-wildcard voor bestaande productieapplicaties en de branchpreviews van
+   Personal News Feed;
+2. geef iedere pull-requestbranch van `hkh` en `hkh-autopilot` een volledige, tijdelijke
+   OpenShift-namespace met vooralsnog een eigen lege database en automatische cleanup;
+3. bewijs het databasepad met één kleine verticale functionaliteit: een beheerder voegt een
+   laatste-nieuwsbericht toe en gebruikers zien de nieuwste berichten;
+4. maak daarna de productieopslag duurzaam en geef iedere branch een eigen databasekopie met
+   representatieve testdata.
+
+LVM Storage wordt in deze fase niet geïnstalleerd of als gekozen oplossing vastgelegd. De
+onderliggende opslagtechniek blijft een afzonderlijk beslispunt. Daardoor kunnen routing,
+branchpreviews en de eerste databasefunctionaliteit al worden gebouwd en getest zonder op die
+keuze vooruit te lopen.
+
+### Stap 1 — één Cloudflare-wildcard
+
+`*.vdzonsoftware.nl` wordt de algemene HTTP(S)-bestemming van de Cloudflare Tunnel en wijst naar
+de interne OpenShift-ingressrouter. OpenShift kiest daarna op basis van de oorspronkelijke
+hostnaam de declaratieve `Route` en service:
+
+```text
+*.vdzonsoftware.nl
+        │
+        ▼
+router-internal-default.openshift-ingress.svc.cluster.local:80
+        │
+        ├── Route host=news.vdzonsoftware.nl
+        │      └── frontend.personal-news-feed.svc.cluster.local
+        ├── Route host=hkh.vdzonsoftware.nl
+        │      └── frontend.hkh.svc.cluster.local
+        └── Route host=pnf-pr-42.vdzonsoftware.nl
+               └── frontend.pnf-pr-42.svc.cluster.local
+```
+
+- iedere productieapplicatie declareert `Route.spec.host` in de eigen Git-repository;
+- Personal News Feed-previews krijgen eveneens een Git-managed OpenShift Route;
+- nieuwe OpenShift-webapps vereisen daarna geen nieuwe Cloudflare-route;
+- Cloudflare behoudt de `Host`-header en bereikt de router cluster-intern via HTTP; de publieke
+  verbinding en de Cloudflare Tunnel blijven versleuteld en de betreffende OpenShift Routes staan
+  voor dit interne pad op `insecureEdgeTerminationPolicy: Allow`;
+- een onbekende wildcardhost heeft geen bijpassende OpenShift Route, geeft een routerfout en
+  bereikt geen applicatie;
+- bestaande exacte Cloudflare-routes worden pas één voor één verwijderd nadat de corresponderende
+  OpenShift Route via de wildcard is getest;
+- de Newsfeed-previewrouter wordt pas verwijderd nadat productie en minimaal één gelijktijdige
+  Newsfeed-preview aantoonbaar via OpenShift ingress werken;
+- uitzonderingen blijven mogelijk voor diensten buiten OpenShift, niet-HTTP-protocollen of een
+  bewust afwijkend beveiligingsbeleid.
+
+#### Status stap 1 — afgerond op 7 augustus 2026
+
+- de Cloudflare Tunnel bevat alleen `*.vdzonsoftware.nl` naar
+  `http://router-internal-default.openshift-ingress.svc.cluster.local:80` en de verplichte
+  catch-all;
+- alle bestaande productiehosts hebben een Git-managed `Route.spec.host` en zijn publiek met
+  `200` getest; de Product Factory-health-API is eveneens via de wildcard getest;
+- alle specifieke Cloudflare-applicatieregels zijn na een gecontroleerde canary verwijderd;
+- Personal News Feed-preview PR 211 is end-to-end opgebouwd en was via
+  `pnf-pr-211.vdzonsoftware.nl` `Synced`, `Healthy` en publiek bereikbaar;
+- de tijdelijke PR, namespace en canary zijn na de test verwijderd;
+- de oude Newsfeed-previewrouter is uit Git en OpenShift verwijderd;
+- een onbekende wildcardhost geeft `503` en bereikt geen applicatie.
+
+### Stap 2 — branchomgevingen voor beide HKH-varianten
+
+Iedere open pull request van `hkh` en `hkh-autopilot` krijgt een eigen volledige omgeving. Met
+“alle branches” wordt hier iedere branch met een open pull request bedoeld; losse, niet-gepubliceerde
+lokale branches gebruiken geen clusterresources.
+
+| Repository | Namespace | Gebruikerspreview | Adminpreview |
+|---|---|---|---|
+| `hkh` | `hkh-pr-<N>` | `hkh-pr-<N>.vdzonsoftware.nl` | `hkh-admin-pr-<N>.vdzonsoftware.nl` |
+| `hkh-autopilot` | `hkh-autopilot-pr-<N>` | `hkh-autopilot-pr-<N>.vdzonsoftware.nl` | `hkh-autopilot-admin-pr-<N>.vdzonsoftware.nl` |
+
+De eerste previewversie bevat per namespace:
+
+- de backend van de pull-requestbranch;
+- de Flutter-gebruikersfrontend van die branch;
+- de Flutter-adminfrontend van die branch;
+- een eigen PostgreSQL-pod met `emptyDir`, eigen credentials en een lege database waarop Flyway
+  alle migraties uitvoert;
+- expliciete OpenShift Routes voor gebruiker en admin;
+- uitsluitend previewsecrets en een previewmarker die een productiedatabaseverbinding blokkeert;
+- een preview-only testbeheerder. Dynamische previewhosts worden niet één voor één aan de
+  productie-Google OAuth-client toegevoegd.
+
+De ApplicationSet maakt de namespace bij een open pull request en verwijdert hem na sluiten of
+mergen. Een aanvullende sweeper ruimt achtergebleven namespaces op als GitHub/ArgoCD-events zijn
+gemist. Cleanup verwijdert daarmee ook de tijdelijke database, routes, secrets en testdata.
+
+De lifecycle wordt generiek ingericht voor Newsfeed, HKH en HKH Autopilot. Daarbij gelden harde
+veiligheids- en herstelregels:
+
+- alleen namespaces met een exact toegestaan patroon én een expliciet preview-eigenaarslabel mogen
+  automatisch worden verwijderd;
+- de actuele open pull requests zijn de uiteindelijke bron van waarheid; alleen het ontbreken van
+  een ArgoCD Application is vanwege races onvoldoende bewijs;
+- vóór creatie wordt opnieuw gecontroleerd of de pull request nog open is, zodat een namespace niet
+  vlak na merge opnieuw wordt aangemaakt;
+- cleanup wacht een korte graceperiode en vereist twee opeenvolgende controles voordat een
+  verweesde namespace wordt verwijderd;
+- cleanup verwijdert namespace en eventuele externe databasebranch/-kopie als één idempotente
+  lifecycle-operatie en blijft een half afgeronde cleanup opnieuw proberen;
+- een periodieke reconciler controleert ook previews die al vóór de huidige controller bestonden;
+- metrics en logs tonen actieve previews, verwijderde previews, mislukte cleanup en de ouderdom van
+  verweesde namespaces zonder secretwaarden te loggen;
+- tests simuleren expliciet sluiten tijdens provisioning, een gemist GitHub-event, een tijdelijke
+  GitHub-storing, dubbele cleanup en een ongeldige namespaceprefix.
+
+### Stap 3 — eerste verticale databasefunctionaliteit: laatste nieuws
+
+De eerste databasefunctionaliteit blijft bewust klein en gebruikt dezelfde contracten in `hkh` en
+`hkh-autopilot`:
+
+- Flyway maakt een tabel voor laatste-nieuwsberichten met stabiele ID, titel, berichttekst,
+  publicatiemoment, aanmaakmoment en maker;
+- de backend biedt een publieke lees-API die berichten nieuwste-eerst teruggeeft;
+- de backend biedt een beveiligde admin-API om één bericht toe te voegen;
+- alleen een geldig geauthenticeerd en geautoriseerd adminaccount mag toevoegen;
+- `hkh-admin` krijgt een formulier met titel en berichttekst, duidelijke validatie en een zichtbare
+  succes- of foutstatus;
+- de gewone HKH-app toont alle berichten nieuwste-eerst en heeft een laad-, lege en foutstatus;
+- unit-, repository-, API-, Flutter- en end-to-endtests dekken toevoegen en teruglezen;
+- dezelfde functionele contracttest draait tegen HKH en HKH Autopilot om de gelijke baseline te
+  bewaken.
+
+Deze functionaliteit mag in de tijdelijke previews al volledig worden gebruikt. Zolang stap 4 nog
+niet klaar is, wordt de productieomgeving niet gebruikt voor nieuws dat duurzaam bewaard moet
+blijven.
+
+### Stap 4 — databasefundering zonder vooraf gekozen LVM-oplossing
+
+Pas nadat de verticale functionaliteit in previews werkt, wordt de duurzame opslag gekozen en
+ingericht:
+
+- inventariseer eerst waar de huidige `local-path`-PVC's fysiek terechtkomen, welke disks werkelijk
+  beschikbaar zijn en welke data een pod-, node- of diskstoring moet overleven;
+- leg in een korte ADR de keuze vast tussen een PVC op de bestaande storageclass, een PostgreSQL-
+  operator op een ondersteunde storageclass, externe PostgreSQL of een andere onderbouwde optie;
+- LVM Storage blijft buiten scope totdat daar afzonderlijk over is besloten;
+- vervang de productie-`emptyDir` van HKH, HKH Autopilot en Product Factory door de gekozen
+  persistente oplossing, zonder de JDBC/Flyway-contracten van de applicaties te veranderen;
+- PostgreSQL blijft de leidende database. Grote foto's, scans, audio en video gaan later naar
+  S3-compatibele objectopslag met alleen metadata en checksum in PostgreSQL;
+- zelf gemaakte nieuwsberichten, gebruikersinstellingen, correcties en Product Factory-status zijn
+  primaire data en krijgen off-node back-up en een aantoonbare restoretest;
+- opnieuw te importeren bronkopieën, zoekindexen en embeddings worden gescheiden en mogen opnieuw
+  worden opgebouwd.
+
+Iedere pull-requestpreview krijgt in deze stap niet langer alleen een lege database, maar een eigen
+kopie van een kleine, gesaneerde en versievaste previewdatabase:
+
+- de previewseed bevat meerdere laatste-nieuwsberichten, waaronder voldoende data om sortering,
+  lange tekst en lege/optionele velden te testen;
+- de kopie wordt gemaakt met een eenvoudige PostgreSQL-template of dump/restore; productie wordt
+  nooit automatisch gekopieerd;
+- daarna voert de branch zijn eigen Flyway-migraties uit, zodat ook afwijkende schema's veilig
+  getest kunnen worden;
+- database, rol en credentials zijn uniek per repository en pull-requestnummer;
+- een fail-closed guard blokkeert testmutaties als de previewmarker ontbreekt of het doel op
+  productie lijkt;
+- bij het sluiten van de pull request wordt de databasekopie idempotent verwijderd;
+- snapshot- of clone-optimalisatie wordt pas onderzocht wanneer dump/restore aantoonbaar te traag
+  wordt.
+
+Testcontainers blijft daarnaast in build en CI een aparte laag: iedere integratietestrun start een
+verse PostgreSQL-container en voert Flyway uit. Een volledige OpenShift-preview vervangt deze snelle
+integratietests niet.
+
+### Werk in kleine stories
+
+1. Sluit de Cloudflare-wildcard met een tijdelijke host veilig aan op OpenShift ingress.
+2. Migreer de bestaande productiehosts en Newsfeed-previews één voor één naar Git-managed
+   OpenShift Routes en verwijder daarna de Newsfeed-previewrouter.
+3. Maak een ApplicationSet en previewoverlay voor `hkh-pr-<N>` met backend, beide frontends en een
+   eigen lege PostgreSQL-database.
+4. Maak dezelfde branchomgeving voor `hkh-autopilot-pr-<N>`.
+5. Repareer eerst de Newsfeed-lifecycle-race en voeg daarna generieke, idempotente cleanup en een
+   sweeper voor Newsfeed en beide soorten HKH-previewnamespace toe.
+6. Maak de Flyway-migratie, repository en GET/POST-API voor laatste nieuws.
+7. Voeg in de HKH-admin het formulier voor een laatste-nieuwsbericht toe.
+8. Toon in de HKH-gebruikersapp alle laatste-nieuwsberichten nieuwste-eerst.
+9. Breng dezelfde verticale functionaliteit gecontroleerd over naar HKH Autopilot en bewijs
+   contractpariteit.
+10. Inventariseer de bestaande storage en leg de persistente databasekeuze vast zonder LVM Storage
+    te installeren.
+11. Migreer de drie productieapplicaties gecontroleerd van `emptyDir` naar de gekozen persistente
+    PostgreSQL-oplossing.
+12. Maak per preview een eigen databasekopie uit een versievaste seed met laatste-nieuwstestdata.
+13. Borg Testcontainers/Flyway-tests, productieguards, off-node back-up en een hersteltest.
+
+### Definition of done
+
+- Productie en Personal News Feed-previews lopen via één Cloudflare-wildcard en Git-managed
+  OpenShift Routes.
+- Iedere open pull request van HKH en HKH Autopilot heeft een eigen bereikbare gebruikers- en
+  adminpreview, backend, namespace en aanvankelijk lege database.
+- Sluiten of mergen van een pull request verwijdert de volledige previewomgeving; de sweeper ruimt
+  aantoonbaar een verweesde testnamespace op.
+- Een PR die tijdens provisioning wordt gemerged laat geen opnieuw aangemaakte namespace achter;
+  een tijdelijke fout bij GitHub of ArgoCD verwijdert geen preview van een nog open PR.
+- Na de afgesproken graceperiode bestaan er geen `pnf-pr-*`, `hkh-pr-*` of
+  `hkh-autopilot-pr-*`-namespaces zonder bijbehorende open pull request.
+- Een beheerder kan in beide HKH-varianten een laatste-nieuwsbericht toevoegen en een gebruiker
+  ziet alle berichten nieuwste-eerst.
+- De uiteindelijke productieopslag is persistent en hersteld na een gecontroleerde podrestart.
+- Iedere preview krijgt een eigen databasekopie met testnieuws en kan een afwijkende Flyway-
+  migratie uitvoeren zonder een andere preview of productie te beïnvloeden.
+- Een off-node back-up is succesvol teruggezet en functioneel gecontroleerd.
+- Er is in deze fase geen LVM Storage geïnstalleerd of impliciet als definitieve keuze aangenomen.
+
+## 9. Fase 4 — koppeling met Software Factory
 
 ### Doel
 
@@ -503,7 +721,7 @@ GET  /api/integrations/v1/events?after=<cursor>
 - Alle subtaken en de eindstatus zijn in Product Factory zichtbaar.
 - Een testvraag kan via Product Factory worden beantwoord en de story gaat verder.
 
-## 9. Fase 4 — meerdere producten als kernmodel
+## 10. Fase 5 — meerdere producten als kernmodel
 
 ### Doel
 
@@ -553,7 +771,7 @@ Elk product bevat minimaal:
 - Product Factory kan voor `hkh` geen story publiceren zolang de ontwikkelmodus niet `autonomous`
   is.
 
-## 10. Fase 5 — productonderzoek en UX in shadow mode
+## 11. Fase 6 — productonderzoek en UX in shadow mode
 
 ### Doel
 
@@ -590,7 +808,7 @@ Software Factory.
 - Een criticus kan een kandidaat verwerpen of terugsturen.
 - Er is geen menselijke productbeslissing nodig geweest.
 
-## 11. Fase 6 — autonome storycyclus
+## 12. Fase 7 — autonome storycyclus
 
 ### Doel
 
@@ -644,7 +862,7 @@ Alleen een `HumanAction` bij:
 Een HumanAction bevat exacte stappen, reden, eventuele kosten, blokkadestatus en een automatische
 controle waarmee Product Factory kan vaststellen dat de handeling klaar is.
 
-## 12. Fase 7 — baseline bevriezen en ontwikkelpaden splitsen
+## 13. Fase 8 — baseline bevriezen en ontwikkelpaden splitsen
 
 ### Doel
 
@@ -672,7 +890,7 @@ productontwikkeling van `hkh`, terwijl Product Factory uitsluitend de productont
 - Autonome storypublicatie voor `hkh` wordt technisch geweigerd.
 - HKH Autopilot kan zelfstandig zijn eerste productiteratie starten.
 
-## 13. Fase 8 — parallelle productontwikkeling en vergelijking
+## 14. Fase 9 — parallelle productontwikkeling en vergelijking
 
 ### Verdeling
 
@@ -707,7 +925,7 @@ in scope en gemaakte aannames worden naast de cijfers vastgelegd.
 - Iedere autonome story verwijst naar de workspace-commit waarop de productbeslissing is gebaseerd.
 - Alleen echte HumanActions worden aan de eigenaar gemeld.
 
-## 14. Daarna — leren en opschalen
+## 15. Daarna — leren en opschalen
 
 Na de eerste verticale slice:
 
@@ -720,7 +938,7 @@ Na de eerste verticale slice:
 - budget, scheduler en WIP per product verfijnen;
 - herstel, back-up, retentie en incidentrunbooks voltooien.
 
-## 15. Eerste uitvoerbare storyvolgorde
+## 16. Eerste uitvoerbare storyvolgorde
 
 Deze volgorde is bedoeld als startbacklog voor Software Factory. Iedere regel wordt een afzonderlijke,
 kleine story; combineer ze niet tot één grote bootstrapstory.
@@ -728,6 +946,11 @@ kleine story; combineer ze niet tot één grote bootstrapstory.
 De eenmalige directory-, template- en validatie-inrichting van `product-factory-workspace` gebeurt
 in fase 0 buiten Software Factory, omdat deze repository bewust geen buildtarget is. Vanaf story 15
 publiceert de Product Factory daar zelf uitsluitend gevalideerde productartefacten.
+
+Stories 1 tot en met 18 vormen de reeds gekozen technische baselines. De eerstvolgende uitvoering
+begint bij story 19: eerst wildcard-routing, daarna lege HKH-branchomgevingen, vervolgens de
+laatste-nieuwsfunctionaliteit en pas daarna de duurzame database-inrichting. De functionele
+Product Factory-koppeling en verdere autonomie volgen daarop.
 
 | Volgorde | Target | Storyresultaat |
 |---:|---|---|
@@ -749,17 +972,34 @@ publiceert de Product Factory daar zelf uitsluitend gevalideerde productartefact
 | 16 | Product Factory | Eigen agentworker en duurzaam resultaatcontract |
 | 17 | Product Factory | Dashboard-backend, Flutter-dashboard en Google-loginbasis |
 | 18 | Product Factory | OpenShift-deployment en versie/deployverificatie |
-| 19 | Software Factory | Versievaste idempotente Product Factory-integratie-API |
-| 20 | Product Factory | Software Factory-client en story/statusreconciliatie |
-| 21 | Product Factory | Multi-productmodel met ontwikkelmodus en beide HKH-varianten |
-| 22 | Product Factory | Researcher, bronmodel en workspace-publicatie in shadow mode |
-| 23 | Product Factory | Product Owner, UX Designer, Critic en Story Writer in shadow mode |
-| 24 | Product Factory | Autonome vraagbeantwoording en HumanAction-beleid |
-| 25 | Product Factory | Begrensde autonome storypublicatie met WIP één |
-| 26 | Beide HKH-varianten | Baseline bevriezen en handmatig/autonoom ontwikkelpad activeren |
-| 27 | HKH Autopilot via Product Factory | Eerste autonome productiteratie en verticale functionaliteit |
+| 19 | Infrastructuur | Cloudflare-wildcard met een tijdelijke host veilig op OpenShift ingress aansluiten |
+| 20 | Infrastructuur/Newsfeed | Productiehosts en Newsfeed-previews naar Git-managed Routes migreren en de oude previewrouter verwijderen |
+| 21 | HKH | Per open pull request een namespace met backend, frontends en een eigen lege database maken |
+| 22 | HKH Autopilot | Dezelfde volledige branchomgeving met eigen lege database maken |
+| 23 | Infrastructuur | Newsfeed-race repareren en veilige generieke cleanup/sweeper voor alle previewomgevingen inrichten |
+| 24 | HKH | Flyway-schema, repository en beveiligde lees-/schrijf-API voor laatste nieuws maken |
+| 25 | HKH | In de admin een laatste-nieuwsbericht kunnen toevoegen |
+| 26 | HKH | In de gebruikersapp alle laatste-nieuwsberichten nieuwste-eerst tonen |
+| 27 | HKH Autopilot | De verticale laatste-nieuwsslice gecontroleerd overnemen met dezelfde contracten |
+| 28 | Beide HKH-varianten | Contract-, Flutter- en end-to-endpariteit voor laatste nieuws aantonen |
+| 29 | Infrastructuur | Bestaande storage inventariseren en een persistente databasekeuze vastleggen zonder LVM te installeren |
+| 30 | HKH | Productiedatabase naar de gekozen persistente PostgreSQL-oplossing migreren |
+| 31 | HKH Autopilot | Productiedatabase naar een afzonderlijke persistente PostgreSQL-oplossing migreren |
+| 32 | Product Factory | Operationele database gecontroleerd persistent maken met behoud van bestaande status |
+| 33 | Infrastructuur | Iedere preview een eigen databasekopie uit de versievaste laatste-nieuwsseed geven |
+| 34 | Alle drie applicaties | Testcontainers-, Flyway- en productieguardtests componentgericht in CI borgen |
+| 35 | Infrastructuur | Off-node PostgreSQL-back-up, retentie en een aantoonbare restore-oefening inrichten |
+| 36 | Software Factory | Versievaste idempotente Product Factory-integratie-API |
+| 37 | Product Factory | Software Factory-client en story/statusreconciliatie |
+| 38 | Product Factory | Multi-productmodel met ontwikkelmodus en beide HKH-varianten |
+| 39 | Product Factory | Researcher, bronmodel en workspace-publicatie in shadow mode |
+| 40 | Product Factory | Product Owner, UX Designer, Critic en Story Writer in shadow mode |
+| 41 | Product Factory | Autonome vraagbeantwoording en HumanAction-beleid |
+| 42 | Product Factory | Begrensde autonome storypublicatie met WIP één |
+| 43 | Beide HKH-varianten | Baseline bevriezen en handmatig/autonoom ontwikkelpad activeren |
+| 44 | HKH Autopilot via Product Factory | Eerste autonome productiteratie en verticale functionaliteit |
 
-## 16. Beslispunten die geen productinput vereisen
+## 17. Beslispunten die geen productinput vereisen
 
 De agents mogen zelfstandig beslissen over:
 
@@ -771,5 +1011,5 @@ De agents mogen zelfstandig beslissen over:
 - defaults die goedkoop, omkeerbaar en veilig zijn;
 - afwijzen van een idee dat onvoldoende bewijs of productwaarde heeft.
 
-Zij leggen deze keuzes wel vast. Alleen de expliciete HumanAction-categorieën uit fase 6 worden aan
+Zij leggen deze keuzes wel vast. Alleen de expliciete HumanAction-categorieën uit fase 7 worden aan
 een mens voorgelegd.
