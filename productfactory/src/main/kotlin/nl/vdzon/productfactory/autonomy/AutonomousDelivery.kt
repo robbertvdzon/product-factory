@@ -106,6 +106,8 @@ data class HumanActionCompletion(
     val questionPhase: String?,
 )
 
+internal fun JsonNode.hasNonBlankTextValue(): Boolean = !isMissingNode && !isNull && asText().isNotBlank()
+
 interface SoftwareFactoryGateway {
     fun createStory(request: SoftwareFactoryStoryRequest, idempotencyKey: String): SoftwareFactoryStoryResponse
     fun story(storyKey: String): JsonNode
@@ -634,8 +636,8 @@ class AutonomousCoordinator(
         val fields = issue.path("fields")
         val phase = fields.path("storyPhase").asText(null)
         val awaitingHuman = detail.path("subtasks").firstOrNull { it.path("fields").path("subtaskPhase").asText() == "awaiting-human" }
-        val hasError = fields.path("error").asText().isNotBlank() || detail.path("subtasks").any {
-            it.path("fields").path("error").asText().isNotBlank() || it.path("fields").path("subtaskPhase").asText() == "deploy-failed"
+        val hasError = fields.path("error").hasNonBlankTextValue() || detail.path("subtasks").any {
+            it.path("fields").path("error").hasNonBlankTextValue() || it.path("fields").path("subtaskPhase").asText() == "deploy-failed"
         }
         val done = issue.path("status").asText().lowercase() in setOf("done", "finished", "closed") ||
             (detail.path("subtasks").size() > 0 && detail.path("subtasks").all { subtaskDone(it.path("fields").path("subtaskPhase").asText()) })
