@@ -81,6 +81,9 @@ class AgentWorkerClient(
         taskThread.submit {
             val result = runCatching { taskExecutor.execute(frame.task) }
                 .getOrElse { AgentResult(frame.task.runId, "FAILED", "Agenttaak faalde: ${it.message ?: it.javaClass.simpleName}") }
+            if (result.status != "COMPLETED") {
+                logger.warn("Agenttaak {} eindigde als {}: {}", result.runId, result.status, result.summary.take(1_000))
+            }
             completed[frame.task.runId] = result
             inFlight.remove(frame.task.runId)
             send(AgentWorkerResultFrame(result = result))
@@ -89,11 +92,19 @@ class AgentWorkerClient(
 
     private fun send(frame: Any) {
         val active = socket.get()?.takeIf { !it.isOutputClosed } ?: return
+        val payload = runCatching { mapper.writeValueAsString(frame) }.getOrElse {
+            logger.error("Agentworker-frame kon niet worden geserialiseerd: {}", it.message)
+            return
+        }
         runCatching {
-            synchronized(sendLock) { active.sendText(mapper.writeValueAsString(frame), true).join() }
+            synchronized(sendLock) { active.sendText(payload, true).join() }
         }.onFailure {
             logger.warn("Agentworker-frame kon niet worden verstuurd: {}", it.message)
-            scheduleReconnect()
+            if (socket.compareAndSet(active, null)) {
+                heartbeat?.cancel(true)
+                active.abort()
+                scheduleReconnect()
+            }
         }
     }
 
@@ -159,18 +170,20 @@ class AgentWorkerClient(
         }
 
         override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
-            socket.compareAndSet(webSocket, null)
-            heartbeat?.cancel(true)
             logger.info("Agentworker-verbinding gesloten: {} {}", statusCode, reason)
-            scheduleReconnect()
+            if (socket.compareAndSet(webSocket, null)) {
+                heartbeat?.cancel(true)
+                scheduleReconnect()
+            }
             return null
         }
 
         override fun onError(webSocket: WebSocket, error: Throwable) {
-            socket.compareAndSet(webSocket, null)
-            heartbeat?.cancel(true)
             logger.warn("Agentworker-transportfout: {}", error.message)
-            scheduleReconnect()
+            if (socket.compareAndSet(webSocket, null)) {
+                heartbeat?.cancel(true)
+                scheduleReconnect()
+            }
         }
     }
 

@@ -2,9 +2,12 @@ package nl.vdzon.productfactory.agentworker
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import nl.vdzon.productfactory.contracts.AgentResult
 import nl.vdzon.productfactory.contracts.AgentTask
+import nl.vdzon.productfactory.contracts.AgentWorkerResultFrame
 import nl.vdzon.productfactory.contracts.AgentWorkerTaskFrame
 import java.nio.file.Files
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,6 +20,17 @@ class AgentContractTest {
         assertEquals(task, mapper.readValue<AgentTask>(mapper.writeValueAsString(task)))
         val frame = AgentWorkerTaskFrame(task = task)
         assertEquals(frame, mapper.readValue<AgentWorkerTaskFrame>(mapper.writeValueAsString(frame)))
+    }
+
+    @Test fun `agent result frame serializes its completion timestamp`() {
+        val mapper = jacksonObjectMapper().findAndRegisterModules()
+        val frame = AgentWorkerResultFrame(
+            result = AgentResult("run-result", "COMPLETED", "klaar", completedAt = Instant.parse("2026-08-07T13:17:00Z")),
+        )
+
+        val decoded = mapper.readValue<AgentWorkerResultFrame>(mapper.writeValueAsString(frame))
+
+        assertEquals(frame, decoded)
     }
 
     @Test fun `codex command uses workspace sandbox subscription cli and configured model`() {
