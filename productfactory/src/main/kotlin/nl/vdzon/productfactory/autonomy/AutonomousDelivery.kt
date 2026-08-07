@@ -29,6 +29,7 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.ZoneId
 import java.sql.Timestamp
+import java.util.UUID
 
 data class StoryDeliveryView(
     val id: Long,
@@ -280,7 +281,13 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
             { row, _ -> StoryQuestionRecord(row.getLong(1), row.getLong(2), row.getString(3), row.getString(4), row.getString(5), row.getString(6)) },
             deliveryId, targetKey, phase,
         ).single()
-        if (record.question != question || record.status == "ERROR") {
+        val resolutionIsNoLongerRunning = record.status == "RESOLVING" && (jdbc.queryForObject(
+            """select count(*) from agent_run ar join story_question q on q.agent_run_id = ar.run_id
+                where q.id = ? and ar.status = 'RUNNING'""".trimIndent(),
+            Int::class.java,
+            record.id,
+        ) ?: 0) == 0
+        if (record.question != question || record.status == "ERROR" || resolutionIsNoLongerRunning) {
             jdbc.update(
                 "update human_action set status = 'COMPLETED', completed_at = current_timestamp where question_id = ? and status = 'OPEN'",
                 record.id,
@@ -405,10 +412,10 @@ class AutonomousQuestionResolver(
     private fun resolve(delivery: StoryDeliveryView, question: StoryQuestionRecord, targetType: String, answerPhase: String) {
         val product = products.requireStoryPublication(delivery.productSlug)
         val fullProduct = products.requireProduct(product.slug)
-        val runId = "question-${delivery.id}-${question.id}"
+        val runId = "question-${delivery.id}-${question.id}-${UUID.randomUUID()}"
         if (!repository.startQuestion(question.id, runId)) return
-        agentRuns.register(runId, product.slug, "question-resolver")
         try {
+            agentRuns.register(runId, product.slug, "question-resolver")
             val result = agents.execute(
                 AgentTask(
                     runId = runId,
