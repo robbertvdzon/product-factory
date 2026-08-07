@@ -7,6 +7,7 @@ import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.AgentWorkerResultFrame
 import nl.vdzon.productfactory.contracts.AgentWorkerTaskFrame
 import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -100,6 +101,19 @@ class AgentContractTest {
         )
         assertEquals(setOf("PATH", "HOME", "CODEX_HOME"), safe.keys)
         assertFalse(safe.values.any { it.contains("secret") })
+    }
+
+    @Test fun `relative workspace path is resolved from repository configuration root`() {
+        val repository = Path.of("/Users/example/git/product-factory")
+
+        assertEquals(
+            Path.of("/Users/example/git/product-factory-workspace"),
+            resolveWorkspacePath(repository, "../product-factory-workspace"),
+        )
+        assertEquals(
+            Path.of("/opt/product-factory-workspace"),
+            resolveWorkspacePath(repository, "/opt/product-factory-workspace"),
+        )
     }
 
     @Test fun `worker process remains alive until shutdown`() {
