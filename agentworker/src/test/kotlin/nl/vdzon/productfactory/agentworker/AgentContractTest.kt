@@ -103,6 +103,18 @@ class AgentContractTest {
         assertFalse(safe.values.any { it.contains("secret") })
     }
 
+    @Test fun `agent command receives end of input instead of waiting forever`() {
+        val result = ProcessAgentCommandRunner().run(
+            listOf("/bin/sh", "-c", "if read input; then exit 9; else printf closed; fi"),
+            Files.createTempDirectory("pf-agent-stdin"),
+            2,
+        )
+
+        assertFalse(result.timedOut)
+        assertEquals(0, result.exitCode)
+        assertEquals("closed", result.output.trim())
+    }
+
     @Test fun `relative workspace path is resolved from repository configuration root`() {
         val repository = Path.of("/Users/example/git/product-factory")
 
