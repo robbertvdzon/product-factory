@@ -37,10 +37,25 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
     @GetMapping("/shadow-iterations")
     fun shadowIterations(): Any = runtime.products().flatMap { product -> runtime.shadowIterations(product["slug"].toString()) }
 
+    @GetMapping("/autonomy/deliveries")
+    fun deliveries(): Any = runtime.products().flatMap { product -> runtime.deliveries(product["slug"].toString()) }
+
+    @GetMapping("/autonomy/human-actions")
+    fun humanActions(): Any = runtime.products().flatMap { product -> runtime.humanActions(product["slug"].toString()) }
+
     @PostMapping("/products/{slug}/shadow-iterations")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun startShadowIteration(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =
         runtime.startShadowIteration(slug, request?.get("focus"))
+
+    @PostMapping("/products/{slug}/autonomous-cycles")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun startAutonomousCycle(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =
+        runtime.startAutonomousCycle(slug, request?.get("focus"))
+
+    @PostMapping("/autonomy/human-actions/{id}/complete")
+    fun completeHumanAction(@PathVariable id: Long, @RequestBody request: Map<String, String>) =
+        runtime.completeHumanAction(id, request["result"].orEmpty())
 
     @GetMapping("/workspace/publications/{runId}")
     fun publication(@PathVariable runId: String, @RequestParam productSlug: String): Any = runtime.publication(productSlug, runId)

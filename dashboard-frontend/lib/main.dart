@@ -204,6 +204,8 @@ class _OverviewPageState extends State<OverviewPage> {
     api.stories(),
     api.publications(),
     api.shadowIterations(),
+    api.deliveries(),
+    api.humanActions(),
   ]);
   Future<void> _changeStatus(String slug, String action) async {
     await api.changeProductStatus(slug, action);
@@ -238,6 +240,59 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
+  Future<void> _startAutonomousCycle(String slug) async {
+    try {
+      await api.startAutonomousCycle(slug);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Autonome productcyclus voor $slug is gestart.'),
+          ),
+        );
+        setState(_reload);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
+
+  Future<void> _completeHumanAction(Map<String, dynamic> action) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${action['title']}'),
+        content: TextField(
+          controller: controller,
+          minLines: 3,
+          maxLines: 8,
+          decoration: const InputDecoration(
+            labelText: 'Wat heb je uitgevoerd en wat was het resultaat?',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuleren'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Gereed melden'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.trim().isEmpty) return;
+    await api.completeHumanAction(action['id'] as int, result.trim());
+    if (mounted) setState(_reload);
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -265,6 +320,8 @@ class _OverviewPageState extends State<OverviewPage> {
         final stories = snapshot.data![1];
         final publications = snapshot.data![2];
         final iterations = snapshot.data![3];
+        final deliveries = snapshot.data![4];
+        final humanActions = snapshot.data![5];
         return ListView(
           padding: const EdgeInsets.all(24),
           children: [
@@ -314,6 +371,11 @@ class _OverviewPageState extends State<OverviewPage> {
                   value: '${iterations.length}',
                   icon: Icons.science_outlined,
                 ),
+                MetricCard(
+                  label: 'Software Factory-stories',
+                  value: '${deliveries.length}',
+                  icon: Icons.precision_manufacturing_outlined,
+                ),
               ],
             ),
             const SizedBox(height: 32),
@@ -362,11 +424,33 @@ class _OverviewPageState extends State<OverviewPage> {
                         ],
                       ),
                       const SizedBox(height: 8),
+                      Text(
+                        active
+                            ? 'Active: geplande productcycli en leveringen mogen draaien.'
+                            : 'Gepauzeerd: er starten geen nieuwe agents, stories of automatische antwoorden; extern lopend werk wordt niet afgebroken.',
+                      ),
+                      Text(
+                        product['developmentMode'] == 'autonomous'
+                            ? 'Autonomous: de Product Factory mag geaccepteerde stories zelfstandig naar de Software Factory sturen.'
+                            : 'Niet-autonoom: de Product Factory mag geen stories zelfstandig publiceren.',
+                      ),
                       Align(
                         alignment: Alignment.centerRight,
                         child: Wrap(
                           spacing: 8,
                           children: [
+                            FilledButton.icon(
+                              onPressed:
+                                  active &&
+                                      product['developmentMode'] ==
+                                          'autonomous' &&
+                                      product['workspaceOwnership'] ==
+                                          'product-factory'
+                                  ? () => _startAutonomousCycle(slug)
+                                  : null,
+                              icon: const Icon(Icons.auto_awesome),
+                              label: const Text('Autonome cyclus nu'),
+                            ),
                             FilledButton.icon(
                               onPressed:
                                   active &&
@@ -431,6 +515,53 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               );
             }),
+            const SizedBox(height: 24),
+            Text(
+              'Software Factory-stories',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (deliveries.isEmpty)
+              const ListTile(
+                leading: Icon(Icons.hourglass_empty),
+                title: Text(
+                  'Nog geen stories naar de Software Factory gestuurd',
+                ),
+              ),
+            ...deliveries.map((item) {
+              final delivery = item as Map<String, dynamic>;
+              return ListTile(
+                leading: const Icon(Icons.precision_manufacturing_outlined),
+                title: Text(
+                  '${delivery['externalStoryKey'] ?? 'wordt verstuurd'} · ${delivery['title']}',
+                ),
+                subtitle: Text(
+                  '${delivery['productSlug']} · ${delivery['status']} · ${delivery['remotePhase'] ?? 'nog geen fase'}',
+                ),
+              );
+            }),
+            if (humanActions.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Text(
+                'Menselijke acties',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              ...humanActions.map((item) {
+                final action = item as Map<String, dynamic>;
+                return ListTile(
+                  leading: const Icon(Icons.warning_amber_outlined),
+                  title: Text('${action['title']}'),
+                  subtitle: Text('${action['category']} · ${action['reason']}'),
+                  trailing:
+                      action['status'] == 'OPEN' &&
+                          action['category'] != 'MANUAL_ACTION'
+                      ? FilledButton(
+                          onPressed: () => _completeHumanAction(action),
+                          child: const Text('Gereed melden'),
+                        )
+                      : null,
+                );
+              }),
+            ],
             const SizedBox(height: 24),
             Text(
               'Storykandidaten',

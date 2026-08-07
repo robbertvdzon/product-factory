@@ -974,6 +974,33 @@ Alleen een `HumanAction` bij:
 Een HumanAction bevat exacte stappen, reden, eventuele kosten, blokkadestatus en een automatische
 controle waarmee Product Factory kan vaststellen dat de handeling klaar is.
 
+### Status fase 7 — gerealiseerd op 7 augustus 2026
+
+- `active` is de uitvoeringsschakelaar: geplande autonome cycli, workspace-publicaties, nieuwe
+  Software Factory-stories en automatische antwoorden zijn toegestaan. `paused` blokkeert nieuwe
+  autonome writes; een reeds bij Software Factory lopende build wordt niet destructief afgebroken;
+- `autonomous` is de bevoegdheid: alleen de combinatie `active` + `autonomous` +
+  workspace-eigenaarschap `product-factory` mag storykandidaten vrijgeven. `manual` en
+  `observe-only` kunnen dus ook in status `active` staan zonder publicatierecht;
+- een dagelijkse scheduler volgt het productschema, start hoogstens één productcyclus en bewaakt
+  maximaal drie leveringen per etmaal en de ingestelde WIP-limiet;
+- autonome en shadow-iteraties gebruiken dezelfde vijf gecontroleerde rollen, maar zijn met een
+  blijvende modus gescheiden. Alleen een autonome `ACCEPT` komt voor levering in aanmerking;
+- de workspace-PR wordt gevolgd via GitHub en een kandidaat blijft intern totdat die PR werkelijk
+  is gemerged. De merge-commit-SHA en het artefactpad gaan mee naar de story;
+- Software Factory heeft een aparte tokenbeveiligde machine-API. `Idempotency-Key` staat ook als
+  duurzame marker in de story, zodat een retry na een time-out geen dubbele story kan maken;
+- iedere vrijgegeven kandidaat wordt als echte Software Factory-story aangemaakt en daarna op
+  `start-next` gezet. Product Factory bewaart de externe storykey en volgt fase, fouten en afronding;
+- `QUESTION_RESOLVER` beantwoordt gewone product-, UX- en technische keuzes autonoom. Alleen de
+  expliciete categorieën uit “Menselijke escalatie” maken een zichtbare `HumanAction` en blokkeren
+  vervolgwerk;
+- na afronding wordt een herleidbare evaluatie als productgeheugen én als workspace-artefact
+  gepubliceerd voordat een volgende cyclus mag starten;
+- het dashboard toont de betekenis van status en ontwikkelmodus, biedt afzonderlijke knoppen voor
+  een veilige shadow-iteratie en een echte autonome cyclus, en toont externe stories en menselijke
+  acties.
+
 ## 13. Fase 8 — baseline bevriezen en ontwikkelpaden splitsen
 
 ### Doel

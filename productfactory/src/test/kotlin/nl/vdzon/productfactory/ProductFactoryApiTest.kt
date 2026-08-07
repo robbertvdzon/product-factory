@@ -73,7 +73,7 @@ class ProductFactoryApiTest(
     }
 
     @Test
-    fun `products pause independently and only autonomous products publish stories`() {
+    fun `pause is isolated and story publication requires autonomous approval plus merged evidence`() {
         createOwnerProduct("owner-led")
         mvc.post("/api/products/hkh-autopilot/pause").andExpect { status { isOk() }; jsonPath("$.status") { value("paused") } }
         mvc.post("/api/story-candidates") {
@@ -94,7 +94,7 @@ class ProductFactoryApiTest(
         mvc.post("/api/story-candidates/$autopilotStory/publish") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"productSlug":"hkh-autopilot"}"""
-        }.andExpect { status { isOk() }; jsonPath("$.status") { value("PUBLISHED") } }
+        }.andExpect { status { isConflict() } }
     }
 
     private fun createProduct(slug: String, name: String, mission: String) {

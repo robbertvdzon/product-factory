@@ -34,6 +34,14 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri { it.path("/api/shadow-iterations").queryParam("productSlug", slug).build() }
         .retrieve().body(listType).orEmpty()
 
+    fun deliveries(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri { it.path("/api/autonomy/deliveries").queryParam("productSlug", slug).build() }
+        .retrieve().body(listType).orEmpty()
+
+    fun humanActions(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri { it.path("/api/autonomy/human-actions").queryParam("productSlug", slug).build() }
+        .retrieve().body(listType).orEmpty()
+
     fun publication(slug: String, runId: String): Any = runtime.get()
         .uri { it.path("/api/workspace/publications/{runId}").queryParam("productSlug", slug).build(runId) }
         .retrieve().body(Any::class.java)!!
@@ -51,6 +59,15 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/products/{slug}/shadow-iterations", slug)
         .body(mapOf("focus" to focus))
         .retrieve().body(Any::class.java)!!
+
+    fun startAutonomousCycle(slug: String, focus: String?): Any = runtime.post()
+        .uri("/api/products/{slug}/autonomous-cycles", slug)
+        .body(mapOf("focus" to focus))
+        .retrieve().body(Any::class.java)!!
+
+    fun completeHumanAction(id: Long, result: String) = runtime.post()
+        .uri("/api/autonomy/human-actions/{id}/complete", id)
+        .body(mapOf("result" to result)).retrieve().toBodilessEntity()
 
     fun requireRunnableProduct(slug: String) {
         val product = product(slug)

@@ -23,3 +23,9 @@ product-factory:
     repository: ${PF_WORKSPACE_REPOSITORY}
     main-branch: ${PF_WORKSPACE_MAIN_BRANCH:main}
     remote-publication: ${PF_WORKSPACE_REMOTE_PUBLICATION:false}
+  software-factory:
+    base-url: ${PF_SOFTWARE_FACTORY_BASE_URL:http://localhost:9090}
+    token: ${PF_SOFTWARE_FACTORY_TOKEN:}
+  autonomy:
+    enabled: ${PF_AUTONOMY_ENABLED:false}
+    poll-delay: ${PF_AUTONOMY_POLL_DELAY:PT1M}

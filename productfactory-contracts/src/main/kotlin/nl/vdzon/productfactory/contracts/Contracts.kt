@@ -108,6 +108,7 @@ data class ShadowIterationView(
     val productSlug: String,
     val sequenceNumber: Int,
     val focus: String,
+    val mode: String,
     val status: String,
     val currentRole: String?,
     val criticVerdict: String?,
