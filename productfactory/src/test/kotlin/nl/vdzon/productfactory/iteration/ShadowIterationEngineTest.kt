@@ -17,6 +17,7 @@ import java.security.MessageDigest
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @SpringBootTest
@@ -28,6 +29,25 @@ class ShadowIterationEngineTest(
     @Autowired private val workspace: FakeWorkspacePublicationPort,
     @Autowired private val jdbc: JdbcTemplate,
 ) {
+    @Test
+    fun `candidate from a failed workspace publication does not block a retry`() {
+        val iteration = repository.create("hkh-autopilot", "Simuleer een mislukte workspace-publicatie")
+        repository.saveCandidate(
+            iteration.id,
+            "hkh-autopilot",
+            "Herstelbare kandidaat",
+            "Een kandidaat waarvan de workspace-publicatie is mislukt.",
+            "- Publicatie kan opnieuw worden geprobeerd",
+            "failed-publication-fingerprint",
+            "ACCEPT",
+            "Inhoudelijk geaccepteerd",
+            null,
+        )
+        repository.markFailed(iteration.id, "Workspace tijdelijk niet beschikbaar")
+
+        assertNull(repository.findDuplicate("hkh-autopilot", "failed-publication-fingerprint"))
+    }
+
     @Test
     fun `critic accepts rejects and returns complete isolated shadow iterations`() {
         bridge.scenario = Scenario.ACCEPT
