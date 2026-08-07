@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.iteration
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.agentruntime.api.AgentRunRegistry
 import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.ProductView
@@ -93,6 +94,7 @@ class ShadowIterationEngine(
             ShadowSchemas.critic,
             criticPrompt(product, research, productOwner, ux, stories, candidateContext, iteration.mode),
             storyAttempt,
+            ::applyCriticSeverityPolicy,
         ).also { validateCritic(it, stories.path("candidates").size()) }
 
         while (critic.path("overallVerdict").asText() == "REVISE" && storyAttempt < MAX_STORY_ATTEMPTS) {
@@ -113,6 +115,7 @@ class ShadowIterationEngine(
                 ShadowSchemas.critic,
                 criticPrompt(product, research, productOwner, ux, stories, candidateContext, iteration.mode),
                 storyAttempt,
+                ::applyCriticSeverityPolicy,
             ).also { validateCritic(it, stories.path("candidates").size()) }
         }
 
@@ -150,6 +153,7 @@ class ShadowIterationEngine(
         schema: String,
         prompt: String,
         attempt: Int = 1,
+        transform: (JsonNode) -> JsonNode = { it },
     ): JsonNode {
         val runId = "${iteration.id}-${role.name.lowercase()}-$attempt"
         agentRuns.register(runId, product.slug, "shadow-${role.name.lowercase()}")
@@ -169,10 +173,11 @@ class ShadowIterationEngine(
             if (result.status != "COMPLETED") error("${role.name} mislukte: ${result.summary.take(1000)}")
             val parsed = mapper.readTree(result.summary)
             require(parsed != null && parsed.isObject) { "${role.name} gaf geen JSON-object" }
-            val canonical = mapper.writeValueAsString(parsed)
+            val transformed = transform(parsed)
+            val canonical = mapper.writeValueAsString(transformed)
             repository.completeStep(iteration.id, role.name, attempt, canonical)
             agentRuns.complete(product.slug, runId, "COMPLETED", "shadow-iteration:${iteration.id}/${role.name.lowercase()}")
-            parsed
+            transformed
         } catch (exception: Exception) {
             repository.failStep(iteration.id, role.name, attempt, exception.message ?: exception.javaClass.simpleName)
             runCatching { agentRuns.complete(product.slug, runId, "FAILED", "shadow-iteration:${iteration.id}/${role.name.lowercase()}") }
@@ -251,6 +256,23 @@ class ShadowIterationEngine(
                 "Een geaccepteerde iteratie mag geen blokkerende criticusbevinding hebben"
             }
         }
+    }
+
+    private fun applyCriticSeverityPolicy(output: JsonNode): JsonNode {
+        if (output.path("overallVerdict").asText() != "REVISE") return output
+        if (output.path("issues").any { it.path("severity").asText() == "BLOCKING" }) return output
+
+        val normalized = output.deepCopy<ObjectNode>()
+        normalized.put("overallVerdict", "ACCEPT")
+        normalized.path("candidateReviews").forEach { review ->
+            if (review.path("verdict").asText() == "REVISE") (review as ObjectNode).put("verdict", "ACCEPT")
+        }
+        normalized.put(
+            "summary",
+            normalized.path("summary").asText() +
+                " Niet-blokkerende waarschuwingen blijven vastgelegd, maar houden levering volgens de kwaliteitsgate niet tegen.",
+        )
+        return normalized
     }
 
     private fun reviewedCandidates(productSlug: String, stories: JsonNode, critic: JsonNode): List<ReviewedCandidate> {
@@ -369,8 +391,9 @@ class ShadowIterationEngine(
     private fun criticPrompt(product: ProductView, research: JsonNode, owner: JsonNode, ux: JsonNode, stories: JsonNode, existing: String, mode: String) = """
         ROL: CRITIC. Beoordeel onafhankelijk bronkwaliteit, rechten, privacy, toegankelijkheid, scope,
         consistentie, duplicaten en conflicten. Beoordeel iedere kandidaat exact één keer met zijn nulgebaseerde
-        index. Gebruik REVISE als een gerichte nieuwe uitwerking nodig is en REJECT bij een fundamenteel probleem.
-        ACCEPT mag alleen zonder blokkerende issues. In autonomous-modus is ACCEPT een vrijgave voor levering door de
+        index. Gebruik REVISE uitsluitend als minimaal één issue severity BLOCKING heeft en een gerichte nieuwe
+        uitwerking nodig is. WARNING en INFO blijven zichtbaar, maar blokkeren niet: gebruik dan ACCEPT. Gebruik
+        REJECT bij een fundamenteel probleem. ACCEPT mag alleen zonder blokkerende issues. In autonomous-modus is ACCEPT een vrijgave voor levering door de
         orchestrator; in shadow-modus blijft de kandidaat intern. De huidige modus is $mode.
 
         REGELS:

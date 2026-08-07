@@ -68,7 +68,15 @@ class ShadowIterationEngineTest(
         assertEquals(7, repository.steps("hkh-autopilot", selfCorrected.id).size)
         assertEquals(2, workspace.artifacts.size)
 
-        assertEquals(8, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
+        bridge.scenario = Scenario.WARNING_ONLY_REVISE
+        val warningOnly = repository.create("hkh-autopilot", "Laat waarschuwingen de levering niet blokkeren")
+        engine.run(warningOnly.id)
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", warningOnly.id).status)
+        assertEquals("ACCEPT", repository.require("hkh-autopilot", warningOnly.id).criticVerdict)
+        assertEquals(5, repository.steps("hkh-autopilot", warningOnly.id).size)
+        assertEquals(3, workspace.artifacts.size)
+
+        assertEquals(10, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
         assertEquals(
             0,
             jdbc.queryForObject(
@@ -81,7 +89,7 @@ class ShadowIterationEngineTest(
         )
     }
 
-    enum class Scenario { ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT }
+    enum class Scenario { ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE }
 
     class FakeShadowAgentBridge : ShadowAgentBridge {
         var scenario = Scenario.ACCEPT
@@ -118,18 +126,25 @@ class ShadowIterationEngineTest(
                       "title":"${when {
                           different -> "Brede erfgoedportal"
                           scenario == Scenario.REVISE_THEN_ACCEPT -> "Herziene bronnenkaart voor één locatie"
+                          scenario == Scenario.WARNING_ONLY_REVISE -> "Toegankelijke bronnenkaart met waarschuwing"
                           else -> "Bronnenkaart voor één locatie"
                       }}",
                       "description":"${when {
                           different -> "Bouw in één keer zoeken, kaarten, tijdlijnen, beeldherkenning en reconstructies voor alle bronnen."
                           scenario == Scenario.REVISE_THEN_ACCEPT -> "Toon voor één historische locatie een herzien verhaal met herleidbare bron- en rechteninformatie."
+                          scenario == Scenario.WARNING_ONLY_REVISE -> "Toon één historische locatie en bewaar een niet-blokkerende toegankelijkheidswaarschuwing."
                           else -> "Toon voor één historische locatie een verhaal met herleidbare bron- en rechteninformatie."
                       }}",
                       "acceptanceCriteria":["De gebruiker ziet de bron-URL", "De rechtenindicatie staat naast de bron"],
                       "sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Bronrechten kunnen per object verschillen"]
                     }]
                 }"""
-                "critic" -> if (scenario == Scenario.REVISE || (scenario == Scenario.REVISE_THEN_ACCEPT && firstAttempt)) """{
+                "critic" -> if (scenario == Scenario.WARNING_ONLY_REVISE) """{
+                    "overallVerdict":"REVISE","summary":"De kandidaat is veilig, maar kan later preciezer.",
+                    "issues":[{"severity":"WARNING","category":"ACCESSIBILITY","description":"Controleer de aankondiging ook handmatig.","candidateIndex":0}],
+                    "candidateReviews":[{"candidateIndex":0,"verdict":"REVISE","reason":"Leg de waarschuwing vast voor vervolgwerk."}],
+                    "requiredChanges":["Controleer later met een schermlezer."]
+                }""" else if (scenario == Scenario.REVISE || (scenario == Scenario.REVISE_THEN_ACCEPT && firstAttempt)) """{
                     "overallVerdict":"REVISE","summary":"Het voorstel is te breed voor één toetsbare iteratie.",
                     "issues":[{"severity":"BLOCKING","category":"SCOPE","description":"De kandidaat combineert vijf zelfstandige productrisico's.","candidateIndex":0}],
                     "candidateReviews":[{"candidateIndex":0,"verdict":"REVISE","reason":"Beperk tot één brontransparante locatieflow."}],

@@ -989,6 +989,9 @@ controle waarmee Product Factory kan vaststellen dat de handeling klaar is.
 - bij `REVISE` verwerkt de story writer de concrete criticusfeedback autonoom en beoordeelt de
   criticus de volledige herziening opnieuw. Deze lus is begrensd op drie storypogingen; daarna blijft
   het resultaat `NEEDS_REVISION` en wordt niets gepubliceerd;
+- de ernstclassificatie is bindend: alleen een `BLOCKING` criticusbevinding mag `REVISE` veroorzaken.
+  `WARNING` en `INFO` blijven voor traceerbaarheid in het dossier en de story staan, maar blokkeren
+  een verder veilige kandidaat niet;
 - de workspace-PR wordt gevolgd via GitHub en een kandidaat blijft intern totdat die PR werkelijk
   is gemerged. De merge-commit-SHA en het artefactpad gaan mee naar de story;
 - Software Factory heeft een aparte tokenbeveiligde machine-API. `Idempotency-Key` staat ook als
