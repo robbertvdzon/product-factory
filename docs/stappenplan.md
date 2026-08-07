@@ -827,10 +827,9 @@ Elk product bevat minimaal:
 
 - generieke producttabellen en repositories;
 - productbeheer in het dashboard;
-- `hkh` als handmatig/observe-only vergelijkingsproduct;
 - `hkh-autopilot` als eerste autonoom gestuurd product;
-- `hkh` met workspace-eigenaarschap `owner` en `hkh-autopilot` met eigenaarschap
-  `product-factory` configureren;
+- `hkh` bewust niet in Product Factory registreren, omdat de eigenaar dat product zelf bestuurt;
+- `hkh-autopilot` met workspace-eigenaarschap `product-factory` configureren;
 - productcontext strikt scheiden in iedere query en agentrun;
 - workspace-paden strikt uit de geregistreerde productslug afleiden en path traversal weigeren;
 - pauzeren per product zonder de hele runtime stil te leggen;
@@ -842,18 +841,16 @@ Elk product bevat minimaal:
 - Een tweede fictief product kan zonder codewijziging worden toegevoegd.
 - Runs, kennis, kandidaten en stories van producten lekken niet naar elkaar.
 - Een productrun kan uitsluitend bestanden binnen zijn toegestane workspace-directory publiceren.
-- Product Factory kan geen workspace-wijziging voor `hkh` publiceren.
-- Iedere variant kan zelfstandig worden gepauzeerd en hervat.
-- Product Factory kan voor `hkh` geen story publiceren zolang de ontwikkelmodus niet `autonomous`
-  is.
+- `hkh` komt niet voor in de Product Factory-catalogus en product-API's voor die slug geven `404`.
+- Ieder geregistreerd product kan zelfstandig worden gepauzeerd en hervat.
 
 ### Status fase 5 — afgerond op 7 augustus 2026
 
 - Flyway beheert een generieke productdefinitie met stabiele ID, planning, budgetten, regels,
   repositorykoppeling, ontwikkelmodus en workspacebeleid; onderzoek, geheugen en beslissingen zijn
   afzonderlijke productgebonden tabellen;
-- `hkh` en `hkh-autopilot` zijn uitsluitend initiële data: dezelfde API kan zonder codewijziging
-  volgende producten registreren;
+- uitsluitend `hkh-autopilot` is initiële productdata; `hkh` wordt buiten Product Factory door de
+  eigenaar bestuurd en dezelfde API kan zonder codewijziging volgende producten registreren;
 - iedere query voor runs, kennis, storykandidaten en workspace-publicaties vereist expliciet een
   productcontext; integratietests met `castle-guide` en `archive-explorer` bewaken isolatie;
 - de centrale productpolicy blokkeert een gepauzeerd product, story-publicatie buiten
@@ -991,25 +988,26 @@ productontwikkeling van `hkh`, terwijl Product Factory uitsluitend de productont
 - beide baseline-tags en commit-SHA's in database en workspace registreren;
 - technische verschillen automatisch rapporteren;
 - twee zelfstandige databases, deployments, URL's en APK's bevestigen;
-- Product Factory voor `hkh` op `observe-only` zetten;
 - Product Factory voor `hkh-autopilot` op `autonomous` zetten;
+- bevestigen dat `hkh` niet in de Product Factory-catalogus staat;
 - splitsingsdatum en vergelijkingsregels vastleggen;
 - de splitsingsbeslissing en nulmeting als workspace-artefact publiceren;
-- voorkomen dat Product Factory stories voor `hkh` kan indienen.
+- voorkomen dat Product Factory `hkh` als productcontext kan gebruiken.
 
 ### Definition of done
 
 - Beide varianten slagen voor dezelfde baseline-acceptatietests.
 - Beide varianten hebben de tag `comparison-baseline-v1`.
-- Het dashboard toont duidelijk wie ieder productpad bestuurt.
-- Autonome storypublicatie voor `hkh` wordt technisch geweigerd.
+- Het Product Factory-dashboard toont uitsluitend het autonoom bestuurde `hkh-autopilot`-pad.
+- Product-API's voor `hkh` geven `404`.
 - HKH Autopilot kan zelfstandig zijn eerste productiteratie starten.
 
 ## 14. Fase 9 — parallelle productontwikkeling en vergelijking
 
 ### Verdeling
 
-- **`hkh`** — productkeuzes en nieuwe stories worden door de eigenaar bepaald.
+- **`hkh`** — productkeuzes en nieuwe stories worden buiten Product Factory door de eigenaar
+  bepaald.
 - **`hkh-autopilot`** — Product Factory onderzoekt, kiest, schrijft stories, beantwoordt vragen en
   evalueert; Software Factory bouwt en deployt.
 

@@ -17,24 +17,19 @@ class ProductFactoryApiTest(
     @Autowired private val mapper: ObjectMapper,
 ) {
     @Test
-    fun `HKH products are configuration with independent ownership and modes`() {
-        mvc.get("/api/products/hkh").andExpect {
+    fun `HKH Autopilot is the only initially configured product`() {
+        mvc.get("/api/products").andExpect {
             status { isOk() }
-            jsonPath("$.id") { value("pf-product-hkh-v1") }
-            jsonPath("$.workspaceOwnership") { value("owner") }
-            jsonPath("$.developmentMode") { value("observe-only") }
-            jsonPath("$.workspaceDirectory") { value("products/hkh") }
+            jsonPath("$.length()") { value(1) }
+            jsonPath("$[0].slug") { value("hkh-autopilot") }
         }
+        mvc.get("/api/products/hkh").andExpect { status { isNotFound() } }
         mvc.get("/api/products/hkh-autopilot").andExpect {
             status { isOk() }
             jsonPath("$.workspaceOwnership") { value("product-factory") }
             jsonPath("$.developmentMode") { value("autonomous") }
             jsonPath("$.allowedWritePaths[0]") { exists() }
         }
-        mvc.post("/api/products/hkh/shadow-iterations") {
-            contentType = MediaType.APPLICATION_JSON
-            content = "{}"
-        }.andExpect { status { isConflict() } }
     }
 
     @Test
@@ -79,19 +74,20 @@ class ProductFactoryApiTest(
 
     @Test
     fun `products pause independently and only autonomous products publish stories`() {
+        createOwnerProduct("owner-led")
         mvc.post("/api/products/hkh-autopilot/pause").andExpect { status { isOk() }; jsonPath("$.status") { value("paused") } }
         mvc.post("/api/story-candidates") {
             contentType = MediaType.APPLICATION_JSON
             content = storyJson("hkh-autopilot", "Geblokkeerd")
         }.andExpect { status { isConflict() } }
 
-        mvc.get("/api/products/hkh").andExpect { status { isOk() }; jsonPath("$.status") { value("active") } }
+        mvc.get("/api/products/owner-led").andExpect { status { isOk() }; jsonPath("$.status") { value("active") } }
         mvc.post("/api/products/hkh-autopilot/resume").andExpect { status { isOk() }; jsonPath("$.status") { value("active") } }
 
-        val hkhStory = createStory("hkh", "Handmatige story")
-        mvc.post("/api/story-candidates/$hkhStory/publish") {
+        val ownerStory = createStory("owner-led", "Handmatige story")
+        mvc.post("/api/story-candidates/$ownerStory/publish") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"productSlug":"hkh"}"""
+            content = """{"productSlug":"owner-led"}"""
         }.andExpect { status { isConflict() } }
 
         val autopilotStory = createStory("hkh-autopilot", "Autonome story")
@@ -109,6 +105,23 @@ class ProductFactoryApiTest(
             status { isCreated() }
             jsonPath("$.slug") { value(slug) }
             jsonPath("$.workspaceDirectory") { value("products/$slug") }
+        }
+    }
+
+    private fun createOwnerProduct(slug: String) {
+        mvc.post("/api/products") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{
+                "slug":"$slug",
+                "name":"Door eigenaar beheerd product",
+                "mission":"Test handmatige productregie",
+                "status":"active",
+                "developmentMode":"manual",
+                "workspaceOwnership":"owner"
+            }""".trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.workspaceOwnership") { value("owner") }
         }
     }
 

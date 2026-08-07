@@ -1,5 +1,7 @@
 package nl.vdzon.productfactory.workspace
 
+import nl.vdzon.productfactory.product.CreateProductRequest
+import nl.vdzon.productfactory.product.api.ProductCatalog
 import org.junit.jupiter.api.Test
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import org.springframework.beans.factory.annotation.Autowired
@@ -15,7 +17,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 @SpringBootTest
-class WorkspacePublisherIntegrationTest(@Autowired private val publisher: WorkspacePublisher) {
+class WorkspacePublisherIntegrationTest(
+    @Autowired private val publisher: WorkspacePublisher,
+    @Autowired private val products: ProductCatalog,
+) {
     @Test fun `approved artifact is committed exactly once for a run id`() {
         val request = WorkspaceArtifact(
             "run-phase2-001", "hkh-autopilot", "research/phase-2-proof.md",
@@ -39,8 +44,18 @@ sources: []
     }
 
     @Test fun `owner workspace and paths outside the allowlist are rejected`() {
+        products.create(
+            CreateProductRequest(
+                slug = "owner-led-workspace",
+                name = "Door eigenaar beheerde workspace",
+                mission = "Test de workspacegrens",
+                workspaceOwnership = "owner",
+                status = "active",
+                developmentMode = "manual",
+            ).configuration(),
+        )
         val ownerError = assertFailsWith<org.springframework.web.server.ResponseStatusException> {
-            publisher.publish(WorkspaceArtifact("run-owner-001", "hkh", "research/no-write.md", "# Niet schrijven"))
+            publisher.publish(WorkspaceArtifact("run-owner-001", "owner-led-workspace", "research/no-write.md", "# Niet schrijven"))
         }
         assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ownerError.statusCode)
 
@@ -52,7 +67,7 @@ sources: []
         assertFailsWith<IllegalArgumentException> {
             publisher.publish(WorkspaceArtifact("run-traversal-001", "hkh-autopilot", "research/../../outside.md", "# Buiten workspace"))
         }
-        assertTrue(!Files.exists(workspace.resolve("products/hkh/research/no-write.md")))
+        assertTrue(!Files.exists(workspace.resolve("products/owner-led-workspace/research/no-write.md")))
         assertTrue(!Files.exists(workspace.resolve("products/hkh-autopilot/private/secret.md")))
         assertTrue(!Files.exists(workspace.resolve("outside.md")))
     }
