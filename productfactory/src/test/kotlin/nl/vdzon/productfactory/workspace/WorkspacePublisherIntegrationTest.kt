@@ -10,6 +10,7 @@ import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 @SpringBootTest
@@ -34,6 +35,25 @@ sources: []
         assertEquals("COMMITTED_LOCAL", first.status)
         assertTrue(Files.exists(workspace.resolve("products/hkh-autopilot/research/phase-2-proof.md")))
         assertEquals("2", git("rev-list", "--all", "--count").trim())
+    }
+
+    @Test fun `owner workspace and paths outside the allowlist are rejected`() {
+        val ownerError = assertFailsWith<org.springframework.web.server.ResponseStatusException> {
+            publisher.publish(PublishArtifactRequest("run-owner-001", "hkh", "research/no-write.md", "# Niet schrijven"))
+        }
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ownerError.statusCode)
+
+        val pathError = assertFailsWith<org.springframework.web.server.ResponseStatusException> {
+            publisher.publish(PublishArtifactRequest("run-path-001", "hkh-autopilot", "private/secret.md", "# Niet toegestaan"))
+        }
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, pathError.statusCode)
+
+        assertFailsWith<IllegalArgumentException> {
+            publisher.publish(PublishArtifactRequest("run-traversal-001", "hkh-autopilot", "research/../../outside.md", "# Buiten workspace"))
+        }
+        assertTrue(!Files.exists(workspace.resolve("products/hkh/research/no-write.md")))
+        assertTrue(!Files.exists(workspace.resolve("products/hkh-autopilot/private/secret.md")))
+        assertTrue(!Files.exists(workspace.resolve("outside.md")))
     }
 
     companion object {

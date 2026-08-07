@@ -49,3 +49,4 @@ publiceren; tijdens slaapstand of uitschakelen rapporteert de backend de worker 
 - [Lokale ontwikkeling](docs/development/local-development.md)
 - [OpenShift-deployment](docs/deployment/openshift.md)
 - [Workspace-security](docs/security/workspace-credential.md)
+- [Template voor een volgend product](docs/product-template.md)

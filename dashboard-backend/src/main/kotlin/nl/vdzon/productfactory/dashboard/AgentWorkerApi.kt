@@ -9,22 +9,29 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 
 @RestController
 @RequestMapping("/api/agent-worker")
-class AgentWorkerApi(private val hub: AgentWorkerHub) {
+class AgentWorkerApi(private val hub: AgentWorkerHub, private val runtime: ProductFactoryRuntimeClient) {
     @GetMapping("/status")
     fun status(): AgentWorkerStatus = hub.status()
 
     @PostMapping("/tasks")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun submit(@RequestBody task: AgentTask): AgentTaskStatus = translateErrors { hub.submit(task) }
+    fun submit(@RequestBody task: AgentTask): AgentTaskStatus = translateErrors {
+        runtime.requireRunnableProduct(task.productSlug)
+        hub.submit(task).also { runtime.registerAgentRun(task) }
+    }
 
     @GetMapping("/tasks/{runId}")
-    fun task(@PathVariable runId: String): AgentTaskStatus = translateErrors { hub.taskStatus(runId) }
+    fun task(@PathVariable runId: String, @RequestParam productSlug: String): AgentTaskStatus = translateErrors {
+        runtime.requireAgentRun(productSlug, runId)
+        hub.taskStatus(runId)
+    }
 
     private fun <T> translateErrors(action: () -> T): T = try {
         action()

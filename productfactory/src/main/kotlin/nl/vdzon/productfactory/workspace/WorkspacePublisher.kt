@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.workspace
 
 import nl.vdzon.productfactory.contracts.WorkspacePublicationView
+import nl.vdzon.productfactory.product.api.ProductCatalog
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
@@ -33,6 +34,7 @@ class WorkspaceRepositoryGuard(private val configuredRepository: String) {
 @Service
 class WorkspacePublisher(
     private val jdbc: JdbcTemplate,
+    private val products: ProductCatalog,
     @Value("\${product-factory.workspace.path}") private val workspacePath: String,
     @Value("\${product-factory.workspace.repository}") private val repository: String,
     @Value("\${product-factory.workspace.main-branch:main}") private val mainBranch: String,
@@ -41,8 +43,9 @@ class WorkspacePublisher(
 ) {
     fun publish(request: PublishArtifactRequest): WorkspacePublicationView {
         validate(request)
+        val product = products.requireWorkspacePublication(request.productSlug, request.relativePath)
         val hash = sha256(request.content)
-        find(request.runId)?.let { existing ->
+        findByRunId(request.runId)?.let { existing ->
             if (existing.contentHash != hash || existing.productSlug != request.productSlug || existing.artifactPath != request.relativePath) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Run-ID is al voor andere inhoud gebruikt")
             }
@@ -52,8 +55,10 @@ class WorkspacePublisher(
         WorkspaceRepositoryGuard(repository).requireWorkspaceRepository(readOriginOrConfigured())
         val root = Path.of(workspacePath).toAbsolutePath().normalize()
         require(Files.isDirectory(root.resolve(".git"))) { "PF_WORKSPACE_PATH moet een Git-checkout zijn" }
-        val artifact = root.resolve("products").resolve(request.productSlug).resolve(request.relativePath).normalize()
-        require(artifact.startsWith(root.resolve("products").resolve(request.productSlug))) { "Artefactpad verlaat productdirectory" }
+        val productDirectory = root.resolve(product.workspaceDirectory).normalize()
+        require(productDirectory == root.resolve("products").resolve(request.productSlug).normalize()) { "Ongeldige productdirectory" }
+        val artifact = productDirectory.resolve(request.relativePath).normalize()
+        require(artifact.startsWith(productDirectory)) { "Artefactpad verlaat productdirectory" }
 
         git(root, "checkout", mainBranch)
         if (remotePublication) git(root, "pull", "--ff-only", "origin", mainBranch)
@@ -73,21 +78,37 @@ class WorkspacePublisher(
             status = "PULL_REQUEST"
         }
         jdbc.update("insert into workspace_publication(run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha) values (?, ?, ?, ?, ?, ?, ?)", request.runId, request.productSlug, request.relativePath, hash, status, pullRequest, commitSha)
-        return find(request.runId)!!
+        return find(request.productSlug, request.runId)!!
     }
 
-    fun find(runId: String): WorkspacePublicationView? = jdbc.query(
-        "select run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha from workspace_publication where run_id = ?",
-        { row, _ -> WorkspacePublicationView(row.getString(1), row.getString(2), row.getString(3), row.getString(4), row.getString(5), row.getString(6), row.getString(7)) }, runId
+    fun find(productSlug: String, runId: String): WorkspacePublicationView? = jdbc.query(
+        "select run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha from workspace_publication where product_slug = ? and run_id = ?",
+        { row, _ -> WorkspacePublicationView(row.getString(1), row.getString(2), row.getString(3), row.getString(4), row.getString(5), row.getString(6), row.getString(7)) },
+        productSlug,
+        runId,
     ).firstOrNull()
 
-    fun list(): List<WorkspacePublicationView> = jdbc.query(
-        "select run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha from workspace_publication order by created_at desc",
-    ) { row, _ -> WorkspacePublicationView(row.getString(1), row.getString(2), row.getString(3), row.getString(4), row.getString(5), row.getString(6), row.getString(7)) }
+    private fun findByRunId(runId: String): WorkspacePublicationView? = jdbc.query(
+        "select run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha from workspace_publication where run_id = ?",
+        { row, _ -> WorkspacePublicationView(row.getString(1), row.getString(2), row.getString(3), row.getString(4), row.getString(5), row.getString(6), row.getString(7)) },
+        runId,
+    ).firstOrNull()
 
-    fun readArtifact(runId: String): String {
-        val publication = find(runId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        val path = Path.of(workspacePath).resolve("products").resolve(publication.productSlug).resolve(publication.artifactPath).normalize()
+    fun list(productSlug: String): List<WorkspacePublicationView> {
+        products.requireProduct(productSlug)
+        return jdbc.query(
+            "select run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha from workspace_publication where product_slug = ? order by created_at desc",
+            { row, _ -> WorkspacePublicationView(row.getString(1), row.getString(2), row.getString(3), row.getString(4), row.getString(5), row.getString(6), row.getString(7)) },
+            productSlug,
+        )
+    }
+
+    fun readArtifact(productSlug: String, runId: String): String {
+        val product = products.requireContext(productSlug)
+        val publication = find(productSlug, runId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val root = Path.of(workspacePath).toAbsolutePath().normalize()
+        val path = root.resolve(product.workspaceDirectory).resolve(publication.artifactPath).normalize()
+        require(path.startsWith(root.resolve(product.workspaceDirectory).normalize())) { "Artefactpad verlaat productdirectory" }
         return Files.readString(path)
     }
 
@@ -138,7 +159,9 @@ class WorkspacePublisher(
 @RequestMapping("/api/workspace/publications")
 class WorkspacePublicationController(private val publisher: WorkspacePublisher) {
     @PostMapping @ResponseStatus(HttpStatus.CREATED) fun publish(@RequestBody request: PublishArtifactRequest) = publisher.publish(request)
-    @GetMapping fun list() = publisher.list()
-    @GetMapping("/{runId}") fun get(@PathVariable runId: String) = publisher.find(runId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-    @GetMapping("/{runId}/artifact", produces = ["text/markdown"]) fun artifact(@PathVariable runId: String) = publisher.readArtifact(runId)
+    @GetMapping fun list(@RequestParam productSlug: String) = publisher.list(productSlug)
+    @GetMapping("/{runId}") fun get(@PathVariable runId: String, @RequestParam productSlug: String) =
+        publisher.find(productSlug, runId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    @GetMapping("/{runId}/artifact", produces = ["text/markdown"])
+    fun artifact(@PathVariable runId: String, @RequestParam productSlug: String) = publisher.readArtifact(productSlug, runId)
 }

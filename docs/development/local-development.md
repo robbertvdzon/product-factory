@@ -16,10 +16,13 @@ Handmatig een product en interne storykandidaat maken:
 
 ```bash
 curl -X POST http://localhost:8080/api/products -H 'Content-Type: application/json' \
-  -d '{"slug":"hkh-autopilot","name":"HKH Autopilot","mission":"Ontsluit geschiedenis","guardrails":"Bronnen zijn verplicht"}'
+  -d '{"slug":"voorbeeld-product","name":"Voorbeeldproduct","mission":"Ontsluit relevante kennis","status":"active","developmentMode":"autonomous"}'
 curl -X POST http://localhost:8080/api/story-candidates -H 'Content-Type: application/json' \
-  -d '{"productSlug":"hkh-autopilot","title":"Kleine proef","description":"Toets één hypothese"}'
+  -d '{"productSlug":"voorbeeld-product","title":"Kleine proef","description":"Toets één hypothese"}'
+curl 'http://localhost:8080/api/story-candidates?productSlug=voorbeeld-product'
 ```
+
+Zie [het producttemplate](../product-template.md) voor alle instellingen en veiligheidsregels.
 
 ## Agentworker op de Mac
 
@@ -58,5 +61,6 @@ crash of nieuwe login. De Mac moet wel ingeschakeld en wakker zijn; een WebSocke
 niet overleven en reconnect automatisch zodra macOS weer actief is.
 
 De geauthenticeerde dashboard-API biedt `GET /api/agent-worker/status`,
-`POST /api/agent-worker/tasks` en `GET /api/agent-worker/tasks/{runId}`. Taakdispatch is
+`POST /api/agent-worker/tasks` en
+`GET /api/agent-worker/tasks/{runId}?productSlug=<slug>`. Taakdispatch is
 asynchroon: de POST retourneert `202`, waarna het resultaat via het statusendpoint gevolgd wordt.
