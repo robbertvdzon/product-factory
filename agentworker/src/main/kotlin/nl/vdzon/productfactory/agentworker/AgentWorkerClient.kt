@@ -15,6 +15,7 @@ import java.nio.ByteBuffer
 import java.time.Duration
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -34,6 +35,7 @@ class AgentWorkerClient(
     private val taskThread = Executors.newSingleThreadExecutor()
     private val reconnectPending = AtomicBoolean(false)
     private val shuttingDown = AtomicBoolean(false)
+    private val shutdown = CountDownLatch(1)
     private val backoffMs = AtomicLong(MIN_RECONNECT_MS)
     private val completed = ConcurrentHashMap<String, AgentResult>()
     private val inFlight = ConcurrentHashMap.newKeySet<String>()
@@ -45,6 +47,11 @@ class AgentWorkerClient(
         require(settings.token.isNotBlank()) { "PF_AGENT_WORKER_TOKEN ontbreekt" }
         require(settings.workerId.isNotBlank()) { "PF_AGENT_WORKER_ID ontbreekt" }
         connect()
+    }
+
+    fun runUntilShutdown() {
+        start()
+        shutdown.await()
     }
 
     private fun connect() {
@@ -104,6 +111,7 @@ class AgentWorkerClient(
         runCatching { socket.get()?.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown")?.join() }
         scheduler.shutdownNow()
         taskThread.shutdownNow()
+        shutdown.countDown()
     }
 
     private inner class Listener : WebSocket.Listener {

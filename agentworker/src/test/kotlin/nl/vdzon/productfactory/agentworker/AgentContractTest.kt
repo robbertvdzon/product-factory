@@ -7,6 +7,7 @@ import nl.vdzon.productfactory.contracts.AgentWorkerTaskFrame
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AgentContractTest {
@@ -38,5 +39,28 @@ class AgentContractTest {
         assertEquals("/opt/homebrew/bin/codex", command.first())
         assertTrue(command.containsAll(listOf("exec", "--json", "workspace-write", "--model", "gpt-5.6-terra")))
         assertTrue(command.last().contains("Onderzoek openbare archieven"))
+    }
+
+    @Test fun `worker process remains alive until shutdown`() {
+        val settings = AgentWorkerSettings(
+            url = "ws://127.0.0.1:1/agent-worker",
+            token = "secret",
+            workerId = "lifecycle-test",
+            version = "test",
+            workspacePath = Files.createTempDirectory("pf-agent-lifecycle"),
+            codexExecutable = "codex",
+            defaultModel = "gpt-5.6-terra",
+        )
+        val client = AgentWorkerClient(settings, AgentTaskExecutor { error("geen taak verwacht") })
+        val workerThread = Thread(client::runUntilShutdown).apply { start() }
+
+        try {
+            Thread.sleep(100)
+            assertTrue(workerThread.isAlive)
+        } finally {
+            client.stop()
+            workerThread.join(2_000)
+        }
+        assertFalse(workerThread.isAlive)
     }
 }

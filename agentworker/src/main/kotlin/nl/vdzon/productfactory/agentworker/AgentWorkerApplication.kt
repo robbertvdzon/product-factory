@@ -31,7 +31,7 @@ class AgentWorkerApplication {
 
     @Bean fun taskExecutor(settings: AgentWorkerSettings): AgentTaskExecutor = CodexAgentTaskExecutor(settings)
     @Bean fun workerClient(settings: AgentWorkerSettings, taskExecutor: AgentTaskExecutor) = AgentWorkerClient(settings, taskExecutor)
-    @Bean fun startWorker(client: AgentWorkerClient) = CommandLineRunner { client.start() }
+    @Bean fun startWorker(client: AgentWorkerClient) = CommandLineRunner { client.runUntilShutdown() }
 }
 
 fun main(args: Array<String>) {
