@@ -17,11 +17,11 @@ class ProductFactoryApiTest(
     @Autowired private val mapper: ObjectMapper,
 ) {
     @Test
-    fun `HKH Autopilot is the only initially configured product`() {
+    fun `HKH is absent and HKH Autopilot is initially configured`() {
         mvc.get("/api/products").andExpect {
             status { isOk() }
-            jsonPath("$.length()") { value(1) }
-            jsonPath("$[0].slug") { value("hkh-autopilot") }
+            jsonPath("$[?(@.slug == 'hkh')]") { isEmpty() }
+            jsonPath("$[?(@.slug == 'hkh-autopilot')]") { isNotEmpty() }
         }
         mvc.get("/api/products/hkh").andExpect { status { isNotFound() } }
         mvc.get("/api/products/hkh-autopilot").andExpect {
