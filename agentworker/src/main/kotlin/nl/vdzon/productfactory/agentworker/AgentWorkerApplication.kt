@@ -24,7 +24,7 @@ class AgentWorkerApplication {
         token = token,
         workerId = workerId,
         version = version,
-        workspacePath = Path.of(workspacePath).toAbsolutePath().normalize(),
+        workspacePath = resolveWorkspacePath(EnvironmentFiles.locate(), workspacePath),
         codexExecutable = codexExecutable,
         defaultModel = defaultModel,
     )
@@ -32,6 +32,11 @@ class AgentWorkerApplication {
     @Bean fun taskExecutor(settings: AgentWorkerSettings): AgentTaskExecutor = CodexAgentTaskExecutor(settings)
     @Bean fun workerClient(settings: AgentWorkerSettings, taskExecutor: AgentTaskExecutor) = AgentWorkerClient(settings, taskExecutor)
     @Bean fun startWorker(client: AgentWorkerClient) = CommandLineRunner { client.runUntilShutdown() }
+}
+
+internal fun resolveWorkspacePath(configDirectory: Path, configuredPath: String): Path {
+    val path = Path.of(configuredPath)
+    return (if (path.isAbsolute) path else configDirectory.resolve(path)).toAbsolutePath().normalize()
 }
 
 fun main(args: Array<String>) {
