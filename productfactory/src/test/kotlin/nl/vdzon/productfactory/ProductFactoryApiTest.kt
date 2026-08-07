@@ -31,6 +31,10 @@ class ProductFactoryApiTest(
             jsonPath("$.developmentMode") { value("autonomous") }
             jsonPath("$.allowedWritePaths[0]") { exists() }
         }
+        mvc.post("/api/products/hkh/shadow-iterations") {
+            contentType = MediaType.APPLICATION_JSON
+            content = "{}"
+        }.andExpect { status { isConflict() } }
     }
 
     @Test

@@ -37,8 +37,55 @@ class AgentContractTest {
         )
 
         assertEquals("/opt/homebrew/bin/codex", command.first())
-        assertTrue(command.containsAll(listOf("exec", "--json", "workspace-write", "--model", "gpt-5.6-terra")))
+        assertTrue(
+            command.containsAll(
+                listOf(
+                    "--search", "exec", "--ignore-user-config", "--ignore-rules", "shell_environment_policy.inherit=none",
+                    "--json", "read-only", "--ephemeral", "--model", "gpt-5.6-terra",
+                ),
+            ),
+        )
         assertTrue(command.last().contains("Onderzoek openbare archieven"))
+        assertTrue(command.last().contains("Wijzig geen bestanden"))
+    }
+
+    @Test fun `codex command passes a structured output schema`() {
+        val workspace = Files.createTempDirectory("pf-agent-schema")
+        val executor = CodexAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test", workspace, "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val schema = workspace.resolve("response-schema.json")
+        Files.writeString(schema, "{}")
+
+        val command = executor.command(
+            AgentTask("run-schema", "hkh-autopilot", "research", "Onderzoek"),
+            workspace.resolve("last-message"),
+            schema,
+        )
+
+        val option = command.indexOf("--output-schema")
+        assertTrue(option > 0)
+        assertEquals(schema.toString(), command[option + 1])
+    }
+
+    @Test fun `agent process environment contains no application or infrastructure credentials`() {
+        val safe = safeAgentEnvironment(
+            mapOf(
+                "PATH" to "/usr/bin",
+                "HOME" to "/Users/test",
+                "CODEX_HOME" to "/Users/test/.codex",
+                "GH_TOKEN" to "github-secret",
+                "GITHUB_TOKEN" to "github-secret-2",
+                "KUBECONFIG" to "/secret/kubeconfig",
+                "PF_DB_PASSWORD" to "database-secret",
+                "PF_WORKSPACE_GITHUB_TOKEN" to "workspace-secret",
+                "OPENAI_API_KEY" to "api-secret",
+            ),
+        )
+        assertEquals(setOf("PATH", "HOME", "CODEX_HOME"), safe.keys)
+        assertFalse(safe.values.any { it.contains("secret") })
     }
 
     @Test fun `worker process remains alive until shutdown`() {

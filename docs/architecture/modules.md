@@ -4,9 +4,11 @@
 expliciete `@ApplicationModule`-metadata. `ApplicationModules.verify()` en een aanvullende
 conventietest draaien bij iedere Maven-verificatie.
 
-De modules `product`, `story` en `workspace` bevatten de eerste werkende use-cases. De overige
-fase-2-modules zijn als gesloten grenzen gereserveerd en krijgen pas gedrag wanneer een volgende
-fase dat nodig heeft. Zo ontstaan geen generieke lagen die latere domeinen ongemerkt koppelen.
+De modules `product`, `story` en `workspace` bevatten de productconfiguratie en begrensde
+workspacepublicatie. `iteration` bezit de shadow-cyclus en mag uitsluitend de expliciete API's van
+`product`, `agentruntime` en `workspace` gebruiken. `agentruntime` registreert de duurzame
+runstatus; de WebSocket-transportadapter blijft in de afzonderlijke dashboardbackend. De overige
+gereserveerde modules blijven gesloten totdat een volgende fase daar gedrag aan toevoegt.
 
 De contracts-module bevat uitsluitend wire-DTO's voor runtime, dashboard en agentworker. Common
 bevat alleen de zelfstandig geïmplementeerde configuratielader. Geen van beide verwijst naar
@@ -19,7 +21,8 @@ geauthenticeerde Mac-workerverbinding actief. `agentworker` bezit reconnect, hea
 single-flight taakuitvoering en de Codex-CLI-procesgrens. De gedeelde frames staan in
 `productfactory-contracts`; er wordt geen Software Factory-code hergebruikt.
 
-De eerste technische snede houdt taakstatus in het geheugen van de dashboardbackend. Dit is
-geschikt om verbinding, auth en Codex-uitvoering veilig te bewijzen. Voordat nachtelijke autonome
-runs worden geactiveerd verhuist de duurzame wachtrij naar de `agentruntime`-module en PostgreSQL,
-zodat een backendrestart of slapende Mac geen taak kan verliezen.
+De transportstatus van een actieve agenttaak staat tijdelijk in het geheugen van de
+dashboardbackend. Iteratie, stappen, gevalideerde resultaten en eindstatus staan duurzaam in
+PostgreSQL. Een verbroken workerverbinding of backendrestart laat de huidige iteratie daarom
+fail-closed eindigen; automatische hervatting en een duurzame wachtrij horen bij de begrensde
+autonomie van een volgende fase.

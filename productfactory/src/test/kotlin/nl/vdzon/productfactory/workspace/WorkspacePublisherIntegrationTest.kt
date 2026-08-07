@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.workspace
 
 import org.junit.jupiter.api.Test
+import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -16,7 +17,7 @@ import kotlin.test.assertTrue
 @SpringBootTest
 class WorkspacePublisherIntegrationTest(@Autowired private val publisher: WorkspacePublisher) {
     @Test fun `approved artifact is committed exactly once for a run id`() {
-        val request = PublishArtifactRequest(
+        val request = WorkspaceArtifact(
             "run-phase2-001", "hkh-autopilot", "research/phase-2-proof.md",
             """---
 product: hkh-autopilot
@@ -39,17 +40,17 @@ sources: []
 
     @Test fun `owner workspace and paths outside the allowlist are rejected`() {
         val ownerError = assertFailsWith<org.springframework.web.server.ResponseStatusException> {
-            publisher.publish(PublishArtifactRequest("run-owner-001", "hkh", "research/no-write.md", "# Niet schrijven"))
+            publisher.publish(WorkspaceArtifact("run-owner-001", "hkh", "research/no-write.md", "# Niet schrijven"))
         }
         assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ownerError.statusCode)
 
         val pathError = assertFailsWith<org.springframework.web.server.ResponseStatusException> {
-            publisher.publish(PublishArtifactRequest("run-path-001", "hkh-autopilot", "private/secret.md", "# Niet toegestaan"))
+            publisher.publish(WorkspaceArtifact("run-path-001", "hkh-autopilot", "private/secret.md", "# Niet toegestaan"))
         }
         assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, pathError.statusCode)
 
         assertFailsWith<IllegalArgumentException> {
-            publisher.publish(PublishArtifactRequest("run-traversal-001", "hkh-autopilot", "research/../../outside.md", "# Buiten workspace"))
+            publisher.publish(WorkspaceArtifact("run-traversal-001", "hkh-autopilot", "research/../../outside.md", "# Buiten workspace"))
         }
         assertTrue(!Files.exists(workspace.resolve("products/hkh/research/no-write.md")))
         assertTrue(!Files.exists(workspace.resolve("products/hkh-autopilot/private/secret.md")))

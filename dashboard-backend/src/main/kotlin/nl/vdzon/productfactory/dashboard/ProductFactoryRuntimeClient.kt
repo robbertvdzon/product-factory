@@ -30,6 +30,10 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri { it.path("/api/workspace/publications").queryParam("productSlug", slug).build() }
         .retrieve().body(listType).orEmpty()
 
+    fun shadowIterations(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri { it.path("/api/shadow-iterations").queryParam("productSlug", slug).build() }
+        .retrieve().body(listType).orEmpty()
+
     fun publication(slug: String, runId: String): Any = runtime.get()
         .uri { it.path("/api/workspace/publications/{runId}").queryParam("productSlug", slug).build(runId) }
         .retrieve().body(Any::class.java)!!
@@ -41,6 +45,11 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
     fun createProduct(body: Map<String, Any?>): Any = runtime.post().uri("/api/products").body(body).retrieve().body(Any::class.java)!!
 
     fun changeStatus(slug: String, action: String): Any = runtime.post().uri("/api/products/{slug}/{action}", slug, action)
+        .retrieve().body(Any::class.java)!!
+
+    fun startShadowIteration(slug: String, focus: String?): Any = runtime.post()
+        .uri("/api/products/{slug}/shadow-iterations", slug)
+        .body(mapOf("focus" to focus))
         .retrieve().body(Any::class.java)!!
 
     fun requireRunnableProduct(slug: String) {

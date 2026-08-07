@@ -12,6 +12,7 @@ class DashboardApi {
   Future<List<dynamic>> products() => _list('/api/products');
   Future<List<dynamic>> stories() => _list('/api/story-candidates');
   Future<List<dynamic>> publications() => _list('/api/workspace/publications');
+  Future<List<dynamic>> shadowIterations() => _list('/api/shadow-iterations');
   Future<String> artifact(String productSlug, String runId) async {
     final response = await http.get(
       Uri.parse(
@@ -46,6 +47,19 @@ class DashboardApi {
     if (response.statusCode != 201) {
       throw StateError(
         'Product kon niet worden toegevoegd (${response.statusCode}).',
+      );
+    }
+  }
+
+  Future<void> startShadowIteration(String slug) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/products/$slug/shadow-iterations'),
+      headers: headers,
+      body: '{}',
+    );
+    if (response.statusCode != 202) {
+      throw StateError(
+        'Shadow-iteratie kon niet worden gestart (${response.statusCode}).',
       );
     }
   }

@@ -25,4 +25,18 @@ class DashboardAuthenticationFilterTest {
         DashboardAuthenticationFilter(verifier, true).doFilter(request, response, MockFilterChain())
         assertEquals(200, response.status)
     }
+
+    @Test fun `internal agent bridge requires its dedicated constant time token`() {
+        val filter = InternalAgentAuthenticationFilter("bridge-secret")
+        val missingResponse = MockHttpServletResponse()
+        filter.doFilter(MockHttpServletRequest("POST", "/internal/agent-worker/tasks"), missingResponse, MockFilterChain())
+        assertEquals(401, missingResponse.status)
+
+        val request = MockHttpServletRequest("POST", "/internal/agent-worker/tasks").apply {
+            addHeader(InternalAgentAuthenticationFilter.TOKEN_HEADER, "bridge-secret")
+        }
+        val acceptedResponse = MockHttpServletResponse()
+        filter.doFilter(request, acceptedResponse, MockFilterChain())
+        assertEquals(200, acceptedResponse.status)
+    }
 }

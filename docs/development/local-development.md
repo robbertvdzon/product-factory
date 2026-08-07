@@ -64,3 +64,19 @@ De geauthenticeerde dashboard-API biedt `GET /api/agent-worker/status`,
 `POST /api/agent-worker/tasks` en
 `GET /api/agent-worker/tasks/{runId}?productSlug=<slug>`. Taakdispatch is
 asynchroon: de POST retourneert `202`, waarna het resultaat via het statusendpoint gevolgd wordt.
+
+## Shadow-iteratie uitvoeren
+
+Controleer eerst met `./product-factory agent-worker-status` dat de Mac-worker draait. Start daarna
+via de dashboardknop **Shadow-iteratie** of rechtstreeks op de runtime:
+
+```bash
+curl -X POST http://localhost:8080/api/products/hkh-autopilot/shadow-iterations \
+  -H 'Content-Type: application/json' -d '{}'
+curl 'http://localhost:8080/api/shadow-iterations?productSlug=hkh-autopilot'
+```
+
+De runtime verstuurt iedere rol via de interne, met `PF_AGENT_WORKER_TOKEN` beveiligde bridge naar
+de dashboardbackend. Dezelfde token moet dus in runtime, dashboardbackend en lokale agentworker
+staan; hij wordt niet doorgegeven aan het Codex-subproces. Zie
+[shadow-mode.md](../architecture/shadow-mode.md) voor rollen, validatie en opslaggrenzen.
