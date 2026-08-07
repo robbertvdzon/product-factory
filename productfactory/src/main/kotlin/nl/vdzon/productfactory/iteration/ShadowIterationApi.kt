@@ -215,7 +215,10 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
     ).joinToString("\n\n").take(12_000).ifBlank { "Nog geen eerdere beoordeelde productiteraties." }
 
     fun findDuplicate(productSlug: String, fingerprint: String): Long? = jdbc.queryForObject(
-        "select max(id) from story_candidate where product_slug = ? and fingerprint = ? and status in ('INTERNAL', 'PUBLISHED')",
+        """select max(c.id) from story_candidate c
+            join shadow_iteration i on i.id = c.iteration_id
+            where c.product_slug = ? and c.fingerprint = ?
+              and (c.status = 'PUBLISHED' or (c.status = 'INTERNAL' and i.status = 'ACCEPTED'))""".trimIndent(),
         Long::class.java,
         productSlug,
         fingerprint,
