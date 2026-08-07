@@ -571,6 +571,30 @@ veiligheids- en herstelregels:
 - tests simuleren expliciet sluiten tijdens provisioning, een gemist GitHub-event, een tijdelijke
   GitHub-storing, dubbele cleanup en een ongeldige namespaceprefix.
 
+#### Status stap 2 — afgerond op 7 augustus 2026
+
+- `hkh-previews` en `hkh-autopilot-previews` volgen iedere open pull request en maken de afgesproken
+  namespaces, gebruikersroutes en adminroutes;
+- beide repositories bouwen voor een pull request backend, gebruikersfrontend en adminfrontend op
+  de exacte head-SHA; een post-merge build houdt `main` als branch uitgecheckt en publiceert de
+  GitOps image-pins;
+- iedere preview gebruikt uitsluitend een eigen `emptyDir`-PostgreSQL, vaste niet-productie-
+  credentials en een previewmarker; de backend weigert previewmodus met een externe database-URL;
+- de adminfrontends gebruiken in previewmodus een backend-gecontroleerde testbeheerder, zonder
+  dynamische hosts aan de productie-Google OAuth-client toe te voegen;
+- echte PR's 12 en 13 van zowel HKH als HKH Autopilot zijn met alle vier publieke hosts,
+  backendversie, lege database, Flyway-migratie en adminlogin `Synced` en `Healthy` getest;
+- de generieke `preview-reconciler` gebruikt GitHub als bron van waarheid, een expliciet
+  eigenaarslabel, exacte namespacepatronen, een graceperiode, opeenvolgende observaties en een
+  laatste PR-check voor delete; GitHub-fouten stoppen alle mutaties;
+- de reconciler publiceert health/metrics en gestructureerde logs, heeft gerichte tests voor de
+  lifecycle-races en gebruikt een door CI gepinde image-SHA;
+- sluiten/mergen verwijdert eerst alle ArgoCD-resources en daarna de namespace; zes oude verweesde
+  Newsfeed-namespaces (`pnf-pr-203`, `206`, `207`, `208`, `209`, `210`) zijn via dezelfde veilige
+  reconciliatie opgeruimd;
+- de Newsfeed Neon-labeller controleert GitHub vóór branchcreatie, verwijdert een externe branch
+  pas nadat de namespace veilig weg is en is als vaste image-SHA uitgerold.
+
 ### Stap 3 — eerste verticale databasefunctionaliteit: laatste nieuws
 
 De eerste databasefunctionaliteit blijft bewust klein en gebruikt dezelfde contracten in `hkh` en
