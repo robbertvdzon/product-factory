@@ -20,3 +20,43 @@ curl -X POST http://localhost:8080/api/products -H 'Content-Type: application/js
 curl -X POST http://localhost:8080/api/story-candidates -H 'Content-Type: application/json' \
   -d '{"productSlug":"hkh-autopilot","title":"Kleine proef","description":"Toets één hypothese"}'
 ```
+
+## Agentworker op de Mac
+
+De worker gebruikt `codex exec` en de bestaande abonnementslogin uit `~/.codex/auth.json`. Maak
+één afzonderlijk, willekeurig bridgetoken en zet dezelfde waarde lokaal en via het SealedSecret:
+
+```bash
+openssl rand -hex 32
+# zet de uitvoer als PF_AGENT_WORKER_TOKEN in secrets.env
+./deploy/seal-secrets.sh
+```
+
+Publiceer eerst backend en SealedSecret. Start daarna eenmalig in de voorgrond voor controle:
+
+```bash
+./product-factory agent-worker-once
+```
+
+De productie-URL is standaard
+`wss://product-factory-api.vdzonsoftware.nl/agent-worker`. De verbinding wordt vanaf de Mac
+opgebouwd; Cloudflare of de router hoeft geen verbinding naar de Mac te kunnen openen. De worker
+verwijdert `OPENAI_API_KEY` en `CODEX_API_KEY` uit ieder Codex-subproces, zodat de opgeslagen
+ChatGPT-login bepalend blijft.
+
+Installeer hem daarna als macOS LaunchAgent, in dezelfde stijl als de Software Factory:
+
+```bash
+./product-factory agent-worker-install
+./product-factory agent-worker-status
+tail -f work/agentworker.log
+```
+
+Gebruik `agent-worker-restart` na een lokale code-update en `agent-worker-uninstall` om de
+LaunchAgent te verwijderen. Een LaunchAgent houdt geen terminalvenster open en herstart na een
+crash of nieuwe login. De Mac moet wel ingeschakeld en wakker zijn; een WebSocket kan slaapstand
+niet overleven en reconnect automatisch zodra macOS weer actief is.
+
+De geauthenticeerde dashboard-API biedt `GET /api/agent-worker/status`,
+`POST /api/agent-worker/tasks` en `GET /api/agent-worker/tasks/{runId}`. Taakdispatch is
+asynchroon: de POST retourneert `202`, waarna het resultaat via het statusendpoint gevolgd wordt.

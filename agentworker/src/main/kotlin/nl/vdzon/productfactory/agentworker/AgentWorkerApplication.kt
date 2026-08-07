@@ -1,24 +1,37 @@
 package nl.vdzon.productfactory.agentworker
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import nl.vdzon.productfactory.common.config.EnvironmentFiles
-import nl.vdzon.productfactory.contracts.AgentResult
-import nl.vdzon.productfactory.contracts.AgentTask
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.context.annotation.Bean
+import java.nio.file.Path
 
 @SpringBootApplication
 class AgentWorkerApplication {
-    @Bean fun executeTask() = CommandLineRunner {
-        val taskJson = System.getenv("PF_AGENT_TASK_JSON") ?: return@CommandLineRunner
-        val mapper = jacksonObjectMapper().findAndRegisterModules()
-        val task: AgentTask = mapper.readValue(taskJson)
-        val result = AgentResult(task.runId, "COMPLETED", "Agentworker-contract is uitgevoerd voor ${task.taskType}")
-        println(mapper.writeValueAsString(result))
-    }
+    @Bean
+    fun settings(
+        @Value("\${PF_AGENT_WORKER_URL:}") url: String,
+        @Value("\${PF_AGENT_WORKER_TOKEN:}") token: String,
+        @Value("\${PF_AGENT_WORKER_ID:\${user.name}-mac}") workerId: String,
+        @Value("\${PF_BUILD_SHA:development}") version: String,
+        @Value("\${PF_AGENT_WORKSPACE_PATH:../product-factory-workspace}") workspacePath: String,
+        @Value("\${PF_CODEX_EXECUTABLE:codex}") codexExecutable: String,
+        @Value("\${PF_AGENT_MODEL:gpt-5.6-terra}") defaultModel: String,
+    ) = AgentWorkerSettings(
+        url = url,
+        token = token,
+        workerId = workerId,
+        version = version,
+        workspacePath = Path.of(workspacePath).toAbsolutePath().normalize(),
+        codexExecutable = codexExecutable,
+        defaultModel = defaultModel,
+    )
+
+    @Bean fun taskExecutor(settings: AgentWorkerSettings): AgentTaskExecutor = CodexAgentTaskExecutor(settings)
+    @Bean fun workerClient(settings: AgentWorkerSettings, taskExecutor: AgentTaskExecutor) = AgentWorkerClient(settings, taskExecutor)
+    @Bean fun startWorker(client: AgentWorkerClient) = CommandLineRunner { client.start() }
 }
 
 fun main(args: Array<String>) {
