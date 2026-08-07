@@ -616,6 +616,29 @@ Deze functionaliteit mag in de tijdelijke previews al volledig worden gebruikt. 
 niet klaar is, wordt de productieomgeving niet gebruikt voor nieuws dat duurzaam bewaard moet
 blijven.
 
+#### Status stap 3 — afgerond op 7 augustus 2026
+
+- HKH en HKH Autopilot hebben dezelfde nieuwe Spring Modulith-module `news`, met een Flyway
+  V2-migratie, JDBC-repository en nieuwste-eerst-sortering in PostgreSQL;
+- `GET /api/news` is publiek leesbaar en `POST /api/admin/news` hergebruikt fail-closed dezelfde
+  Google- en preview-authenticatie als de bestaande beheerlogin;
+- beide adminapps hebben een gevalideerd formulier voor titel en berichttekst met duidelijke
+  bezig-, succes- en foutstatus; beide gebruikersapps tonen laad-, lege-, fout- en gevulde
+  nieuwstoestanden;
+- integratietests starten echte PostgreSQL 16-containers, voeren beide Flyway-migraties uit en
+  bewijzen autorisatie, validatie, toevoegen en nieuwste-eerst teruglezen; Fluttertests bewaken
+  daarnaast HTTP-contracten en schermgedrag;
+- PR 14 van beide repositories is op de exacte branch-SHA `Synced` en `Healthy` getest; de gedeelde
+  previewcontracttest heeft in iedere eigen database een beheerbericht gepubliceerd en publiek
+  teruggelezen;
+- beide PR's zijn gemerged, alle productie-images zijn op de merge-SHA gepind, Flyway rapporteert
+  schema V2 en de nieuwe APK's zijn gepubliceerd;
+- de previewreconciler heeft na merge de twee tijdelijke PR 14-omgevingen volgens de graceperiode
+  opgeruimd.
+
+Nieuws in productie blijft tot stap 4 technisch vluchtig doordat PostgreSQL nog `emptyDir` gebruikt.
+Dit is zichtbaar gemaakt in plaats van als duurzame opslag te presenteren.
+
 ### Stap 4 — databasefundering zonder vooraf gekozen LVM-oplossing
 
 Pas nadat de verticale functionaliteit in previews werkt, wordt de duurzame opslag gekozen en
