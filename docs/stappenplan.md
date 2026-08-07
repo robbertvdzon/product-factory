@@ -900,6 +900,29 @@ Software Factory.
 - Een criticus kan een kandidaat verwerpen of terugsturen.
 - Er is geen menselijke productbeslissing nodig geweest.
 
+### Status fase 6 — afgerond op 7 augustus 2026
+
+- de runtime voert vijf strikt gescheiden rollen uit (`RESEARCHER`, `PRODUCT_OWNER`,
+  `UX_DESIGNER`, `STORY_WRITER` en `CRITIC`), valideert hun gestructureerde output en bewaart
+  stappen, artefacten, bronnen, UX, beslissingen en kandidaten duurzaam in PostgreSQL;
+- de Mac-agentworker start Codex fail-closed met native webonderzoek, read-only werkruimte,
+  geïsoleerde configuratie en een minimale omgevingsvariabelen-allowlist; GitHub-, cluster-,
+  database- en Product Factory-credentials bereiken de onderzoeksagents niet;
+- vier volledige productie-iteraties (`shadow-hkh-autopilot-0004` tot en met `0007`) hebben elk
+  alle vijf rollen en vijf gevalideerde artefacten afgerond. Zij legden respectievelijk 6, 6, 7 en
+  8 bronnen met URL, raadpleegdatum en rechtenindicatie vast en maakten samen zes kandidaten;
+- de onafhankelijke criticus gaf alle vier iteraties `REVISE`. Daardoor bleven alle zes kandidaten
+  intern `REJECTED`, ontstond geen workspace-commit en werd geen enkele kandidaat naar Software
+  Factory gepubliceerd. Dit bewijst het bedoelde veilige shadow-gedrag zonder menselijke
+  productbeslissing;
+- integratietests bewaken daarnaast `ACCEPT`, `REVISE`, duplicaatdetectie, productisolatie en de
+  regel dat uitsluitend een geaccepteerd, niet-duplicaat dossier via één herleidbare workspace-PR
+  mag worden gepubliceerd;
+- de eerste drie fail-closed proefruns brachten drie productieproblemen aan het licht en leidden
+  tot regressietests voor Java-tijdserialisatie en socketreconnectie, relatieve workspacepaden en
+  het sluiten van stdin van het Codex-subproces. De vier daaropvolgende iteraties liepen zonder
+  technische fout of retry volledig door.
+
 ## 12. Fase 7 — autonome storycyclus
 
 ### Doel
