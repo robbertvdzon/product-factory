@@ -5,10 +5,12 @@ import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.modulith.Modulithic
 import org.springframework.scheduling.annotation.EnableAsync
+import org.springframework.scheduling.annotation.EnableScheduling
 
 @Modulithic
 @SpringBootApplication
 @EnableAsync
+@EnableScheduling
 class ProductFactoryApplication
 
 fun main(args: Array<String>) {

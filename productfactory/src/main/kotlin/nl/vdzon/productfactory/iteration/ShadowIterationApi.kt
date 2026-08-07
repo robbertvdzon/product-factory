@@ -27,7 +27,12 @@ class ShadowIterationController(private val service: ShadowIterationService) {
     @PostMapping("/api/products/{slug}/shadow-iterations")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun start(@PathVariable slug: String, @RequestBody(required = false) request: StartShadowIterationRequest?): ShadowIterationView =
-        service.start(slug, request?.focus)
+        service.startShadow(slug, request?.focus)
+
+    @PostMapping("/api/products/{slug}/autonomous-cycles")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun startAutonomous(@PathVariable slug: String, @RequestBody(required = false) request: StartShadowIterationRequest?): ShadowIterationView =
+        service.startAutonomous(slug, request?.focus)
 
     @GetMapping("/api/shadow-iterations")
     fun list(@RequestParam productSlug: String): List<ShadowIterationView> = service.list(productSlug)
@@ -47,8 +52,15 @@ class ShadowIterationService(
     private val events: ApplicationEventPublisher,
 ) {
     @Transactional
-    fun start(productSlug: String, requestedFocus: String?): ShadowIterationView {
+    fun startShadow(productSlug: String, requestedFocus: String?): ShadowIterationView = doStart(productSlug, requestedFocus, "shadow")
+
+    @Transactional
+    fun startAutonomous(productSlug: String, requestedFocus: String?): ShadowIterationView = doStart(productSlug, requestedFocus, "autonomous")
+
+    private fun doStart(productSlug: String, requestedFocus: String?, mode: String): ShadowIterationView {
+        require(mode in setOf("shadow", "autonomous"))
         val product = products.requireActive(productSlug)
+        if (mode == "autonomous") products.requireStoryPublication(productSlug)
         if (product.workspaceOwnership != "product-factory") {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Shadow-iteraties vereisen workspace-eigenaarschap product-factory")
         }
@@ -58,7 +70,7 @@ class ShadowIterationService(
         val focus = requestedFocus?.trim()?.ifBlank { null }
             ?: "Bepaal autonoom de belangrijkste nog onbeantwoorde productvraag op basis van missie, bestaand dossier en eerdere iteraties."
         require(focus.length <= 1000) { "Focus mag maximaal 1000 tekens bevatten" }
-        val iteration = repository.create(product.slug, focus)
+        val iteration = repository.create(product.slug, focus, mode)
         events.publishEvent(ShadowIterationStarted(iteration.id))
         return iteration
     }
@@ -87,7 +99,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         productSlug,
     ) ?: 0) > 0
 
-    fun create(productSlug: String, focus: String): ShadowIterationView {
+    fun create(productSlug: String, focus: String, mode: String = "shadow"): ShadowIterationView {
         val sequence = (jdbc.queryForObject(
             "select coalesce(max(sequence_number), 0) + 1 from shadow_iteration where product_slug = ?",
             Int::class.java,
@@ -95,11 +107,12 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         ) ?: 1)
         val id = "shadow-$productSlug-${sequence.toString().padStart(4, '0')}"
         jdbc.update(
-            "insert into shadow_iteration(id, product_slug, sequence_number, focus, status) values (?, ?, ?, ?, 'QUEUED')",
+            "insert into shadow_iteration(id, product_slug, sequence_number, focus, mode, status) values (?, ?, ?, ?, ?, 'QUEUED')",
             id,
             productSlug,
             sequence,
             focus,
+            mode,
         )
         return require(productSlug, id)
     }
@@ -193,12 +206,12 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
     fun previousIterationContext(productSlug: String, currentIterationId: String): String = jdbc.query(
         """select i.sequence_number, a.artifact_type, a.content_json
             from shadow_iteration i join shadow_iteration_artifact a on a.iteration_id = i.id
-            where i.product_slug = ? and i.id <> ? and i.status = 'ACCEPTED'
+            where i.product_slug = ? and i.id <> ? and i.status in ('ACCEPTED', 'NEEDS_REVISION', 'REJECTED')
             order by i.sequence_number desc, a.artifact_type limit 8""".trimIndent(),
         { row, _ -> "Iteratie ${row.getInt(1)} / ${row.getString(2)}: ${row.getString(3).take(3000)}" },
         productSlug,
         currentIterationId,
-    ).joinToString("\n\n").take(12_000).ifBlank { "Nog geen eerdere geaccepteerde shadow-iteraties." }
+    ).joinToString("\n\n").take(12_000).ifBlank { "Nog geen eerdere beoordeelde productiteraties." }
 
     fun findDuplicate(productSlug: String, fingerprint: String): Long? = jdbc.queryForObject(
         "select max(id) from story_candidate where product_slug = ? and fingerprint = ? and status in ('INTERNAL', 'PUBLISHED')",
@@ -318,7 +331,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
     private val mapper = { row: java.sql.ResultSet, _: Int ->
         ShadowIterationView(
             row.getString("id"), row.getString("product_slug"), row.getInt("sequence_number"), row.getString("focus"),
-            row.getString("status"), row.getString("current_agent_role"), row.getString("critic_verdict"), row.getInt("candidate_count"),
+            row.getString("mode"), row.getString("status"), row.getString("current_agent_role"), row.getString("critic_verdict"), row.getInt("candidate_count"),
             row.getString("workspace_run_id"), row.getString("workspace_pull_request_url"), row.getString("workspace_commit_sha"),
             row.getString("error_message"), row.getTimestamp("created_at").toInstant(), row.getTimestamp("started_at")?.toInstant(),
             row.getTimestamp("completed_at")?.toInstant(),

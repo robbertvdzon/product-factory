@@ -14,3 +14,9 @@ product-factory:
     repository: git@github.com:robbertvdzon/product-factory-workspace.git
     main-branch: main
     remote-publication: false
+  software-factory:
+    base-url: http://localhost:1
+    token: test-token
+  autonomy:
+    enabled: false
+    poll-delay: PT1H

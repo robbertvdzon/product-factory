@@ -13,6 +13,7 @@ REQUIRED_KEYS=(
   PF_GOOGLE_CLIENT_ID
   PF_ADMIN_EMAILS
   PF_AGENT_WORKER_TOKEN
+  PF_SOFTWARE_FACTORY_TOKEN
 )
 
 if ! command -v kubeseal >/dev/null 2>&1; then

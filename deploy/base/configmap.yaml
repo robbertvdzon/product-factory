@@ -13,5 +13,8 @@ data:
   PF_WORKSPACE_REPOSITORY: https://github.com/robbertvdzon/product-factory-workspace.git
   PF_WORKSPACE_MAIN_BRANCH: main
   PF_WORKSPACE_REMOTE_PUBLICATION: "true"
+  PF_SOFTWARE_FACTORY_BASE_URL: http://softwarefactory-dashboard-backend.software-factory.svc.cluster.local
+  PF_AUTONOMY_ENABLED: "true"
+  PF_AUTONOMY_POLL_DELAY: PT1M
   PF_DASHBOARD_AUTH_REQUIRED: "true"
   PF_DASHBOARD_ORIGIN: https://product-factory.vdzonsoftware.nl

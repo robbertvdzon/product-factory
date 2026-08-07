@@ -105,6 +105,22 @@ class WorkspacePublisher(
         )
     }
 
+    /** Ververs een open workspace-PR. Stories mogen pas uit een daadwerkelijk gemergede basis ontstaan. */
+    fun refresh(runId: String): WorkspacePublicationView? {
+        val current = findByRunId(runId) ?: return null
+        val pullRequestUrl = current.pullRequestUrl
+        if (!remotePublication || current.status == "MERGED" || pullRequestUrl.isNullOrBlank()) return current
+        require(workspaceToken.isNotBlank()) { "PF_WORKSPACE_GITHUB_TOKEN ontbreekt" }
+        val prNumber = pullRequestUrl.substringAfterLast('/').toIntOrNull() ?: return current
+        val response = githubClient().get().uri("/repos/${repositoryPath()}/pulls/$prNumber").retrieve().body(Map::class.java)
+            ?: return current
+        if (response["merged_at"] != null) {
+            val mergedSha = response["merge_commit_sha"]?.toString()?.takeIf { it.isNotBlank() } ?: current.commitSha
+            jdbc.update("update workspace_publication set status = 'MERGED', commit_sha = ? where run_id = ?", mergedSha, runId)
+        }
+        return findByRunId(runId)
+    }
+
     fun readArtifact(productSlug: String, runId: String): String {
         val product = products.requireContext(productSlug)
         val publication = find(productSlug, runId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
@@ -142,10 +158,8 @@ class WorkspacePublisher(
     private fun sha256(content: String) = MessageDigest.getInstance("SHA-256").digest(content.toByteArray()).joinToString("") { "%02x".format(it) }
 
     private fun createPullRequest(branch: String, runId: String): String {
-        val repositoryPath = repository.removeSuffix(".git").substringAfter("github.com:", repository.removeSuffix(".git").substringAfter("github.com/"))
-        require(repositoryPath.count { it == '/' } == 1) { "Ongeldige GitHub-workspacerepository" }
-        val client = RestClient.builder().baseUrl("https://api.github.com").defaultHeader("Authorization", "Bearer $workspaceToken").defaultHeader("Accept", "application/vnd.github+json").build()
-        val response = client.post().uri("/repos/$repositoryPath/pulls").body(mapOf(
+        val client = githubClient()
+        val response = client.post().uri("/repos/${repositoryPath()}/pulls").body(mapOf(
             "title" to "Product Factory · $runId", "head" to branch, "base" to mainBranch,
             "body" to "Goedgekeurd Product Factory-artefact voor run `$runId`."
         )).retrieve().body(Map::class.java) ?: error("GitHub gaf geen pull-requestresultaat")
@@ -155,6 +169,14 @@ class WorkspacePublisher(
             .retrieve().toBodilessEntity()
         return url
     }
+
+    private fun githubClient() = RestClient.builder().baseUrl("https://api.github.com")
+        .defaultHeader("Authorization", "Bearer $workspaceToken")
+        .defaultHeader("Accept", "application/vnd.github+json").build()
+
+    private fun repositoryPath(): String =
+        repository.removeSuffix(".git").substringAfter("github.com:", repository.removeSuffix(".git").substringAfter("github.com/"))
+            .also { require(it.count { character -> character == '/' } == 1) { "Ongeldige GitHub-workspacerepository" } }
 }
 
 @RestController

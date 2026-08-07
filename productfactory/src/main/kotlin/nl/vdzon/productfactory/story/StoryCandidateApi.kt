@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.story
 
 import nl.vdzon.productfactory.contracts.StoryCandidateView
+import nl.vdzon.productfactory.autonomy.api.StoryDeliveryPort
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
@@ -12,7 +13,11 @@ data class PublishStoryCandidateRequest(val productSlug: String)
 
 @RestController
 @RequestMapping("/api/story-candidates")
-class StoryCandidateController(private val jdbc: JdbcTemplate, private val products: ProductCatalog) {
+class StoryCandidateController(
+    private val jdbc: JdbcTemplate,
+    private val products: ProductCatalog,
+    private val deliveryService: StoryDeliveryPort,
+) {
     @GetMapping fun list(@RequestParam productSlug: String): List<StoryCandidateView> {
         val product = products.requireContext(productSlug)
         return jdbc.query(
@@ -38,9 +43,7 @@ class StoryCandidateController(private val jdbc: JdbcTemplate, private val produ
     @PostMapping("/{id}/publish")
     fun publish(@PathVariable id: Long, @RequestBody request: PublishStoryCandidateRequest): StoryCandidateView {
         products.requireStoryPublication(request.productSlug)
-        if (jdbc.update("update story_candidate set status = 'PUBLISHED' where id = ? and product_slug = ?", id, request.productSlug) == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Onbekende storykandidaat voor dit product")
-        }
+        deliveryService.deliverCandidate(request.productSlug, id)
         return jdbc.query(
             "select id, product_slug, title, description, status, created_at from story_candidate where id = ? and product_slug = ?",
             mapper,

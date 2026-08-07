@@ -56,7 +56,7 @@ class ShadowIterationEngine(
             product,
             ShadowRole.RESEARCHER,
             ShadowSchemas.research,
-            researchPrompt(iteration.focus, product, previousContext, today),
+            researchPrompt(iteration.focus, product, previousContext, today, iteration.mode),
         ).also { validateResearch(it, today) }
         val sourceUrls = research.path("sources").map { it.path("url").asText() }.toSet()
 
@@ -81,7 +81,7 @@ class ShadowIterationEngine(
             product,
             ShadowRole.STORY_WRITER,
             ShadowSchemas.stories,
-            storyPrompt(product, research, productOwner, ux, candidateContext),
+            storyPrompt(product, research, productOwner, ux, candidateContext, iteration.mode),
         ).also { validateStories(it, product.maxStoriesPerCycle, sourceUrls) }
 
         val critic = executeRole(
@@ -89,7 +89,7 @@ class ShadowIterationEngine(
             product,
             ShadowRole.CRITIC,
             ShadowSchemas.critic,
-            criticPrompt(product, research, productOwner, ux, stories, candidateContext),
+            criticPrompt(product, research, productOwner, ux, stories, candidateContext, iteration.mode),
         ).also { validateCritic(it, stories.path("candidates").size()) }
 
         val sources = validatedSources(research, today)
@@ -274,8 +274,8 @@ class ShadowIterationEngine(
         )
     }
 
-    private fun researchPrompt(focus: String, product: ProductView, previous: String, today: LocalDate) = """
-        ROL: RESEARCHER. Doe onafhankelijk webonderzoek voor een productiteratie in shadow mode.
+    private fun researchPrompt(focus: String, product: ProductView, previous: String, today: LocalDate, mode: String) = """
+        ROL: RESEARCHER. Doe onafhankelijk webonderzoek voor een productiteratie in $mode-modus.
         Vandaag is $today. Gebruik uitsluitend werkelijk geraadpleegde publieke webbronnen. Iedere bevinding moet
         naar minstens één bron uit sources verwijzen. Noteer per bron de raadpleegdatum exact als $today,
         een concrete rechten- of licentie-indicatie (of dat die nog onbekend is) en waarom de bron relevant is.
@@ -322,10 +322,11 @@ class ShadowIterationEngine(
         Lever alleen JSON volgens het opgegeven schema.
     """.trimIndent()
 
-    private fun storyPrompt(product: ProductView, research: JsonNode, owner: JsonNode, ux: JsonNode, existing: String) = """
+    private fun storyPrompt(product: ProductView, research: JsonNode, owner: JsonNode, ux: JsonNode, existing: String, mode: String) = """
         ROL: STORY_WRITER. Schrijf één tot maximaal ${product.maxStoriesPerCycle.coerceAtMost(3)} kleine,
-        samenhangende en afzonderlijk toetsbare interne storykandidaten. Ze worden in shadow mode NIET naar
-        Software Factory gestuurd. Gebruik alleen bron-URL's uit het onderzoek. Vermijd overlap met bestaande
+        samenhangende en afzonderlijk toetsbare storykandidaten. In shadow-modus blijven ze intern; in autonomous-modus
+        kan de orchestrator ze na criticusacceptatie en workspace-merge naar Software Factory sturen. Jij verstuurt
+        zelf niets. De huidige modus is $mode. Gebruik alleen bron-URL's uit het onderzoek. Vermijd overlap met bestaande
         kandidaten en benoem afhankelijkheden en risico's.
 
         WIP-LIMIET: ${product.wipLimit}
@@ -341,11 +342,12 @@ class ShadowIterationEngine(
         Lever alleen JSON volgens het opgegeven schema.
     """.trimIndent()
 
-    private fun criticPrompt(product: ProductView, research: JsonNode, owner: JsonNode, ux: JsonNode, stories: JsonNode, existing: String) = """
+    private fun criticPrompt(product: ProductView, research: JsonNode, owner: JsonNode, ux: JsonNode, stories: JsonNode, existing: String, mode: String) = """
         ROL: CRITIC. Beoordeel onafhankelijk bronkwaliteit, rechten, privacy, toegankelijkheid, scope,
         consistentie, duplicaten en conflicten. Beoordeel iedere kandidaat exact één keer met zijn nulgebaseerde
         index. Gebruik REVISE als een gerichte nieuwe uitwerking nodig is en REJECT bij een fundamenteel probleem.
-        ACCEPT mag alleen zonder blokkerende issues en betekent nog steeds uitsluitend interne shadow-kandidaten.
+        ACCEPT mag alleen zonder blokkerende issues. In autonomous-modus is ACCEPT een vrijgave voor levering door de
+        orchestrator; in shadow-modus blijft de kandidaat intern. De huidige modus is $mode.
 
         REGELS:
         bronnen=${product.sourceRules}
