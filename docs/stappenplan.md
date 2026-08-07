@@ -84,8 +84,8 @@ Factory-storykey en de voor monitoring noodzakelijke snapshots.
 - de Product Factory-database bevat operationele toestand: runs, planning, locks, retries, status,
   kosten, externe storykeys en verwijzingen naar workspace-pad en commit-SHA;
 - tijdelijke agentresultaten blijven in de database totdat de criticus ze accepteert of verwerpt;
-- grote binaire artefacten staan in S3-compatibele objectopslag, met metadata en een stabiele link
-  vanuit de workspace;
+- grote binaire artefacten worden vooralsnog niet door Product Factory opgeslagen; als daar later
+  een concrete behoefte voor ontstaat, volgt daarvoor een afzonderlijke opslagbeslissing;
 - Software Factory beheert zijn eigen uitvoeringsdata en schrijft via stories in de
   productrepositories.
 
@@ -468,13 +468,12 @@ Deze fase wordt bewust in vier opeenvolgende stappen uitgevoerd:
    OpenShift-namespace met vooralsnog een eigen lege database en automatische cleanup;
 3. bewijs het databasepad met één kleine verticale functionaliteit: een beheerder voegt een
    laatste-nieuwsbericht toe en gebruikers zien de nieuwste berichten;
-4. maak daarna de productieopslag duurzaam en geef iedere branch een eigen databasekopie met
-   representatieve testdata.
+4. maak daarna de productieopslag duurzaam en geef iedere branch een eigen database die de backend
+   automatisch vult met deterministische, representatieve previewdata.
 
-LVM Storage wordt in deze fase niet geïnstalleerd of als gekozen oplossing vastgelegd. De
-onderliggende opslagtechniek blijft een afzonderlijk beslispunt. Daardoor kunnen routing,
-branchpreviews en de eerste databasefunctionaliteit al worden gebouwd en getest zonder op die
-keuze vooruit te lopen.
+LVM Storage wordt in deze fase niet geïnstalleerd. Voor stap 4 is de bestaande SSD-gebonden
+`local-path`-storageclass het uitgangspunt; pas als capaciteit of gebruik daar later aanleiding toe
+geeft, volgt een afzonderlijke nieuwe opslagkeuze.
 
 ### Stap 1 — één Cloudflare-wildcard
 
@@ -639,40 +638,59 @@ blijven.
 Nieuws in productie blijft tot stap 4 technisch vluchtig doordat PostgreSQL nog `emptyDir` gebruikt.
 Dit is zichtbaar gemaakt in plaats van als duurzame opslag te presenteren.
 
-### Stap 4 — databasefundering zonder vooraf gekozen LVM-oplossing
+### Stap 4 — persistente PostgreSQL en deterministische previewdata
 
-Pas nadat de verticale functionaliteit in previews werkt, wordt de duurzame opslag gekozen en
-ingericht:
+De opslagkeuze voor deze stap is bewust eenvoudig:
 
-- inventariseer eerst waar de huidige `local-path`-PVC's fysiek terechtkomen, welke disks werkelijk
-  beschikbaar zijn en welke data een pod-, node- of diskstoring moet overleven;
-- leg in een korte ADR de keuze vast tussen een PVC op de bestaande storageclass, een PostgreSQL-
-  operator op een ondersteunde storageclass, externe PostgreSQL of een andere onderbouwde optie;
-- LVM Storage blijft buiten scope totdat daar afzonderlijk over is besloten;
-- vervang de productie-`emptyDir` van HKH, HKH Autopilot en Product Factory door de gekozen
-  persistente oplossing, zonder de JDBC/Flyway-contracten van de applicaties te veranderen;
-- PostgreSQL blijft de leidende database. Grote foto's, scans, audio en video gaan later naar
-  S3-compatibele objectopslag met alleen metadata en checksum in PostgreSQL;
-- zelf gemaakte nieuwsberichten, gebruikersinstellingen, correcties en Product Factory-status zijn
-  primaire data en krijgen off-node back-up en een aantoonbare restoretest;
-- opnieuw te importeren bronkopieën, zoekindexen en embeddings worden gescheiden en mogen opnieuw
-  worden opgebouwd.
+- PostgreSQL blijft de enige datastore; foto's, scans, audio, video, S3 en andere objectstorage
+  vallen buiten deze fase en worden alleen opnieuw onderzocht als daar later een concrete behoefte
+  voor ontstaat;
+- productie-PostgreSQL van HKH, HKH Autopilot en Product Factory krijgt een persistente PVC op de
+  SSD via de bestaande `local-path`-storageclass;
+- inventariseer en documenteer vóór de migratie de werkelijke SSD-locatie, capaciteit en
+  herstelprocedure in een korte ADR;
+- LVM Storage en een PostgreSQL-operator zijn geen voorwaarde en worden in deze stap niet
+  geïnstalleerd;
+- vervang de productie-`emptyDir` zonder de JDBC- en Flyway-contracten van de applicaties te
+  veranderen;
+- maak iedere nacht per productiedatabase een gecomprimeerde `pg_dump` met checksum naar een eigen
+  map op de externe HDD, met afgesproken retentie;
+- bewijs periodiek met een restore naar een tijdelijke database dat de dumps werkelijk bruikbaar
+  zijn; de externe HDD is een tweede opslagmedium, maar geen bescherming tegen verlies van de hele
+  fysieke locatie;
+- als SQL-data later niet meer passend op de SSD kan worden opgeslagen, volgt dan pas een nieuwe
+  opslagbeslissing.
 
-Iedere pull-requestpreview krijgt in deze stap niet langer alleen een lege database, maar een eigen
-kopie van een kleine, gesaneerde en versievaste previewdatabase:
+Iedere pull-requestpreview krijgt een eigen kleine, verwijderbare PostgreSQL-PVC op de SSD. Dit is
+geen fysieke kopie van productie en er wordt geen productie-inhoud naar previews geëxporteerd. De
+database wordt opgebouwd door Flyway en daarna automatisch gevuld door de backend:
 
-- de previewseed bevat meerdere laatste-nieuwsberichten, waaronder voldoende data om sortering,
-  lange tekst en lege/optionele velden te testen;
-- de kopie wordt gemaakt met een eenvoudige PostgreSQL-template of dump/restore; productie wordt
-  nooit automatisch gekopieerd;
-- daarna voert de branch zijn eigen Flyway-migraties uit, zodat ook afwijkende schema's veilig
-  getest kunnen worden;
-- database, rol en credentials zijn uniek per repository en pull-requestnummer;
-- een fail-closed guard blokkeert testmutaties als de previewmarker ontbreekt of het doel op
-  productie lijkt;
-- bij het sluiten van de pull request wordt de databasekopie idempotent verwijderd;
-- snapshot- of clone-optimalisatie wordt pas onderzocht wanneer dump/restore aantoonbaar te traag
-  wordt.
+1. Flyway voert eerst alle normale schema- en datamigraties van de branch uit.
+2. Een Kotlin-component `PreviewDataSeeder` start daarna alleen wanneer de deployment expliciet
+   `HKH_RUNTIME_MODE=preview`, een PR-nummer en de juiste previewmarker meegeeft.
+3. De seeder controleert aanvullend fail-closed dat de verbonden database een previewdatabase is;
+   bij twijfel stopt de backend zonder data te wijzigen.
+4. De seeder maakt vaste, inhoudelijk kloppende scenario's met stabiele ID's en datums. De eerste
+   set bevat meerdere laatste-nieuwsberichten voor sortering, lange tekst en relevante randgevallen;
+   latere sets kunnen bijvoorbeeld onderling verbonden personen, gebouwen, gebeurtenissen en
+   bronnen bevatten.
+5. Een kleine `preview_seed_history` registreert welke benoemde seedsets, zoals `news-v1` of
+   `buildings-v1`, zijn toegepast. Nieuwe tabellen of velden krijgen in dezelfde wijziging een
+   nieuwe of bijgewerkte seedset.
+6. Iedere backendstart reconcilieert de seedsets idempotent: ontbrekende sets worden toegevoegd,
+   herkenbare seedrecords mogen worden aangevuld, dubbele records ontstaan niet en handmatig via de
+   app ingevoerde previewdata wordt niet overschreven.
+
+Dezelfde seederlogica krijgt een optioneel preview-only beheerendpoint
+`POST /api/admin/preview/test-data/ensure`. Dit endpoint gebruikt exact dezelfde idempotente service,
+vereist preview-adminrechten en bestaat niet in productie. Automatisch seeden bij backendstart is
+de normale route; het endpoint is alleen bedoeld om de verwachte testdata expliciet opnieuw te
+controleren of aan te vullen.
+
+Database, PVC, rol en credentials zijn uniek per repository en pull-requestnummer. Na iedere push
+kan de branch zijn eigen nieuwe Flyway-migraties en seedversies uitvoeren. Bij het sluiten van de
+pull request verwijdert de bestaande previewreconciler de volledige namespace en daarmee ook de
+previewdatabase en PVC.
 
 Testcontainers blijft daarnaast in build en CI een aparte laag: iedere integratietestrun start een
 verse PostgreSQL-container en voert Flyway uit. Een volledige OpenShift-preview vervangt deze snelle
@@ -693,19 +711,25 @@ integratietests niet.
 8. Toon in de HKH-gebruikersapp alle laatste-nieuwsberichten nieuwste-eerst.
 9. Breng dezelfde verticale functionaliteit gecontroleerd over naar HKH Autopilot en bewijs
    contractpariteit.
-10. Inventariseer de bestaande storage en leg de persistente databasekeuze vast zonder LVM Storage
-    te installeren.
-11. Migreer de drie productieapplicaties gecontroleerd van `emptyDir` naar de gekozen persistente
-    PostgreSQL-oplossing.
-12. Maak per preview een eigen databasekopie uit een versievaste seed met laatste-nieuwstestdata.
-13. Borg Testcontainers/Flyway-tests, productieguards, off-node back-up en een hersteltest.
+10. Inventariseer de SSD- en HDD-locaties en leg de gekozen PVC-, back-up- en herstelopzet vast
+    zonder LVM Storage te installeren.
+11. Migreer de drie productieapplicaties gecontroleerd van `emptyDir` naar een eigen persistente
+    PostgreSQL-PVC op de SSD.
+12. Richt dagelijkse gecomprimeerde PostgreSQL-dumps met checksum en retentie op de externe HDD in
+    en bewijs een herstel naar een tijdelijke database.
+13. Bouw in beide HKH-backends de deterministische, versieerbare en idempotente
+    `PreviewDataSeeder`, inclusief preview-only `ensure`-endpoint en productieguards.
+14. Geef iedere HKH-preview een eigen verwijderbare PVC en laat Flyway plus de seeder aantoonbaar
+    meegroeien met een branch die het databaseschema wijzigt.
+15. Borg Testcontainers-, Flyway-, seed-, productieguard- en restoretests componentgericht in CI.
 
 ### Definition of done
 
 - Productie en Personal News Feed-previews lopen via één Cloudflare-wildcard en Git-managed
   OpenShift Routes.
 - Iedere open pull request van HKH en HKH Autopilot heeft een eigen bereikbare gebruikers- en
-  adminpreview, backend, namespace en aanvankelijk lege database.
+  adminpreview, backend, namespace en database; die is in stap 2 nog leeg en wordt vanaf stap 4
+  automatisch met deterministische previewdata gevuld.
 - Sluiten of mergen van een pull request verwijdert de volledige previewomgeving; de sweeper ruimt
   aantoonbaar een verweesde testnamespace op.
 - Een PR die tijdens provisioning wordt gemerged laat geen opnieuw aangemaakte namespace achter;
@@ -715,9 +739,14 @@ integratietests niet.
 - Een beheerder kan in beide HKH-varianten een laatste-nieuwsbericht toevoegen en een gebruiker
   ziet alle berichten nieuwste-eerst.
 - De uiteindelijke productieopslag is persistent en hersteld na een gecontroleerde podrestart.
-- Iedere preview krijgt een eigen databasekopie met testnieuws en kan een afwijkende Flyway-
-  migratie uitvoeren zonder een andere preview of productie te beïnvloeden.
-- Een off-node back-up is succesvol teruggezet en functioneel gecontroleerd.
+- Iedere preview krijgt een eigen PostgreSQL-PVC; Flyway en de Kotlin-seeder leveren automatisch
+  dezelfde bruikbare, deterministische beginsituatie zonder productiegegevens te kopiëren.
+- Een bestaande preview krijgt na een schema-uitbreiding alleen de ontbrekende seedversie, zonder
+  dubbele records of verlies van handmatig ingevoerde previewdata.
+- De seeder en het `ensure`-endpoint kunnen aantoonbaar niet tegen productie worden uitgevoerd.
+- Een dagelijkse dump vanaf de SSD naar de externe HDD is succesvol naar een tijdelijke database
+  teruggezet en functioneel gecontroleerd.
+- Er is in deze fase geen S3- of andere objectstorage ingericht.
 - Er is in deze fase geen LVM Storage geïnstalleerd of impliciet als definitieve keuze aangenomen.
 
 ## 9. Fase 4 — koppeling met Software Factory
@@ -1029,22 +1058,23 @@ Product Factory-koppeling en verdere autonomie volgen daarop.
 | 26 | HKH | In de gebruikersapp alle laatste-nieuwsberichten nieuwste-eerst tonen |
 | 27 | HKH Autopilot | De verticale laatste-nieuwsslice gecontroleerd overnemen met dezelfde contracten |
 | 28 | Beide HKH-varianten | Contract-, Flutter- en end-to-endpariteit voor laatste nieuws aantonen |
-| 29 | Infrastructuur | Bestaande storage inventariseren en een persistente databasekeuze vastleggen zonder LVM te installeren |
-| 30 | HKH | Productiedatabase naar de gekozen persistente PostgreSQL-oplossing migreren |
-| 31 | HKH Autopilot | Productiedatabase naar een afzonderlijke persistente PostgreSQL-oplossing migreren |
-| 32 | Product Factory | Operationele database gecontroleerd persistent maken met behoud van bestaande status |
-| 33 | Infrastructuur | Iedere preview een eigen databasekopie uit de versievaste laatste-nieuwsseed geven |
-| 34 | Alle drie applicaties | Testcontainers-, Flyway- en productieguardtests componentgericht in CI borgen |
-| 35 | Infrastructuur | Off-node PostgreSQL-back-up, retentie en een aantoonbare restore-oefening inrichten |
-| 36 | Software Factory | Versievaste idempotente Product Factory-integratie-API |
-| 37 | Product Factory | Software Factory-client en story/statusreconciliatie |
-| 38 | Product Factory | Multi-productmodel met ontwikkelmodus en beide HKH-varianten |
-| 39 | Product Factory | Researcher, bronmodel en workspace-publicatie in shadow mode |
-| 40 | Product Factory | Product Owner, UX Designer, Critic en Story Writer in shadow mode |
-| 41 | Product Factory | Autonome vraagbeantwoording en HumanAction-beleid |
-| 42 | Product Factory | Begrensde autonome storypublicatie met WIP één |
-| 43 | Beide HKH-varianten | Baseline bevriezen en handmatig/autonoom ontwikkelpad activeren |
-| 44 | HKH Autopilot via Product Factory | Eerste autonome productiteratie en verticale functionaliteit |
+| 29 | Infrastructuur | SSD- en HDD-opslag inventariseren en de PVC-, back-up- en herstelkeuze zonder LVM vastleggen |
+| 30 | HKH | Productiedatabase naar een persistente PostgreSQL-PVC op de SSD migreren |
+| 31 | HKH Autopilot | Productiedatabase naar een afzonderlijke persistente PostgreSQL-PVC op de SSD migreren |
+| 32 | Product Factory | Operationele PostgreSQL-database op de SSD persistent maken met behoud van bestaande status |
+| 33 | Infrastructuur | Dagelijkse gecomprimeerde PostgreSQL-dumps naar de externe HDD met retentie en restore-oefening inrichten |
+| 34 | Beide HKH-varianten | Deterministische versieerbare Kotlin-seeder, previewguards en preview-only ensure-endpoint bouwen |
+| 35 | Infrastructuur | Iedere preview een eigen verwijderbare SSD-PVC geven en Flyway plus previewseeding valideren |
+| 36 | Alle drie applicaties | Testcontainers-, Flyway-, seed-, productieguard- en restoretests componentgericht in CI borgen |
+| 37 | Software Factory | Versievaste idempotente Product Factory-integratie-API |
+| 38 | Product Factory | Software Factory-client en story/statusreconciliatie |
+| 39 | Product Factory | Multi-productmodel met ontwikkelmodus en beide HKH-varianten |
+| 40 | Product Factory | Researcher, bronmodel en workspace-publicatie in shadow mode |
+| 41 | Product Factory | Product Owner, UX Designer, Critic en Story Writer in shadow mode |
+| 42 | Product Factory | Autonome vraagbeantwoording en HumanAction-beleid |
+| 43 | Product Factory | Begrensde autonome storypublicatie met WIP één |
+| 44 | Beide HKH-varianten | Baseline bevriezen en handmatig/autonoom ontwikkelpad activeren |
+| 45 | HKH Autopilot via Product Factory | Eerste autonome productiteratie en verticale functionaliteit |
 
 ## 17. Beslispunten die geen productinput vereisen
 
