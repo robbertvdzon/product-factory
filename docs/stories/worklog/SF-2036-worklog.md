@@ -51,6 +51,25 @@ Vangnet (allemaal groen):
 - `mvn -B --no-transfer-progress clean verify` vanuit de root: BUILD SUCCESS, exitcode 0,
   0 failures en 0 errors (59 backendtests)
 
-`dashboard-frontend/pubspec.lock` staat mee in de wijziging: `flutter pub get` heeft een paar
+## Review SF-2037 (reviewer)
+
+Beoordeeld: volledige story-diff `main...HEAD` (formatting.dart, limited_list.dart, main.dart,
+pubspec.lock, beide testbestanden, docs/factory, deze worklog).
+
+Akkoord op de functionele kern: AC1-AC11 zijn afgedekt (starttijd/doorlooptijd met fallback en
+'loopt nog', vast `dd-MM-yyyy HH:mm`-formaat, 5/+10 met eigen teller per sectie buiten de
+`FutureBuilder`, metric-tegels blijven totalen tonen, sortering nieuwste eerst vóór het afkappen).
+AC12 (docs) en AC13 (18 unittests + 5 widgettests) ook. Helpers zijn defensief en goed getest.
+
+Blokkerend:
+- `dashboard-frontend/pubspec.lock` bumpt `sdks.dart` van `>=3.9.0` naar `>=3.10.0-0`, terwijl
+  `dashboard-frontend/Dockerfile` op `ghcr.io/cirruslabs/flutter:3.35.0` (Dart 3.9.x) staat. Die
+  image wordt op elke PR/main gebouwd (`.github/workflows/images.yml`) en is niet onderdeel van
+  `.factory/verification.yaml`, dus het groene vangnet dekt hem niet. Oorzaak is een
+  toolchain-divergentie (agentcontainer Dart 3.12 vs CI Flutter 3.44.6 vs image 3.35.0).
+  Oplossing: Dockerfile-base gelijktrekken met CI (3.44.6) óf de lock terugdraaien; kies bewust en
+  onderbouw het.
+
+
 transitieve pakketten bijgewerkt. Bewust niet teruggedraaid, zodat een volgende `flutter test`-run in
 dezelfde workspace de worktree niet alsnog wijzigt tijdens het verzamelen van bewijs.
