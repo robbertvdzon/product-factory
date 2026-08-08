@@ -76,6 +76,7 @@ data class ProductView(
     val workspaceOwnership: String,
     val liveUrl: String?,
     val previewUrlPattern: String?,
+    val acceptanceUrl: String?,
     val status: String,
     val developmentMode: String,
     val iterationTimes: List<String>,

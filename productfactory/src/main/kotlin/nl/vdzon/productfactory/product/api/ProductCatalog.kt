@@ -25,6 +25,7 @@ data class ProductConfiguration(
     val workspaceOwnership: String,
     val liveUrl: String?,
     val previewUrlPattern: String?,
+    val acceptanceUrl: String?,
     val status: String,
     val developmentMode: String,
     val iterationTimes: List<String>,
@@ -109,15 +110,16 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
                 """insert into product_definition (
                     id, slug, name, mission, description, guardrails, software_factory_project_key,
                     target_repository_name, workspace_directory, workspace_ownership, live_url,
-                    preview_url_pattern, status, development_mode, timezone,
+                    preview_url_pattern, acceptance_url, status, development_mode, timezone,
                     max_stories_per_cycle, wip_limit, ai_provider, ai_model, daily_budget_cents,
                     monthly_budget_cents, escalation_policy, source_rules, privacy_rules,
                     accessibility_rules, quality_rules
-                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
                 "pf-${UUID.randomUUID()}", product.slug, product.name.trim(), product.mission.trim(),
                 product.description.trim(), product.guardrails.trim(), product.softwareFactoryProjectKey.trim(),
                 product.targetRepositoryName.trim(), "products/${product.slug}", product.workspaceOwnership,
                 product.liveUrl?.trim()?.ifBlank { null }, product.previewUrlPattern?.trim()?.ifBlank { null },
+                product.acceptanceUrl?.trim()?.ifBlank { null },
                 product.status, product.developmentMode, product.timezone.trim(),
                 product.maxStoriesPerCycle, product.wipLimit, product.aiProvider.trim(), product.aiModel.trim(),
                 product.dailyBudgetCents, product.monthlyBudgetCents, product.escalationPolicy.trim(),
@@ -222,6 +224,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         }
         validateUrl(candidate.liveUrl)
         validateUrl(candidate.previewUrlPattern?.replace("{number}", "1"))
+        validateUrl(candidate.acceptanceUrl)
         val paths = candidate.allowedWritePaths.map(::normalizeRelativePath).distinct().sorted()
         if (candidate.workspaceOwnership == "product-factory") require(paths.isNotEmpty()) { "Minimaal één schrijfpad is verplicht" }
         return candidate.copy(slug = slug, allowedWritePaths = paths)
@@ -245,6 +248,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         workspaceOwnership = row.getString("workspace_ownership"),
         liveUrl = row.getString("live_url"),
         previewUrlPattern = row.getString("preview_url_pattern"),
+        acceptanceUrl = row.getString("acceptance_url"),
         status = row.getString("status"),
         developmentMode = row.getString("development_mode"),
         iterationTimes = jdbc.queryForList(

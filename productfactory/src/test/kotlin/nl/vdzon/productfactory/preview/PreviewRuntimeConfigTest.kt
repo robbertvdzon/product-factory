@@ -59,4 +59,18 @@ class PreviewRuntimeConfigTest {
             PreviewRuntimeConfig(enabled = true, marker = PreviewRuntimeConfig.REQUIRED_MARKER, databaseUrl = VALID_DB_URL, previewPrNumber = "0")
         }
     }
+
+    @Test
+    fun `acceptance marker is valid without a pr number`() {
+        val config = PreviewRuntimeConfig(enabled = true, marker = PreviewRuntimeConfig.ACCEPTANCE_MARKER, databaseUrl = VALID_DB_URL, previewPrNumber = "")
+        assert(config.prNumber == null)
+        assert(config.requireSeedingAllowed() == 0)
+    }
+
+    @Test
+    fun `acceptance marker rejects a pr number`() {
+        assertFailsWith<IllegalArgumentException> {
+            PreviewRuntimeConfig(enabled = true, marker = PreviewRuntimeConfig.ACCEPTANCE_MARKER, databaseUrl = VALID_DB_URL, previewPrNumber = "42")
+        }
+    }
 }
