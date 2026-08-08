@@ -62,3 +62,44 @@ jobs:
             GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
           cache-from: type=gha,scope=product-factory-dashboard-frontend
           cache-to: type=gha,mode=max,scope=product-factory-dashboard-frontend
+  # GitOps promotion: ArgoCD only redeploys when the manifest actually changes. Our images use a
+  # mutable :main tag, so a rebuild alone leaves the running pods untouched. This job pins the
+  # deploy manifests to the SHA tag that was just built and pushed (reusable-image.yml and the
+  # dashboard-frontend job above always publish one), so the commit itself is the deploy trigger.
+  promote:
+    needs: [changes, runtime, agent, dashboard-backend, dashboard-frontend]
+    if: |
+      always() && !cancelled() &&
+      needs.runtime.result != 'failure' && needs.dashboard-backend.result != 'failure' && needs.dashboard-frontend.result != 'failure' &&
+      (github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' || needs.changes.outputs.dashboard_backend == 'true' || needs.changes.outputs.dashboard_frontend == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin rebuilt images to this commit's SHA tag
+        run: |
+          set -euo pipefail
+          pin() { sed -i "s#\(image: ghcr.io/robbertvdzon/$1:\)[A-Za-z0-9._-]*#\1sha-${GITHUB_SHA}#" "$2"; }
+          if [ "${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' }}" = "true" ]; then
+            pin product-factory-runtime deploy/base/runtime.yaml
+          fi
+          if [ "${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.dashboard_backend == 'true' }}" = "true" ]; then
+            pin product-factory-dashboard-backend deploy/base/dashboard.yaml
+          fi
+          if [ "${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.dashboard_frontend == 'true' }}" = "true" ]; then
+            pin product-factory-dashboard-frontend deploy/base/dashboard.yaml
+          fi
+          git diff -- deploy/base
+      - name: Commit and push the promotion
+        run: |
+          set -euo pipefail
+          git config user.name "product-factory-ci"
+          git config user.email "ci@vdzonsoftware.nl"
+          git add deploy/base/runtime.yaml deploy/base/dashboard.yaml
+          if git diff --cached --quiet; then
+            echo "Niets om te promoten (image ongewijzigd)."
+            exit 0
+          fi
+          git commit -m "deploy: pin images to ${GITHUB_SHA}"
+          git push origin HEAD:main
