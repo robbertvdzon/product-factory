@@ -156,9 +156,17 @@ beneden:
   cyclus nog, dan staat er `loopt nog: <tijd sinds start>` en loopt die waarde mee met de
   auto-refresh. Een nog niet gestarte cyclus toont geen doorlooptijd. Datum en tijd staan in de
   lokale tijdzone van de browser als `dd-MM-yyyy HH:mm`, nooit als ruwe ISO-string.
-  Aanklikken opent een detailscherm met de opdracht, alle vijf
+  Elke iteratierij toont daarnaast exact één vaste classificatiebadge — `onderzoek-onvoldoende`,
+  `guardrail-conflict`, `richting-gekozen` of `richting-verworpen` — die puur wordt afgeleid uit de
+  bestaande velden `status`, `criticVerdict` en `errorMessage`; iteraties zonder ondubbelzinnige
+  uitkomst (nog lopend/in de wachtrij, of een onvoorziene statuswaarde) vallen terug op
+  `onderzoek-onvoldoende`. De badge toont de classificatie zowel als zichtbare tekst als via een
+  Semantics-label, dus niet uitsluitend via kleur, en elk van de vier kleurenparen haalt WCAG 2.1
+  AA-contrast (≥ 4.5:1). Aanklikken opent een detailscherm met de opdracht, alle vijf
   agentstappen (status, start-/eindtijd, foutmelding), het volledige gepubliceerde dossier en de
   ruwe JSON-output per rol — dit scherm ververst zichzelf elke 3 seconden zolang de cyclus loopt.
+  De weergave van de workspace-publicatie/PR-referentie (`workspacePullRequestUrl`/
+  `workspaceCommitSha`) in dit detailscherm is door de badge-toevoeging ongewijzigd gebleven.
 - **Software Factory-stories**: elke levering met storysleutel, titel, status (`DELIVERING`,
   `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`, `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst
   bekende Software Factory-fase.

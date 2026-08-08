@@ -27,7 +27,9 @@
 
 - `main.dart` — widgets en pagina's; `api.dart` — HTTP-client; `config.dart` — build-time config;
   `session.dart` — Google-login; `formatting.dart` — datum/tijd- en duurformattering;
-  `limited_list.dart` — de 5/+10-lijstbeperking.
+  `limited_list.dart` — de 5/+10-lijstbeperking; `classification.dart` — de vaste
+  iteratie-uitkomstclassificatie (mapping van `status`/`criticVerdict`/`errorMessage` naar één van
+  vier badge-waarden), de bijbehorende AA-contrastkleuren en de `ClassificationBadge`-widget.
 - Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
   `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
   `4m 12s`, `35s`). Backendtijdstempels zijn ISO-8601 in UTC; `parseInstant` is defensief en levert
