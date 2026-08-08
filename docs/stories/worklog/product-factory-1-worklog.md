@@ -41,3 +41,26 @@ Done / rationale:
 - `.factory/verification.yaml` was al correct (geen wijziging nodig): alle vier verplichte commando's
   staan er al met stabiele id's, argv zonder shell, bestaande relatieve working directories en
   begrensde timeouts.
+
+## Tester (product-2) - testnotities 2026-08-08
+
+- Diff van deze story raakt uitsluitend `dashboard-frontend/` (+ dit worklog); volgens
+  `.factory/verification.yaml`-pathPrefixes triggert dat alleen `dashboard-flutter-analyze` en
+  `dashboard-flutter-test`, niet de maven-module. Beide gedraaid in `dashboard-frontend/`:
+  - `flutter analyze`: "No issues found!"
+  - `flutter test`: 40/40 geslaagd, waaronder `classification_test.dart` (12 tests: alle vier
+    mappings, beide fallback-gevallen, whitelist-check, WCAG-contrastratio per kleurvariant),
+    `classification_badge_widget_test.dart` (widget-/Semantics-check op precies één toegestane
+    badgetekst per rij) en `iteration_workspace_publication_regression_test.dart`
+    (baseline-regressie op de workspace-publicatie-weergave, ongewijzigd).
+  - Extra rooktest `flutter build web`: succesvol, geen errors.
+- Codecontrole `classification.dart`/`main.dart`: mapping dekt alle vier AC-waarden plus expliciet
+  fallback-gedrag voor QUEUED/RUNNING/onbekende status; badge is additief in de `title`-`Wrap` van de
+  bestaande `ListTile`, subtitle/detaildialoog ongewijzigd; badge-tekst is zowel zichtbaar (`Text`) als
+  via `Semantics`-label leesbaar (niet alleen kleur).
+- Geen preview-omgeving beschikbaar (leeg `SF_PREVIEW_URL`/geen browser in agentcontainer, zie
+  bestaande agent-tip); E2E/screenshotverificatie was daarom niet mogelijk, gecompenseerd met
+  widgettests + build-rooktest + codecontrole.
+- `git status` na afloop schoon (build/ is gitignored); geen bestanden gewijzigd door de tester.
+- Conclusie: alle acceptatiecriteria van product-factory-1 zijn geverifieerd en het voorgeschreven
+  vangnet voor deze diff is groen zonder failures/errors → `tested`.
