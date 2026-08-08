@@ -2,6 +2,8 @@ name: Build container images
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,6 +16,8 @@ jobs:
       agent: ${{ steps.filter.outputs.agent }}
       dashboard_backend: ${{ steps.filter.outputs.dashboard_backend }}
       dashboard_frontend: ${{ steps.filter.outputs.dashboard_frontend }}
+      ref: ${{ steps.resolve.outputs.ref }}
+      sha: ${{ steps.resolve.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -24,52 +28,103 @@ jobs:
             agent: ['pom.xml', 'agentworker/**', 'productfactory-common/**', 'productfactory-contracts/**', 'Dockerfile.agent', '.github/workflows/images.yml', '.github/workflows/reusable-image.yml']
             dashboard_backend: ['pom.xml', 'dashboard-backend/**', 'productfactory-common/**', 'productfactory-contracts/**', '.github/workflows/images.yml', '.github/workflows/reusable-image.yml']
             dashboard_frontend: ['dashboard-frontend/**', '.github/workflows/images.yml']
+      - name: Resolve build ref and sha
+        id: resolve
+        shell: bash
+        run: |
+          # Bij een pull_request-event is github.sha de synthetische mergecommit, niet de echte
+          # headcommit van de branch. De ArgoCD-previewApplicationSet deployt op de echte headcommit
+          # ({{.head_sha}}), dus moeten we daar exact op taggen en die commit uitchecken.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
   runtime:
     needs: changes
-    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.changes.outputs.runtime == 'true'
     uses: ./.github/workflows/reusable-image.yml
-    with: {image: product-factory-runtime, context: '.', dockerfile: productfactory/Dockerfile}
+    with:
+      image: product-factory-runtime
+      context: '.'
+      dockerfile: productfactory/Dockerfile
+      ref: ${{ needs.changes.outputs.ref }}
+      sha: ${{ needs.changes.outputs.sha }}
+      main_tag: ${{ github.event_name == 'pull_request' && format('sha-{0}', needs.changes.outputs.sha) || 'main' }}
     secrets: inherit
   agent:
     needs: changes
-    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.agent == 'true'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.changes.outputs.agent == 'true'
     uses: ./.github/workflows/reusable-image.yml
-    with: {image: product-factory-agent, context: '.', dockerfile: Dockerfile.agent}
+    with:
+      image: product-factory-agent
+      context: '.'
+      dockerfile: Dockerfile.agent
+      ref: ${{ needs.changes.outputs.ref }}
+      sha: ${{ needs.changes.outputs.sha }}
+      main_tag: ${{ github.event_name == 'pull_request' && format('sha-{0}', needs.changes.outputs.sha) || 'main' }}
     secrets: inherit
   dashboard-backend:
     needs: changes
-    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.dashboard_backend == 'true'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.changes.outputs.dashboard_backend == 'true'
     uses: ./.github/workflows/reusable-image.yml
-    with: {image: product-factory-dashboard-backend, context: '.', dockerfile: dashboard-backend/Dockerfile}
+    with:
+      image: product-factory-dashboard-backend
+      context: '.'
+      dockerfile: dashboard-backend/Dockerfile
+      ref: ${{ needs.changes.outputs.ref }}
+      sha: ${{ needs.changes.outputs.sha }}
+      main_tag: ${{ github.event_name == 'pull_request' && format('sha-{0}', needs.changes.outputs.sha) || 'main' }}
     secrets: inherit
   dashboard-frontend:
     needs: changes
-    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.dashboard_frontend == 'true'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.changes.outputs.dashboard_frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: {ref: '${{ needs.changes.outputs.ref }}'}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
+      - name: Select build configuration
+        id: config
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Moet exact overeenkomen met de dashboard-backend-Route-hostnaam die de ArgoCD
+            # previewApplicationSet zet (zie
+            # robberts-infrastructure/manifests/root-app/apps/product-factory-applicationset.yaml).
+            echo "api_base_url=https://product-factory-api-pr-${{ github.event.pull_request.number }}.vdzonsoftware.nl" >> "$GITHUB_OUTPUT"
+            echo "google_client_id=" >> "$GITHUB_OUTPUT"
+          else
+            echo "api_base_url=https://product-factory-api.vdzonsoftware.nl" >> "$GITHUB_OUTPUT"
+            echo "google_client_id=${{ vars.GOOGLE_CLIENT_ID }}" >> "$GITHUB_OUTPUT"
+          fi
       - uses: docker/build-push-action@v6
         with:
           context: dashboard-frontend
           file: dashboard-frontend/Dockerfile
           push: true
-          tags: ghcr.io/robbertvdzon/product-factory-dashboard-frontend:main,ghcr.io/robbertvdzon/product-factory-dashboard-frontend:sha-${{ github.sha }}
+          tags: |
+            ghcr.io/robbertvdzon/product-factory-dashboard-frontend:sha-${{ needs.changes.outputs.sha }}
+            ghcr.io/robbertvdzon/product-factory-dashboard-frontend:${{ github.event_name == 'pull_request' && format('sha-{0}', needs.changes.outputs.sha) || 'main' }}
           build-args: |
-            API_BASE_URL=https://product-factory-api.vdzonsoftware.nl
-            GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+            API_BASE_URL=${{ steps.config.outputs.api_base_url }}
+            GOOGLE_CLIENT_ID=${{ steps.config.outputs.google_client_id }}
           cache-from: type=gha,scope=product-factory-dashboard-frontend
           cache-to: type=gha,mode=max,scope=product-factory-dashboard-frontend
   # GitOps promotion: ArgoCD only redeploys when the manifest actually changes. Our images use a
   # mutable :main tag, so a rebuild alone leaves the running pods untouched. This job pins the
   # deploy manifests to the SHA tag that was just built and pushed (reusable-image.yml and the
   # dashboard-frontend job above always publish one), so the commit itself is the deploy trigger.
+  # PR-builds worden nooit gepromoot: die images worden alleen door de previewApplicationSet
+  # gebruikt, niet door de productiedeployment in deploy/base.
   promote:
     needs: [changes, runtime, agent, dashboard-backend, dashboard-frontend]
     if: |
-      always() && !cancelled() &&
+      always() && !cancelled() && github.event_name != 'pull_request' &&
       needs.runtime.result != 'failure' && needs.dashboard-backend.result != 'failure' && needs.dashboard-frontend.result != 'failure' &&
       (github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' || needs.changes.outputs.dashboard_backend == 'true' || needs.changes.outputs.dashboard_frontend == 'true')
     runs-on: ubuntu-latest

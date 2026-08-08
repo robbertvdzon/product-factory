@@ -15,7 +15,7 @@ class ModulithArchitectureTest {
 
     @Test fun `every business module is explicit and fail closed`() {
         val root = Path.of("src/main/kotlin/nl/vdzon/productfactory")
-        val modules = listOf("product", "iteration", "research", "opportunity", "ux", "decision", "story", "monitoring", "humanaction", "agentruntime", "knowledge", "workspace", "dashboard", "config", "support", "web")
+        val modules = listOf("product", "iteration", "research", "opportunity", "ux", "decision", "story", "monitoring", "humanaction", "agentruntime", "knowledge", "workspace", "dashboard", "config", "support", "web", "preview")
         modules.forEach { module ->
             val text = root.resolve(module).resolve("package-info.java").readText()
             assertTrue(text.contains("@org.springframework.modulith.ApplicationModule"), "$module mist modulemetadata")

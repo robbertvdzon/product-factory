@@ -107,7 +107,14 @@ class ShadowIterationEngineTest(
         assertEquals(6, repository.steps("hkh-autopilot", warningOnly.id).size)
         assertEquals(4, workspace.artifacts.size)
 
-        assertEquals(12, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
+        assertEquals(
+            12,
+            jdbc.queryForObject(
+                "select count(*) from research_source where iteration_id in (?, ?, ?, ?, ?, ?)",
+                Int::class.java,
+                accepted.id, duplicate.id, revision.id, selfCorrected.id, autonomousCorrection.id, warningOnly.id,
+            ),
+        )
         assertEquals(
             0,
             jdbc.queryForObject(
