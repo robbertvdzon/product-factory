@@ -1,4 +1,8 @@
-FROM ghcr.io/cirruslabs/flutter:3.35.0 AS build
+# Flutter 3.44 (Dart 3.12) hoort bij de toolchain waarop pubspec.lock is opgelost en waarop
+# .github/workflows/verify.yml analyse en tests draait. 3.35.0 bracht Dart 3.9 mee en kon de
+# lock (sdks.dart >=3.10.0-0) niet meer bouwen. Van cirruslabs is 3.44.0 de nieuwste gepubliceerde
+# tag; verify.yml staat op 3.44.6, dezelfde Flutter-minor en dezelfde Dart-major.minor.
+FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
 ARG API_BASE_URL
 ARG GOOGLE_CLIENT_ID
 ARG AUTH_REQUIRED=true

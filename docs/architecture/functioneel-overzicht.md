@@ -142,14 +142,21 @@ Het (Google-beveiligde) Flutter-dashboard ververst zichzelf elke 5 seconden en t
 beneden:
 
 - **Metrics**: aantal producten, interne storykandidaten, workspace-publicaties, cycli en
-  Software Factory-stories.
+  Software Factory-stories. Deze tegels tonen altijd het *totaal*, ook wanneer de lijst eronder is
+  ingekort.
 - **Producten**: per product status (`draft`/`active`/gepauzeerd), ontwikkelmodus
   (`manual`/`autonomous`/`observe-only`), project- en repositorykoppeling, `maxStoriesPerCycle` en
   `wipLimit`, met knoppen om een cyclus of shadow-iteratie te starten of het product te
   pauzeren/hervatten. Gepauzeerd betekent: geen nieuwe agents, stories of automatische antwoorden
   meer, maar extern lopend werk wordt niet afgebroken.
 - **Productcycli en onderzoekssessies**: elke cyclus met status, huidige rol (als hij nog loopt),
-  aantal kandidaten en criticusoordeel. Aanklikken opent een detailscherm met de opdracht, alle vijf
+  starttijd, doorlooptijd, aantal kandidaten en criticusoordeel. De starttijd komt uit `startedAt`,
+  of uit `createdAt` zolang de cyclus nog niet gestart is. De doorlooptijd is het verschil tussen
+  start en afronding, compact weergegeven als bijvoorbeeld `2u 13m`, `4m 12s` of `35s`; loopt de
+  cyclus nog, dan staat er `loopt nog: <tijd sinds start>` en loopt die waarde mee met de
+  auto-refresh. Een nog niet gestarte cyclus toont geen doorlooptijd. Datum en tijd staan in de
+  lokale tijdzone van de browser als `dd-MM-yyyy HH:mm`, nooit als ruwe ISO-string.
+  Aanklikken opent een detailscherm met de opdracht, alle vijf
   agentstappen (status, start-/eindtijd, foutmelding), het volledige gepubliceerde dossier en de
   ruwe JSON-output per rol — dit scherm ververst zichzelf elke 3 seconden zolang de cyclus loopt.
 - **Software Factory-stories**: elke levering met storysleutel, titel, status (`DELIVERING`,
@@ -160,6 +167,16 @@ beneden:
 - **Storykandidaten**: alle interne kandidaten (ook afgewezen of nog niet geleverde) met status.
 - **Workspace**: alle gepubliceerde artefacten (dossiers, evaluaties), aanklikbaar om de volledige
   inhoud te lezen.
+
+Alle lijsten hierboven (producten, productcycli, Software Factory-stories, access tokens, elke
+subsectie van de storykandidaten en workspace-publicaties) tonen standaard **5 items**. Staat er meer
+klaar, dan verschijnt eronder een knop **'Meer (nog N)'** die er telkens **10** bij toont; die knop
+verdwijnt zodra alles zichtbaar is. Elke sectie heeft een eigen, onafhankelijke teller die de
+auto-refresh overleeft: een uitgeklapte lijst blijft uitgeklapt en nieuwe items verschijnen bovenaan.
+Lijsten met een bruikbaar tijdstempel (cycli, leveringen, storykandidaten, access tokens) staan
+gesorteerd op nieuwste eerst; producten houden hun volgorde op slug en workspace-publicaties — die
+geen tijdstempel hebben — de volgorde van de backend. Het inkorten gebeurt volledig in de frontend op
+de al opgehaalde data; de backend-endpoints kennen geen paginering.
 
 ## 8. Samenvatting van de belangrijkste regel
 

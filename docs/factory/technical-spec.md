@@ -1,0 +1,63 @@
+# Technical Spec
+
+## Stack
+
+| Onderdeel | Technologie |
+| --- | --- |
+| Backend-modules | Kotlin 2.1.21 op Java 21, Spring Boot 3.5.14, Spring Modulith 1.4.11 |
+| Build backend | Maven (multi-module, root `pom.xml`) |
+| Database | PostgreSQL via Spring JDBC (`JdbcTemplate`); tijdstempels als `Instant` (UTC) |
+| Frontend | Flutter/Dart (`environment: sdk: ^3.9.0`), web-target, Material 3 |
+| Frontend-dependencies | `http`, `google_sign_in(_web)`, `shared_preferences`, lints via `flutter_lints` |
+| Statische analyse | `flutter analyze` (frontend), detekt via Maven-profiel `quality` (backend) |
+
+## Module-indeling
+
+- `productfactory-contracts` — gedeelde datacontracten (`Contracts.kt`) tussen runtime, agentworker en
+  dashboard. De view-types die het dashboard toont (`ShadowIterationView`, `StoryCandidateView`,
+  `WorkspacePublicationView`) staan hier; `StoryDeliveryView`/`HumanActionView` staan in
+  `productfactory/.../autonomy/AutonomousDelivery.kt`.
+- `productfactory-common` — gedeelde infrastructuurcode.
+- `productfactory` — de runtime: productcycli (shadow iterations), storykandidaten, autonome levering.
+- `agentworker` — draait agents in containers (zie `Dockerfile.agent`).
+- `dashboard-backend` — Spring Boot API + Google-authenticatie; ontsluit de runtime voor het dashboard.
+- `dashboard-frontend` — de Flutter-webapp met het productoverzicht.
+
+## Frontend-conventies (`dashboard-frontend/lib`)
+
+- `main.dart` — widgets en pagina's; `api.dart` — HTTP-client; `config.dart` — build-time config;
+  `session.dart` — Google-login; `formatting.dart` — datum/tijd- en duurformattering;
+  `limited_list.dart` — de 5/+10-lijstbeperking.
+- Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
+  `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
+  `4m 12s`, `35s`). Backendtijdstempels zijn ISO-8601 in UTC; `parseInstant` is defensief en levert
+  `null` bij ontbrekende of onleesbare waarden.
+- Paginering gebeurt client-side: alle lijstdata komt in één refresh binnen, de frontend toont er
+  standaard 5 van en laadt er per klik op 'Meer' 10 bij. De tellers staan in `_OverviewPageState`
+  (dus buiten de `FutureBuilder`) zodat de auto-refresh van 5 s de uitklapstand behoudt.
+- Teksten in de UI zijn Nederlands; commentaar legt het *waarom* vast, niet het *wat*.
+- Formatteer nieuwe of gewijzigde code met `dart format`; laat ongerelateerde regels met rust, zodat de
+  diff van een story leesbaar blijft (het bestand is historisch niet volledig dart-formatted).
+
+## Bekende valkuilen
+
+- `WorkspacePublicationView` heeft geen tijdstempel; die lijst kan dus niet op 'nieuwste eerst'
+  gesorteerd worden en houdt de volgorde van de backend.
+- Widgettests met lange lijsten hebben een hoog testvenster nodig (`tester.view.physicalSize`), anders
+  valt de 'Meer'-knop buiten beeld en mist de tap.
+
+## Verificatiecommando's
+
+Exact de commandoset uit `.factory/verification.yaml`:
+
+| id | commando | working directory |
+| --- | --- | --- |
+| `repository-maven-verify` | `mvn -B --no-transfer-progress clean verify` | `.` |
+| `dashboard-flutter-analyze` | `flutter analyze` | `dashboard-frontend` |
+| `dashboard-flutter-test` | `flutter test` | `dashboard-frontend` |
+| `agent-image-build` | `docker build --target build -f Dockerfile.agent .` (niet agent-runnable) | `.` |
+
+Na een tester-AI-run voert de agentworker deze zelf uit en schrijft additive revisiongebonden evidence in
+`AgentResultFile`; de factory valideert config, commandset, exitcodes en HEAD/worktree-tree onafhankelijk en
+fail-closed. Timeout stopt parent en child-processen; een output-readerfout is nooit groen. Duration moet
+exact met start/eind overeenkomen en samenvatting/rapportlocatie zijn begrensd.

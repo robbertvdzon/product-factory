@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'config.dart';
+import 'formatting.dart';
 import 'google_button_stub.dart'
     if (dart.library.html) 'google_button_web.dart'
     as google_button;
+import 'limited_list.dart';
 import 'session.dart';
 
 void main() => runApp(const ProductFactoryDashboard());
@@ -194,6 +196,33 @@ class _OverviewPageState extends State<OverviewPage> {
   late Future<List<dynamic>> data;
   late final DashboardApi api;
   Timer? refreshTimer;
+
+  /// Hoeveel items er per sectie zichtbaar zijn. Deze tellers staan bewust in de state en niet in de
+  /// FutureBuilder, zodat de auto-refresh (elke 5 s) een uitgeklapte lijst uitgeklapt laat.
+  final Map<String, int> visibleCounts = {};
+
+  int _visibleCount(String section) =>
+      visibleCounts[section] ?? kInitialVisibleItems;
+
+  void _showMore(String section, int itemCount) => setState(
+    () => visibleCounts[section] = nextVisibleCount(
+      _visibleCount(section),
+      itemCount,
+    ),
+  );
+
+  /// Bouwt een overzichtslijst met de standaardbeperking (5 items, +10 per klik) en een eigen teller per sectie.
+  Widget _limitedSection(
+    String section,
+    List<Map<String, dynamic>> items,
+    Widget Function(Map<String, dynamic> item) itemBuilder,
+  ) => LimitedListSection(
+    itemCount: items.length,
+    visibleCount: _visibleCount(section),
+    itemBuilder: (_, index) => itemBuilder(items[index]),
+    onShowMore: () => _showMore(section, items.length),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -344,12 +373,22 @@ class _OverviewPageState extends State<OverviewPage> {
             child: Text('Dashboard kon niet laden: ${snapshot.error}'),
           );
         }
-        final products = snapshot.data![0] as List<dynamic>;
+        final products = (snapshot.data![0] as List<dynamic>)
+            .cast<Map<String, dynamic>>();
         final stories = snapshot.data![1] as List<dynamic>;
-        final publications = snapshot.data![2] as List<dynamic>;
-        final iterations = snapshot.data![3] as List<dynamic>;
+        // Workspace-publicaties hebben geen tijdstempel in de contracts; daar geldt alleen de beperking.
+        final publications = (snapshot.data![2] as List<dynamic>)
+            .cast<Map<String, dynamic>>();
+        final iterations = sortedByNewestFirst(
+          snapshot.data![3] as List<dynamic>,
+          ['startedAt', 'createdAt'],
+        );
         final deliveries = snapshot.data![4] as List<dynamic>;
-        final humanActions = snapshot.data![5] as List<dynamic>;
+        final sortedDeliveries = sortedByNewestFirst(deliveries, ['createdAt']);
+        final humanActions = sortedByNewestFirst(
+          snapshot.data![5] as List<dynamic>,
+          ['createdAt'],
+        );
         final aiCatalog = snapshot.data![6] as Map<String, dynamic>;
         return ListView(
           padding: const EdgeInsets.all(24),
@@ -410,8 +449,7 @@ class _OverviewPageState extends State<OverviewPage> {
             const SizedBox(height: 32),
             Text('Producten', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            ...products.map((item) {
-              final product = item as Map<String, dynamic>;
+            _limitedSection('products', products, (product) {
               final slug = '${product['slug']}';
               final status = '${product['status']}';
               final active = status == 'active';
@@ -516,11 +554,11 @@ class _OverviewPageState extends State<OverviewPage> {
                 leading: Icon(Icons.hourglass_empty),
                 title: Text('Nog geen productcycli of onderzoekssessies'),
               ),
-            ...iterations.map((item) {
-              final iteration = item as Map<String, dynamic>;
+            _limitedSection('iterations', iterations, (iteration) {
               final status = '${iteration['status']}';
               final role = iteration['currentRole'];
               final pr = iteration['workspacePullRequestUrl'];
+              final timing = iterationTiming(iteration);
               return Card(
                 child: ListTile(
                   leading: Icon(
@@ -535,6 +573,8 @@ class _OverviewPageState extends State<OverviewPage> {
                     [
                       status,
                       if (role != null) 'bezig: ${_roleLabel('$role')}',
+                      'gestart ${timing.startLabel}',
+                      if (timing.durationLabel != null) timing.durationLabel!,
                       '${iteration['candidateCount']} kandidaten',
                       if (iteration['criticVerdict'] != null)
                         'criticus: ${iteration['criticVerdict']}',
@@ -560,8 +600,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   'Nog geen stories naar de Software Factory gestuurd',
                 ),
               ),
-            ...deliveries.map((item) {
-              final delivery = item as Map<String, dynamic>;
+            _limitedSection('deliveries', sortedDeliveries, (delivery) {
               return ListTile(
                 leading: const Icon(Icons.precision_manufacturing_outlined),
                 title: Text(
@@ -578,8 +617,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 'Benodigde access tokens',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              ...humanActions.map((item) {
-                final action = item as Map<String, dynamic>;
+              _limitedSection('humanActions', humanActions, (action) {
                 return ListTile(
                   leading: const Icon(Icons.warning_amber_outlined),
                   title: Text('${action['title']}'),
@@ -598,11 +636,16 @@ class _OverviewPageState extends State<OverviewPage> {
               'Storywachtrij',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            ..._buildStoryQueueSections(context, stories, deliveries),
+            ..._buildStoryQueueSections(
+              context,
+              sortedByNewestFirst(stories, ['createdAt']),
+              deliveries,
+              visibleCount: _visibleCount,
+              onShowMore: _showMore,
+            ),
             const SizedBox(height: 24),
             Text('Workspace', style: Theme.of(context).textTheme.titleLarge),
-            ...publications.map((item) {
-              final publication = item as Map<String, dynamic>;
+            _limitedSection('publications', publications, (publication) {
               final runId = '${publication['runId']}';
               final productSlug = '${publication['productSlug']}';
               return ListTile(
@@ -712,6 +755,7 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
           final currentRole = iteration['currentRole'];
           final dossier = result['dossier'] as String?;
           final summary = iteration['summary'] as String?;
+          final timing = iterationTiming(iteration);
           return ListView(
             children: [
               Wrap(
@@ -723,7 +767,8 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                   Chip(label: Text(_deliveryLabel('${iteration['mode']}'))),
                   if (currentRole != null)
                     Chip(label: Text('bezig: $currentRole')),
-                  Text('${iteration['createdAt']}'),
+                  Text('gestart ${timing.startLabel}'),
+                  if (timing.durationLabel != null) Text(timing.durationLabel!),
                 ],
               ),
               if (running) ...[
@@ -793,9 +838,9 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                     [
                       stepStatus,
                       if (step['startedAt'] != null)
-                        'start ${step['startedAt']}',
+                        'start ${formatDateTime(step['startedAt'])}',
                       if (step['completedAt'] != null)
-                        'klaar ${step['completedAt']}',
+                        'klaar ${formatDateTime(step['completedAt'])}',
                       if (step['errorMessage'] != null)
                         '${step['errorMessage']}',
                     ].join(' · '),
@@ -832,7 +877,7 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                 return ExpansionTile(
                   tilePadding: EdgeInsets.zero,
                   title: Text(_roleLabel('${artifact['artifactType']}')),
-                  subtitle: Text('${artifact['createdAt']}'),
+                  subtitle: Text(formatDateTime(artifact['createdAt'])),
                   children: [
                     Align(
                       alignment: Alignment.centerLeft,
@@ -897,11 +942,16 @@ String _roleLabel(String value) => switch (value.toLowerCase()) {
 /// Bouwt de wachtrij-secties (Fout / Bezig / In wachtrij / Klaar) voor de storykandidaten die de backend al
 /// filtert op niet-afgekeurd (zie `StoryCandidateController.list`). Elke kandidaat wordt gekoppeld aan zijn
 /// Software Factory-levering (indien aanwezig) om de fase te bepalen; zonder levering staat hij nog in de wachtrij.
+///
+/// Elke subsectie heeft zijn eigen 5/+10-teller; die wordt via [visibleCount]/[onShowMore] uit de
+/// paginastate aangereikt zodat de auto-refresh de uitklapstand niet weggooit.
 List<Widget> _buildStoryQueueSections(
   BuildContext context,
   List<dynamic> stories,
-  List<dynamic> deliveries,
-) {
+  List<dynamic> deliveries, {
+  required int Function(String section) visibleCount,
+  required void Function(String section, int itemCount) onShowMore,
+}) {
   final deliveryByCandidate = <int, Map<String, dynamic>>{};
   for (final item in deliveries) {
     final delivery = item as Map<String, dynamic>;
@@ -928,7 +978,12 @@ List<Widget> _buildStoryQueueSections(
     }
   }
 
-  Widget section(String title, IconData icon, List<Map<String, dynamic>> items) {
+  Widget section(
+    String key,
+    String title,
+    IconData icon,
+    List<Map<String, dynamic>> items,
+  ) {
     if (items.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -942,40 +997,52 @@ List<Widget> _buildStoryQueueSections(
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
-          ...items.map((story) {
-            final delivery = deliveryByCandidate[story['id']];
-            final iteration = story['iterationSequenceNumber'];
-            final subtitleParts = [
-              '${story['productSlug']}',
-              if (iteration != null) 'iteratie $iteration',
-              if (delivery?['externalStoryKey'] != null)
-                '${delivery!['externalStoryKey']}',
-              if (delivery?['remotePhase'] != null)
-                '${delivery!['remotePhase']}',
-              if (delivery?['status'] == 'ERROR' &&
-                  delivery?['errorMessage'] != null)
-                '${delivery!['errorMessage']}',
-            ];
-            return Card(
-              child: ListTile(
-                leading: Icon(icon),
-                title: Text('${story['title']}'),
-                subtitle: Text(subtitleParts.join(' · ')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showStoryCandidateDetails(context, story, delivery),
-              ),
-            );
-          }),
+          LimitedListSection(
+            itemCount: items.length,
+            visibleCount: visibleCount(key),
+            onShowMore: () => onShowMore(key, items.length),
+            itemBuilder: (context, index) {
+              final story = items[index];
+              final delivery = deliveryByCandidate[story['id']];
+              final iteration = story['iterationSequenceNumber'];
+              final subtitleParts = [
+                '${story['productSlug']}',
+                if (iteration != null) 'iteratie $iteration',
+                if (delivery?['externalStoryKey'] != null)
+                  '${delivery!['externalStoryKey']}',
+                if (delivery?['remotePhase'] != null)
+                  '${delivery!['remotePhase']}',
+                if (delivery?['status'] == 'ERROR' &&
+                    delivery?['errorMessage'] != null)
+                  '${delivery!['errorMessage']}',
+              ];
+              return Card(
+                child: ListTile(
+                  leading: Icon(icon),
+                  title: Text('${story['title']}'),
+                  subtitle: Text(subtitleParts.join(' · ')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () =>
+                      _showStoryCandidateDetails(context, story, delivery),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
   return [
-    section('Fout', Icons.error_outline, failed),
-    section('Bezig', Icons.precision_manufacturing_outlined, inProgress),
-    section('In wachtrij', Icons.hourglass_empty, queued),
-    section('Klaar', Icons.check_circle_outline, done),
+    section('queue-failed', 'Fout', Icons.error_outline, failed),
+    section(
+      'queue-in-progress',
+      'Bezig',
+      Icons.precision_manufacturing_outlined,
+      inProgress,
+    ),
+    section('queue-queued', 'In wachtrij', Icons.hourglass_empty, queued),
+    section('queue-done', 'Klaar', Icons.check_circle_outline, done),
     if (failed.isEmpty && inProgress.isEmpty && queued.isEmpty && done.isEmpty)
       const ListTile(
         leading: Icon(Icons.hourglass_empty),
