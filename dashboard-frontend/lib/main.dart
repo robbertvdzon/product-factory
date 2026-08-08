@@ -595,17 +595,10 @@ class _OverviewPageState extends State<OverviewPage> {
             ],
             const SizedBox(height: 24),
             Text(
-              'Storykandidaten',
+              'Storywachtrij',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            ...stories.map((item) {
-              final story = item as Map<String, dynamic>;
-              return ListTile(
-                title: Text('${story['title']}'),
-                subtitle: Text('${story['productSlug']} · ${story['status']}'),
-                leading: const Icon(Icons.notes),
-              );
-            }),
+            ..._buildStoryQueueSections(context, stories, deliveries),
             const SizedBox(height: 24),
             Text('Workspace', style: Theme.of(context).textTheme.titleLarge),
             ...publications.map((item) {
@@ -900,6 +893,168 @@ String _roleLabel(String value) => switch (value.toLowerCase()) {
   'critic-3' => 'Criticus · revisie 3',
   _ => value.replaceAll('_', ' '),
 };
+
+/// Bouwt de wachtrij-secties (Fout / Bezig / In wachtrij / Klaar) voor de storykandidaten die de backend al
+/// filtert op niet-afgekeurd (zie `StoryCandidateController.list`). Elke kandidaat wordt gekoppeld aan zijn
+/// Software Factory-levering (indien aanwezig) om de fase te bepalen; zonder levering staat hij nog in de wachtrij.
+List<Widget> _buildStoryQueueSections(
+  BuildContext context,
+  List<dynamic> stories,
+  List<dynamic> deliveries,
+) {
+  final deliveryByCandidate = <int, Map<String, dynamic>>{};
+  for (final item in deliveries) {
+    final delivery = item as Map<String, dynamic>;
+    final candidateId = delivery['candidateId'];
+    if (candidateId is int) deliveryByCandidate[candidateId] = delivery;
+  }
+
+  final failed = <Map<String, dynamic>>[];
+  final inProgress = <Map<String, dynamic>>[];
+  final queued = <Map<String, dynamic>>[];
+  final done = <Map<String, dynamic>>[];
+  for (final item in stories) {
+    final story = item as Map<String, dynamic>;
+    final delivery = deliveryByCandidate[story['id']];
+    switch (delivery?['status']) {
+      case null:
+        queued.add(story);
+      case 'ERROR':
+        failed.add(story);
+      case 'DONE':
+        done.add(story);
+      default:
+        inProgress.add(story);
+    }
+  }
+
+  Widget section(String title, IconData icon, List<Map<String, dynamic>> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              '$title (${items.length})',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          ...items.map((story) {
+            final delivery = deliveryByCandidate[story['id']];
+            final iteration = story['iterationSequenceNumber'];
+            final subtitleParts = [
+              '${story['productSlug']}',
+              if (iteration != null) 'iteratie $iteration',
+              if (delivery?['externalStoryKey'] != null)
+                '${delivery!['externalStoryKey']}',
+              if (delivery?['remotePhase'] != null)
+                '${delivery!['remotePhase']}',
+              if (delivery?['status'] == 'ERROR' &&
+                  delivery?['errorMessage'] != null)
+                '${delivery!['errorMessage']}',
+            ];
+            return Card(
+              child: ListTile(
+                leading: Icon(icon),
+                title: Text('${story['title']}'),
+                subtitle: Text(subtitleParts.join(' · ')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showStoryCandidateDetails(context, story, delivery),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  return [
+    section('Fout', Icons.error_outline, failed),
+    section('Bezig', Icons.precision_manufacturing_outlined, inProgress),
+    section('In wachtrij', Icons.hourglass_empty, queued),
+    section('Klaar', Icons.check_circle_outline, done),
+    if (failed.isEmpty && inProgress.isEmpty && queued.isEmpty && done.isEmpty)
+      const ListTile(
+        leading: Icon(Icons.hourglass_empty),
+        title: Text('Nog geen storykandidaten'),
+      ),
+  ];
+}
+
+void _showStoryCandidateDetails(
+  BuildContext context,
+  Map<String, dynamic> story,
+  Map<String, dynamic>? delivery,
+) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('${story['title']}'),
+      content: SizedBox(
+        width: 720,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (delivery != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      Chip(label: Text('${delivery['status']}')),
+                      if (delivery['externalStoryKey'] != null)
+                        Chip(label: Text('${delivery['externalStoryKey']}')),
+                      if (delivery['remotePhase'] != null)
+                        Chip(label: Text('${delivery['remotePhase']}')),
+                    ],
+                  ),
+                ),
+              SelectableText('${story['description']}'),
+              if ('${story['acceptanceCriteria'] ?? ''}'.trim().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Acceptatiecriteria',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                SelectableText('${story['acceptanceCriteria']}'),
+              ],
+              if ('${story['criticReason'] ?? ''}'.trim().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Beoordeling criticus',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                SelectableText('${story['criticReason']}'),
+              ],
+              if (delivery?['errorMessage'] != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Foutmelding',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                SelectableText('${delivery!['errorMessage']}'),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Sluiten'),
+        ),
+      ],
+    ),
+  );
+}
 
 class AddProductDialog extends StatefulWidget {
   const AddProductDialog({required this.aiCatalog, super.key});

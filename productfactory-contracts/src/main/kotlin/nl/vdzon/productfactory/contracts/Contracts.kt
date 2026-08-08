@@ -94,7 +94,17 @@ data class ProductView(
     val createdAt: Instant,
     val updatedAt: Instant,
 )
-data class StoryCandidateView(val id: Long, val productSlug: String, val title: String, val description: String, val status: String, val createdAt: Instant)
+data class StoryCandidateView(
+    val id: Long,
+    val productSlug: String,
+    val title: String,
+    val description: String,
+    val status: String,
+    val createdAt: Instant,
+    val iterationSequenceNumber: Int? = null,
+    val acceptanceCriteria: String? = null,
+    val criticReason: String? = null,
+)
 data class ProductRecordView(
     val id: Long,
     val productSlug: String,

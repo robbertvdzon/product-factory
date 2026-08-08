@@ -18,11 +18,17 @@ class StoryCandidateController(
     private val products: ProductCatalog,
     private val deliveryService: StoryDeliveryPort,
 ) {
+    // REJECTED/DUPLICATE kandidaten gaan nooit naar de Software Factory; die vervuilen de wachtrijweergave alleen maar.
     @GetMapping fun list(@RequestParam productSlug: String): List<StoryCandidateView> {
         val product = products.requireContext(productSlug)
         return jdbc.query(
-            "select id, product_slug, title, description, status, created_at from story_candidate where product_slug = ? order by id",
-            mapper,
+            """select c.id, c.product_slug, c.title, c.description, c.status, c.created_at,
+                      i.sequence_number, c.acceptance_criteria, c.critic_reason
+                 from story_candidate c
+                 left join shadow_iteration i on i.id = c.iteration_id
+                where c.product_slug = ? and c.status not in ('REJECTED', 'DUPLICATE')
+                order by c.id""".trimIndent(),
+            mapperWithIteration,
             product.slug,
         )
     }
@@ -53,4 +59,10 @@ class StoryCandidateController(
     }
 
     private val mapper = { row: java.sql.ResultSet, _: Int -> StoryCandidateView(row.getLong(1), row.getString(2), row.getString(3), row.getString(4), row.getString(5), row.getTimestamp(6).toInstant()) }
+    private val mapperWithIteration = { row: java.sql.ResultSet, _: Int ->
+        StoryCandidateView(
+            row.getLong(1), row.getString(2), row.getString(3), row.getString(4), row.getString(5), row.getTimestamp(6).toInstant(),
+            row.getObject(7, java.lang.Integer::class.java)?.toInt(), row.getString(8), row.getString(9),
+        )
+    }
 }
