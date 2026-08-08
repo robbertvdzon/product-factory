@@ -5,6 +5,7 @@ import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.AgentTaskState
 import nl.vdzon.productfactory.contracts.AgentTaskStatus
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Profile
 import org.springframework.http.HttpStatusCode
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -16,6 +17,7 @@ fun interface ShadowAgentBridge {
 }
 
 @Component
+@Profile("!mock-agent-bridge")
 class HttpShadowAgentBridge(
     @Value("\${product-factory.agent-bridge.base-url}") baseUrl: String,
     @Value("\${PF_AGENT_WORKER_TOKEN:}") private val token: String,
