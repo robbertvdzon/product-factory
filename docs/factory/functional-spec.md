@@ -29,8 +29,12 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    tekst als via een Semantics-label (niet uitsluitend via kleur) en elk van de vijf kleurenparen
    haalt WCAG 2.1 AA-contrast (≥ 4.5:1). De voortgangsindicator gebruikt `Semantics(liveRegion:
    true)` (het Flutter-web-equivalent van `aria-live="polite"`), zodat een schermlezer meekrijgt
-   wanneer een iteratie nog loopt. Klikken opent de detaildialoog met voortgang, artifacts en het
-   productdossier.
+   wanneer een iteratie nog loopt. De badge zelf is met muis én toetsenbord (Tab, Enter/Spatie)
+   te activeren en klapt dan een inline scope-disclaimerpaneel open direct onder de badge, met de
+   vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen pop-upvenster of dialoog,
+   `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of Escape klapt het
+   paneel weer in en herstelt de focus op de badge. Een klik op de rij buiten de badge opent nog
+   steeds de detaildialoog met voortgang, artifacts en het productdossier.
 4. **Software Factory-stories** — de leveringen met externe storykey, status en fase.
 5. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
 6. **Storywachtrij** — storykandidaten verdeeld over Fout / Bezig / In wachtrij / Klaar.
