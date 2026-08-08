@@ -77,3 +77,40 @@ Done / rationale:
   probleem en niet in scope van deze story, maar visueel iets om in een latere UX-pass
   naar te kijken.
 - Conclusie: geen blockers gevonden; akkoord.
+
+## Tester-notities (product-20)
+
+- Vangnet gedraaid (agent-runnable subset uit `.factory/verification.yaml`):
+  - `flutter analyze` (dashboard-frontend) → "No issues found!" (0 issues).
+  - `flutter test` (dashboard-frontend) → 63/63 tests groen, exit 0 ("All tests passed!").
+    Zowel default (concurrent) als `-j 1` (serieel) gedraaid; serieel geeft de
+    betrouwbaarste per-testnaam-log (concurrente compact-reporter-output toont soms
+    dezelfde regel meerdere keren door interleaving van shards — cosmetisch, de
+    +N-teller en het eindtotaal (63) kloppen in beide runs). Alle 8 testfiles zijn
+    hiermee bevestigd inclusief de nieuwe `classification_badge_disclosure_test.dart`
+    (19 tests) en de bestaande `classification_test.dart`, `formatting_test.dart`,
+    `widget_test.dart`, `classification_badge_widget_test.dart`,
+    `iteration_progress_indicator_test.dart`,
+    `iteration_workspace_publication_regression_test.dart`, `limited_list_test.dart`.
+  - `mvn -B --no-transfer-progress clean verify` (repo-root) → BUILD SUCCESS, alle
+    backend-modules groen (35 + 17 + 7 tests, 0 failures/errors).
+  - De twee docker-image-buildcommando's in `.factory/verification.yaml` staan op
+    `agentRunnable: false` en zijn CI-only (geen docker in de agentcontainer);
+    conform eerdere agent-tip niet zelf gedraaid.
+- Codeverificatie tegen de acceptance criteria in `.task.md`:
+  - Diff blijft beperkt tot `dashboard-frontend/lib/classification.dart`, de nieuwe
+    testfile en de worklog — `main.dart` ongewijzigd bevestigd (`grep ClassificationBadge
+    lib/main.dart` toont alleen het bestaande gebruik op regel 587).
+  - Alle vijf badge-varianten hebben eigen toetsenbord-only tests (Tab, Enter/Space),
+    expanded-toggle zonder `Dialog`/`AlertDialog` in de boom, de exacte disclaimerzin
+    per variant, Escape+focusherstel, Semantics-label per variant, en afwezigheid van
+    een externe iteratielog-link — allemaal aanwezig en groen in
+    `classification_badge_disclosure_test.dart`.
+  - Rijklikgedrag-regressietest bevestigt: tap op badge triggert `ListTile.onTap` niet,
+    tap ernaast wel.
+- Preview: `SF_PREVIEW_URL` (https://product-factory-pr-38.vdzonsoftware.nl) en de
+  API-health-endpoint beantwoorden beide met HTTP 200 (curl-smoketest); er is geen
+  browsertool in deze agentcontainer beschikbaar voor interactieve
+  toetsenbord-/screenshotverificatie in de preview zelf, dus die verificatie steunt op
+  de widgettests hierboven (conform eerdere agent-tip over ontbrekende browser).
+- Geen bugs gevonden; geen tijdelijke testdata aangemaakt (geen cleanup nodig).
