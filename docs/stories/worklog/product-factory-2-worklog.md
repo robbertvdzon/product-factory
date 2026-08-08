@@ -43,3 +43,20 @@ Done / rationale:
 - Vangnet gedraaid: `flutter analyze` (schoon), `flutter test` (41/41 groen, incl. de aangepaste en
   nieuwe tests), `mvn -B --no-transfer-progress clean verify` (BUILD SUCCESS, backendmodules
   ongewijzigd door deze story). Geen `pubspec.lock`-wijziging.
+
+## Review (product-7)
+
+- Diff tegen `main` bekeken (`classification.dart`, beide testbestanden,
+  `functional-spec.md`, worklog). Logica in `classifyIterationOutcome` klopt: `status == null` en
+  elke waarde die niet in `kBekendeStatuswaardenPerCategorie` voorkomt (incl. lege string) geeft
+  `kNietClassificeerbaar`; QUEUED/RUNNING blijven expliciet op `kOnderzoekOnvoldoende` — dekt AC 1-3.
+- `classification_test.dart`: fallback-test nu op `kNietClassificeerbaar` (onbekend/`null`/leeg),
+  toegestane-lijst-test uitgebreid met `'ONVOORZIEN'`, WCAG-test itereert over
+  `kIterationClassifications` dus dekt automatisch de nieuwe kleur — AC 4/5 gedekt.
+- `classification_badge_widget_test.dart`: dataset uitgebreid met onbekende status + `null`,
+  assert op vijfwaardige set en exact één badge per rij — AC 6 gedekt.
+- `functional-spec.md`: opsomming en kleurenparen-aantal bijgewerkt — AC 7 gedekt.
+- Geen wijzigingen aan `main.dart`, `pubspec.lock` of Dockerfile-basis (relevant i.v.m. bekende
+  Flutter-toolchain-divergentie); geen mergeconflictmarkers; wijzigingen blijven binnen de
+  gedocumenteerde scope.
+- Oordeel: akkoord, geen blockers.
