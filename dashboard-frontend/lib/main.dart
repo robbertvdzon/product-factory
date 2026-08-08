@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'classification.dart';
 import 'config.dart';
 import 'formatting.dart';
 import 'google_button_stub.dart'
@@ -559,6 +560,11 @@ class _OverviewPageState extends State<OverviewPage> {
               final role = iteration['currentRole'];
               final pr = iteration['workspacePullRequestUrl'];
               final timing = iterationTiming(iteration);
+              final classification = classifyIterationOutcome(
+                status: iteration['status'] as String?,
+                criticVerdict: iteration['criticVerdict'] as String?,
+                errorMessage: iteration['errorMessage'] as String?,
+              );
               return Card(
                 child: ListTile(
                   leading: Icon(
@@ -566,8 +572,15 @@ class _OverviewPageState extends State<OverviewPage> {
                         ? Icons.auto_awesome
                         : Icons.science_outlined,
                   ),
-                  title: Text(
-                    '${iteration['productSlug']} · iteratie ${iteration['sequenceNumber']}',
+                  title: Wrap(
+                    spacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        '${iteration['productSlug']} · iteratie ${iteration['sequenceNumber']}',
+                      ),
+                      ClassificationBadge(classification: classification),
+                    ],
                   ),
                   subtitle: Text(
                     [
