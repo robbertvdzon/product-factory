@@ -12,38 +12,53 @@ const String kOnderzoekOnvoldoende = 'onderzoek-onvoldoende';
 const String kGuardrailConflict = 'guardrail-conflict';
 const String kRichtingGekozen = 'richting-gekozen';
 const String kRichtingVerworpen = 'richting-verworpen';
+const String kNietClassificeerbaar = 'niet-classificeerbaar';
 
-/// De vier toegestane classificatiewaarden; een badge mag nooit iets anders tonen.
+/// De vijf toegestane classificatiewaarden; een badge mag nooit iets anders tonen.
 const List<String> kIterationClassifications = [
   kOnderzoekOnvoldoende,
   kGuardrailConflict,
   kRichtingGekozen,
   kRichtingVerworpen,
+  kNietClassificeerbaar,
 ];
+
+/// Expliciete, uitbreidbare tabel van de daadwerkelijk voorkomende bekende ruwe `status`-waarden
+/// per badge-categorie (`status` is een vrij `varchar(32)`, geen DB-enum). QUEUED/RUNNING zijn
+/// bewust gemodelleerde, niet-afgeronde tussenstatussen die op [kOnderzoekOnvoldoende] blijven
+/// mappen. Een toekomstige nieuwe status hoort hier bewust aan een categorie toegevoegd te
+/// worden; alles wat hier niet in voorkomt (inclusief `null`/leeg) is per definitie onbekend en
+/// valt terug op [kNietClassificeerbaar] in [classifyIterationOutcome].
+const Map<String, List<String>> kBekendeStatuswaardenPerCategorie = {
+  kRichtingGekozen: ['ACCEPTED'],
+  kOnderzoekOnvoldoende: ['NEEDS_REVISION', 'QUEUED', 'RUNNING'],
+  kRichtingVerworpen: ['REJECTED'],
+  kGuardrailConflict: ['FAILED'],
+};
 
 /// Bepaalt de classificatie van een iteratie op basis van `status` (en indirect `criticVerdict`/
 /// `errorMessage`, die de backend altijd in lijn met `status` zet, zie `ShadowIterationApi.kt`).
-/// Iteraties zonder ondubbelzinnige uitkomst (nog lopend/in de wachtrij, of een onvoorziene
-/// statuswaarde) vallen expliciet terug op [kOnderzoekOnvoldoende], omdat er dan nog geen
-/// afgeronde uitkomst is om te classificeren en elke rij toch altijd één van de vier vaste
-/// badge-teksten moet tonen.
+/// De vier badge-categorieën worden gevoed door de expliciete, uitbreidbare tabel
+/// [kBekendeStatuswaardenPerCategorie]. Een lopende/wachtende iteratie (QUEUED/RUNNING) valt
+/// bewust terug op [kOnderzoekOnvoldoende], omdat er dan nog geen afgeronde uitkomst is om te
+/// classificeren. Elke andere, niet-bekende statuswaarde (inclusief `null`/leeg en elke
+/// toekomstige, nu nog niet bestaande statuscode) mapt naar [kNietClassificeerbaar], zodat de
+/// badge nooit ten onrechte 'onderzoek-onvoldoende' claimt voor een uitkomst die het systeem niet
+/// kent.
 String classifyIterationOutcome({
   required String? status,
   String? criticVerdict,
   String? errorMessage,
 }) {
-  switch (status) {
-    case 'ACCEPTED':
-      return kRichtingGekozen;
-    case 'NEEDS_REVISION':
-      return kOnderzoekOnvoldoende;
-    case 'REJECTED':
-      return kRichtingVerworpen;
-    case 'FAILED':
-      return kGuardrailConflict;
-    default:
-      return kOnderzoekOnvoldoende;
+  if (status == null) {
+    return kNietClassificeerbaar;
   }
+  for (final entry in kBekendeStatuswaardenPerCategorie.entries) {
+    if (entry.value.contains(status)) {
+      return entry.key;
+    }
+  }
+  return kNietClassificeerbaar;
 }
 
 /// Tekst-op-achtergrondkleurenpaar voor een badgevariant. Elk paar haalt minimaal WCAG 2.1 AA
@@ -74,6 +89,10 @@ const Map<String, ClassificationColors> kClassificationColors = {
   kRichtingVerworpen: ClassificationColors(
     background: Color(0xFFE2E3E5),
     foreground: Color(0xFF383A3D),
+  ),
+  kNietClassificeerbaar: ClassificationColors(
+    background: Color(0xFFCFE2FF),
+    foreground: Color(0xFF073880),
   ),
 };
 

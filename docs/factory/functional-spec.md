@@ -17,11 +17,15 @@ elke 5 seconden en bestaat van boven naar beneden uit:
 3. **Productcycli en onderzoekssessies** — per cyclus status, huidige rol, **starttijd** en
    **doorlooptijd**, aantal kandidaten en of de cyclus doorgezet mag worden. Elke iteratierij toont
    daarnaast exact één vaste classificatiebadge — `onderzoek-onvoldoende`, `guardrail-conflict`,
-   `richting-gekozen` of `richting-verworpen` — afgeleid uit de bestaande velden `status`,
-   `criticVerdict` en `errorMessage` (geen nieuwe databron). De badge communiceert de classificatie
-   zowel via zichtbare tekst als via een Semantics-label (niet uitsluitend via kleur) en elk van de
-   vier kleurenparen haalt WCAG 2.1 AA-contrast (≥ 4.5:1). Klikken opent de detaildialoog met
-   voortgang, artifacts en het productdossier.
+   `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` — afgeleid uit de bestaande
+   velden `status`, `criticVerdict` en `errorMessage` (geen nieuwe databron). `niet-classificeerbaar`
+   verschijnt voor elke ruwe statuswaarde die het systeem niet als een van de vier bekende
+   categorieën of als de bekende tussenstatussen QUEUED/RUNNING herkent (inclusief een ontbrekende
+   status), zodat de badge nooit ten onrechte 'onderzoek-onvoldoende' claimt voor een uitkomst die
+   niet bekend is. De badge communiceert de classificatie zowel via zichtbare tekst als via een
+   Semantics-label (niet uitsluitend via kleur) en elk van de vijf kleurenparen haalt WCAG 2.1
+   AA-contrast (≥ 4.5:1). Klikken opent de detaildialoog met voortgang, artifacts en het
+   productdossier.
 4. **Software Factory-stories** — de leveringen met externe storykey, status en fase.
 5. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
 6. **Storywachtrij** — storykandidaten verdeeld over Fout / Bezig / In wachtrij / Klaar.
