@@ -167,12 +167,17 @@ beneden:
   classificatie zowel als zichtbare tekst als via een Semantics-label, dus niet uitsluitend via
   kleur, en elk van de vijf kleurenparen haalt WCAG 2.1 AA-contrast (≥ 4.5:1). De
   voortgangsindicator gebruikt `Semantics(liveRegion: true)` (het Flutter-web-equivalent van
-  `aria-live="polite"`). Aanklikken opent een detailscherm met de opdracht, alle vijf agentstappen
-  (status, start-/eindtijd, foutmelding), het volledige gepubliceerde dossier en de ruwe
-  JSON-output per rol — dit scherm ververst zichzelf elke 3 seconden zolang de cyclus loopt. De
-  weergave van de workspace-publicatie/PR-referentie (`workspacePullRequestUrl`/
-  `workspaceCommitSha`) in dit detailscherm is door de badge-/indicator-toevoeging ongewijzigd
-  gebleven.
+  `aria-live="polite"`). De classificatiebadge zelf is met muis én toetsenbord (Tab, Enter/Spatie)
+  activeerbaar en klapt dan direct onder de badge een inline scope-disclaimerpaneel open met de
+  vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen `AlertDialog`/`showDialog`,
+  geen focus-trap, `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of
+  Escape klapt het paneel weer in en herstelt de focus op de badge; het paneel bevat geen link
+  naar een externe iteratielog-route. Aanklikken van de rij buiten de badge opent nog steeds een
+  detailscherm met de opdracht, alle vijf agentstappen (status, start-/eindtijd, foutmelding), het
+  volledige gepubliceerde dossier en de ruwe JSON-output per rol — dit scherm ververst zichzelf
+  elke 3 seconden zolang de cyclus loopt. De weergave van de workspace-publicatie/PR-referentie
+  (`workspacePullRequestUrl`/`workspaceCommitSha`) in dit detailscherm is door de badge-/
+  indicator-toevoeging ongewijzigd gebleven.
 - **Software Factory-stories**: elke levering met storysleutel, titel, status (`DELIVERING`,
   `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`, `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst
   bekende Software Factory-fase.

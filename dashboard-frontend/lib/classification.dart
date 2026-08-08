@@ -7,6 +7,7 @@ library;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 const String kOnderzoekOnvoldoende = 'onderzoek-onvoldoende';
 const String kGuardrailConflict = 'guardrail-conflict';
@@ -116,39 +117,150 @@ double contrastRatio(Color a, Color b) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+/// Vaste scope-disclaimerzin in het inline uitklappaneel van [ClassificationBadge]: de badge toont
+/// uitsluitend de vastgestelde uitkomst ('wat'), niet de onderliggende motivatie ('waarom') — die
+/// laatste blijft voorbehouden aan de bestaande `IterationSessionDialog`.
+const String kBadgeScopeDisclaimer =
+    'Dit toont wat de uitkomst was, niet waarom.';
+
 /// Badge die de vaste classificatietekst toont, met AA-contrast en een programmatisch leesbaar
-/// (Semantics) label — de kleur is dus nooit het enige signaal.
-class ClassificationBadge extends StatelessWidget {
+/// (Semantics) label — de kleur is dus nooit het enige signaal. Toetsenbord- en muis-activeerbaar:
+/// klapt bij activatie een inline scope-disclaimerpaneel open direct onder zichzelf.
+///
+/// Bewust géén `showDialog`/`AlertDialog`, ook al is dat het bestaande herbruikbare modale patroon
+/// in dit project (`IterationSessionDialog`, `AddProductDialog`, `ProductSettingsDialog`,
+/// `_completeHumanAction`): een dialoog zou een focus-trap en `role="dialog"`-achtige semantiek
+/// introduceren die voor dit korte scope-signaal niet nodig is, en zou het los koppelen van de
+/// rij waar de badge bij hoort. Het paneel is daarom een gewone widget in de bestaande
+/// widgetboom, geen aparte overlay/route.
+class ClassificationBadge extends StatefulWidget {
   const ClassificationBadge({required this.classification, super.key});
 
   final String classification;
 
   @override
+  State<ClassificationBadge> createState() => _ClassificationBadgeState();
+}
+
+class _ClassificationBadgeState extends State<ClassificationBadge> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'classification-badge');
+  bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild op focuswissel zodat de focusrand (en straks eventuele focus-afhankelijke styling)
+    // synchroon blijft met de daadwerkelijke focusstatus.
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() => setState(() {});
+
+  void _toggleExpanded() => setState(() => _expanded = !_expanded);
+
+  void _collapseAndRestoreFocus() {
+    setState(() => _expanded = false);
+    _focusNode.requestFocus();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space) {
+      _toggleExpanded();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.escape && _expanded) {
+      _collapseAndRestoreFocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors =
-        kClassificationColors[classification] ??
+        kClassificationColors[widget.classification] ??
         kClassificationColors[kOnderzoekOnvoldoende]!;
+    // Eén Semantics op het buitenste niveau (i.p.v. alleen op de badge-chip) zodat het label en de
+    // expanded-status ook direct opvraagbaar zijn via `tester.getSemantics(find.byType(...))` op
+    // deze widget zelf, ongeacht of het paneel er (nog) niet bij staat.
     return Semantics(
-      label: 'classificatie: $classification',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: colors.background,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        // De zichtbare Text blijft de bron van waarheid voor de widgettest en voor gebruikers die
-        // wél kleuren zien; ExcludeSemantics voorkomt een dubbel (en afwijkend) accessibility-label
-        // naast het expliciete label hierboven.
-        child: ExcludeSemantics(
-          child: Text(
-            classification,
-            style: TextStyle(
-              color: colors.foreground,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+      label: 'classificatie: ${widget.classification}',
+      expanded: _expanded,
+      button: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Focus(
+            focusNode: _focusNode,
+            onKeyEvent: _handleKeyEvent,
+            child: GestureDetector(
+              // Consumeert de tap op het badge zelf, zodat de omringende ListTile.onTap (die het
+              // detaildialoog opent) niet ook triggert; een tap ernaast/erbuiten raakt de
+              // GestureDetector niet en bereikt gewoon de rij.
+              behavior: HitTestBehavior.opaque,
+              onTap: _toggleExpanded,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.background,
+                  borderRadius: BorderRadius.circular(12),
+                  border: _focusNode.hasFocus
+                      ? Border.all(color: colors.foreground, width: 2)
+                      : null,
+                ),
+                // De zichtbare Text blijft de bron van waarheid voor de widgettest en voor
+                // gebruikers die wél kleuren zien; ExcludeSemantics voorkomt een dubbel (en
+                // afwijkend) accessibility-label naast het expliciete label hierboven.
+                child: ExcludeSemantics(
+                  child: Text(
+                    widget.classification,
+                    style: TextStyle(
+                      color: colors.foreground,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 260),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colors.background.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.foreground, width: 1),
+                  ),
+                  child: Text(
+                    kBadgeScopeDisclaimer,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
