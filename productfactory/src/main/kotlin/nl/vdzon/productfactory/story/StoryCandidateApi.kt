@@ -19,6 +19,9 @@ class StoryCandidateController(
     private val deliveryService: StoryDeliveryPort,
 ) {
     // REJECTED/DUPLICATE kandidaten gaan nooit naar de Software Factory; die vervuilen de wachtrijweergave alleen maar.
+    // Een kandidaat wiens iteratie FAILED is, heeft nooit een gemergede workspace-publicatie gekregen en kan
+    // daardoor nooit meer geleverd worden (zie AutonomousDelivery.eligible) — die hoort dus ook niet als "in
+    // wachtrij" te ogen.
     @GetMapping fun list(@RequestParam productSlug: String): List<StoryCandidateView> {
         val product = products.requireContext(productSlug)
         return jdbc.query(
@@ -27,6 +30,7 @@ class StoryCandidateController(
                  from story_candidate c
                  left join shadow_iteration i on i.id = c.iteration_id
                 where c.product_slug = ? and c.status not in ('REJECTED', 'DUPLICATE')
+                  and (i.id is null or i.status <> 'FAILED')
                 order by c.id""".trimIndent(),
             mapperWithIteration,
             product.slug,
