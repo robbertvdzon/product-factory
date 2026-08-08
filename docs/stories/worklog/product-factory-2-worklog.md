@@ -60,3 +60,29 @@ Done / rationale:
   Flutter-toolchain-divergentie); geen mergeconflictmarkers; wijzigingen blijven binnen de
   gedocumenteerde scope.
 - Oordeel: akkoord, geen blockers.
+
+## Test (product-8)
+
+- Vangnet gedraaid (dashboard-frontend, enige pathPrefix geraakt door deze diff): `flutter
+  analyze` → "No issues found!" (exit 0); `flutter test` → 41/41 groen (exit 0), inclusief de
+  aangepaste `classification_test.dart`-fallbacktest (onbekend/`null`/`''` → `niet-classificeerbaar`)
+  en de uitgebreide widget-test met 8 rijen (5 bekende statussen + QUEUED/RUNNING + onbekende
+  status + `null`). `mvn ... clean verify` niet vereist: geen enkel bestand in deze diff valt
+  onder de maven-pathPrefixes in `.factory/verification.yaml`.
+- Code geïnspecteerd tegen AC 1-7: `kBekendeStatuswaardenPerCategorie` documenteert de bekende
+  ruwe statuswaarden expliciet en uitbreidbaar (AC1); `classifyIterationOutcome` retourneert voor
+  `null`, `''` en elke onbekende status altijd `kNietClassificeerbaar`, nooit `null`/leeg/exception
+  (AC2); `kIterationClassifications` bevat alle vijf waarden en `kNietClassificeerbaar` heeft een
+  eigen kleurenpaar (AC3); tests dekken bekende waarden, QUEUED/RUNNING-onveranderd-gedrag en de
+  nieuwe fallback (AC4); de WCAG-test itereert over `kIterationClassifications` en dekt dus
+  automatisch het nieuwe kleurenpaar (AC5); de widget-test rendert 8 statuscombinaties en assert
+  exact één badge per rij uit de vijfwaardige set, nooit leeg (AC6); `functional-spec.md` is
+  bijgewerkt met de vijfde badgewaarde en voorwaarde (AC7).
+- Preview (`https://product-factory-pr-36.vdzonsoftware.nl`) is bereikbaar (HTTP 200, correcte
+  Flutter-webshell), maar er is geen browser-/screenshot-tool beschikbaar in deze agentcontainer
+  om de DOM na JS-rendering te inspecteren (conform eerdere agent-tip). Geen live data met een
+  écht onbekende status beschikbaar/aan te maken zonder backend-mutaties, dus geen aanvullende
+  E2E-verificatie via de preview uitgevoerd; de widget-test dekt dit scenario al met een
+  gecontroleerde dataset.
+- Geen testdata aangemaakt/gewijzigd, geen code/tests aangepast. Oordeel: alle AC's voldaan,
+  vangnet groen (0 failures, 0 errors) → `tested`.
