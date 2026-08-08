@@ -136,3 +136,49 @@ Open, niet-blokkerende punten voor een volgende ronde:
 - `dashboard-frontend/pubspec.yaml` staat nog op `sdk: ^3.9.0` terwijl de lock `>=3.10.0-0` eist.
 - De doc-comment van `sortedByNewestFirst` belooft dat items zonder tijdstempel onderling hun
   volgorde houden; `List.sort` in Dart is niet stabiel.
+
+## Test (SF-2038) — akkoord
+
+Volledig vangnet lokaal gedraaid, alles tot het einde:
+- `mvn -B --no-transfer-progress clean verify` (root): BUILD SUCCESS, exitcode 0 — 33 + 17 + 7 tests,
+  0 failures, 0 errors.
+- `flutter analyze` (`dashboard-frontend`): No issues found!, exitcode 0.
+- `flutter test` (`dashboard-frontend`): 25/25 groen, exitcode 0. Geen flakes gezien.
+- Extra: `flutter build web` slaagt (exitcode 0) — de webcompile van `main.dart` met de nieuwe
+  `formatting.dart`/`limited_list.dart` werkt. De Docker-imagebuilds staan als `agentRunnable: false`
+  in `.factory/verification.yaml` en blijven CI-dekking; docker is in de agentcontainer niet aanwezig.
+
+Gedragscontrole tegen de acceptatiecriteria (code + tests gelezen):
+- AC1-5: `iterationTiming` levert start op `startedAt` met `createdAt`-fallback, duur
+  `completedAt - startedAt`, `loopt nog: <duur>` zonder `completedAt` en géén duur als `startedAt`
+  leeg is; `formatDateTime` toont `dd-MM-yyyy HH:mm` lokaal (`parseInstant` doet `toLocal()`).
+  Toegepast in de lijst én in `IterationSessionDialog`; ook stap- en artifacttijden zijn niet langer
+  ruwe ISO-strings. De 'loopt nog'-waarde wordt bij elke rebuild opnieuw berekend en loopt dus mee
+  met de 5s-refresh.
+- AC6-8: `LimitedListSection` + `nextVisibleCount` (5 initieel, +10 per klik, knop weg bij 0 verborgen,
+  label 'Meer (nog N)'). Toegepast op producten, iteraties, deliveries, humanActions, alle vier de
+  wachtrij-subsecties en publicaties, elk met een eigen sleutel in `visibleCounts`.
+- AC9-10: de tellers staan in `_OverviewPageState` (buiten de `FutureBuilder`), dus een refresh
+  behoudt de uitklapstand; lijsten met tijdstempel zijn nieuwste-eerst gesorteerd, dus nieuwe items
+  komen bovenaan. Widgettest 'houdt de uitklapstand vast over een refresh heen' dekt dit.
+- AC11: de metric-tegels gebruiken `products.length`/`stories.length`/etc. op de volledige lijsten.
+- AC12: `technical-spec.md` en `functional-spec.md` bevatten concrete stack-, build- en
+  overzichtspagina-informatie.
+- AC13: `test/formatting_test.dart` en `test/limited_list_test.dart` dekken duurformattering en de
+  'Meer'-knop; alles groen.
+- Sorteervelden bestaan in de contracts: `ShadowIterationView.startedAt/createdAt`,
+  `StoryCandidateView.createdAt`, `StoryDeliveryView.createdAt`, `HumanActionView.createdAt`.
+  `WorkspacePublicationView` heeft er geen — daar geldt terecht alleen de beperking.
+
+Niet uitgevoerd (geen mogelijkheid, niet blokkerend):
+- Preview/E2E in een browser: `deployment.md` heeft een lege `preview_url_template` en de
+  `SF_PREVIEW_*`-velden in `.task.md` zijn leeg; in de container is geen browser beschikbaar.
+  Daarom geen screenshots in `/work/screenshots`.
+
+Niet-blokkerende observaties (voor een volgende story):
+- De widgettests draaien op een eigen harness die het dashboardgebruik nabootst, niet op
+  `OverviewPage` zelf; de bedrading van de sectiesleutels in `main.dart` is alleen via lezen
+  geverifieerd.
+- De eerder door de reviewer gemelde open punten (pubspec `sdk: ^3.9.0` vs lock `>=3.10.0-0`,
+  ontbrekende `dashboard-frontend-image-build` in de tabel van `technical-spec.md`, stabiliteitsclaim
+  bij `sortedByNewestFirst`) staan nog open en zijn cosmetisch/documentair.
