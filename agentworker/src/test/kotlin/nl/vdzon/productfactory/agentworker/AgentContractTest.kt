@@ -85,6 +85,139 @@ class AgentContractTest {
         assertEquals(schema.toString(), command[option + 1])
     }
 
+    @Test fun `claude command uses print json output setting isolation and configured model`() {
+        val workspace = Files.createTempDirectory("pf-claude-workspace")
+        val settings = AgentWorkerSettings(
+            url = "wss://factory.example/agent-worker",
+            token = "secret",
+            workerId = "macbook",
+            version = "test",
+            workspacePath = workspace,
+            codexExecutable = "codex",
+            defaultModel = "gpt-5.6-terra",
+            claudeExecutable = "/opt/homebrew/bin/claude",
+        )
+        val executor = ClaudeAgentTaskExecutor(settings) { _, _, _ -> error("niet uitvoeren") }
+        val command = executor.command(AgentTask("run-3", "hkh-autopilot", "research", "Onderzoek openbare archieven", model = "claude-opus-5"))
+
+        assertEquals("/opt/homebrew/bin/claude", command.first())
+        assertTrue(
+            command.containsAll(
+                listOf(
+                    "--print", "--output-format", "json", "--setting-sources", "", "--tools", "WebSearch,WebFetch",
+                    "--permission-mode", "bypassPermissions", "--model", "claude-opus-5",
+                ),
+            ),
+        )
+        assertTrue(command.last().contains("Onderzoek openbare archieven"))
+        assertTrue(command.last().contains("Wijzig geen bestanden"))
+    }
+
+    @Test fun `claude command passes the response schema inline instead of via a file`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-schema"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val schema = """{"type":"object","required":["greeting"],"properties":{"greeting":{"type":"string"}}}"""
+
+        val command = executor.command(AgentTask("run-4", "hkh-autopilot", "research", "Onderzoek", responseSchema = schema))
+
+        val option = command.indexOf("--json-schema")
+        assertTrue(option > 0)
+        assertEquals(schema, command[option + 1])
+    }
+
+    @Test fun `claude command omits the model flag when the task has no explicit model`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-default-model"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+
+        val command = executor.command(AgentTask("run-5", "hkh-autopilot", "research", "Onderzoek"))
+
+        assertFalse(command.contains("--model"))
+    }
+
+    @Test fun `claude result parsing accepts a clean structured result`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-parse-ok"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val task = AgentTask("run-6", "hkh-autopilot", "research", "Onderzoek", responseSchema = """{"type":"object"}""")
+        val envelope = """{"type":"result","subtype":"success","is_error":false,"result":"{\"greeting\":\"hoi\"}"}"""
+
+        val result = executor.parseResult(task, AgentCommandResult(0, false, envelope))
+
+        assertEquals("COMPLETED", result.status)
+        assertEquals("""{"greeting":"hoi"}""", result.summary)
+    }
+
+    @Test fun `claude result parsing extracts the embedded json object when the model added prose around it`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-parse-prose"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val task = AgentTask("run-7", "hkh-autopilot", "research", "Onderzoek", responseSchema = """{"type":"object"}""")
+        val rawResult = "Hier is mijn antwoord:\n\n```json\n{\"greeting\": \"hoi\", \"nested\": {\"a\": 1}}\n```\n\nBedankt!"
+        val envelope = jacksonObjectMapper().writeValueAsString(
+            mapOf("type" to "result", "subtype" to "success", "is_error" to false, "result" to rawResult),
+        )
+
+        val result = executor.parseResult(task, AgentCommandResult(0, false, envelope))
+
+        assertEquals("COMPLETED", result.status)
+        assertEquals("""{"greeting": "hoi", "nested": {"a": 1}}""", result.summary)
+    }
+
+    @Test fun `claude result parsing fails when is_error is set`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-parse-error"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val task = AgentTask("run-8", "hkh-autopilot", "research", "Onderzoek")
+        val envelope = """{"type":"result","subtype":"error","is_error":true,"result":"OAuth access token has been revoked."}"""
+
+        val result = executor.parseResult(task, AgentCommandResult(1, false, envelope))
+
+        assertEquals("FAILED", result.status)
+        assertTrue(result.summary.contains("OAuth access token has been revoked"))
+    }
+
+    @Test fun `routing executor dispatches on task provider and defaults to codex`() {
+        val calls = mutableListOf<String>()
+        val router = RoutingAgentTaskExecutor(
+            mapOf(
+                "codex" to AgentTaskExecutor { task -> calls.add("codex:${task.runId}"); AgentResult(task.runId, "COMPLETED", "ok") },
+                "claude" to AgentTaskExecutor { task -> calls.add("claude:${task.runId}"); AgentResult(task.runId, "COMPLETED", "ok") },
+            ),
+        )
+
+        router.execute(AgentTask("r1", "hkh-autopilot", "research", "x", provider = "claude"))
+        router.execute(AgentTask("r2", "hkh-autopilot", "research", "x", provider = null))
+        router.execute(AgentTask("r3", "hkh-autopilot", "research", "x", provider = "CLAUDE"))
+
+        assertEquals(listOf("claude:r1", "codex:r2", "claude:r3"), calls)
+    }
+
+    @Test fun `routing executor fails clearly for an unknown provider`() {
+        val router = RoutingAgentTaskExecutor(mapOf("codex" to AgentTaskExecutor { AgentResult(it.runId, "COMPLETED", "ok") }))
+
+        val result = router.execute(AgentTask("r4", "hkh-autopilot", "research", "x", provider = "bard"))
+
+        assertEquals("FAILED", result.status)
+        assertTrue(result.summary.contains("bard"))
+    }
+
     @Test fun `agent process environment contains no application or infrastructure credentials`() {
         val safe = safeAgentEnvironment(
             mapOf(

@@ -2,12 +2,15 @@ package nl.vdzon.productfactory.product
 
 import nl.vdzon.productfactory.contracts.ProductRecordView
 import nl.vdzon.productfactory.contracts.ProductView
+import nl.vdzon.productfactory.product.api.AiCatalog
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.product.api.ProductConfiguration
+import nl.vdzon.productfactory.product.api.UpdateProductSettingsRequest
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -27,7 +30,7 @@ data class CreateProductRequest(
     val previewUrlPattern: String? = null,
     val status: String = "draft",
     val developmentMode: String = "manual",
-    val iterationSchedule: String = "0 3 * * *",
+    val iterationTimes: List<String> = listOf("03:00"),
     val timezone: String = "Europe/Amsterdam",
     val maxStoriesPerCycle: Int = 3,
     val wipLimit: Int = 1,
@@ -55,7 +58,7 @@ data class CreateProductRequest(
         previewUrlPattern = previewUrlPattern,
         status = status,
         developmentMode = developmentMode,
-        iterationSchedule = iterationSchedule,
+        iterationTimes = iterationTimes,
         timezone = timezone,
         maxStoriesPerCycle = maxStoriesPerCycle,
         wipLimit = wipLimit,
@@ -96,6 +99,10 @@ class ProductController(private val catalog: ProductCatalog) {
     @PostMapping("/{slug}/resume")
     fun resume(@PathVariable slug: String): ProductView = catalog.changeStatus(slug, "active")
 
+    @PutMapping("/{slug}/settings")
+    fun updateSettings(@PathVariable slug: String, @RequestBody request: UpdateProductSettingsRequest): ProductView =
+        catalog.updateSettings(slug, request)
+
     @GetMapping("/{slug}/research")
     fun research(@PathVariable slug: String): List<ProductRecordView> = catalog.listRecords(slug, "research")
 
@@ -119,4 +126,10 @@ class ProductController(private val catalog: ProductCatalog) {
     @ResponseStatus(HttpStatus.CREATED)
     fun addDecision(@PathVariable slug: String, @RequestBody request: ProductRecordRequest): ProductRecordView =
         catalog.addRecord(slug, "decision", request.title, request.content)
+}
+
+@RestController
+@RequestMapping("/api/ai-catalog")
+class AiCatalogController {
+    @GetMapping fun get(): Map<String, List<String>> = AiCatalog.MODELS_BY_PROVIDER
 }

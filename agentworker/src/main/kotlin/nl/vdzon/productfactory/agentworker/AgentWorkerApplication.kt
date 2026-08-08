@@ -19,6 +19,7 @@ class AgentWorkerApplication {
         @Value("\${PF_AGENT_WORKSPACE_PATH:../product-factory-workspace}") workspacePath: String,
         @Value("\${PF_CODEX_EXECUTABLE:codex}") codexExecutable: String,
         @Value("\${PF_AGENT_MODEL:gpt-5.6-terra}") defaultModel: String,
+        @Value("\${PF_CLAUDE_EXECUTABLE:claude}") claudeExecutable: String,
     ) = AgentWorkerSettings(
         url = url,
         token = token,
@@ -27,9 +28,13 @@ class AgentWorkerApplication {
         workspacePath = resolveWorkspacePath(EnvironmentFiles.locate(), workspacePath),
         codexExecutable = codexExecutable,
         defaultModel = defaultModel,
+        claudeExecutable = claudeExecutable,
     )
 
-    @Bean fun taskExecutor(settings: AgentWorkerSettings): AgentTaskExecutor = CodexAgentTaskExecutor(settings)
+    @Bean
+    fun taskExecutor(settings: AgentWorkerSettings): AgentTaskExecutor = RoutingAgentTaskExecutor(
+        mapOf("codex" to CodexAgentTaskExecutor(settings), "claude" to ClaudeAgentTaskExecutor(settings)),
+    )
     @Bean fun workerClient(settings: AgentWorkerSettings, taskExecutor: AgentTaskExecutor) = AgentWorkerClient(settings, taskExecutor)
     @Bean fun startWorker(client: AgentWorkerClient) = CommandLineRunner { client.runUntilShutdown() }
 }

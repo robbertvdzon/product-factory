@@ -136,7 +136,7 @@ class AgentWorkerClient(
                     token = settings.token,
                     workerId = settings.workerId,
                     workerVersion = settings.version,
-                    capabilities = listOf("codex-subscription"),
+                    capabilities = listOf("codex-subscription", "claude-subscription"),
                 ),
             )
             startHeartbeat(webSocket)

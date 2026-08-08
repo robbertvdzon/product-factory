@@ -191,7 +191,7 @@ class OverviewPage extends StatefulWidget {
 }
 
 class _OverviewPageState extends State<OverviewPage> {
-  late Future<List<List<dynamic>>> data;
+  late Future<List<dynamic>> data;
   late final DashboardApi api;
   Timer? refreshTimer;
   @override
@@ -210,27 +210,50 @@ class _OverviewPageState extends State<OverviewPage> {
     super.dispose();
   }
 
-  void _reload() => data = Future.wait([
+  void _reload() => data = Future.wait<dynamic>([
     api.products(),
     api.stories(),
     api.publications(),
     api.shadowIterations(),
     api.deliveries(),
     api.humanActions(),
+    api.aiCatalog(),
   ]);
   Future<void> _changeStatus(String slug, String action) async {
     await api.changeProductStatus(slug, action);
     if (mounted) setState(_reload);
   }
 
-  Future<void> _addProduct() async {
+  Future<void> _addProduct(Map<String, dynamic> aiCatalog) async {
     final created = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => const AddProductDialog(),
+      builder: (_) => AddProductDialog(aiCatalog: aiCatalog),
     );
     if (created == null) return;
     await api.createProduct(created);
     if (mounted) setState(_reload);
+  }
+
+  Future<void> _editProductSettings(
+    Map<String, dynamic> product,
+    Map<String, dynamic> aiCatalog,
+  ) async {
+    final settings = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) =>
+          ProductSettingsDialog(product: product, aiCatalog: aiCatalog),
+    );
+    if (settings == null) return;
+    try {
+      await api.updateProductSettings('${product['slug']}', settings);
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
   }
 
   Future<void> _startShadowIteration(String slug) async {
@@ -329,7 +352,7 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
       ],
     ),
-    body: FutureBuilder<List<List<dynamic>>>(
+    body: FutureBuilder<List<dynamic>>(
       future: data,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done &&
@@ -341,12 +364,13 @@ class _OverviewPageState extends State<OverviewPage> {
             child: Text('Dashboard kon niet laden: ${snapshot.error}'),
           );
         }
-        final products = snapshot.data![0];
-        final stories = snapshot.data![1];
-        final publications = snapshot.data![2];
-        final iterations = snapshot.data![3];
-        final deliveries = snapshot.data![4];
-        final humanActions = snapshot.data![5];
+        final products = snapshot.data![0] as List<dynamic>;
+        final stories = snapshot.data![1] as List<dynamic>;
+        final publications = snapshot.data![2] as List<dynamic>;
+        final iterations = snapshot.data![3] as List<dynamic>;
+        final deliveries = snapshot.data![4] as List<dynamic>;
+        final humanActions = snapshot.data![5] as List<dynamic>;
+        final aiCatalog = snapshot.data![6] as Map<String, dynamic>;
         return ListView(
           padding: const EdgeInsets.all(24),
           children: [
@@ -359,7 +383,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed: _addProduct,
+                  onPressed: () => _addProduct(aiCatalog),
                   icon: const Icon(Icons.add),
                   label: const Text('Product toevoegen'),
                 ),
@@ -444,8 +468,12 @@ class _OverviewPageState extends State<OverviewPage> {
                           ),
                           Text('Repo: ${product['targetRepositoryName']}'),
                           Text('Workspace: ${product['workspaceOwnership']}'),
-                          Text('Max stories: ${product['maxStoriesPerCycle']}'),
+                          Text('Max stories per cyclus: ${product['maxStoriesPerCycle']}'),
                           Text('WIP: ${product['wipLimit']}'),
+                          Text('AI: ${product['aiProvider']} · ${product['aiModel']}'),
+                          Text(
+                            'Cyclustijden: ${((product['iterationTimes'] as List<dynamic>?) ?? const []).join(', ')}',
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -495,6 +523,12 @@ class _OverviewPageState extends State<OverviewPage> {
                                 active ? Icons.pause : Icons.play_arrow,
                               ),
                               label: Text(active ? 'Pauzeren' : 'Hervatten'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () =>
+                                  _editProductSettings(product, aiCatalog),
+                              icon: const Icon(Icons.tune),
+                              label: const Text('Instellingen'),
                             ),
                           ],
                         ),
@@ -715,6 +749,7 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
           final running = status == 'QUEUED' || status == 'RUNNING';
           final currentRole = iteration['currentRole'];
           final dossier = result['dossier'] as String?;
+          final summary = iteration['summary'] as String?;
           return ListView(
             children: [
               Wrap(
@@ -737,6 +772,32 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                   currentRole == null
                       ? 'De cyclus staat klaar om te beginnen.'
                       : 'De agent $currentRole is nu bezig. Dit scherm wordt automatisch vernieuwd.',
+                ),
+              ],
+              if (summary != null && summary.trim().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Card(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.summarize_outlined),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Samenvatting voor jou',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(summary),
+                      ],
+                    ),
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
@@ -866,7 +927,8 @@ String _roleLabel(String value) => switch (value.toLowerCase()) {
 };
 
 class AddProductDialog extends StatefulWidget {
-  const AddProductDialog({super.key});
+  const AddProductDialog({required this.aiCatalog, super.key});
+  final Map<String, dynamic> aiCatalog;
   @override
   State<AddProductDialog> createState() => _AddProductDialogState();
 }
@@ -875,21 +937,30 @@ class _AddProductDialogState extends State<AddProductDialog> {
   final slug = TextEditingController();
   final name = TextEditingController();
   final mission = TextEditingController();
+  final maxStoriesPerCycle = TextEditingController(text: '3');
   String developmentMode = 'manual';
   String workspaceOwnership = 'owner';
+  late String aiProvider = widget.aiCatalog.keys.first;
+  late String aiModel = (widget.aiCatalog[aiProvider] as List<dynamic>).first as String;
+  List<String> iterationTimes = ['03:00'];
+
   @override
   void dispose() {
     slug.dispose();
     name.dispose();
     mission.dispose();
+    maxStoriesPerCycle.dispose();
     super.dispose();
   }
 
   void _submit() {
     final normalizedSlug = slug.text.trim().toLowerCase();
+    final stories = int.tryParse(maxStoriesPerCycle.text.trim());
     if (normalizedSlug.isEmpty ||
         name.text.trim().isEmpty ||
-        mission.text.trim().isEmpty) {
+        mission.text.trim().isEmpty ||
+        stories == null ||
+        iterationTimes.isEmpty) {
       return;
     }
     Navigator.pop(context, <String, dynamic>{
@@ -901,6 +972,10 @@ class _AddProductDialogState extends State<AddProductDialog> {
       'developmentMode': developmentMode,
       'workspaceOwnership': workspaceOwnership,
       'status': 'draft',
+      'aiProvider': aiProvider,
+      'aiModel': aiModel,
+      'maxStoriesPerCycle': stories,
+      'iterationTimes': iterationTimes,
     });
   }
 
@@ -909,52 +984,76 @@ class _AddProductDialogState extends State<AddProductDialog> {
     title: const Text('Product toevoegen'),
     content: SizedBox(
       width: 520,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: slug,
-            decoration: const InputDecoration(
-              labelText: 'Slug',
-              hintText: 'mijn-product',
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: slug,
+              decoration: const InputDecoration(
+                labelText: 'Slug',
+                hintText: 'mijn-product',
+              ),
             ),
-          ),
-          TextField(
-            controller: name,
-            decoration: const InputDecoration(labelText: 'Naam'),
-          ),
-          TextField(
-            controller: mission,
-            minLines: 2,
-            maxLines: 4,
-            decoration: const InputDecoration(labelText: 'Missie'),
-          ),
-          DropdownButtonFormField<String>(
-            initialValue: developmentMode,
-            decoration: const InputDecoration(labelText: 'Ontwikkelmodus'),
-            items: const [
-              DropdownMenuItem(value: 'manual', child: Text('Handmatig')),
-              DropdownMenuItem(value: 'autonomous', child: Text('Autonoom')),
-              DropdownMenuItem(
-                value: 'observe-only',
-                child: Text('Alleen observeren'),
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Naam'),
+            ),
+            TextField(
+              controller: mission,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Missie'),
+            ),
+            DropdownButtonFormField<String>(
+              initialValue: developmentMode,
+              decoration: const InputDecoration(labelText: 'Ontwikkelmodus'),
+              items: const [
+                DropdownMenuItem(value: 'manual', child: Text('Handmatig')),
+                DropdownMenuItem(value: 'autonomous', child: Text('Autonoom')),
+                DropdownMenuItem(
+                  value: 'observe-only',
+                  child: Text('Alleen observeren'),
+                ),
+              ],
+              onChanged: (value) => setState(() => developmentMode = value!),
+            ),
+            DropdownButtonFormField<String>(
+              initialValue: workspaceOwnership,
+              decoration: const InputDecoration(labelText: 'Workspace-eigenaar'),
+              items: const [
+                DropdownMenuItem(value: 'owner', child: Text('Eigenaar')),
+                DropdownMenuItem(
+                  value: 'product-factory',
+                  child: Text('Product Factory'),
+                ),
+              ],
+              onChanged: (value) => setState(() => workspaceOwnership = value!),
+            ),
+            TextField(
+              controller: maxStoriesPerCycle,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Max stories per cyclus',
               ),
-            ],
-            onChanged: (value) => setState(() => developmentMode = value!),
-          ),
-          DropdownButtonFormField<String>(
-            initialValue: workspaceOwnership,
-            decoration: const InputDecoration(labelText: 'Workspace-eigenaar'),
-            items: const [
-              DropdownMenuItem(value: 'owner', child: Text('Eigenaar')),
-              DropdownMenuItem(
-                value: 'product-factory',
-                child: Text('Product Factory'),
-              ),
-            ],
-            onChanged: (value) => setState(() => workspaceOwnership = value!),
-          ),
-        ],
+            ),
+            const SizedBox(height: 8),
+            AiProviderModelFields(
+              aiCatalog: widget.aiCatalog,
+              provider: aiProvider,
+              model: aiModel,
+              onChanged: (provider, model) => setState(() {
+                aiProvider = provider;
+                aiModel = model;
+              }),
+            ),
+            const SizedBox(height: 8),
+            IterationTimesField(
+              times: iterationTimes,
+              onChanged: (value) => setState(() => iterationTimes = value),
+            ),
+          ],
+        ),
       ),
     ),
     actions: [
@@ -963,6 +1062,231 @@ class _AddProductDialogState extends State<AddProductDialog> {
         child: const Text('Annuleren'),
       ),
       FilledButton(onPressed: _submit, child: const Text('Toevoegen')),
+    ],
+  );
+}
+
+class ProductSettingsDialog extends StatefulWidget {
+  const ProductSettingsDialog({
+    required this.product,
+    required this.aiCatalog,
+    super.key,
+  });
+  final Map<String, dynamic> product;
+  final Map<String, dynamic> aiCatalog;
+  @override
+  State<ProductSettingsDialog> createState() => _ProductSettingsDialogState();
+}
+
+class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
+  late String developmentMode = '${widget.product['developmentMode']}';
+  late final maxStoriesPerCycle = TextEditingController(
+    text: '${widget.product['maxStoriesPerCycle']}',
+  );
+  late final wipLimit = TextEditingController(
+    text: '${widget.product['wipLimit']}',
+  );
+  late String aiProvider = '${widget.product['aiProvider']}';
+  late String aiModel = '${widget.product['aiModel']}';
+  late List<String> iterationTimes = List<String>.from(
+    (widget.product['iterationTimes'] as List<dynamic>?) ?? const ['03:00'],
+  );
+
+  @override
+  void dispose() {
+    maxStoriesPerCycle.dispose();
+    wipLimit.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final stories = int.tryParse(maxStoriesPerCycle.text.trim());
+    final wip = int.tryParse(wipLimit.text.trim());
+    if (stories == null || wip == null || iterationTimes.isEmpty) return;
+    Navigator.pop(context, <String, dynamic>{
+      'developmentMode': developmentMode,
+      'maxStoriesPerCycle': stories,
+      'wipLimit': wip,
+      'aiProvider': aiProvider,
+      'aiModel': aiModel,
+      'iterationTimes': iterationTimes,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text('Instellingen · ${widget.product['name']}'),
+    content: SizedBox(
+      width: 520,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: developmentMode,
+              decoration: const InputDecoration(labelText: 'Ontwikkelmodus'),
+              items: const [
+                DropdownMenuItem(value: 'manual', child: Text('Handmatig')),
+                DropdownMenuItem(value: 'autonomous', child: Text('Autonoom')),
+                DropdownMenuItem(
+                  value: 'observe-only',
+                  child: Text('Alleen observeren'),
+                ),
+              ],
+              onChanged: (value) => setState(() => developmentMode = value!),
+            ),
+            TextField(
+              controller: maxStoriesPerCycle,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Max stories per cyclus',
+                helperText: 'Hoeveel storykandidaten de story writer per cyclus mag schrijven.',
+              ),
+            ),
+            TextField(
+              controller: wipLimit,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'WIP-limiet',
+                helperText: 'Hoeveel stories er tegelijk in levering mogen zijn.',
+              ),
+            ),
+            const SizedBox(height: 8),
+            AiProviderModelFields(
+              aiCatalog: widget.aiCatalog,
+              provider: aiProvider,
+              model: aiModel,
+              onChanged: (provider, model) => setState(() {
+                aiProvider = provider;
+                aiModel = model;
+              }),
+            ),
+            const SizedBox(height: 8),
+            IterationTimesField(
+              times: iterationTimes,
+              onChanged: (value) => setState(() => iterationTimes = value),
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuleren'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Opslaan')),
+    ],
+  );
+}
+
+/// Providerdropdown + bijbehorende modeldropdown; het modelaanbod verandert mee met de gekozen provider.
+class AiProviderModelFields extends StatelessWidget {
+  const AiProviderModelFields({
+    required this.aiCatalog,
+    required this.provider,
+    required this.model,
+    required this.onChanged,
+    super.key,
+  });
+  final Map<String, dynamic> aiCatalog;
+  final String provider;
+  final String model;
+  final void Function(String provider, String model) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final providers = aiCatalog.keys.toList();
+    final models = (aiCatalog[provider] as List<dynamic>?)?.cast<String>() ?? const <String>[];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('AI-engine', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: providers.contains(provider) ? provider : providers.first,
+                decoration: const InputDecoration(labelText: 'Provider'),
+                items: providers
+                    .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  final nextModels = (aiCatalog[value] as List<dynamic>).cast<String>();
+                  onChanged(value, nextModels.first);
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: models.contains(model) ? model : models.first,
+                decoration: const InputDecoration(labelText: 'Model'),
+                items: models
+                    .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  onChanged(provider, value);
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Bewerkbare lijst met dagelijkse cyclustijden (bv. 03:00, 08:00, 21:00), elk als eigen chip.
+class IterationTimesField extends StatelessWidget {
+  const IterationTimesField({
+    required this.times,
+    required this.onChanged,
+    super.key,
+  });
+  final List<String> times;
+  final ValueChanged<List<String>> onChanged;
+
+  Future<void> _addTime(BuildContext context) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 3, minute: 0),
+    );
+    if (picked == null) return;
+    final formatted =
+        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+    if (times.contains(formatted)) return;
+    onChanged([...times, formatted]..sort());
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Cyclustijden', style: Theme.of(context).textTheme.titleSmall),
+      const SizedBox(height: 4),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final time in times)
+            Chip(
+              label: Text(time),
+              onDeleted: times.length > 1
+                  ? () => onChanged(times.where((t) => t != time).toList())
+                  : null,
+            ),
+          ActionChip(
+            avatar: const Icon(Icons.add, size: 18),
+            label: const Text('Tijd toevoegen'),
+            onPressed: () => _addTime(context),
+          ),
+        ],
+      ),
     ],
   );
 }

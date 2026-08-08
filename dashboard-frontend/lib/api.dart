@@ -15,6 +15,7 @@ class DashboardApi {
   Future<List<dynamic>> shadowIterations() => _list('/api/shadow-iterations');
   Future<List<dynamic>> deliveries() => _list('/api/autonomy/deliveries');
   Future<List<dynamic>> humanActions() => _list('/api/autonomy/human-actions');
+  Future<Map<String, dynamic>> aiCatalog() => _object('/api/ai-catalog');
   Future<Map<String, dynamic>> shadowIterationSession(
     String productSlug,
     String iterationId,
@@ -78,6 +79,22 @@ class DashboardApi {
     if (response.statusCode != 201) {
       throw StateError(
         'Product kon niet worden toegevoegd (${response.statusCode}).',
+      );
+    }
+  }
+
+  Future<void> updateProductSettings(
+    String slug,
+    Map<String, dynamic> settings,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/products/$slug/settings'),
+      headers: headers,
+      body: jsonEncode(settings),
+    );
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Instellingen konden niet worden opgeslagen (${response.statusCode}).',
       );
     }
   }

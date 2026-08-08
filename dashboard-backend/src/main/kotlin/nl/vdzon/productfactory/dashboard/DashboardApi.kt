@@ -6,6 +6,7 @@ import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -27,6 +28,11 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
 
     @PostMapping("/products/{slug}/pause") fun pause(@PathVariable slug: String): Any = runtime.changeStatus(slug, "pause")
     @PostMapping("/products/{slug}/resume") fun resume(@PathVariable slug: String): Any = runtime.changeStatus(slug, "resume")
+
+    @PutMapping("/products/{slug}/settings")
+    fun updateSettings(@PathVariable slug: String, @RequestBody body: Map<String, Any?>): Any = runtime.updateProductSettings(slug, body)
+
+    @GetMapping("/ai-catalog") fun aiCatalog(): Map<String, List<String>> = runtime.aiCatalog()
 
     @GetMapping("/story-candidates")
     fun stories(): Any = runtime.products().flatMap { product -> runtime.stories(product["slug"].toString()) }

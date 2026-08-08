@@ -10,6 +10,7 @@ data class AgentTask(
     val timeoutSeconds: Long = 900,
     val model: String? = null,
     val responseSchema: String? = null,
+    val provider: String? = null,
 )
 
 data class AgentResult(
@@ -77,7 +78,7 @@ data class ProductView(
     val previewUrlPattern: String?,
     val status: String,
     val developmentMode: String,
-    val iterationSchedule: String,
+    val iterationTimes: List<String>,
     val timezone: String,
     val maxStoriesPerCycle: Int,
     val wipLimit: Int,
@@ -117,6 +118,7 @@ data class ShadowIterationView(
     val workspacePullRequestUrl: String?,
     val workspaceCommitSha: String?,
     val errorMessage: String?,
+    val summary: String?,
     val createdAt: Instant,
     val startedAt: Instant?,
     val completedAt: Instant?,

@@ -27,7 +27,7 @@ data class ProductConfiguration(
     val previewUrlPattern: String?,
     val status: String,
     val developmentMode: String,
-    val iterationSchedule: String,
+    val iterationTimes: List<String>,
     val timezone: String,
     val maxStoriesPerCycle: Int,
     val wipLimit: Int,
@@ -40,6 +40,15 @@ data class ProductConfiguration(
     val privacyRules: String,
     val accessibilityRules: String,
     val qualityRules: String,
+)
+
+data class UpdateProductSettingsRequest(
+    val developmentMode: String? = null,
+    val iterationTimes: List<String>? = null,
+    val maxStoriesPerCycle: Int? = null,
+    val wipLimit: Int? = null,
+    val aiProvider: String? = null,
+    val aiModel: String? = null,
 )
 
 data class ProductContext(
@@ -100,16 +109,16 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
                 """insert into product_definition (
                     id, slug, name, mission, description, guardrails, software_factory_project_key,
                     target_repository_name, workspace_directory, workspace_ownership, live_url,
-                    preview_url_pattern, status, development_mode, iteration_schedule, timezone,
+                    preview_url_pattern, status, development_mode, timezone,
                     max_stories_per_cycle, wip_limit, ai_provider, ai_model, daily_budget_cents,
                     monthly_budget_cents, escalation_policy, source_rules, privacy_rules,
                     accessibility_rules, quality_rules
-                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
                 "pf-${UUID.randomUUID()}", product.slug, product.name.trim(), product.mission.trim(),
                 product.description.trim(), product.guardrails.trim(), product.softwareFactoryProjectKey.trim(),
                 product.targetRepositoryName.trim(), "products/${product.slug}", product.workspaceOwnership,
                 product.liveUrl?.trim()?.ifBlank { null }, product.previewUrlPattern?.trim()?.ifBlank { null },
-                product.status, product.developmentMode, product.iterationSchedule.trim(), product.timezone.trim(),
+                product.status, product.developmentMode, product.timezone.trim(),
                 product.maxStoriesPerCycle, product.wipLimit, product.aiProvider.trim(), product.aiModel.trim(),
                 product.dailyBudgetCents, product.monthlyBudgetCents, product.escalationPolicy.trim(),
                 product.sourceRules.trim(), product.privacyRules.trim(), product.accessibilityRules.trim(), product.qualityRules.trim(),
@@ -120,7 +129,42 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         product.allowedWritePaths.forEach {
             jdbc.update("insert into product_allowed_write_path(product_slug, relative_path) values (?, ?)", product.slug, it)
         }
+        replaceIterationTimes(product.slug, product.iterationTimes)
         return requireProduct(product.slug)
+    }
+
+    @Transactional
+    fun updateSettings(slug: String, request: UpdateProductSettingsRequest): ProductView {
+        val normalized = normalizeSlug(slug)
+        val current = requireProduct(normalized)
+        val developmentMode = request.developmentMode ?: current.developmentMode
+        val maxStoriesPerCycle = request.maxStoriesPerCycle ?: current.maxStoriesPerCycle
+        val wipLimit = request.wipLimit ?: current.wipLimit
+        val aiProvider = (request.aiProvider ?: current.aiProvider).trim()
+        val aiModel = (request.aiModel ?: current.aiModel).trim()
+        val iterationTimes = request.iterationTimes ?: current.iterationTimes
+
+        require(developmentMode in DEVELOPMENT_MODES) { "Ongeldige ontwikkelmodus" }
+        require(maxStoriesPerCycle in 1..20) { "Maximaal aantal stories per cyclus moet tussen 1 en 20 liggen" }
+        require(wipLimit in 1..20) { "WIP-limiet moet tussen 1 en 20 liggen" }
+        require(AiCatalog.isValid(aiProvider, aiModel)) { "Onbekende combinatie van AI-provider '$aiProvider' en model '$aiModel'" }
+        require(iterationTimes.isNotEmpty()) { "Minimaal één cyclustijd is verplicht" }
+        iterationTimes.forEach { require(it.matches(TIME_OF_DAY)) { "Ongeldige cyclustijd '$it', gebruik HH:mm" } }
+
+        jdbc.update(
+            """update product_definition set development_mode = ?, max_stories_per_cycle = ?, wip_limit = ?,
+                ai_provider = ?, ai_model = ?, updated_at = current_timestamp where slug = ?""".trimIndent(),
+            developmentMode, maxStoriesPerCycle, wipLimit, aiProvider, aiModel, normalized,
+        )
+        replaceIterationTimes(normalized, iterationTimes)
+        return requireProduct(normalized)
+    }
+
+    private fun replaceIterationTimes(slug: String, times: List<String>) {
+        jdbc.update("delete from product_iteration_time where product_slug = ?", slug)
+        times.distinct().forEach {
+            jdbc.update("insert into product_iteration_time(product_slug, time_of_day) values (?, ?)", slug, java.sql.Time.valueOf("$it:00"))
+        }
     }
 
     fun changeStatus(slug: String, status: String): ProductView {
@@ -170,8 +214,12 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         require(candidate.maxStoriesPerCycle in 1..20) { "Maximaal aantal stories per cyclus moet tussen 1 en 20 liggen" }
         require(candidate.wipLimit in 1..20) { "WIP-limiet moet tussen 1 en 20 liggen" }
         require(candidate.dailyBudgetCents >= 0 && candidate.monthlyBudgetCents >= 0) { "AI-budgetten mogen niet negatief zijn" }
-        require(candidate.iterationSchedule.isNotBlank() && candidate.timezone.isNotBlank()) { "Planning en tijdzone zijn verplicht" }
-        require(candidate.aiProvider.isNotBlank() && candidate.aiModel.isNotBlank()) { "AI-provider en model zijn verplicht" }
+        require(candidate.timezone.isNotBlank()) { "Tijdzone is verplicht" }
+        require(candidate.iterationTimes.isNotEmpty()) { "Minimaal één cyclustijd is verplicht" }
+        candidate.iterationTimes.forEach { require(it.matches(TIME_OF_DAY)) { "Ongeldige cyclustijd '$it', gebruik HH:mm" } }
+        require(AiCatalog.isValid(candidate.aiProvider, candidate.aiModel)) {
+            "Onbekende combinatie van AI-provider '${candidate.aiProvider}' en model '${candidate.aiModel}'"
+        }
         validateUrl(candidate.liveUrl)
         validateUrl(candidate.previewUrlPattern?.replace("{number}", "1"))
         val paths = candidate.allowedWritePaths.map(::normalizeRelativePath).distinct().sorted()
@@ -199,7 +247,11 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         previewUrlPattern = row.getString("preview_url_pattern"),
         status = row.getString("status"),
         developmentMode = row.getString("development_mode"),
-        iterationSchedule = row.getString("iteration_schedule"),
+        iterationTimes = jdbc.queryForList(
+            "select time_of_day from product_iteration_time where product_slug = ? order by time_of_day",
+            java.sql.Time::class.java,
+            row.getString("slug"),
+        ).map { it.toLocalTime().toString().take(5) },
         timezone = row.getString("timezone"),
         maxStoriesPerCycle = row.getInt("max_stories_per_cycle"),
         wipLimit = row.getInt("wip_limit"),
@@ -258,6 +310,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         private val STATUSES = setOf("draft", "active", "paused", "archived")
         private val DEVELOPMENT_MODES = setOf("manual", "autonomous", "observe-only")
         private val OWNERSHIPS = setOf("owner", "product-factory")
+        private val TIME_OF_DAY = Regex("([01]\\d|2[0-3]):[0-5]\\d")
         private const val PRODUCT_SELECT = """select p.* from product_definition p"""
     }
 }

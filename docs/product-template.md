@@ -18,7 +18,7 @@ Gebruik het beheerdashboard of stuur onderstaand contract naar `POST /api/produc
   "previewUrlPattern": "https://voorbeeld-product-pr-{number}.vdzonsoftware.nl",
   "status": "draft",
   "developmentMode": "manual",
-  "iterationSchedule": "0 3 * * *",
+  "iterationTimes": ["03:00"],
   "timezone": "Europe/Amsterdam",
   "maxStoriesPerCycle": 3,
   "wipLimit": 1,

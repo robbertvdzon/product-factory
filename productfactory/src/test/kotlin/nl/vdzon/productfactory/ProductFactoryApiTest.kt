@@ -9,6 +9,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -95,6 +96,50 @@ class ProductFactoryApiTest(
             contentType = MediaType.APPLICATION_JSON
             content = """{"productSlug":"hkh-autopilot"}"""
         }.andExpect { status { isConflict() } }
+    }
+
+    @Test
+    fun `product settings can be switched between AI providers and reject unknown model combinations`() {
+        createProduct("settings-test", "Instellingen", "Test instellingen bijwerken")
+
+        mvc.get("/api/ai-catalog").andExpect {
+            status { isOk() }
+            jsonPath("$.codex") { isNotEmpty() }
+            jsonPath("$.claude") { isNotEmpty() }
+        }
+
+        mvc.put("/api/products/settings-test/settings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"iterationTimes":["03:00","08:00","21:00"],"aiProvider":"claude","aiModel":"claude-sonnet-5","maxStoriesPerCycle":5}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.iterationTimes.length()") { value(3) }
+            jsonPath("$.iterationTimes[0]") { value("03:00") }
+            jsonPath("$.aiProvider") { value("claude") }
+            jsonPath("$.aiModel") { value("claude-sonnet-5") }
+            jsonPath("$.maxStoriesPerCycle") { value(5) }
+        }
+
+        mvc.put("/api/products/settings-test/settings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"aiProvider":"claude","aiModel":"gpt-5.6-terra"}"""
+        }.andExpect { status { isBadRequest() } }
+
+        mvc.put("/api/products/settings-test/settings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"iterationTimes":[]}"""
+        }.andExpect { status { isBadRequest() } }
+
+        mvc.put("/api/products/settings-test/settings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"iterationTimes":["25:00"]}"""
+        }.andExpect { status { isBadRequest() } }
+
+        // aiModel bleef ongewijzigd na de afgewezen updates.
+        mvc.get("/api/products/settings-test").andExpect {
+            status { isOk() }
+            jsonPath("$.aiModel") { value("claude-sonnet-5") }
+        }
     }
 
     private fun createProduct(slug: String, name: String, mission: String) {

@@ -218,23 +218,19 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
     fun errors(productSlug: String): Int = jdbc.queryForObject(
         "select count(*) from story_delivery where product_slug = ? and status = 'ERROR'", Int::class.java, productSlug,
     ) ?: 0
-    fun deliveredToday(productSlug: String, date: LocalDate, zone: ZoneId): Int = jdbc.queryForObject(
-        "select count(*) from story_delivery where product_slug = ? and delivered_at >= ? and delivered_at < ?",
-        Int::class.java, productSlug,
-        databaseTimestamp(date.atStartOfDay(zone).toInstant()),
-        databaseTimestamp(date.plusDays(1).atStartOfDay(zone).toInstant()),
-    ) ?: 0
     fun workspaceRunsToRefresh(productSlug: String): List<String> = jdbc.queryForList(
         """select distinct i.workspace_run_id from shadow_iteration i join workspace_publication w on w.run_id = i.workspace_run_id
             where i.product_slug = ? and i.mode = 'autonomous' and i.status = 'ACCEPTED' and w.status <> 'MERGED'""".trimIndent(),
         String::class.java, productSlug,
     )
-    fun autonomousIterationToday(productSlug: String, date: LocalDate, zone: ZoneId): Boolean = (jdbc.queryForObject(
-        "select count(*) from shadow_iteration where product_slug = ? and mode = 'autonomous' and created_at >= ? and created_at < ?",
-        Int::class.java, productSlug,
+    /** Laatste autonome cyclus die vandaag is gestart, zodat elke geconfigureerde cyclustijd zijn eigen trigger krijgt. */
+    fun lastAutonomousIterationToday(productSlug: String, date: LocalDate, zone: ZoneId): Instant? = jdbc.query(
+        "select max(created_at) as last_created_at from shadow_iteration where product_slug = ? and mode = 'autonomous' and created_at >= ? and created_at < ?",
+        { row, _ -> row.getTimestamp("last_created_at")?.toInstant() },
+        productSlug,
         databaseTimestamp(date.atStartOfDay(zone).toInstant()),
         databaseTimestamp(date.plusDays(1).atStartOfDay(zone).toInstant()),
-    ) ?: 0) > 0
+    ).firstOrNull()
     fun openHumanActions(productSlug: String): Int = jdbc.queryForObject(
         "select count(*) from human_action where product_slug = ? and category = 'ACCESS_TOKEN' and status = 'OPEN'",
         Int::class.java,
@@ -422,6 +418,7 @@ class AutonomousQuestionResolver(
                     productSlug = product.slug,
                     taskType = "question-resolver",
                     model = fullProduct.aiModel.takeUnless { it == "default" },
+                    provider = fullProduct.aiProvider,
                     timeoutSeconds = 600,
                     responseSchema = QUESTION_SCHEMA,
                     prompt = """
@@ -638,14 +635,14 @@ class AutonomousCoordinator(
         val zone = ZoneId.of(product.timezone)
         val today = LocalDate.now(zone)
         val activeCount = deliveries.active(product.slug).size
-        val remainingToday = (product.maxStoriesPerCycle.coerceAtMost(3) - deliveries.deliveredToday(product.slug, today, zone)).coerceAtLeast(0)
-        if (activeCount < product.wipLimit && remainingToday > 0 && deliveries.errors(product.slug) == 0 && deliveries.openHumanActions(product.slug) == 0) {
+        if (activeCount < product.wipLimit && deliveries.errors(product.slug) == 0 && deliveries.openHumanActions(product.slug) == 0) {
             deliveries.eligible(product.slug).firstOrNull()?.let { deliveryService.deliver(it) }
         }
 
         val noWorkInProgress = deliveries.active(product.slug).isEmpty() && deliveries.unevaluatedDone(product.slug).isEmpty() && !iterationRepository.hasActive(product.slug)
+        val lastIterationToday = deliveries.lastAutonomousIterationToday(product.slug, today, zone)
         if (noWorkInProgress && deliveries.errors(product.slug) == 0 && deliveries.openHumanActions(product.slug) == 0 &&
-            isDue(product, ZonedDateTime.now(zone)) && !deliveries.autonomousIterationToday(product.slug, today, zone)
+            isDue(product, ZonedDateTime.now(zone), lastIterationToday)
         ) {
             iterations.startAutonomous(product.slug, null)
         }
@@ -673,12 +670,20 @@ class AutonomousCoordinator(
         "merge-approved", "deploy-approved", "manual-action-done", "manually-approved",
     )
 
-    private fun isDue(product: ProductView, now: ZonedDateTime): Boolean {
-        val parts = product.iterationSchedule.trim().split(Regex("\\s+"))
-        val minute = parts.getOrNull(0)?.toIntOrNull() ?: 0
-        val hour = parts.getOrNull(1)?.toIntOrNull() ?: 3
-        return now.toLocalTime() >= java.time.LocalTime.of(hour.coerceIn(0, 23), minute.coerceIn(0, 59))
-    }
+    private fun isDue(product: ProductView, now: ZonedDateTime, lastIterationToday: Instant?): Boolean =
+        isIterationDue(product.iterationTimes, now, lastIterationToday)
+}
+
+/**
+ * Elke geconfigureerde cyclustijd is precies één keer per dag "due": zodra de tijd is gepasseerd en de laatste
+ * autonome cyclus van vandaag (indien aanwezig) vóór die tijd begon. Zo triggeren 03:00, 08:00 en 21:00 alle drie
+ * hun eigen cyclus in plaats van dat "al één keer vandaag gedraaid" de latere tijden blokkeert.
+ */
+internal fun isIterationDue(iterationTimes: List<String>, now: ZonedDateTime, lastIterationToday: Instant?): Boolean {
+    val times = iterationTimes.mapNotNull { runCatching { java.time.LocalTime.parse(it) }.getOrNull() }
+    if (times.isEmpty()) return false
+    val lastLocalTime = lastIterationToday?.let { ZonedDateTime.ofInstant(it, now.zone).toLocalTime() }
+    return times.any { slot -> now.toLocalTime() >= slot && (lastLocalTime == null || lastLocalTime < slot) }
 }
 
 @RestController

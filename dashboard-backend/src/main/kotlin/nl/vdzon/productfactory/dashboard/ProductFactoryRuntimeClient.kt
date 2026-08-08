@@ -68,6 +68,12 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
     fun changeStatus(slug: String, action: String): Any = runtime.post().uri("/api/products/{slug}/{action}", slug, action)
         .retrieve().body(Any::class.java)!!
 
+    fun updateProductSettings(slug: String, body: Map<String, Any?>): Any = runtime.put()
+        .uri("/api/products/{slug}/settings", slug).body(body).retrieve().body(Any::class.java)!!
+
+    fun aiCatalog(): Map<String, List<String>> = runtime.get().uri("/api/ai-catalog").retrieve()
+        .body(object : ParameterizedTypeReference<Map<String, List<String>>>() {}).orEmpty()
+
     fun startShadowIteration(slug: String, focus: String?): Any = runtime.post()
         .uri("/api/products/{slug}/shadow-iterations", slug)
         .body(mapOf("focus" to focus))

@@ -361,12 +361,17 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         )
     }
 
+    /** Voor dummies geschreven samenvatting van de cyclus (onderzoek, productbesluit, resulterende stories). */
+    fun saveSummary(iterationId: String, summary: String) {
+        jdbc.update("update shadow_iteration set summary = ? where id = ?", summary, iterationId)
+    }
+
     private val mapper = { row: java.sql.ResultSet, _: Int ->
         ShadowIterationView(
             row.getString("id"), row.getString("product_slug"), row.getInt("sequence_number"), row.getString("focus"),
             row.getString("mode"), row.getString("status"), row.getString("current_agent_role"), row.getString("critic_verdict"), row.getInt("candidate_count"),
             row.getString("workspace_run_id"), row.getString("workspace_pull_request_url"), row.getString("workspace_commit_sha"),
-            row.getString("error_message"), row.getTimestamp("created_at").toInstant(), row.getTimestamp("started_at")?.toInstant(),
+            row.getString("error_message"), row.getString("summary"), row.getTimestamp("created_at").toInstant(), row.getTimestamp("started_at")?.toInstant(),
             row.getTimestamp("completed_at")?.toInstant(),
         )
     }

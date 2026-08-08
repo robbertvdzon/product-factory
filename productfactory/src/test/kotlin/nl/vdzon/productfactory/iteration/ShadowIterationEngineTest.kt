@@ -54,8 +54,9 @@ class ShadowIterationEngineTest(
         val accepted = repository.create("hkh-autopilot", "Vind de beste eerste bronervaring")
         engine.run(accepted.id)
         assertEquals("ACCEPTED", repository.require("hkh-autopilot", accepted.id).status)
-        assertEquals(5, repository.steps("hkh-autopilot", accepted.id).size)
-        assertEquals(5, repository.artifacts("hkh-autopilot", accepted.id).size)
+        assertEquals("Dit is een korte, voor-dummies samenvatting van de testcyclus.", repository.require("hkh-autopilot", accepted.id).summary)
+        assertEquals(6, repository.steps("hkh-autopilot", accepted.id).size)
+        assertEquals(6, repository.artifacts("hkh-autopilot", accepted.id).size)
         assertTrue(repository.artifacts("hkh-autopilot", accepted.id).any { it.artifactType == "product_owner" })
         assertEquals(1, workspace.artifacts.size)
         assertTrue(workspace.artifacts.single().content.contains("Rechtenindicatie"))
@@ -80,21 +81,22 @@ class ShadowIterationEngineTest(
         engine.run(revision.id)
         assertEquals("NEEDS_REVISION", repository.require("hkh-autopilot", revision.id).status)
         assertEquals("REVISE", repository.require("hkh-autopilot", revision.id).criticVerdict)
-        assertEquals(9, repository.steps("hkh-autopilot", revision.id).size)
+        assertEquals("Dit is een korte, voor-dummies samenvatting van de testcyclus.", repository.require("hkh-autopilot", revision.id).summary)
+        assertEquals(10, repository.steps("hkh-autopilot", revision.id).size)
         assertEquals(1, workspace.artifacts.size)
 
         bridge.scenario = Scenario.REVISE_THEN_ACCEPT
         val selfCorrected = repository.create("hkh-autopilot", "Verwerk criticusfeedback autonoom")
         engine.run(selfCorrected.id)
         assertEquals("ACCEPTED", repository.require("hkh-autopilot", selfCorrected.id).status)
-        assertEquals(7, repository.steps("hkh-autopilot", selfCorrected.id).size)
+        assertEquals(8, repository.steps("hkh-autopilot", selfCorrected.id).size)
         assertEquals(2, workspace.artifacts.size)
 
         bridge.scenario = Scenario.AUTONOMY_REVISE_THEN_ACCEPT
         val autonomousCorrection = repository.create("hkh-autopilot", "Verwijder handmatige afhankelijkheden", "autonomous")
         engine.run(autonomousCorrection.id)
         assertEquals("ACCEPTED", repository.require("hkh-autopilot", autonomousCorrection.id).status)
-        assertEquals(7, repository.steps("hkh-autopilot", autonomousCorrection.id).size)
+        assertEquals(8, repository.steps("hkh-autopilot", autonomousCorrection.id).size)
         assertEquals(3, workspace.artifacts.size)
 
         bridge.scenario = Scenario.WARNING_ONLY_REVISE
@@ -102,7 +104,7 @@ class ShadowIterationEngineTest(
         engine.run(warningOnly.id)
         assertEquals("ACCEPTED", repository.require("hkh-autopilot", warningOnly.id).status)
         assertEquals("ACCEPT", repository.require("hkh-autopilot", warningOnly.id).criticVerdict)
-        assertEquals(5, repository.steps("hkh-autopilot", warningOnly.id).size)
+        assertEquals(6, repository.steps("hkh-autopilot", warningOnly.id).size)
         assertEquals(4, workspace.artifacts.size)
 
         assertEquals(12, jdbc.queryForObject("select count(*) from research_source", Int::class.java))
@@ -190,6 +192,7 @@ class ShadowIterationEngineTest(
                     "candidateReviews":[{"candidateIndex":0,"verdict":"ACCEPT","reason":"Kleine toetsbare scope met expliciete broninformatie."}],
                     "requiredChanges":[]
                 }"""
+                "summary" -> """{"summary":"Dit is een korte, voor-dummies samenvatting van de testcyclus."}"""
                 else -> error("Onbekende testrol ${task.taskType}")
             }
             return AgentResult(task.runId, "COMPLETED", json)

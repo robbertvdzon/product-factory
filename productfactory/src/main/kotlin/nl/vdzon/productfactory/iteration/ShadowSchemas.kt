@@ -52,6 +52,13 @@ internal object ShadowSchemas {
         listOf("overallVerdict", "summary", "issues", "candidateReviews", "requiredChanges"),
     )
 
+    val summary = schema(
+        """
+        "summary":{"type":"string","minLength":40,"maxLength":4000}
+        """.trimIndent(),
+        listOf("summary"),
+    )
+
     private fun schema(properties: String, required: List<String>) =
         """{"type":"object","additionalProperties":false,"required":[${required.joinToString(",") { "\"$it\"" }}],"properties":{$properties}}"""
 }
