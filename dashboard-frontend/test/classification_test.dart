@@ -63,6 +63,24 @@ void main() {
       },
     );
 
+    test(
+      'representatief voor een tijdens uitvoering afgebroken iteratie: een onbekende, '
+      'niet-QUEUED/RUNNING statuswaarde mapt deterministisch naar niet-classificeerbaar '
+      '(er bestaat geen apart CANCELLED-statusveld in het datamodel)',
+      () {
+        expect(
+          classifyIterationOutcome(status: 'CANCELLED'),
+          kNietClassificeerbaar,
+        );
+        // Determinisme: herhaalde aanroepen met dezelfde onbekende status geven altijd hetzelfde
+        // resultaat.
+        expect(
+          classifyIterationOutcome(status: 'CANCELLED'),
+          kNietClassificeerbaar,
+        );
+      },
+    );
+
     test('elke classificatiewaarde zit in de vaste toegestane lijst', () {
       for (final status in [
         'ACCEPTED',

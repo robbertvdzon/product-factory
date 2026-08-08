@@ -557,6 +557,9 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
             _limitedSection('iterations', iterations, (iteration) {
               final status = '${iteration['status']}';
+              // Zelfde onderscheid als hierboven bij het detaildialoog (regel ~767): QUEUED/RUNNING
+              // is nog lopend en heeft dus geen afgeronde uitkomst om te classificeren.
+              final running = status == 'QUEUED' || status == 'RUNNING';
               final role = iteration['currentRole'];
               final pr = iteration['workspacePullRequestUrl'];
               final timing = iterationTiming(iteration);
@@ -579,7 +582,9 @@ class _OverviewPageState extends State<OverviewPage> {
                       Text(
                         '${iteration['productSlug']} · iteratie ${iteration['sequenceNumber']}',
                       ),
-                      ClassificationBadge(classification: classification),
+                      running
+                          ? const IterationProgressIndicator()
+                          : ClassificationBadge(classification: classification),
                     ],
                   ),
                   subtitle: Text(
@@ -1499,6 +1504,48 @@ class IterationTimesField extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// Neutrale voortgangsindicator voor een lopende/wachtende iteratie (`status` QUEUED/RUNNING),
+/// getoond in plaats van de [ClassificationBadge]: er is dan nog geen afgeronde uitkomst om te
+/// classificeren (zie ook regel ~767, waar hetzelfde status-onderscheid al gebruikt wordt in het
+/// detaildialoog). `Semantics(liveRegion: true)` is het Flutter-web-equivalent van
+/// `aria-live="polite"`, zodat een schermlezer meekrijgt wanneer deze indicator verschijnt of weer
+/// plaatsmaakt voor een badge na de volgende auto-refresh.
+class IterationProgressIndicator extends StatelessWidget {
+  const IterationProgressIndicator({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      label: 'bezig: iteratie loopt nog',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const ExcludeSemantics(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 6),
+              Text(
+                'bezig',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MetricCard extends StatelessWidget {
