@@ -550,6 +550,15 @@ class DeliveryEvaluationService(
         val storyKey = delivery.externalStoryKey ?: return
         val runId = "evaluation-${storyKey.lowercase()}"
         val content = """
+            ---
+            product: ${delivery.productSlug}
+            artifact_type: evaluation
+            run_id: $runId
+            date: ${LocalDate.now()}
+            status: approved
+            sources:
+              - ${delivery.artifactPath}
+            ---
             # Evaluatie $storyKey
 
             - Product: `${delivery.productSlug}`
