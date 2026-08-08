@@ -154,7 +154,12 @@ class ClaudeAgentTaskExecutor(
         val isError = envelope.path("is_error").asBoolean(false) || envelope.path("subtype").asText("success") != "success"
         if (isError) return failed(task, resultText.ifBlank { "Claude-taak mislukte zonder verdere toelichting." })
         if (task.responseSchema == null) return AgentResult(task.runId, "COMPLETED", resultText, completedAt = Instant.now())
-        val structured = asJsonObject(resultText) ?: return failed(task, "Claude gaf geen valide JSON volgens het schema terug: ${resultText.take(500)}")
+        // Bij --json-schema levert Claude de gevalideerde data in het aparte "structured_output"-veld;
+        // "result" blijft het vrije-tekst-antwoord (vaak een samenvatting in plaats van de JSON zelf).
+        val structuredOutput = envelope.path("structured_output").takeIf { it.isObject }
+        val structured = structuredOutput?.let { mapper.writeValueAsString(it) }
+            ?: asJsonObject(resultText)
+            ?: return failed(task, "Claude gaf geen valide JSON volgens het schema terug: ${resultText.take(500)}")
         return AgentResult(task.runId, "COMPLETED", structured, completedAt = Instant.now())
     }
 

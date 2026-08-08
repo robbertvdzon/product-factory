@@ -158,6 +158,30 @@ class AgentContractTest {
         assertEquals("""{"greeting":"hoi"}""", result.summary)
     }
 
+    @Test fun `claude result parsing prefers the structured_output field over the free-text result`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-parse-structured"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val task = AgentTask("run-6b", "hkh-autopilot", "research", "Onderzoek", responseSchema = """{"type":"object"}""")
+        val envelope = jacksonObjectMapper().writeValueAsString(
+            mapOf(
+                "type" to "result",
+                "subtype" to "success",
+                "is_error" to false,
+                "result" to "Onderzoek afgerond en als gestructureerde JSON opgeleverd.",
+                "structured_output" to mapOf("greeting" to "hoi"),
+            ),
+        )
+
+        val result = executor.parseResult(task, AgentCommandResult(0, false, envelope))
+
+        assertEquals("COMPLETED", result.status)
+        assertEquals("""{"greeting":"hoi"}""", result.summary)
+    }
+
     @Test fun `claude result parsing extracts the embedded json object when the model added prose around it`() {
         val executor = ClaudeAgentTaskExecutor(
             AgentWorkerSettings(
