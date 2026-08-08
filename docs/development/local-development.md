@@ -1,7 +1,9 @@
 # Lokale ontwikkeling
 
 1. Kopieer `secrets.env.example` naar het gitignored `secrets.env` en kies een lokaal
-   databasewachtwoord.
+   databasewachtwoord. Zie [deploy/README.md](../../deploy/README.md#database-verbinden) voor hoe
+   je met `psql` verbinding maakt met zowel deze lokale database als met productie, en waar alle
+   credentials (inclusief `PF_DB_PASSWORD`) precies vandaan komen.
 2. Zorg dat `../product-factory-workspace` een checkout van de workspace-repository is.
 3. Start de volledige omgeving met `./product-factory up`.
 4. Open het dashboard op `http://localhost:8082`; lokale auth staat standaard uit.

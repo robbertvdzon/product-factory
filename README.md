@@ -50,5 +50,6 @@ publiceren; tijdens slaapstand of uitschakelen rapporteert de backend de worker 
 - [Productagents in shadow mode](docs/architecture/shadow-mode.md)
 - [Lokale ontwikkeling](docs/development/local-development.md)
 - [OpenShift-deployment](docs/deployment/openshift.md)
+- [Deployment, secrets en databasetoegang (lokaal en productie)](deploy/README.md)
 - [Workspace-security](docs/security/workspace-credential.md)
 - [Template voor een volgend product](docs/product-template.md)

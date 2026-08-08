@@ -39,14 +39,48 @@ Cloudflare publiceert `product-factory.vdzonsoftware.nl` naar
 `product-factory-api.vdzonsoftware.nl` naar
 `http://dashboard-backend.product-factory.svc.cluster.local:8081`.
 
-## Rechtstreekse databasetoegang vanaf het thuisnetwerk
+## Database verbinden
 
-De `postgres`-Service is `NodePort` op `30432` (naast de gewone `ClusterIP`-toegang die de runtime
-intern gebruikt). Een OpenShift `Route` werkt niet voor ruwe Postgres-TCP en er is geen
-`LoadBalancer` (geen MetalLB) op deze cluster, dus dit is de LAN-only weg: alleen bereikbaar via het
-vaste node-IP `192.168.178.64` binnen het thuisnetwerk, nooit van buitenaf (geen
-routerportforwarding, los van de Cloudflare Tunnel voor de webapps).
+Er zijn twee volledig gescheiden PostgreSQL-databases: een lokale, lege ontwikkeldatabase via
+docker-compose, en de productiedatabase in OpenShift. Beide gebruiken gebruikersnaam en database
+`productfactory`; alleen host, poort en wachtwoord verschillen.
+
+### Waar de credentials staan
+
+Alle wachtwoorden staan uitsluitend in het gitignored rootbestand `secrets.env` (nooit in Git, ook
+niet versleuteld — zie hierboven). Zoek daarin naar `PF_DB_PASSWORD`. Dat ene wachtwoord geldt voor
+zowel de lokale als, na de laatste `./deploy/seal-secrets.sh`-run, de productiedatabase: het
+bronbestand ís de bron voor het `SealedSecret` dat productie gebruikt. Staat `secrets.env` er niet
+(nog), kopieer dan eerst `secrets.env.example` ernaartoe.
+
+Er is geen andere plek om dit wachtwoord te vinden: `deploy/base/sealed-secret-product-factory.yaml`
+is asymmetrisch versleuteld tegen het clustercertificaat en is alléén door de Sealed
+Secrets-controller in de cluster zelf te ontsleutelen — ook niet door iemand met leestoegang tot
+deze repository.
+
+### Lokaal (ontwikkeldatabase, leeg, geen productiedata)
 
 ```bash
-psql "postgresql://productfactory:<wachtwoord>@192.168.178.64:30432/productfactory"
+./product-factory up     # start docker-compose, inclusief postgres op localhost:5436
+psql "postgresql://productfactory:$(grep PF_DB_PASSWORD ../secrets.env | cut -d= -f2)@localhost:5436/productfactory"
 ```
+
+### Productie (echte cyclus-, story- en leveringsdata)
+
+De `postgres`-Service in OpenShift is `NodePort` op `30432` (naast de gewone `ClusterIP`-toegang die
+de runtime intern gebruikt). Een OpenShift `Route` werkt niet voor ruwe Postgres-TCP en er is geen
+`LoadBalancer` (geen MetalLB) op deze cluster, dus dit is de LAN-only weg: alleen bereikbaar via het
+vaste node-IP `192.168.178.64` binnen het thuisnetwerk, nooit van buitenaf (geen
+routerportforwarding, los van de Cloudflare Tunnel voor de webapps). Geen `oc login` of
+`oc port-forward` nodig — dit werkt direct vanaf elk toestel op het thuisnetwerk.
+
+```bash
+psql "postgresql://productfactory:$(grep PF_DB_PASSWORD secrets.env | cut -d= -f2)@192.168.178.64:30432/productfactory"
+```
+
+Relevante tabellen voor productcycli: `shadow_iteration` (cyclusstatus, rol, criticusoordeel),
+`shadow_iteration_step` (per-rol agentoutput), `story_candidate` (voorgestelde stories, inclusief
+afgewezen), `story_delivery` (levering aan de Software Factory, status, externe storysleutel),
+`story_question` en `human_action` (vragen/escalaties tijdens uitvoering). Zie
+[functioneel-overzicht.md](../docs/architecture/functioneel-overzicht.md) voor wat deze tabellen
+functioneel betekenen.
