@@ -46,6 +46,7 @@ publiceren; tijdens slaapstand of uitschakelen rapporteert de backend de worker 
 
 - [Architectuurreferentie](docs/architecture/reference-baseline.md)
 - [Modulegrenzen](docs/architecture/modules.md)
+- [Functioneel overzicht: wat doet een productcyclus precies](docs/architecture/functioneel-overzicht.md)
 - [Productagents in shadow mode](docs/architecture/shadow-mode.md)
 - [Lokale ontwikkeling](docs/development/local-development.md)
 - [OpenShift-deployment](docs/deployment/openshift.md)
