@@ -4,6 +4,7 @@ import nl.vdzon.productfactory.contracts.WorkspacePublicationView
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
@@ -17,6 +18,12 @@ import java.security.MessageDigest
 import java.util.Base64
 
 data class PublishArtifactRequest(val runId: String, val productSlug: String, val relativePath: String, val content: String)
+
+/** GraphQL-variabelen voorkomen handmatige stringescaping van de node-ID in de mutation. */
+internal fun enableAutoMergeMutation(pullRequestId: String): Map<String, Any> = mapOf(
+    "query" to "mutation(\$id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: \$id, mergeMethod: SQUASH}) { pullRequest { id } } }",
+    "variables" to mapOf("id" to pullRequestId),
+)
 
 internal fun gitAuthorizationHeader(token: String): String {
     val credentials = Base64.getEncoder().encodeToString("x-access-token:$token".toByteArray())
@@ -49,6 +56,8 @@ class WorkspacePublisher(
     @Value("\${product-factory.workspace.remote-publication:false}") private val remotePublication: Boolean,
     @Value("\${PF_WORKSPACE_GITHUB_TOKEN:}") private val workspaceToken: String,
 ) : WorkspacePublicationPort {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     override fun publish(artifact: WorkspaceArtifact): WorkspacePublicationView {
         validate(artifact)
         val product = products.requireWorkspacePublication(artifact.productSlug, artifact.relativePath)
@@ -123,8 +132,34 @@ class WorkspacePublisher(
         if (response["merged_at"] != null) {
             val mergedSha = response["merge_commit_sha"]?.toString()?.takeIf { it.isNotBlank() } ?: current.commitSha
             jdbc.update("update workspace_publication set status = 'MERGED', commit_sha = ? where run_id = ?", mergedSha, runId)
+            return findByRunId(runId)
         }
-        return findByRunId(runId)
+        advanceTowardsMerge(prNumber, response)
+        return current
+    }
+
+    /**
+     * Duwt een open PR richting merge, opnieuw geprobeerd bij elke poll totdat hij gemerged is:
+     * - `clean`: niets houdt de merge nog tegen, dus merge direct.
+     * - `unknown`: GitHub berekent de status nog; probeer het bij de volgende poll opnieuw.
+     * - overige status (bv. wachtend op een check): vraag GitHub's eigen auto-merge aan.
+     */
+    private fun advanceTowardsMerge(prNumber: Int, pullRequest: Map<*, *>) {
+        when (pullRequest["mergeable_state"]?.toString()) {
+            "clean" -> mergeNow(prNumber)
+            "unknown", null -> Unit
+            else -> {
+                val nodeId = pullRequest["node_id"]?.toString() ?: return
+                requestAutoMerge(prNumber, nodeId)
+            }
+        }
+    }
+
+    private fun mergeNow(prNumber: Int) {
+        runCatching {
+            githubClient().put().uri("/repos/${repositoryPath()}/pulls/$prNumber/merge")
+                .body(mapOf("merge_method" to "squash")).retrieve().toBodilessEntity()
+        }.onFailure { logger.warn("Direct mergen van PR #{} mislukte: {}", prNumber, it.message) }
     }
 
     fun readArtifact(productSlug: String, runId: String): String {
@@ -169,11 +204,25 @@ class WorkspacePublisher(
             "title" to "Product Factory · $runId", "head" to branch, "base" to mainBranch,
             "body" to "Goedgekeurd Product Factory-artefact voor run `$runId`."
         )).retrieve().body(Map::class.java) ?: error("GitHub gaf geen pull-requestresultaat")
-        val url = response["html_url"]?.toString() ?: error("Pull-request-URL ontbreekt")
-        val nodeId = response["node_id"]?.toString() ?: error("Pull-request-node ontbreekt")
-        client.post().uri("/graphql").body(mapOf("query" to "mutation { enablePullRequestAutoMerge(input: {pullRequestId: \\\"$nodeId\\\", mergeMethod: SQUASH}) { pullRequest { id } } }"))
-            .retrieve().toBodilessEntity()
-        return url
+        // GitHub berekent mergeable_state async, dus direct na aanmaken is die vrijwel altijd nog
+        // "unknown". De eerstvolgende [refresh]-poll (uiterlijk binnen product-factory.autonomy.poll-delay)
+        // duwt de PR daadwerkelijk richting merge.
+        return response["html_url"]?.toString() ?: error("Pull-request-URL ontbreekt")
+    }
+
+    /**
+     * Vraagt GitHub's eigen auto-merge aan zodat de PR zelfstandig mergt zodra hij mergeable is.
+     * Faalt nooit hard: de publicatie zelf is al geslaagd, en [refresh] probeert dit iedere poll opnieuw.
+     */
+    private fun requestAutoMerge(prNumber: Int, nodeId: String) {
+        val response = runCatching {
+            githubClient().post().uri("/graphql").body(enableAutoMergeMutation(nodeId)).retrieve().body(Map::class.java)
+        }.getOrElse {
+            logger.warn("Auto-merge aanvragen voor PR #{} mislukte: {}", prNumber, it.message)
+            return
+        }
+        val errors = response?.get("errors") as? List<*>
+        if (!errors.isNullOrEmpty()) logger.warn("Auto-merge aanvragen voor PR #{} gaf GraphQL-fouten: {}", prNumber, errors)
     }
 
     private fun githubClient() = RestClient.builder().baseUrl("https://api.github.com")
