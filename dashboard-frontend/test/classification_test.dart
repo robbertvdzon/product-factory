@@ -51,13 +51,17 @@ void main() {
       },
     );
 
-    test('fallback: onbekende of ontbrekende statuswaarde', () {
-      expect(
-        classifyIterationOutcome(status: 'ONVOORZIEN'),
-        kOnderzoekOnvoldoende,
-      );
-      expect(classifyIterationOutcome(status: null), kOnderzoekOnvoldoende);
-    });
+    test(
+      'fallback: onbekende of ontbrekende statuswaarde wordt niet-classificeerbaar',
+      () {
+        expect(
+          classifyIterationOutcome(status: 'ONVOORZIEN'),
+          kNietClassificeerbaar,
+        );
+        expect(classifyIterationOutcome(status: null), kNietClassificeerbaar);
+        expect(classifyIterationOutcome(status: ''), kNietClassificeerbaar);
+      },
+    );
 
     test('elke classificatiewaarde zit in de vaste toegestane lijst', () {
       for (final status in [
@@ -67,6 +71,7 @@ void main() {
         'FAILED',
         'QUEUED',
         'RUNNING',
+        'ONVOORZIEN',
         null,
       ]) {
         expect(

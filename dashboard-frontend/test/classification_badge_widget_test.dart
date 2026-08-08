@@ -55,11 +55,19 @@ void main() {
     },
     {'sequenceNumber': 5, 'status': 'QUEUED'},
     {'sequenceNumber': 6, 'status': 'RUNNING'},
+    {'sequenceNumber': 7, 'status': 'ONVOORZIEN_TOEKOMSTIG_LABEL'},
+    {'sequenceNumber': 8, 'status': null},
   ];
 
   testWidgets(
-    'elke iteratierij toont precies één van de vier toegestane badge-teksten',
+    'elke iteratierij toont precies één van de vijf toegestane badge-teksten, nooit een lege statuscel',
     (tester) async {
+      // Groot testvenster zodat alle 8 rijen binnen de sliver-cache-extent vallen; anders bouwt
+      // ListView geen Elements voor rijen buiten beeld en mist find.text() ze.
+      tester.view.physicalSize = const Size(1200, 3000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
       await tester.pumpWidget(
         _IterationListHarness(iterations: sampleIterations),
       );
@@ -84,7 +92,8 @@ void main() {
         expect(matches, findsNWidgets(expectedCount));
       }
 
-      // Geen enkele rij toont vrije tekst of een andere waarde dan de vier toegestane badgeteksten.
+      // Geen enkele rij toont vrije tekst of een andere waarde dan de vijf toegestane badgeteksten,
+      // en dus ook nooit een lege statuscel.
       final badgeFinder = find.byType(ClassificationBadge);
       expect(badgeFinder, findsNWidgets(sampleIterations.length));
       for (final element in badgeFinder.evaluate()) {
