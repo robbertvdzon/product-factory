@@ -156,18 +156,23 @@ beneden:
   cyclus nog, dan staat er `loopt nog: <tijd sinds start>` en loopt die waarde mee met de
   auto-refresh. Een nog niet gestarte cyclus toont geen doorlooptijd. Datum en tijd staan in de
   lokale tijdzone van de browser als `dd-MM-yyyy HH:mm`, nooit als ruwe ISO-string.
-  Elke iteratierij toont daarnaast exact één vaste classificatiebadge — `onderzoek-onvoldoende`,
-  `guardrail-conflict`, `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` — die
-  puur wordt afgeleid uit de bestaande velden `status`, `criticVerdict` en `errorMessage`;
-  iteraties die nog lopen of in de wachtrij staan (QUEUED/RUNNING) vallen terug op
-  `onderzoek-onvoldoende`, terwijl elke onvoorziene of ontbrekende statuswaarde naar
-  `niet-classificeerbaar` mapt. De badge toont de classificatie zowel als zichtbare tekst als via
-  een Semantics-label, dus niet uitsluitend via kleur, en elk van de vijf kleurenparen haalt WCAG
-  2.1 AA-contrast (≥ 4.5:1). Aanklikken opent een detailscherm met de opdracht, alle vijf
-  agentstappen (status, start-/eindtijd, foutmelding), het volledige gepubliceerde dossier en de
-  ruwe JSON-output per rol — dit scherm ververst zichzelf elke 3 seconden zolang de cyclus loopt.
-  De weergave van de workspace-publicatie/PR-referentie (`workspacePullRequestUrl`/
-  `workspaceCommitSha`) in dit detailscherm is door de badge-toevoeging ongewijzigd gebleven.
+  Elke iteratierij toont daarnaast exact één van twee dingen, puur afgeleid uit bestaande velden
+  (geen nieuwe databron): iteraties die nog lopen of in de wachtrij staan (`status` QUEUED/RUNNING)
+  tonen een neutrale voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge;
+  elke andere status toont een vaste classificatiebadge — `onderzoek-onvoldoende`,
+  `guardrail-conflict`, `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` —
+  afgeleid uit de velden `status`, `criticVerdict` en `errorMessage`. Elke onvoorziene of
+  ontbrekende statuswaarde (inclusief een tijdens uitvoering afgebroken iteratie, waarvoor geen
+  apart CANCELLED-statusveld bestaat) mapt naar `niet-classificeerbaar`. De badge toont de
+  classificatie zowel als zichtbare tekst als via een Semantics-label, dus niet uitsluitend via
+  kleur, en elk van de vijf kleurenparen haalt WCAG 2.1 AA-contrast (≥ 4.5:1). De
+  voortgangsindicator gebruikt `Semantics(liveRegion: true)` (het Flutter-web-equivalent van
+  `aria-live="polite"`). Aanklikken opent een detailscherm met de opdracht, alle vijf agentstappen
+  (status, start-/eindtijd, foutmelding), het volledige gepubliceerde dossier en de ruwe
+  JSON-output per rol — dit scherm ververst zichzelf elke 3 seconden zolang de cyclus loopt. De
+  weergave van de workspace-publicatie/PR-referentie (`workspacePullRequestUrl`/
+  `workspaceCommitSha`) in dit detailscherm is door de badge-/indicator-toevoeging ongewijzigd
+  gebleven.
 - **Software Factory-stories**: elke levering met storysleutel, titel, status (`DELIVERING`,
   `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`, `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst
   bekende Software Factory-fase.

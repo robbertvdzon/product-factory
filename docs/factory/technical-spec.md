@@ -30,7 +30,11 @@
   `limited_list.dart` — de 5/+10-lijstbeperking; `classification.dart` — de vaste
   iteratie-uitkomstclassificatie (mapping van `status`/`criticVerdict`/`errorMessage` naar één van
   vijf badge-waarden, inclusief de fallbackwaarde `niet-classificeerbaar` voor onbekende
-  statuswaarden), de bijbehorende AA-contrastkleuren en de `ClassificationBadge`-widget.
+  statuswaarden), de bijbehorende AA-contrastkleuren en de `ClassificationBadge`-widget. Voor een
+  iteratie met `status` QUEUED of RUNNING toont de iteratierij in plaats van de badge de
+  `IterationProgressIndicator`-widget (`main.dart`), met `Semantics(liveRegion: true)` als
+  Flutter-web-equivalent van `aria-live="polite"`; elke andere status toont ongewijzigd exact één
+  `ClassificationBadge`.
 - Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
   `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
   `4m 12s`, `35s`). Backendtijdstempels zijn ISO-8601 in UTC; `parseInstant` is defensief en levert
