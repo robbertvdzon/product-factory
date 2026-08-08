@@ -119,3 +119,20 @@ Vangnet ronde 2 (allemaal groen):
 - `flutter analyze` in `dashboard-frontend`: "No issues found!"
 - `flutter test` in `dashboard-frontend`: 25 tests, alles geslaagd
 - `mvn -B --no-transfer-progress clean verify` vanuit de root: BUILD SUCCESS, exitcode 0
+
+## Review ronde 2 (SF-2037) — akkoord
+
+Volledige story-diff (`git diff main...HEAD`) beoordeeld: alle 13 acceptatiecriteria gedekt.
+Gerichte hercontroles in de reviewcontainer: `flutter analyze` → No issues found, `flutter test` →
+25/25 groen, worktree bleef daarna schoon (pubspec.lock werd niet herschreven). De eerder gemelde
+blocker is opgelost: `ghcr.io/cirruslabs/flutter:3.44.0` bestaat aantoonbaar (manifest HTTP 200 op
+ghcr.io) en is de nieuwste gepubliceerde stabiele tag, dus de gepinde base kan de lock-ondergrens
+`dart >=3.10.0-0` halen. De frontend-imagebuild zelf blijft CI-dekking (`agentRunnable: false`).
+
+Open, niet-blokkerende punten voor een volgende ronde:
+- `docs/factory/technical-spec.md` noemt zijn tabel "exact de commandoset uit
+  `.factory/verification.yaml`", maar mist `dashboard-frontend-image-build`;
+  `development.md` noemt hem wel.
+- `dashboard-frontend/pubspec.yaml` staat nog op `sdk: ^3.9.0` terwijl de lock `>=3.10.0-0` eist.
+- De doc-comment van `sortedByNewestFirst` belooft dat items zonder tijdstempel onderling hun
+  volgorde houden; `List.sort` in Dart is niet stabiel.
