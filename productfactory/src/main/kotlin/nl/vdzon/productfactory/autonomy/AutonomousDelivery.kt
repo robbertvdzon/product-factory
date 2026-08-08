@@ -644,7 +644,7 @@ class AutonomousCoordinator(
         if (noWorkInProgress && deliveries.errors(product.slug) == 0 && deliveries.openHumanActions(product.slug) == 0 &&
             isDue(product, ZonedDateTime.now(zone), lastIterationToday)
         ) {
-            iterations.startAutonomous(product.slug, null)
+            iterations.startCycle(product.slug, null)
         }
     }
 

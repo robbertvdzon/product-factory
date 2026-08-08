@@ -18,13 +18,16 @@ cleanup() { rm -f "$LOCK_FILE"; }
 trap cleanup EXIT
 trap 'echo "[agentworker] gestopt."; exit 0' INT TERM
 
+# Alleen een waarschuwing, geen harde stop: welke provider (codex/claude) een taak echt nodig heeft
+# hangt af van het product, en elke executor controleert zijn eigen login al per taak. Zo blokkeert het
+# ontbreken van de ene login niet het opstarten van de worker voor producten die de andere gebruiken.
 if ! command -v codex >/dev/null 2>&1; then
-  echo "[agentworker] Codex CLI ontbreekt in PATH." >&2
-  exit 1
+  echo "[agentworker] let op: Codex CLI ontbreekt in PATH; codex-taken zullen mislukken." >&2
+elif ! codex login status >/dev/null 2>&1; then
+  echo "[agentworker] let op: geen geldige Codex-login; codex-taken zullen mislukken totdat 'codex login' is uitgevoerd." >&2
 fi
-if ! codex login status >/dev/null 2>&1; then
-  echo "[agentworker] geen geldige Codex-login; voer eerst 'codex login' uit." >&2
-  exit 1
+if ! command -v claude >/dev/null 2>&1; then
+  echo "[agentworker] let op: Claude Code CLI ontbreekt in PATH; claude-taken zullen mislukken." >&2
 fi
 if [[ ! -f "$ROOT/secrets.env" ]] || [[ -z "$(awk -F= '$1 == "PF_AGENT_WORKER_TOKEN" {print substr($0, index($0, "=") + 1)}' "$ROOT/secrets.env" | tail -1)" ]]; then
   echo "[agentworker] PF_AGENT_WORKER_TOKEN ontbreekt in secrets.env." >&2

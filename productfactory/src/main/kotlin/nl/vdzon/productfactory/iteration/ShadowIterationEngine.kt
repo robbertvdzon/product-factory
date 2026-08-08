@@ -94,7 +94,7 @@ class ShadowIterationEngine(
             ShadowSchemas.critic,
             criticPrompt(product, research, productOwner, ux, stories, candidateContext, iteration.mode),
             storyAttempt,
-            { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it), iteration.mode) },
+            { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it)) },
         ).also { validateCritic(it, stories.path("candidates").size()) }
 
         while (critic.path("overallVerdict").asText() == "REVISE" && storyAttempt < MAX_STORY_ATTEMPTS) {
@@ -115,7 +115,7 @@ class ShadowIterationEngine(
                 ShadowSchemas.critic,
                 criticPrompt(product, research, productOwner, ux, stories, candidateContext, iteration.mode),
                 storyAttempt,
-                { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it), iteration.mode) },
+                { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it)) },
             ).also { validateCritic(it, stories.path("candidates").size()) }
         }
 
@@ -295,8 +295,7 @@ class ShadowIterationEngine(
         return normalized
     }
 
-    private fun applyAutonomyPolicy(stories: JsonNode, output: JsonNode, mode: String): JsonNode {
-        if (mode != "autonomous") return output
+    private fun applyAutonomyPolicy(stories: JsonNode, output: JsonNode): JsonNode {
         val violations = stories.path("candidates").mapIndexedNotNull { index, candidate ->
             val executionRequirements = (
                 textList(candidate.path("acceptanceCriteria")) + textList(candidate.path("dependsOn"))
@@ -372,10 +371,10 @@ class ShadowIterationEngine(
         repository.saveKnowledge(
             iterationId = iterationId,
             productSlug = product.slug,
-            researchTitle = "Shadow-iteratie ${iterationId.substringAfterLast('-')}: onderzoek",
+            researchTitle = "Productcyclus ${iterationId.substringAfterLast('-')}: onderzoek",
             researchContent = research.path("summary").asText(),
             firstSourceUrl = sources.first().url,
-            decisionTitle = "Shadow-iteratie ${iterationId.substringAfterLast('-')}: productbesluit",
+            decisionTitle = "Productcyclus ${iterationId.substringAfterLast('-')}: productbesluit",
             decisionContent = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(productOwner),
             uxTitle = ux.path("flowName").asText(),
             uxContent = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(ux),

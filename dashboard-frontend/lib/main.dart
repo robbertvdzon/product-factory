@@ -256,33 +256,13 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
-  Future<void> _startShadowIteration(String slug) async {
+  Future<void> _startCycle(String slug) async {
     try {
-      await api.startShadowIteration(slug);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Shadow-iteratie voor $slug is gestart.')),
-        );
-        setState(_reload);
-      }
-    } catch (error) {
+      await api.startCycle(slug);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$error')));
-      }
-    }
-  }
-
-  Future<void> _startAutonomousCycle(String slug) async {
-    try {
-      await api.startAutonomousCycle(slug);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Autonome productcyclus voor $slug is gestart.'),
-          ),
-        );
+        ).showSnackBar(SnackBar(content: Text('Productcyclus voor $slug is gestart.')));
         setState(_reload);
       }
     } catch (error) {
@@ -495,24 +475,12 @@ class _OverviewPageState extends State<OverviewPage> {
                             FilledButton.icon(
                               onPressed:
                                   active &&
-                                      product['developmentMode'] ==
-                                          'autonomous' &&
                                       product['workspaceOwnership'] ==
                                           'product-factory'
-                                  ? () => _startAutonomousCycle(slug)
+                                  ? () => _startCycle(slug)
                                   : null,
                               icon: const Icon(Icons.auto_awesome),
                               label: const Text('Start productcyclus nu'),
-                            ),
-                            FilledButton.icon(
-                              onPressed:
-                                  active &&
-                                      product['workspaceOwnership'] ==
-                                          'product-factory'
-                                  ? () => _startShadowIteration(slug)
-                                  : null,
-                              icon: const Icon(Icons.science_outlined),
-                              label: const Text('Shadow-iteratie'),
                             ),
                             OutlinedButton.icon(
                               onPressed: () => _changeStatus(
@@ -570,6 +538,7 @@ class _OverviewPageState extends State<OverviewPage> {
                       '${iteration['candidateCount']} kandidaten',
                       if (iteration['criticVerdict'] != null)
                         'criticus: ${iteration['criticVerdict']}',
+                      _deliveryLabel('${iteration['mode']}'),
                     ].join(' · '),
                   ),
                   trailing: pr == null
@@ -758,7 +727,7 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Chip(label: Text(status)),
-                  Chip(label: Text('${iteration['mode']}')),
+                  Chip(label: Text(_deliveryLabel('${iteration['mode']}'))),
                   if (currentRole != null)
                     Chip(label: Text('bezig: $currentRole')),
                   Text('${iteration['createdAt']}'),
@@ -912,6 +881,12 @@ String _prettyJson(String value) {
     return value;
   }
 }
+
+/// De onderliggende `mode` ('autonomous'/'shadow') is een door de backend afgeleide waarde, geen keuze van de
+/// gebruiker — deze tekst maakt duidelijk wat dat concreet betekent, in plaats van het jargon zelf te tonen.
+String _deliveryLabel(String mode) => mode == 'autonomous'
+    ? 'kan doorgezet worden'
+    : 'niet doorgezet (product staat niet op autonoom)';
 
 String _roleLabel(String value) => switch (value.toLowerCase()) {
   'researcher' => 'Onderzoeker',

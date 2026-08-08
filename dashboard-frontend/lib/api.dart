@@ -99,28 +99,15 @@ class DashboardApi {
     }
   }
 
-  Future<void> startShadowIteration(String slug) async {
+  Future<void> startCycle(String slug) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/api/products/$slug/shadow-iterations'),
+      Uri.parse('$baseUrl/api/products/$slug/cycles'),
       headers: headers,
       body: '{}',
     );
     if (response.statusCode != 202) {
       throw StateError(
-        'Shadow-iteratie kon niet worden gestart (${response.statusCode}).',
-      );
-    }
-  }
-
-  Future<void> startAutonomousCycle(String slug) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/products/$slug/autonomous-cycles'),
-      headers: headers,
-      body: '{}',
-    );
-    if (response.statusCode != 202) {
-      throw StateError(
-        'Autonome cyclus kon niet worden gestart (${response.statusCode}).',
+        'Productcyclus kon niet worden gestart (${response.statusCode}).',
       );
     }
   }

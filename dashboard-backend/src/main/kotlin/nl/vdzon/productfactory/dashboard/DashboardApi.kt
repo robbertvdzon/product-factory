@@ -61,15 +61,10 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
     @GetMapping("/autonomy/human-actions")
     fun humanActions(): Any = runtime.products().flatMap { product -> runtime.humanActions(product["slug"].toString()) }
 
-    @PostMapping("/products/{slug}/shadow-iterations")
+    @PostMapping("/products/{slug}/cycles")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun startShadowIteration(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =
-        runtime.startShadowIteration(slug, request?.get("focus"))
-
-    @PostMapping("/products/{slug}/autonomous-cycles")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    fun startAutonomousCycle(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =
-        runtime.startAutonomousCycle(slug, request?.get("focus"))
+    fun startCycle(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =
+        runtime.startCycle(slug, request?.get("focus"))
 
     @PostMapping("/autonomy/human-actions/{id}/complete")
     fun completeHumanAction(@PathVariable id: Long, @RequestBody request: Map<String, String>) =

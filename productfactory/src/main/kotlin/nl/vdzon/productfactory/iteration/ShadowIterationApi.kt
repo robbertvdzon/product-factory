@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
-data class StartShadowIterationRequest(val focus: String? = null)
+data class StartCycleRequest(val focus: String? = null)
 data class ShadowIterationStarted(val iterationId: String)
 data class ShadowIterationArtifactView(
     val artifactType: String,
@@ -30,15 +30,15 @@ data class ShadowIterationArtifactView(
 
 @RestController
 class ShadowIterationController(private val service: ShadowIterationService) {
-    @PostMapping("/api/products/{slug}/shadow-iterations")
+    /**
+     * Eén actie om een productcyclus te starten. Of de uitkomst daadwerkelijk naar de Software Factory
+     * doorgezet kan worden, hangt uitsluitend af van de developmentMode-instelling van het product
+     * (autonoom = kan doorgezet worden, anders = blijft intern) — niet van een aparte keuze hier.
+     */
+    @PostMapping("/api/products/{slug}/cycles")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun start(@PathVariable slug: String, @RequestBody(required = false) request: StartShadowIterationRequest?): ShadowIterationView =
-        service.startShadow(slug, request?.focus)
-
-    @PostMapping("/api/products/{slug}/autonomous-cycles")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    fun startAutonomous(@PathVariable slug: String, @RequestBody(required = false) request: StartShadowIterationRequest?): ShadowIterationView =
-        service.startAutonomous(slug, request?.focus)
+    fun start(@PathVariable slug: String, @RequestBody(required = false) request: StartCycleRequest?): ShadowIterationView =
+        service.startCycle(slug, request?.focus)
 
     @GetMapping("/api/shadow-iterations")
     fun list(@RequestParam productSlug: String): List<ShadowIterationView> = service.list(productSlug)
@@ -61,22 +61,17 @@ class ShadowIterationService(
     private val products: ProductCatalog,
     private val events: ApplicationEventPublisher,
 ) {
+    /** Modus wordt afgeleid van de productinstelling, niet gekozen door de aanroeper. */
     @Transactional
-    fun startShadow(productSlug: String, requestedFocus: String?): ShadowIterationView = doStart(productSlug, requestedFocus, "shadow")
-
-    @Transactional
-    fun startAutonomous(productSlug: String, requestedFocus: String?): ShadowIterationView = doStart(productSlug, requestedFocus, "autonomous")
-
-    private fun doStart(productSlug: String, requestedFocus: String?, mode: String): ShadowIterationView {
-        require(mode in setOf("shadow", "autonomous"))
+    fun startCycle(productSlug: String, requestedFocus: String?): ShadowIterationView {
         val product = products.requireActive(productSlug)
-        if (mode == "autonomous") products.requireStoryPublication(productSlug)
         if (product.workspaceOwnership != "product-factory") {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Shadow-iteraties vereisen workspace-eigenaarschap product-factory")
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Productcycli vereisen workspace-eigenaarschap product-factory")
         }
         if (repository.hasActive(product.slug)) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Er loopt al een shadow-iteratie voor dit product")
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Er loopt al een productcyclus voor dit product")
         }
+        val mode = if (product.developmentMode == "autonomous") "autonomous" else "shadow"
         val focus = requestedFocus?.trim()?.ifBlank { null }
             ?: "Bepaal autonoom de belangrijkste nog onbeantwoorde productvraag op basis van missie, bestaand dossier en eerdere iteraties."
         require(focus.length <= 1000) { "Focus mag maximaal 1000 tekens bevatten" }

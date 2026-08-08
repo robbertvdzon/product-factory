@@ -74,13 +74,8 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
     fun aiCatalog(): Map<String, List<String>> = runtime.get().uri("/api/ai-catalog").retrieve()
         .body(object : ParameterizedTypeReference<Map<String, List<String>>>() {}).orEmpty()
 
-    fun startShadowIteration(slug: String, focus: String?): Any = runtime.post()
-        .uri("/api/products/{slug}/shadow-iterations", slug)
-        .body(mapOf("focus" to focus))
-        .retrieve().body(Any::class.java)!!
-
-    fun startAutonomousCycle(slug: String, focus: String?): Any = runtime.post()
-        .uri("/api/products/{slug}/autonomous-cycles", slug)
+    fun startCycle(slug: String, focus: String?): Any = runtime.post()
+        .uri("/api/products/{slug}/cycles", slug)
         .body(mapOf("focus" to focus))
         .retrieve().body(Any::class.java)!!
 

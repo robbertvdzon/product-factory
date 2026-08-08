@@ -45,7 +45,10 @@ internal object ShadowDossierRenderer {
         appendLine("sources:")
         sources.forEach { appendLine("  - ${it.url}") }
         appendLine("---")
-        appendLine(if (iteration.mode == "autonomous") "# Autonome productcyclus ${iteration.sequenceNumber}" else "# Shadow-iteratie ${iteration.sequenceNumber}")
+        appendLine(
+            if (iteration.mode == "autonomous") "# Productcyclus ${iteration.sequenceNumber}"
+            else "# Productcyclus ${iteration.sequenceNumber} (niet doorgezet)",
+        )
         appendLine()
         appendLine("**Focus:** ${iteration.focus}")
         appendLine()
@@ -129,9 +132,11 @@ internal object ShadowDossierRenderer {
         appendLine()
         appendLine(
             if (iteration.mode == "autonomous") {
-                "_Dit dossier is in autonomous mode gemaakt. Geaccepteerde stories mogen na workspace-merge naar Software Factory worden gestuurd._"
+                "_Dit product stond op autonoom toen deze cyclus draaide: geaccepteerde stories mogen na het mergen " +
+                    "van deze workspace-publicatie automatisch naar de Software Factory worden gestuurd._"
             } else {
-                "_Dit dossier is in shadow mode gemaakt. Er is geen story naar Software Factory gestuurd._"
+                "_Dit product stond niet op autonoom toen deze cyclus draaide. Deze cyclus is NIET doorgezet: er is " +
+                    "en wordt geen story naar de Software Factory gestuurd op basis van dit dossier._"
             },
         )
     }
