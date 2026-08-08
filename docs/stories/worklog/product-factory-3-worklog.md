@@ -41,3 +41,19 @@ Done / rationale:
   niet aangepast.
 - Alleen nieuwe/gewijzigde regels geformatteerd met `dart format`; ongerelateerde, historisch
   niet-geformatteerde regels in `main.dart` blijven ongewijzigd (bevestigd via diff-review).
+
+## Review (product-13)
+- Diff (main...HEAD) beperkt tot: main.dart (rij QUEUED/RUNNING → IterationProgressIndicator,
+  nieuwe widget), classification_test.dart (CANCELLED → niet-classificeerbaar), nieuwe
+  iteration_progress_indicator_test.dart (wederzijdse exclusiviteit + liveRegion), worklog.
+- Geverifieerd: `kBekendeStatuswaardenPerCategorie` mapte QUEUED/RUNNING al op
+  kOnderzoekOnvoldoende — de nieuwe indicator vervangt terecht die potentieel misleidende badge
+  voor lopende iteraties; detaildialoog (regel ~767) had al eigen, ongewijzigde progress-UI en
+  gebruikt geen ClassificationBadge, dus terecht buiten scope gelaten.
+- `dart format --set-exit-if-changed lib/main.dart` toont afwijkingen, maar diff tegen een lokaal
+  geformatteerde kopie bevestigt dat deze uitsluitend pre-existing blokken raken (snackbar/
+  dropdown/helperText rond regels 290-1458), niet het gewijzigde blok van deze story (557-603,
+  1501-1548). Geen regressie.
+- Geen wijziging aan Contracts.kt/schema/migraties; alleen bestaand `status`-veld gelezen.
+  Bevinding over status als bestaand onderscheidend signaal staat expliciet in de commit-
+  beschrijving/worklog. Akkoord.
