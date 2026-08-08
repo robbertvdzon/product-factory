@@ -10,6 +10,6 @@ class DashboardCorsConfiguration(
     @Value("\${PF_DASHBOARD_ORIGIN:http://localhost:8082}") private val dashboardOrigin: String,
 ) : WebMvcConfigurer {
     override fun addCorsMappings(registry: CorsRegistry) {
-        registry.addMapping("/api/**").allowedOrigins(dashboardOrigin).allowedMethods("GET", "POST", "OPTIONS").allowedHeaders("Authorization", "Content-Type")
+        registry.addMapping("/api/**").allowedOrigins(dashboardOrigin).allowedMethods("GET", "POST", "PUT", "OPTIONS").allowedHeaders("Authorization", "Content-Type")
     }
 }
