@@ -57,3 +57,29 @@ Done / rationale:
 - Geen wijziging aan Contracts.kt/schema/migraties; alleen bestaand `status`-veld gelezen.
   Bevinding over status als bestaand onderscheidend signaal staat expliciet in de commit-
   beschrijving/worklog. Akkoord.
+
+## Test (product-14)
+- Geen preview-omgeving/browser beschikbaar in de agentcontainer (bevestigd via `docs/factory/deployment.md`
+  en het ontbreken van SF_PREVIEW_* in `.task.md` bij pickup); geverifieerd via codeverificatie +
+  het volledige agent-runnable vangnet.
+- Diff-check: alleen `dashboard-frontend/lib/main.dart`, `dashboard-frontend/test/classification_test.dart`,
+  `dashboard-frontend/test/iteration_progress_indicator_test.dart` en deze worklog gewijzigd. Geen
+  wijziging aan `Contracts.kt`, databaseschema of migraties; geen nieuw datamodelveld.
+- Code-review: iteratierij in `main.dart` (regel ~558-590) toont voor `status` QUEUED/RUNNING nu
+  `IterationProgressIndicator` i.p.v. `ClassificationBadge`; voor elke andere status blijft exact
+  één `ClassificationBadge` staan, ongewijzigd. `IterationProgressIndicator` gebruikt
+  `Semantics(liveRegion: true)` (aria-live="polite"-equivalent). Komt overeen met de acceptance
+  criteria en de eerder vastgestelde bevinding dat `status` (QUEUED/RUNNING vs. overig) het enige
+  gebruikte onderscheidende signaal is; geen apart CANCELLED-veld.
+- Vangnet gedraaid (allemaal groen, geen failures/errors):
+  - `mvn -B --no-transfer-progress clean verify` (root): BUILD SUCCESS, alle modules groen
+    (7 backend-tests, 0 failures/errors).
+  - `flutter analyze` (dashboard-frontend): "No issues found!".
+  - `flutter test` (dashboard-frontend): alle 44 tests groen, incl. de nieuwe
+    `classification_test.dart`-case (onbekende status `CANCELLED` → `kNietClassificeerbaar`,
+    deterministisch dubbel geverifieerd) en `iteration_progress_indicator_test.dart` (wederzijdse
+    exclusiviteit tussen indicator en badge per statusgroep + liveRegion-assertie).
+  - `flutter build web` (rooktest, niet in verification.yaml maar goedkoop en build/ is gitignored):
+    slaagt, geen compile-issues.
+- Conclusie: implementatie voldoet aan alle acceptance criteria van product-factory-3; vangnet
+  volledig groen. Akkoord — door naar `tested`.
