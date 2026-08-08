@@ -51,3 +51,29 @@ Done / rationale:
   SDK zelf).
 - `.factory/verification.yaml` ongewijzigd: geen nieuwe verificatiecommando's nodig voor deze
   story.
+
+## Reviewer-notities (product-19)
+
+- Diff tegen `main` beperkt tot `dashboard-frontend/lib/classification.dart`,
+  nieuwe testfile `dashboard-frontend/test/classification_badge_disclosure_test.dart`
+  en de worklog zelf — conform scope uit `.task.md`, `main.dart` inderdaad ongewijzigd.
+- Geverifieerd: `AlertDialog`/`showDialog`/`Dialog` worden nergens gebruikt in het nieuwe
+  paneel; motivatie voor inline disclosure staat zowel als dartdoc bij `ClassificationBadge`
+  als in de worklog, conform AC.
+- Alle vijf varianten (`kIterationClassifications`) hebben eigen toetsenbord-only tests
+  (Tab-bereikbaarheid, Enter/Space-activatie, exacte disclaimerzin, Semantics-label).
+  Escape-test bevestigt zowel `expanded -> false` als focus terug op het badge.
+  Test op afwezigheid van externe link/route aanwezig.
+- Bestaande `classification_badge_widget_test.dart` blijft functioneel compatibel: die
+  test raakt alleen `label`/`find.text`, niet de nieuwe expanded/button-flags.
+- `main.dart` (regel 578-589) bevestigt dat de echte iteratierij dezelfde
+  `Wrap`-in-`ListTile.title`-structuur heeft als de testharness — geen mismatch tussen test
+  en productiecode.
+- `.factory/verification.yaml`-commando's `dashboard-flutter-analyze` en
+  `dashboard-flutter-test` dekken de gewijzigde paden (`dashboard-frontend/`); geen
+  backend-, dependency- of Dockerfile-wijzigingen die buiten het vangnet vallen.
+- [suggestie] Het uitklappaneel zit binnen dezelfde `Wrap` als de rij-titel in `main.dart`
+  (regel 578-589); bij expansie groeit de rijhoogte binnen die Wrap. Functioneel geen
+  probleem en niet in scope van deze story, maar visueel iets om in een latere UX-pass
+  naar te kijken.
+- Conclusie: geen blockers gevonden; akkoord.
