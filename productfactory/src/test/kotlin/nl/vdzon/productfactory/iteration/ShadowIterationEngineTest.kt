@@ -5,6 +5,7 @@ import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.WorkspacePublicationView
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
+import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -206,8 +207,10 @@ class ShadowIterationEngineTest(
         }
     }
 
-    class FakeWorkspacePublicationPort : WorkspacePublicationPort {
+    class FakeWorkspacePublicationPort : WorkspacePublicationPort, WorkspaceVisionPort {
         val artifacts = mutableListOf<WorkspaceArtifact>()
+        var vision: String? = null
+        override fun readVision(productSlug: String): String? = vision
         override fun publish(artifact: WorkspaceArtifact): WorkspacePublicationView {
             artifacts += artifact
             return WorkspacePublicationView(

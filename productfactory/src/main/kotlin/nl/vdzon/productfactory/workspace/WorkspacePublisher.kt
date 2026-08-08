@@ -4,6 +4,7 @@ import nl.vdzon.productfactory.contracts.WorkspacePublicationView
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
+import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -55,8 +56,25 @@ class WorkspacePublisher(
     @Value("\${product-factory.workspace.main-branch:main}") private val mainBranch: String,
     @Value("\${product-factory.workspace.remote-publication:false}") private val remotePublication: Boolean,
     @Value("\${PF_WORKSPACE_GITHUB_TOKEN:}") private val workspaceToken: String,
-) : WorkspacePublicationPort {
+) : WorkspacePublicationPort, WorkspaceVisionPort {
     private val logger = LoggerFactory.getLogger(javaClass)
+
+    override fun readVision(productSlug: String): String? {
+        val root = Path.of(workspacePath).toAbsolutePath().normalize()
+        if (!Files.isDirectory(root.resolve(".git"))) return null
+        return runCatching {
+            git(root, "checkout", mainBranch)
+            if (remotePublication) git(root, "pull", "--ff-only", "origin", mainBranch)
+            val visionPath = root.resolve("products").resolve(productSlug).resolve("product-vision.md").normalize()
+            if (!Files.isRegularFile(visionPath)) null else stripFrontMatter(Files.readString(visionPath))
+        }.onFailure { logger.warn("Kon productvisie voor {} niet lezen: {}", productSlug, it.message) }.getOrNull()
+    }
+
+    private fun stripFrontMatter(content: String): String {
+        if (!content.startsWith("---\n")) return content.trim()
+        val end = content.indexOf("\n---\n", 4)
+        return if (end == -1) content.trim() else content.substring(end + 5).trim()
+    }
 
     override fun publish(artifact: WorkspaceArtifact): WorkspacePublicationView {
         validate(artifact)
