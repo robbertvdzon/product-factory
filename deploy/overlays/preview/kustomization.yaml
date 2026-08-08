@@ -39,3 +39,17 @@ patches:
         value: ClusterIP
       - op: remove
         path: /spec/ports/0/nodePort
+  # De runtime-Route staat in productie bewust op Redirect omdat hij daar nooit rechtstreeks
+  # bezocht wordt. In preview moet een tester het mock-agent-bridge-endpoint wel kunnen aanroepen;
+  # Redirect veroorzaakt daar een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+  # cluster-intern altijd via HTTP benadert (zie docs/stappenplan.md, wildcard-routing). Allow
+  # (zoals de andere twee Routes al gebruiken) lost dat op.
+  - target:
+      group: route.openshift.io
+      version: v1
+      kind: Route
+      name: runtime
+    patch: |-
+      - op: replace
+        path: /spec/tls/insecureEdgeTerminationPolicy
+        value: Allow
