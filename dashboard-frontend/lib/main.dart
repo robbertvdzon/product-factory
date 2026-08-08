@@ -204,8 +204,11 @@ class _OverviewPageState extends State<OverviewPage> {
   int _visibleCount(String section) =>
       visibleCounts[section] ?? kInitialVisibleItems;
 
-  void _showMore(String section) => setState(
-    () => visibleCounts[section] = _visibleCount(section) + kShowMoreStep,
+  void _showMore(String section, int itemCount) => setState(
+    () => visibleCounts[section] = nextVisibleCount(
+      _visibleCount(section),
+      itemCount,
+    ),
   );
 
   /// Bouwt een overzichtslijst met de standaardbeperking (5 items, +10 per klik) en een eigen teller per sectie.
@@ -217,7 +220,7 @@ class _OverviewPageState extends State<OverviewPage> {
     itemCount: items.length,
     visibleCount: _visibleCount(section),
     itemBuilder: (_, index) => itemBuilder(items[index]),
-    onShowMore: () => _showMore(section),
+    onShowMore: () => _showMore(section, items.length),
   );
 
   @override
@@ -947,7 +950,7 @@ List<Widget> _buildStoryQueueSections(
   List<dynamic> stories,
   List<dynamic> deliveries, {
   required int Function(String section) visibleCount,
-  required void Function(String section) onShowMore,
+  required void Function(String section, int itemCount) onShowMore,
 }) {
   final deliveryByCandidate = <int, Map<String, dynamic>>{};
   for (final item in deliveries) {
@@ -997,7 +1000,7 @@ List<Widget> _buildStoryQueueSections(
           LimitedListSection(
             itemCount: items.length,
             visibleCount: visibleCount(key),
-            onShowMore: () => onShowMore(key),
+            onShowMore: () => onShowMore(key, items.length),
             itemBuilder: (context, index) {
               final story = items[index];
               final delivery = deliveryByCandidate[story['id']];

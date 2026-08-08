@@ -15,6 +15,15 @@ commands:
     argv: [flutter, test]
     workingDirectory: dashboard-frontend
     timeoutSeconds: 900
+  # De frontend-image wordt op elke PR en op main gebouwd (.github/workflows/images.yml) en is het
+  # enige pad waar pubspec.lock tegen de gepinde Flutter-base wordt opgelost. Zonder deze entry viel
+  # die build buiten het vangnet.
+  - id: dashboard-frontend-image-build
+    agentRunnable: false
+    pathPrefixes: [dashboard-frontend/]
+    argv: [docker, build, -f, dashboard-frontend/Dockerfile, dashboard-frontend]
+    workingDirectory: .
+    timeoutSeconds: 1800
   - id: agent-image-build
     agentRunnable: false
     pathPrefixes: [Dockerfile.agent, agentworker/, productfactory-common/, productfactory-contracts/, pom.xml]

@@ -36,7 +36,10 @@ class _HarnessState extends State<_Harness> {
             itemCount: labels.length,
             visibleCount: visibleCount,
             itemBuilder: (_, index) => ListTile(title: Text(labels[index])),
-            onShowMore: () => setState(() => visibleCount += kShowMoreStep),
+            onShowMore: () => setState(
+              () =>
+                  visibleCount = nextVisibleCount(visibleCount, labels.length),
+            ),
           ),
         ],
       ),
@@ -57,6 +60,32 @@ Future<void> _pumpHarness(WidgetTester tester, List<String> labels) async {
 }
 
 void main() {
+  test('nextVisibleCount hoogt op met de stap en stopt bij het aantal items', () {
+    expect(nextVisibleCount(5, 40), 15);
+    expect(nextVisibleCount(15, 40), 25);
+    // Nooit verder dan de lijst lang is, ook niet als de teller al te ver staat.
+    expect(nextVisibleCount(5, 12), 12);
+    expect(nextVisibleCount(20, 12), 12);
+    expect(nextVisibleCount(5, 0), 0);
+  });
+
+  testWidgets('een korte lijst laat de teller niet doorgroeien', (
+    tester,
+  ) async {
+    // Klik op een lijst van 8: alles zichtbaar, de teller loopt niet door naar 15.
+    await _pumpHarness(tester, _labels(8));
+    await tester.tap(find.textContaining('Meer'));
+    await tester.pump();
+    expect(find.byType(ListTile), findsNWidgets(8));
+    expect(find.textContaining('Meer'), findsNothing);
+
+    // Groeit de lijst tijdens een refresh, dan staat hij niet verder open dan aangeklikt.
+    tester.state<_HarnessState>(find.byType(_Harness)).refreshWith(_labels(40));
+    await tester.pump();
+    expect(find.byType(ListTile), findsNWidgets(8));
+    expect(find.text('Meer (nog 32)'), findsOneWidget);
+  });
+
   testWidgets('toont standaard 5 items met het resterende aantal op de knop', (
     tester,
   ) async {

@@ -69,7 +69,53 @@ Blokkerend:
   toolchain-divergentie (agentcontainer Dart 3.12 vs CI Flutter 3.44.6 vs image 3.35.0).
   Oplossing: Dockerfile-base gelijktrekken met CI (3.44.6) óf de lock terugdraaien; kies bewust en
   onderbouw het.
+Kleiner (suggestie):
+- `_showMore` liet de teller ongelimiteerd groeien; begrenzen op het aantal items.
 
+## SF-2037 (development, ronde 2 - review-bevindingen verwerkt)
 
-transitieve pakketten bijgewerkt. Bewust niet teruggedraaid, zodat een volgende `flutter test`-run in
-dezelfde workspace de worktree niet alsnog wijzigt tijdens het verzamelen van bewijs.
+Stappenplan:
+[x]: blocker pubspec.lock vs Dockerfile-base oplossen
+[x]: suggestie `_showMore` begrenzen + test
+[x]: vangnet opnieuw groen draaien
+
+### Blocker: toolchain-divergentie (opgelost via optie a)
+
+Gekozen: **Dockerfile-base gelijktrekken met de CI-toolchain**, niet de lock terugdraaien.
+
+Onderbouwing - terugdraaien werkt aantoonbaar niet. Met `git checkout main -- pubspec.lock` gevolgd
+door `flutter pub get` herschrijft pub de lock meteen weer naar exact dezelfde inhoud (`characters`
+1.4.1, `matcher` 0.12.19, `material_color_utilities` 0.13.0, `meta` 1.18.0, `test_api` 0.7.11,
+`sdks.dart >=3.10.0-0`). Dat is geen keuze van deze story: de `flutter_test` die met Flutter 3.44
+meekomt pint die pakketten. Zowel de agentcontainer als `verify.yml` (`flutter-version: 3.44.6`)
+draaien op 3.44, dus optie (b) zou bij de eerstvolgende `pub get` in CI of in een agentrun opnieuw
+stuk gaan. De echte oorzaak is de image die nog op 3.35.0 (Dart 3.9) stond.
+
+- `dashboard-frontend/Dockerfile`: base van `ghcr.io/cirruslabs/flutter:3.35.0` naar `:3.44.0`.
+  3.44.6 bestaat niet als image-tag - de tag-lijst van `ghcr.io/cirruslabs/flutter` gaat bij de
+  stabiele releases tot `3.44.0`. Zelfde Flutter-minor en zelfde Dart 3.12 als CI, dus de lock
+  wordt daar nu wel gehaald.
+- Geverifieerd zonder docker (niet beschikbaar in de agentcontainer) door de bouwstappen uit de
+  Dockerfile lokaal op Flutter 3.44.7 te draaien: `flutter build web --release --pwa-strategy=none`
+  slaagt en de cache-busting erna (`sha256sum main.dart.js`, hernoemen, `sed` in
+  `flutter_bootstrap.js`/`flutter.js`) haalt ook op 3.44 zijn eigen guard
+  `test -z "$(grep -rl 'main\.dart\.js' .)"`. De image-build zelf is dus niet in deze container
+  bewezen; dat gebeurt in `.github/workflows/images.yml`.
+- Gat in het vangnet gedicht: `.factory/verification.yaml` heeft nu
+  `dashboard-frontend-image-build` (`agentRunnable: false`, zoals `agent-image-build`), en
+  `docs/factory/development.md` beschrijft de drie plekken waar de Flutter-versie is gepind.
+
+### Suggestie: teller begrenzen
+
+- `nextVisibleCount(current, itemCount)` in `lib/limited_list.dart`: +10 per klik, maar nooit verder
+  dan het aantal items. `_showMore` in `main.dart` gebruikt hem, net als de testharness.
+  Zonder die grens stond een lijst die tussen twee refreshes krimpt en daarna weer groeit verder
+  open dan de gebruiker had aangeklikt.
+- Tests erbij: een unittest voor `nextVisibleCount` (ook de randgevallen teller-te-hoog en lege
+  lijst) en een widgettest die op een lijst van 8 klikt en daarna naar 40 laat groeien; die toont
+  nog steeds 8 items met `Meer (nog 32)`.
+
+Vangnet ronde 2 (allemaal groen):
+- `flutter analyze` in `dashboard-frontend`: "No issues found!"
+- `flutter test` in `dashboard-frontend`: 25 tests, alles geslaagd
+- `mvn -B --no-transfer-progress clean verify` vanuit de root: BUILD SUCCESS, exitcode 0

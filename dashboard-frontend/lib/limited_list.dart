@@ -6,6 +6,12 @@ const int kInitialVisibleItems = 5;
 /// Aantal items dat er per klik op 'Meer' bij komt.
 const int kShowMoreStep = 10;
 
+/// De nieuwe tellerstand na een klik op 'Meer': [kShowMoreStep] erbij, maar nooit meer dan
+/// [itemCount]. Zonder die begrenzing zou een lijst die tussen twee refreshes krimpt en daarna weer
+/// groeit ineens verder openstaan dan de gebruiker heeft aangeklikt.
+int nextVisibleCount(int current, int itemCount) =>
+    current + kShowMoreStep < itemCount ? current + kShowMoreStep : itemCount;
+
 /// Toont maximaal [visibleCount] items met daaronder een 'Meer'-knop zolang er nog items verborgen zijn.
 ///
 /// De teller zit bewust *buiten* deze widget (in de state van de pagina), zodat de auto-refresh van het
