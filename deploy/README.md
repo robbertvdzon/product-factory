@@ -38,3 +38,15 @@ Cloudflare publiceert `product-factory.vdzonsoftware.nl` naar
 `http://dashboard-frontend.product-factory.svc.cluster.local:8080` en
 `product-factory-api.vdzonsoftware.nl` naar
 `http://dashboard-backend.product-factory.svc.cluster.local:8081`.
+
+## Rechtstreekse databasetoegang vanaf het thuisnetwerk
+
+De `postgres`-Service is `NodePort` op `30432` (naast de gewone `ClusterIP`-toegang die de runtime
+intern gebruikt). Een OpenShift `Route` werkt niet voor ruwe Postgres-TCP en er is geen
+`LoadBalancer` (geen MetalLB) op deze cluster, dus dit is de LAN-only weg: alleen bereikbaar via het
+vaste node-IP `192.168.178.64` binnen het thuisnetwerk, nooit van buitenaf (geen
+routerportforwarding, los van de Cloudflare Tunnel voor de webapps).
+
+```bash
+psql "postgresql://productfactory:<wachtwoord>@192.168.178.64:30432/productfactory"
+```
