@@ -79,3 +79,21 @@ Getest:
   `productfactory-agentworker`, `productfactory-dashboard-backend`), 0 failures, 0 errors.
 - Frontend (`dashboard-frontend`) niet geraakt door deze wijziging (geen bestand in die map
   aangepast), dus `flutter analyze`/`flutter test` niet apart gedraaid voor deze story.
+
+## Review product-43
+
+- Diff exact conform scope: `ShadowSchemas.kt`, `ShadowIterationEngine.kt`,
+  `ShadowDossierRenderer.kt`, `ShadowIterationEngineTest.kt`, worklog. Geen andere bestanden
+  gewijzigd (`git status` schoon, alles gecommit).
+- `candidateKey` correct verplicht/kebab-case/uniek in `validateStories`; legacy
+  `"Kandidaat <n>"`-patroon in `dependsOn` wordt afgewezen.
+- `resolveCandidateDependencies` (ShadowDossierRenderer.kt) is een pure, kaart-gebaseerde lookup
+  (geen arrayindex) — order-independence geverifieerd met een aparte test die voorwaartse en
+  achterwaartse `linkedMapOf`-invoegvolgorde vergelijkt.
+- `applyAutonomyPolicy` terecht ongewijzigd gelaten (blijft tekstuele scan, agnostisch voor
+  dependsOn-format).
+- `story_candidate.id`, `WorkspacePublisher.kt`, `AutonomousDelivery.kt`, `StoryCandidateApi.kt`
+  niet aangeraakt — conform scope.
+- Bekende beperking (publish-pad leest dependsOn niet) expliciet gedocumenteerd in worklog.
+- Gerichte testrun: `mvn -B --no-transfer-progress -pl productfactory -am -Dtest=ShadowIterationEngineTest -Dsurefire.failIfNoSpecifiedTests=false test` → BUILD SUCCESS, 6/6 tests groen (incl. de 3 nieuwe regressietests: cross-key dependency ordeonafhankelijk, pure-helper ordeonafhankelijk, afwijzing legacy positioneel formaat).
+- Geen blockers gevonden.
