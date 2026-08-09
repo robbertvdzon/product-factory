@@ -34,7 +34,13 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen pop-upvenster of dialoog,
    `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of Escape klapt het
    paneel weer in en herstelt de focus op de badge. Een klik op de rij buiten de badge opent nog
-   steeds de detaildialoog met voortgang, artifacts en het productdossier.
+   steeds de detaildialoog met voortgang, artifacts en het productdossier. Heeft de iteratie
+   `status == 'FAILED'`, dan toont dit detaildialoog (`IterationSessionDialog`,
+   `dashboard-frontend/lib/main.dart`) direct onder het 'Opdracht'-blok een 'Foutreden'-blok met de
+   inhoud van `iteration['errorMessage']`, of exact de tekst 'Geen foutreden beschikbaar' als dat
+   veld leeg of `null` is; bij elke andere status blijft dit blok volledig verborgen. Het blok heeft
+   een expliciet `Semantics`-label `'Foutreden: <tekst>'`, zodat het als afzonderlijk betekenisvol
+   blok wordt aangekondigd door schermlezers.
 4. **Software Factory-stories** — de leveringen met externe storykey, status en fase.
 5. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
 6. **Storywachtrij** — storykandidaten verdeeld over Fout / Bezig / In wachtrij / Klaar. Is een

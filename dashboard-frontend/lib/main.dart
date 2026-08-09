@@ -887,6 +887,36 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                   ),
                   const SizedBox(height: 4),
                   SelectableText('${iteration['focus']}'),
+                  if (status == 'FAILED') ...[
+                    const SizedBox(height: 16),
+                    Builder(
+                      builder: (context) {
+                        final rawErrorMessage =
+                            '${iteration['errorMessage'] ?? ''}'.trim();
+                        final errorText = rawErrorMessage.isEmpty
+                            ? 'Geen foutreden beschikbaar'
+                            : rawErrorMessage;
+                        return Semantics(
+                          label: 'Foutreden: $errorText',
+                          child: ExcludeSemantics(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Foutreden',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 4),
+                                SelectableText(errorText),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Text(
                     'Voortgang',
