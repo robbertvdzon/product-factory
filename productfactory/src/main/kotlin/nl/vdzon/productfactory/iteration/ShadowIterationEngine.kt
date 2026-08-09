@@ -174,7 +174,7 @@ class ShadowIterationEngine(
                     productSlug = product.slug,
                     taskType = "shadow-${role.name.lowercase()}",
                     prompt = prompt,
-                    timeoutSeconds = ROLE_TIMEOUT_SECONDS,
+                    timeoutSeconds = if (role == ShadowRole.RESEARCHER) RESEARCHER_TIMEOUT_SECONDS else ROLE_TIMEOUT_SECONDS,
                     model = product.aiModel.takeUnless { it == "default" },
                     provider = product.aiProvider,
                     responseSchema = schema,
@@ -748,6 +748,10 @@ class ShadowIterationEngine(
     companion object {
         private val log = LoggerFactory.getLogger(ShadowIterationEngine::class.java)
         private const val ROLE_TIMEOUT_SECONDS = 900L
+        // RESEARCHER bekijkt de acceptatieomgeving nu via een echte (headless) browser in plaats van WebFetch
+        // (zie AgentTaskExecutor.isResearcherTask): browsernavigatie, paginalaadtijd en scriptuitvoering maken
+        // die stap merkbaar trager dan de overige, puur tekst-/toolgedreven rollen, die ruim binnen 900s blijven.
+        private const val RESEARCHER_TIMEOUT_SECONDS = 1800L
         private const val MAX_STORY_ATTEMPTS = 3
         private const val DEPENDSON_RESOLUTION_ARTIFACT_TYPE = "dependson_resolution"
         private val OWNER_ACTION_PATTERN = Regex(
