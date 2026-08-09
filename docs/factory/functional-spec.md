@@ -40,7 +40,14 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    `kClassificationColors`-kleurenpaar) — geen losse `Chip` met de ruwe backend-statuswaarde (bv.
    'NEEDS_REVISION') meer. De badge is het eerste focusbare element in het dialoog, vóór de secties
    Voortgang, agentresultaten en workspace-publicaties, en is er via toetsenbord (Tab, Enter/Spatie)
-   op dezelfde manier te bedienen als op de lijstkaart. Heeft de iteratie
+   op dezelfde manier te bedienen als op de lijstkaart. In de sectie agentresultaten toont elke
+   uitgeklapte roltegel (Onderzoeker, Product owner, UX-ontwerp, Story writer, Criticus) naast de
+   bestaande ruwe JSON ook een leesbare samenvatting van de bekende tekstvelden van die rol (bv.
+   `summary`, `findings`, `decisions`/`rationale`, `steps`, `candidates`, `issues`), direct zichtbaar
+   zonder extra klik en zonder lege of `null`-velden. Is de inhoud niet decodeerbaar of onherkend
+   (of van een retry-poging met `-2`/`-3`-suffix op `artifactType`, die dezelfde weergave als de
+   eerste poging krijgt), dan blijft uitsluitend de ruwe JSON zichtbaar, zonder dat het dialoog
+   crasht. Heeft de iteratie
    `status == 'FAILED'`, dan toont dit detaildialoog (`IterationSessionDialog`,
    `dashboard-frontend/lib/main.dart`) direct onder het 'Opdracht'-blok een 'Foutreden'-blok met de
    inhoud van `iteration['errorMessage']`, of exact de tekst 'Geen foutreden beschikbaar' als dat
