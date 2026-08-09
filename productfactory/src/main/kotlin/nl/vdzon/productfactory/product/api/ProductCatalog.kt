@@ -50,6 +50,8 @@ data class UpdateProductSettingsRequest(
     val wipLimit: Int? = null,
     val aiProvider: String? = null,
     val aiModel: String? = null,
+    val targetRepositoryName: String? = null,
+    val acceptanceUrl: String? = null,
 )
 
 data class ProductContext(
@@ -145,6 +147,8 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         val aiProvider = (request.aiProvider ?: current.aiProvider).trim()
         val aiModel = (request.aiModel ?: current.aiModel).trim()
         val iterationTimes = request.iterationTimes ?: current.iterationTimes
+        val targetRepositoryName = (request.targetRepositoryName ?: current.targetRepositoryName).trim()
+        val acceptanceUrl = request.acceptanceUrl?.trim()?.ifBlank { null } ?: current.acceptanceUrl
 
         require(developmentMode in DEVELOPMENT_MODES) { "Ongeldige ontwikkelmodus" }
         require(maxStoriesPerCycle in 1..20) { "Maximaal aantal stories per cyclus moet tussen 1 en 20 liggen" }
@@ -152,11 +156,14 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         require(AiCatalog.isValid(aiProvider, aiModel)) { "Onbekende combinatie van AI-provider '$aiProvider' en model '$aiModel'" }
         require(iterationTimes.isNotEmpty()) { "Minimaal één cyclustijd is verplicht" }
         iterationTimes.forEach { require(it.matches(TIME_OF_DAY)) { "Ongeldige cyclustijd '$it', gebruik HH:mm" } }
+        require(targetRepositoryName.matches(REPOSITORY)) { "Ongeldige repositorynaam" }
+        validateUrl(acceptanceUrl)
 
         jdbc.update(
             """update product_definition set development_mode = ?, max_stories_per_cycle = ?, wip_limit = ?,
-                ai_provider = ?, ai_model = ?, updated_at = current_timestamp where slug = ?""".trimIndent(),
-            developmentMode, maxStoriesPerCycle, wipLimit, aiProvider, aiModel, normalized,
+                ai_provider = ?, ai_model = ?, target_repository_name = ?, acceptance_url = ?, updated_at = current_timestamp
+                where slug = ?""".trimIndent(),
+            developmentMode, maxStoriesPerCycle, wipLimit, aiProvider, aiModel, targetRepositoryName, acceptanceUrl, normalized,
         )
         replaceIterationTimes(normalized, iterationTimes)
         return requireProduct(normalized)
