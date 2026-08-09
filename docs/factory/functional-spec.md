@@ -34,7 +34,13 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen pop-upvenster of dialoog,
    `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of Escape klapt het
    paneel weer in en herstelt de focus op de badge. Een klik op de rij buiten de badge opent nog
-   steeds de detaildialoog met voortgang, artifacts en het productdossier. Heeft de iteratie
+   steeds de detaildialoog met voortgang, artifacts en het productdossier. Dit detaildialoog
+   (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) toont dezelfde `ClassificationBadge`
+   met dezelfde `classifyIterationOutcome`-uitkomst als de lijstkaart-rij (identieke badge-tekst en
+   `kClassificationColors`-kleurenpaar) — geen losse `Chip` met de ruwe backend-statuswaarde (bv.
+   'NEEDS_REVISION') meer. De badge is het eerste focusbare element in het dialoog, vóór de secties
+   Voortgang, agentresultaten en workspace-publicaties, en is er via toetsenbord (Tab, Enter/Spatie)
+   op dezelfde manier te bedienen als op de lijstkaart. Heeft de iteratie
    `status == 'FAILED'`, dan toont dit detaildialoog (`IterationSessionDialog`,
    `dashboard-frontend/lib/main.dart`) direct onder het 'Opdracht'-blok een 'Foutreden'-blok met de
    inhoud van `iteration['errorMessage']`, of exact de tekst 'Geen foutreden beschikbaar' als dat
