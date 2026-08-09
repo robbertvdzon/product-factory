@@ -56,3 +56,30 @@ Done / rationale:
 - Niet gewijzigd (bewust buiten scope, conform de story): `story_candidate.id`-semantiek (nog
   steeds de auto-increment primary key), `WorkspacePublisher.kt`, `AutonomousDelivery.kt`,
   `StoryCandidateApi.kt`, hkh/hkh-autopilot en alle authenticatie-/PR-goedkeuringsflows.
+
+## Reviewer-notities (product-49)
+
+- Volledige diff (main...HEAD) bekeken: ShadowIterationEngine.kt, ShadowDossierRenderer.kt,
+  ShadowIterationApi.kt, ShadowIterationEngineTest.kt.
+- Geverifieerd dat de batch-brede `require`-afwijzing voor het legacy `"Kandidaat <n>"`-patroon in
+  `validateStories` is verwijderd, en dat `resolveDependencyReferences` eerst op `candidateKey`
+  resolveert en pas daarna op legacy batchpositie terugvalt, zonder cascade naar andere kandidaten.
+- `persistValidatedResults` slaat geblokkeerde kandidaten niet op, logt de onvertaalde waarde, en
+  legt via het nieuwe `saveArtifact(...)`/`dependson_resolution`-artefact een duurzame, doorzoekbare
+  sleutel→backlog-ID-mapping vast (ook voor niet-ACCEPT-uitkomsten, want `persistValidatedResults`
+  loopt onvoorwaardelijk). `run()` sluit geblokkeerde kandidaten terecht ook uit van `accepted`
+  (en dus van het gepubliceerde dossier).
+- `saveCandidate` gebruikt nu `GeneratedKeyHolder` en geeft `story_candidate.id` terug.
+- Beide vereiste tests aanwezig en inhoudelijk correct: "a dependsOn value that cannot be resolved to
+  a backlog-ID blocks only that candidate" en "a dependsOn value in the legacy Kandidaat N format
+  resolves via the positional fallback and is marked as such" (fixtures met 2 kandidaten, dus niet
+  zelf-referentieel). Pure-resolver-tests dekken candidateKey-lookup, legacy-fallback en onopgeloste
+  gevallen.
+- Scope gecontroleerd: geen wijzigingen in `WorkspacePublisher.kt`, `AutonomousDelivery.kt`,
+  `StoryCandidateApi.kt` of hkh/hkh-autopilot.
+- Gericht herdraaid: `mvn -B --no-transfer-progress -pl productfactory test
+  -Dtest=ShadowIterationEngineTest -Dsurefire.failIfNoSpecifiedTests=false` → BUILD SUCCESS, 9/9
+  tests groen (inclusief de 2 nieuwe). Ook `mvn -pl productfactory -am install -DskipTests` groen
+  (volledige compile van de betrokken modules); de resterende Kotlin-warnings in
+  `AutonomousDeliveryIntegrationTest.kt` zijn pre-existing en niet door deze subtaak geraakt.
+- Geen blockers gevonden. Akkoord.
