@@ -63,6 +63,15 @@ hierboven).
 > nooit in `story_candidate` belanden (zie hierboven), is `blocked` via deze API in de praktijk
 > vandaag altijd `false` bij productiedata — het veld is getest met direct geseede fixture-data,
 > niet via de volledige pijplijn.
+>
+> **Update (product-factory-11):** de `blocked`/`blockedReason`-velden die product-factory-10 aan
+> `StoryCandidateView` toevoegde, worden sindsdien ook getoond: `_buildStoryQueueSections`
+> (`dashboard-frontend/lib/main.dart`) rendert, alleen wanneer `blocked == true` en `blockedReason`
+> niet leeg is, direct onder de titel van de storykandidaat-kaart een label met icoon en de tekst
+> "Geblokkeerd: <reden>" — puur presentationeel op de al opgehaalde `/api/story-candidates`-response,
+> zonder nieuwe call of berekening. Dit is uitsluitend een frontend-weergavelaag; de backend-kant
+> (inclusief de constatering dat `blocked` in productiedata vandaag altijd `false` is, zie hierboven)
+> is door deze story niet gewijzigd.
 
 ## Uitkomst
 

@@ -184,6 +184,14 @@ beneden:
 - **Benodigde access tokens**: alleen zichtbaar zodra er iets openstaat; met een knop "Gereed
   melden" per item.
 - **Storykandidaten**: alle interne kandidaten (ook afgewezen of nog niet geleverde) met status.
+  Zit een kandidaat vast door een onopgeloste `dependsOn`-verwijzing (`blocked == true` met een
+  niet-lege `blockedReason`), dan toont de kaart direct — geen extra klik nodig — onder de titel een
+  label met icoon en de tekst "Geblokkeerd: <reden>", in hetzelfde WCAG AA-geverifieerde
+  kleurenpaar (`kGuardrailConflict`, `classification.dart`) als de classificatiebadges hierboven en
+  opvraagbaar via de semantics-tree van de kaart. Zonder blokkade of reden blijft de kaart
+  ongewijzigd; het label wordt uitsluitend uit de al opgehaalde `blocked`/`blockedReason`-velden
+  gerenderd, zonder extra netwerkverzoek (`_buildStoryQueueSections`,
+  `dashboard-frontend/lib/main.dart`).
 - **Workspace**: alle gepubliceerde artefacten (dossiers, evaluaties), aanklikbaar om de volledige
   inhoud te lezen.
 
