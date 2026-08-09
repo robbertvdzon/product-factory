@@ -13,6 +13,7 @@ internal data class ValidatedSource(
 
 internal data class ReviewedCandidate(
     val index: Int,
+    val candidateKey: String,
     val title: String,
     val description: String,
     val acceptanceCriteria: List<String>,
@@ -23,7 +24,18 @@ internal data class ReviewedCandidate(
     val reason: String,
     val fingerprint: String,
     val duplicateOfId: Long?,
+    /** Sleutels uit [dependsOn] die binnen dezelfde batch daadwerkelijk naar een candidateKey verwijzen. */
+    val resolvedDependsOn: List<String> = emptyList(),
 )
+
+/**
+ * Koppelt dependsOn-waarden aan de bijbehorende kandidaat via een candidateKey-lookup (kaart, geen
+ * arrayindex), zodat de koppeling stabiel blijft ongeacht batch- of reviewvolgorde.
+ */
+internal fun resolveCandidateDependencies(
+    candidatesByKey: Map<String, ReviewedCandidate>,
+    dependsOn: List<String>,
+): List<ReviewedCandidate> = dependsOn.mapNotNull(candidatesByKey::get)
 
 internal object ShadowDossierRenderer {
     fun render(
@@ -142,13 +154,19 @@ internal object ShadowDossierRenderer {
             appendLine()
             appendLine("### ${candidate.title}")
             appendLine()
+            appendLine("_Sleutel: `${candidate.candidateKey}`_")
+            appendLine()
             appendLine(candidate.description)
             appendLine()
             appendLine("**Acceptatiecriteria**")
             candidate.acceptanceCriteria.forEach { appendLine("- $it") }
             appendLine()
             appendLine("Bronnen: ${candidate.sourceUrls.joinToString(", ") { "[$it]($it)" }}")
-            if (candidate.dependsOn.isNotEmpty()) appendLine("\nAfhankelijkheden: ${candidate.dependsOn.joinToString()}")
+            if (candidate.dependsOn.isNotEmpty()) {
+                val resolvedTitles = candidate.resolvedDependsOn.joinToString()
+                val suffix = if (resolvedTitles.isNotBlank()) " (binnen deze batch herkend als: $resolvedTitles)" else ""
+                appendLine("\nAfhankelijkheden (candidateKey): ${candidate.dependsOn.joinToString()}$suffix")
+            }
             if (candidate.risks.isNotEmpty()) appendLine("\nRisico's: ${candidate.risks.joinToString()}")
         }
         appendLine()
