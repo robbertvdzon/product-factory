@@ -60,3 +60,30 @@ Done / rationale:
 - [info] Wijziging is puur additief: geen routes, schema, auth of PR-flow geraakt. Geen
   bugs/regressies/scope-afwijkingen gevonden.
 - Oordeel: akkoord.
+
+## Test (product-32)
+
+- Documentatie-inhoud van `docs/factory/functional-spec.md` (sectie "Status en conclusion van een
+  productcyclus") geverifieerd tegen de daadwerkelijke broncode:
+  `ShadowIterationView.status` (Contracts.kt: `status: String`, geen enum); QUEUED/RUNNING/ACCEPTED/
+  NEEDS_REVISION/REJECTED/FAILED (ShadowIterationApi.kt); geen apart `conclusion`-veld; vijf badges
+  + fallback naar `niet-classificeerbaar` kloppen 1-op-1 met `kBekendeStatuswaardenPerCategorie` en
+  `classifyIterationOutcome` in `dashboard-frontend/lib/classification.dart`; de onvoorwaardelijke
+  immutabiliteitszin klopt met de `TERMINAL_STATUSES_SQL`-guard (`'ACCEPTED', 'NEEDS_REVISION',
+  'REJECTED', 'FAILED'`) + `log.warn` in `markAccepted`/`markReviewed`/`markFailed`
+  (ShadowIterationApi.kt, regels 323-393). Alle vier acceptance-criteria-zinnen letterlijk aanwezig.
+- Volledig vangnet gedraaid en groen:
+  - `mvn -B --no-transfer-progress clean verify` (repo-root): `BUILD SUCCESS`, exitcode 0.
+    `FunctionalSpecStatusConclusionDocTest`: 4 tests, 0 failures, 0 errors. Alle overige modules
+    (productfactory, agentworker, dashboard-backend, productfactory-common) eveneens 0
+    failures/errors.
+  - `flutter analyze` (dashboard-frontend): "No issues found!", exitcode 0.
+  - `flutter test` (dashboard-frontend): "All tests passed!", 63/63, exitcode 0 (herhaalde testregels
+    in de log zijn het bekende shard-interleaving-weergaveartefact, geen echte herhalingen — zie
+    agent-tips).
+- Preview-smoketest: `https://product-factory-pr-40.vdzonsoftware.nl` → 200,
+  `https://product-factory-api-pr-40.vdzonsoftware.nl/actuator/health` → 200. Geen browsertool
+  beschikbaar in de agentcontainer; interactieve verificatie was niet nodig omdat deze story puur
+  documentatie + een backend-doctest betreft, geen UI-wijziging.
+- Geen bugs of afwijkingen gevonden. Geen code/tests gewijzigd.
+- Oordeel: `tested`.
