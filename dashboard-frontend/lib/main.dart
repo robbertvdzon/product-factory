@@ -1007,12 +1007,18 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                               children: readableFields,
                             ),
                           ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: SelectableText(
-                            _prettyJson('${artifact['contentJson']}'),
+                        if (readableFields.isNotEmpty)
+                          TechnicalDetailsToggle(
+                            key: const Key('technicalDetailsToggle'),
+                            content: _prettyJson('${artifact['contentJson']}'),
                           ),
-                        ),
+                        if (readableFields.isEmpty)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: SelectableText(
+                              _prettyJson('${artifact['contentJson']}'),
+                            ),
+                          ),
                       ],
                     );
                   }),
@@ -1060,6 +1066,61 @@ String _prettyJson(String value) {
     return const JsonEncoder.withIndent('  ').convert(jsonDecode(value));
   } catch (_) {
     return value;
+  }
+}
+
+/// Standaard ingeklapte, toetsenbord- en schermlezerbedienbare toggle voor de ruwe-JSON-weergave
+/// van een agentresultaat (product-85). `InkWell` is zelf al bereikbaar met Tab/Shift+Tab en
+/// activeerbaar met Enter/Spatie; `Semantics(expanded: ...)` is het Flutter-web-equivalent van
+/// `aria-expanded` en wordt via `MergeSemantics` samengevoegd met de knop-semantiek (focus/rol)
+/// van de onderliggende `InkWell`.
+class TechnicalDetailsToggle extends StatefulWidget {
+  const TechnicalDetailsToggle({required this.content, super.key});
+
+  final String content;
+
+  @override
+  State<TechnicalDetailsToggle> createState() => _TechnicalDetailsToggleState();
+}
+
+class _TechnicalDetailsToggleState extends State<TechnicalDetailsToggle> {
+  bool _expanded = false;
+
+  void _toggle() => setState(() => _expanded = !_expanded);
+
+  @override
+  Widget build(BuildContext context) {
+    return MergeSemantics(
+      child: Semantics(
+        expanded: _expanded,
+        button: true,
+        label: 'Toon technische details',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: _toggle,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                    const SizedBox(width: 4),
+                    const Text('Toon technische details'),
+                  ],
+                ),
+              ),
+            ),
+            if (_expanded)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SelectableText(widget.content),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
