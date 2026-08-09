@@ -70,3 +70,25 @@ Done / rationale:
   tests sluiten QUEUED/RUNNING expliciet en beargumenteerd uit als geldige pariteitscase — dus geen
   blocker voor deze subtaak, maar het is de moeite waard om in een vervolgstory te overwegen of het
   dialoog dezelfde running-conditional als de lijstkaart moet krijgen.
+
+## Test (product-74)
+
+- Diff tegen `main` geverifieerd: alleen `dashboard-frontend/lib/main.dart` (de `Chip` naar
+  `ClassificationBadge`-vervanging op regel ~836), het nieuwe testbestand
+  `test/iteration_session_dialog_classification_badge_test.dart` en de worklog. Alle vijf
+  acceptatiecriteria uit de story zijn 1-op-1 terug te vinden als aparte test-groep in dat bestand
+  (pariteit lijstkaart/dialoog, geen rauwe statuschip meer, toetsenbordnavigatie + toggle, Semantics-
+  aankondiging, WCAG-contrast >=4.5:1, focusvolgorde voor Voortgang/agentresultaten/workspace).
+- Vangnet: enige geraakte paden vallen onder `dashboard-frontend/` in `.factory/verification.yaml` ->
+  `flutter analyze` en `flutter test` zijn de toepasselijke commands (mvn-module en docker-builds
+  worden door deze diff niet geraakt).
+  - `flutter analyze`: "No issues found!" (exitcode 0).
+  - `flutter test`: "All tests passed!", 93/93 groen (exitcode 0), inclusief alle 14 nieuwe tests uit
+    `iteration_session_dialog_classification_badge_test.dart`. Geen enkele rode/geskipte test.
+- Preview-smoketest (`https://product-factory-pr-47.vdzonsoftware.nl`): frontend `/` -> 200,
+  `/actuator/health` -> 200. Geen browsertool in de agentcontainer beschikbaar (bekend, zie agent-tip
+  'dashboard-frontend-preview-now-available'), dus interactieve/toetsenbord-verificatie in de preview
+  zelf is niet uitgevoerd; leunt op de widget-tests hierboven die exact dit gedrag (Tab/Enter/Space,
+  Semantics, focusvolgorde) simuleren.
+- Geen bugs gevonden. Geen tijdelijke testdata aangemaakt, geen code/tests gewijzigd.
+- Oordeel: `tested`.
