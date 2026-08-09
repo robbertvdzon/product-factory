@@ -175,7 +175,13 @@ beneden:
   naar een externe iteratielog-route. Aanklikken van de rij buiten de badge opent nog steeds een
   detailscherm met de opdracht, alle vijf agentstappen (status, start-/eindtijd, foutmelding), het
   volledige gepubliceerde dossier en de ruwe JSON-output per rol — dit scherm ververst zichzelf
-  elke 3 seconden zolang de cyclus loopt. De weergave van de workspace-publicatie/PR-referentie
+  elke 3 seconden zolang de cyclus loopt. Dit detailscherm (`IterationSessionDialog`,
+  `dashboard-frontend/lib/main.dart`) toont bovenaan dezelfde `ClassificationBadge` (zelfde
+  `classifyIterationOutcome`-uitkomst, zelfde badge-tekst en `kClassificationColors`-kleurenpaar) als
+  de lijstkaart-rij, in plaats van de ruwe backend-statuswaarde (bv. 'NEEDS_REVISION') als losse
+  `Chip`; de badge is er het eerste focusbare element, vóór Voortgang/agentresultaten/
+  workspace-publicaties, en met toetsenbord (Tab, Enter/Spatie) op dezelfde manier bedienbaar als op
+  de lijstkaart. De weergave van de workspace-publicatie/PR-referentie
   (`workspacePullRequestUrl`/`workspaceCommitSha`) in dit detailscherm is door de badge-/
   indicator-toevoeging ongewijzigd gebleven. Heeft de iteratie zelf `status == 'FAILED'`, dan toont
   dit detailscherm (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) direct onder het

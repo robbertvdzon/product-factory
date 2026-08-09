@@ -833,7 +833,13 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Chip(label: Text(status)),
+                      ClassificationBadge(
+                        classification: classifyIterationOutcome(
+                          status: iteration['status'] as String?,
+                          criticVerdict: iteration['criticVerdict'] as String?,
+                          errorMessage: iteration['errorMessage'] as String?,
+                        ),
+                      ),
                       Chip(label: Text(_deliveryLabel('${iteration['mode']}'))),
                       if (currentRole != null)
                         Chip(label: Text('bezig: $currentRole')),
