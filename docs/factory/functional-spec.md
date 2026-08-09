@@ -37,7 +37,14 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    steeds de detaildialoog met voortgang, artifacts en het productdossier.
 4. **Software Factory-stories** — de leveringen met externe storykey, status en fase.
 5. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
-6. **Storywachtrij** — storykandidaten verdeeld over Fout / Bezig / In wachtrij / Klaar.
+6. **Storywachtrij** — storykandidaten verdeeld over Fout / Bezig / In wachtrij / Klaar. Is een
+   kandidaat geblokkeerd door een onopgeloste `dependsOn`-verwijzing (`blocked == true` met een
+   niet-lege `blockedReason`), dan toont de kaart direct — zonder extra klik — onder de titel een
+   label met icoon en de tekst "Geblokkeerd: <reden>", in het bestaande WCAG AA-contrasterende
+   kleurenpaar `kGuardrailConflict` (`classification.dart`) en opvraagbaar via de semantics-tree
+   van de kaart. Ontbreekt de blokkade of de reden, dan blijft de kaart ongewijzigd; er wordt geen
+   extra data opgehaald voor dit label (`_buildStoryQueueSections`,
+   `dashboard-frontend/lib/main.dart`).
 7. **Workspace** — gepubliceerde artifacts, klikbaar om de inhoud te tonen.
 
 ### Start- en doorlooptijd van een productcyclus
