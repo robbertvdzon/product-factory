@@ -48,6 +48,13 @@
 
 ## Bekende valkuilen
 
+- De conclusie van een `shadow_iteration` (kolommen `status`/`critic_verdict`) is write-once zodra
+  de iteratie een terminale staat bereikt (`ACCEPTED`/`NEEDS_REVISION`/`REJECTED`/`FAILED`):
+  `markAccepted`/`markReviewed`/`markFailed` in `ShadowIterationRepository`
+  (`productfactory/.../iteration/ShadowIterationApi.kt`) hebben een `and status not in (...)`-guard
+  in hun `WHERE`-clausule, zodat een tweede schrijfpoging 0 rijen raakt in plaats van de bestaande
+  conclusie stilzwijgend te overschrijven; zo'n genegeerde poging wordt gelogd (`log.warn`, met
+  iteratie-id).
 - `WorkspacePublicationView` heeft geen tijdstempel; die lijst kan dus niet op 'nieuwste eerst'
   gesorteerd worden en houdt de volgorde van de backend.
 - Widgettests met lange lijsten hebben een hoog testvenster nodig (`tester.view.physicalSize`), anders
