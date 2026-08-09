@@ -518,7 +518,7 @@ class AutonomousDeliveryService(
             val response = client.createStory(
                 SoftwareFactoryStoryRequest(
                     product.slug, product.softwareFactoryProjectKey, candidate.title,
-                    storyDescription(candidate), product.targetRepositoryName, product.aiProvider, product.aiModel,
+                    storyDescription(candidate), product.softwareFactoryProjectKey, product.aiProvider, product.aiModel,
                     candidate.workspaceRunId, candidate.workspaceCommitSha, candidate.artifactPath,
                 ),
                 "${candidate.productSlug}:candidate:${candidate.candidateId}",
