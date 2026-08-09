@@ -34,6 +34,7 @@ publiceren; tijdens slaapstand of uitschakelen rapporteert de backend de worker 
 - [Modulegrenzen](docs/architecture/modules.md)
 - [Functioneel overzicht: wat doet een productcyclus precies](docs/architecture/functioneel-overzicht.md)
 - [Productagents in shadow mode](docs/architecture/shadow-mode.md)
+- [dependsOn-datamodel van storykandidaten](docs/architecture/dependson-datamodel.md)
 - [Lokale ontwikkeling](docs/development/local-development.md)
 - [OpenShift-deployment](docs/deployment/openshift.md)
 - [Deployment, secrets en databasetoegang (lokaal en productie)](deploy/README.md)
