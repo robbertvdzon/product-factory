@@ -201,6 +201,25 @@ class AgentContractTest {
         assertEquals("""{"greeting": "hoi", "nested": {"a": 1}}""", result.summary)
     }
 
+    @Test fun `claude result parsing prefers the last valid json object when the model thinks out loud first`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-parse-multi-json"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val task = AgentTask("run-7b", "hkh-autopilot", "research", "Onderzoek", responseSchema = """{"type":"object"}""")
+        val rawResult = "Kladversie: {\"greeting\": \"concept\"}\n\nHet definitieve antwoord: {\"greeting\": \"definitief\"}"
+        val envelope = jacksonObjectMapper().writeValueAsString(
+            mapOf("type" to "result", "subtype" to "success", "is_error" to false, "result" to rawResult),
+        )
+
+        val result = executor.parseResult(task, AgentCommandResult(0, false, envelope))
+
+        assertEquals("COMPLETED", result.status)
+        assertEquals("""{"greeting": "definitief"}""", result.summary)
+    }
+
     @Test fun `claude result parsing fails when is_error is set`() {
         val executor = ClaudeAgentTaskExecutor(
             AgentWorkerSettings(

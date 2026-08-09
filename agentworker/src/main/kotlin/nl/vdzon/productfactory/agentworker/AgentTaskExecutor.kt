@@ -161,41 +161,57 @@ class ClaudeAgentTaskExecutor(
             return failed(task, if (subtype != "success") "Claude-taak mislukte ($subtype): $reason" else "Claude-taak mislukte: $reason")
         }
         if (task.responseSchema == null) return AgentResult(task.runId, "COMPLETED", resultText, completedAt = Instant.now())
-        // Bij --json-schema levert Claude de gevalideerde data in het aparte "structured_output"-veld;
-        // "result" blijft het vrije-tekst-antwoord (vaak een samenvatting in plaats van de JSON zelf).
+        // Bij --json-schema levert Claude de gevalideerde data doorgaans in het aparte "structured_output"-
+        // veld; "result" blijft het vrije-tekst-antwoord. Maar --json-schema dwingt dit CLI-side niet af, en
+        // Claude schrijft met enige regelmaat gewoon een prozasamenvatting terug in plaats van dat veld te
+        // vullen. Val dan terug op het laatste geldige JSON-object dat ergens in "result" staat (modellen
+        // "denken hardop" soms in eerdere JSON-achtige tussenstukken vóór het uiteindelijke antwoord).
         val structuredOutput = envelope.path("structured_output").takeIf { it.isObject }
         val structured = structuredOutput?.let { mapper.writeValueAsString(it) }
-            ?: asJsonObject(resultText)
+            ?: lastJsonObject(resultText)
             ?: return failed(task, "Claude gaf geen valide JSON volgens het schema terug: ${resultText.take(500)}")
         return AgentResult(task.runId, "COMPLETED", structured, completedAt = Instant.now())
     }
 
-    /** `--json-schema` dwingt de uiteindelijke JSON niet CLI-side af; parseer strikt, val anders terug op het eerste JSON-object in de tekst. */
-    private fun asJsonObject(text: String): String? {
+    /**
+     * Doorzoekt tekst op alle top-level JSON-objecten en geeft de laatst gevonden geldige terug in plaats
+     * van de eerste — een tussentijdse JSON-achtige gedachte eerder in de tekst mag het echte antwoord
+     * verderop niet verdringen.
+     */
+    private fun lastJsonObject(text: String): String? {
         runCatching { mapper.readTree(text) }.getOrNull()?.takeIf { it.isObject }?.let { return text }
-        val start = text.indexOf('{')
-        if (start < 0) return null
-        var depth = 0
-        var inString = false
-        var escaped = false
-        for (index in start until text.length) {
-            val character = text[index]
-            when {
-                escaped -> escaped = false
-                inString && character == '\\' -> escaped = true
-                character == '"' -> inString = !inString
-                inString -> Unit
-                character == '{' -> depth++
-                character == '}' -> {
-                    depth--
-                    if (depth == 0) {
-                        val candidate = text.substring(start, index + 1)
-                        return runCatching { mapper.readTree(candidate) }.getOrNull()?.takeIf { it.isObject }?.let { candidate }
+        var searchFrom = 0
+        var found: String? = null
+        while (true) {
+            val start = text.indexOf('{', searchFrom)
+            if (start < 0) break
+            var depth = 0
+            var inString = false
+            var escaped = false
+            var end = -1
+            for (index in start until text.length) {
+                val character = text[index]
+                when {
+                    escaped -> escaped = false
+                    inString && character == '\\' -> escaped = true
+                    character == '"' -> inString = !inString
+                    inString -> Unit
+                    character == '{' -> depth++
+                    character == '}' -> {
+                        depth--
+                        if (depth == 0) {
+                            end = index
+                            break
+                        }
                     }
                 }
             }
+            if (end < 0) break
+            val candidate = text.substring(start, end + 1)
+            if (runCatching { mapper.readTree(candidate) }.getOrNull()?.isObject == true) found = candidate
+            searchFrom = end + 1
         }
-        return null
+        return found
     }
 
     private fun hasClaudeSubscriptionCredentials(): Boolean =
