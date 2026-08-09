@@ -43,3 +43,30 @@ Done / rationale:
 - `dart format` alleen op de aangepaste bestanden gedraaid; één ongerelateerde cosmetische
   regelherformattering in `main.dart` (buiten de gewijzigde sectie) handmatig teruggedraaid om de
   diff beperkt te houden (zie agent-tip 'main-dart-niet-dart-formatted').
+
+## Review (product-73)
+
+- Diff tegen `main` beperkt tot `dashboard-frontend/lib/main.dart` (regel ~836), het nieuwe
+  testbestand en deze worklog. Geen ongerelateerde bestanden geraakt; overige chips (delivery-mode,
+  'bezig: rol') ongewijzigd, `classification.dart` niet aangeraakt. `pubspec.lock` ongewijzigd (geen
+  toolchain-divergentierisico).
+- Zelf gericht geverifieerd i.p.v. de developer-claim alleen op prijs te nemen:
+  `flutter test test/iteration_session_dialog_classification_badge_test.dart` → 14/14 groen;
+  volledige `flutter test` → 93/93 groen; `flutter analyze lib/main.dart
+  test/iteration_session_dialog_classification_badge_test.dart` → geen issues. Dit dekt alle vijf
+  acceptatiecriteria (pariteit, geen rauwe Chip meer, toetsenbord, Semantics, contrast, focusvolgorde).
+- `dart format --set-exit-if-changed lib/main.dart` geeft wel een diff, maar die zit uitsluitend op
+  regel ~1150 (`isBlocked`), ver buiten de gewijzigde `IterationSessionDialog`-sectie — bekend
+  pre-existing patroon (agent-tip 'flutter-dart-format-main-dart-diff-triage'), geen regressie van
+  deze subtaak.
+- [suggestie] De nieuwe `ClassificationBadge` in het dialoog wordt onvoorwaardelijk getoond, ook
+  tijdens QUEUED/RUNNING; de lijstkaart toont dan i.p.v. de badge een `IterationProgressIndicator`
+  (main.dart:589-591). Omdat `classifyIterationOutcome` QUEUED/RUNNING bewust op
+  `onderzoek-onvoldoende` mapt (pre-existing gedrag in `classification.dart`, niet gewijzigd door
+  deze story), toont het dialoog nu tijdens een lopende/wachtende cyclus een badge die suggereert dat
+  het onderzoek al ontoereikend was, terwijl de cyclus nog moet beginnen of loopt (er staat wel al een
+  aparte `LinearProgressIndicator` + toelichtingstekst onder de Wrap). De storyscope vroeg letterlijk
+  om vervanging van de Chip door de badge zonder een running-uitzondering te noemen, en de nieuwe
+  tests sluiten QUEUED/RUNNING expliciet en beargumenteerd uit als geldige pariteitscase — dus geen
+  blocker voor deze subtaak, maar het is de moeite waard om in een vervolgstory te overwegen of het
+  dialoog dezelfde running-conditional als de lijstkaart moet krijgen.
