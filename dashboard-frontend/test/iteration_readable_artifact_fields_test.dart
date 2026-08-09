@@ -97,6 +97,16 @@ Future<void> _expandArtifactTile(WidgetTester tester, String roleLabel) async {
   await tester.pumpAndSettle();
 }
 
+/// De rauwe JSON staat, wanneer er leesbare velden zijn, achter een ingeklapte
+/// 'Toon technische details'-toggle; klap die eerst uit voordat je op rauwe-JSON-tekst matcht.
+Future<void> _expandTechnicalDetails(WidgetTester tester) async {
+  final toggle = find.text('Toon technische details');
+  await tester.ensureVisible(toggle);
+  await tester.pump();
+  await tester.tap(toggle);
+  await tester.pumpAndSettle();
+}
+
 /// De dialoog kan meer content bevatten dan het standaard 800x600-testvenster (bv. het FAILED-
 /// foutredenblok samen met een uitgeklapte artefacttegel); vergroot het venster zodat een
 /// `ListView(children:...)` niet-zichtbare content ook daadwerkelijk bouwt (sliver-cache-extent).
@@ -157,7 +167,9 @@ void main() {
       // Lege 'inspiration'-array levert geen kopje op (AC4).
       expect(find.text('Inspiratie'), findsNothing);
 
-      // De rauwe-JSON-weergave blijft bestaan naast de leesbare tekst (AC2).
+      // De rauwe-JSON-weergave blijft bestaan naast de leesbare tekst, achter de toggle (AC1/AC2).
+      expect(find.textContaining('"summary"'), findsNothing);
+      await _expandTechnicalDetails(tester);
       expect(find.textContaining('"summary"'), findsOneWidget);
     },
   );
@@ -232,6 +244,7 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Samenvatting'), findsOneWidget);
       expect(find.text('Bevindingen'), findsNothing);
+      await _expandTechnicalDetails(tester);
       expect(find.textContaining('"findings"'), findsOneWidget);
     },
   );
