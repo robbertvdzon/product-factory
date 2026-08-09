@@ -43,3 +43,20 @@ Done / rationale:
   gewijzigd in deze subtaak.
 - `.factory/verification.yaml` niet gewijzigd: de nieuwe testklasse valt al onder de bestaande
   `repository-maven-verify`-entry (pathPrefix `productfactory/`), en er is geen nieuw command nodig.
+
+## Review (product-31)
+
+- [info] Alle vier vereiste elementen in `docs/factory/functional-spec.md` geverifieerd tegen de
+  bevestigde code: `ShadowIterationView.status` (Contracts.kt, `status: String`, geen enum) met
+  QUEUED/RUNNING (lopend) en ACCEPTED/NEEDS_REVISION/REJECTED/FAILED (voltooid); geen apart
+  `conclusion`-veld, badges + fallback naar `niet-classificeerbaar` kloppen met
+  `classification.dart` (`kBekendeStatuswaardenPerCategorie`, `classifyIterationOutcome`); de
+  onvoorwaardelijke immutabiliteitszin klopt met de `TERMINAL_STATUSES_SQL`-guard + `log.warn` in
+  `ShadowIterationApi.kt` (regels 323-393) en met de bevestigde `guard-added`-uitkomst in
+  `product-factory-5-worklog.md`.
+- [info] `FunctionalSpecStatusConclusionDocTest.kt` dekt de drie vereiste kernzinnen met
+  whitespace-genormaliseerde matches; valt onder bestaande `repository-maven-verify` (pathPrefix
+  `productfactory/`), geen wijziging aan `.factory/verification.yaml` nodig.
+- [info] Wijziging is puur additief: geen routes, schema, auth of PR-flow geraakt. Geen
+  bugs/regressies/scope-afwijkingen gevonden.
+- Oordeel: akkoord.
