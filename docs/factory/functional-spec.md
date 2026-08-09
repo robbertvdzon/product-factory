@@ -60,6 +60,38 @@ overleeft de auto-refresh: een uitgeklapte lijst blijft uitgeklapt en nieuwe ite
 Lijsten met een bruikbaar tijdstempel staan gesorteerd op nieuwste eerst; workspace-publicaties hebben geen
 tijdstempel en houden de volgorde van de backend.
 
+## Status en conclusion van een productcyclus
+
+Dit blok legt vast wat "status" en "conclusion" van een productcyclus (shadow iteration) betekenen
+en hoe ze zich tot elkaar verhouden, als zelfstandige uitleg naast de badge-beschrijving hierboven.
+
+- **Status is altijd óf lopend, óf voltooid — nooit iets ertussenin.** Het bestaande `status`-veld
+  (`ShadowIterationView.status`, `productfactory-contracts/.../Contracts.kt`) kent de ruwe waarden
+  QUEUED, RUNNING, ACCEPTED, NEEDS_REVISION, REJECTED en FAILED. QUEUED en RUNNING zijn **lopend**;
+  ACCEPTED, NEEDS_REVISION, REJECTED en FAILED zijn **voltooid**. Het eindoordeel (conclusion) is
+  pas relevant en geldig zodra de status voltooid is; zolang een iteratie nog loopt, bestaat er nog
+  geen conclusion om te tonen.
+- **Er bestaat geen apart `conclusion`-veld in het datamodel.** De term "conclusion" verwijst naar
+  het geheel van de bestaande velden `status`, `criticVerdict` (en `errorMessage` bij een FAILED
+  iteratie), samen vertaald naar één van de vijf vaste badges — `onderzoek-onvoldoende`,
+  `guardrail-conflict`, `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` — via
+  `classifyIterationOutcome` in `dashboard-frontend/lib/classification.dart`. Dit wijkt af van een
+  eventueel aspirational onderzoeksmodel waarin "conclusion" als apart databaseveld wordt
+  gesuggereerd: dat veld bestaat niet en is ook niet nodig, omdat `status`/`criticVerdict`/
+  `errorMessage` de conclusion samen al volledig bepalen.
+- **Een tijdens uitvoering onderbroken iteratie wordt automatisch geclassificeerd, zonder apart
+  menselijk besluitmoment.** Er bestaat geen apart CANCELLED-statusveld voor dit geval. Zodra de
+  ruwe `status`-waarde niet QUEUED/RUNNING is en niet voorkomt in de bekende categorieën
+  (`kBekendeStatuswaardenPerCategorie` in `classification.dart`), valt `classifyIterationOutcome`
+  vanzelf terug op de badge `niet-classificeerbaar` — zonder dat iemand daar apart over hoeft te
+  beslissen.
+- **Het eindoordeel van een iteratie wijzigt, na vaststelling, niet meer.** Dit geldt
+  onvoorwaardelijk: `markAccepted`, `markReviewed` en `markFailed` in
+  `productfactory/.../ShadowIterationApi.kt` weigeren sindsdien een tweede schrijfpoging op
+  `status`/`critic_verdict` zodra een iteratie al in een terminale staat staat (voorwaarde
+  `... where id = ? and status not in (TERMINAL_STATUSES_SQL)`), en loggen een genegeerde poging
+  als `log.warn` met het betrokken iteratie-id.
+
 ## Testerafspraken
 
 Een testerresultaat bereikt alleen `tested` met compleet groen machinebewijs uit
