@@ -151,7 +151,64 @@ class ShadowIterationEngineTest(
         assertEquals("COMPLETED", researcherSteps[1].status)
     }
 
-    enum class Scenario { ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE, RESEARCH_RETRY_THEN_ACCEPT }
+    @Test
+    fun `two candidates referencing each other by candidateKey resolve correctly regardless of batch order`() {
+        bridge.scenario = Scenario.CROSS_KEY_DEPENDENCY
+        val iteration = repository.create("hkh-autopilot", "Koppel twee onderling afhankelijke kandidaten via hun candidateKey")
+        engine.run(iteration.id)
+
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", iteration.id).status)
+        val dossier = workspace.artifacts.single().content
+        // De eerste kandidaat in de batch (index 0, "locatie-broncontrole") hangt af van de kandidaat die
+        // ná hem in de array staat (index 1, "locatie-verhaal-basis"): dit kan alleen correct oplossen via
+        // een candidateKey-lookup, niet via een op arrayvolgorde/positie gebaseerde koppeling.
+        assertTrue(dossier.contains("Sleutel: `locatie-broncontrole`"))
+        assertTrue(dossier.contains("Sleutel: `locatie-verhaal-basis`"))
+        assertTrue(dossier.contains("Afhankelijkheden (candidateKey): locatie-verhaal-basis (binnen deze batch herkend als: locatie-verhaal-basis)"))
+        assertTrue(dossier.contains("Afhankelijkheden (candidateKey): locatie-broncontrole (binnen deze batch herkend als: locatie-broncontrole)"))
+    }
+
+    @Test
+    fun `resolveCandidateDependencies looks up by candidateKey regardless of map insertion order`() {
+        val a = ReviewedCandidate(
+            0, "kandidaat-a", "Kandidaat A", "Omschrijving A", listOf("criterium"), listOf("https://bron.example/"),
+            listOf("kandidaat-b"), listOf(), "ACCEPT", "ok", "fingerprint-a", null,
+        )
+        val b = ReviewedCandidate(
+            1, "kandidaat-b", "Kandidaat B", "Omschrijving B", listOf("criterium"), listOf("https://bron.example/"),
+            listOf("kandidaat-a"), listOf(), "ACCEPT", "ok", "fingerprint-b", null,
+        )
+
+        val forwardOrder = linkedMapOf(a.candidateKey to a, b.candidateKey to b)
+        val reverseOrder = linkedMapOf(b.candidateKey to b, a.candidateKey to a)
+
+        assertEquals(listOf(b), resolveCandidateDependencies(forwardOrder, a.dependsOn))
+        assertEquals(listOf(b), resolveCandidateDependencies(reverseOrder, a.dependsOn))
+        assertEquals(listOf(a), resolveCandidateDependencies(forwardOrder, b.dependsOn))
+        assertEquals(listOf(a), resolveCandidateDependencies(reverseOrder, b.dependsOn))
+    }
+
+    @Test
+    fun `dependsOn using the old positional Kandidaat N format is rejected`() {
+        bridge.scenario = Scenario.LEGACY_POSITIONAL_DEPENDSON
+        val iteration = repository.create("hkh-autopilot", "Wijs een verouderde positionele dependsOn-verwijzing af")
+
+        val failure = runCatching { engine.run(iteration.id) }.exceptionOrNull()
+        assertTrue(failure != null && (failure.message ?: "").contains("Kandidaat"))
+        assertEquals(
+            0,
+            jdbc.queryForObject(
+                "select count(*) from story_candidate where iteration_id = ?",
+                Int::class.java,
+                iteration.id,
+            ),
+        )
+    }
+
+    enum class Scenario {
+        ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE,
+        RESEARCH_RETRY_THEN_ACCEPT, CROSS_KEY_DEPENDENCY, LEGACY_POSITIONAL_DEPENDSON,
+    }
 
     class FakeShadowAgentBridge : ShadowAgentBridge {
         var scenario = Scenario.ACCEPT
@@ -196,8 +253,40 @@ class ShadowIterationEngineTest(
                     "accessibility":["Alle onderdelen zijn met toetsenbord bereikbaar."],
                     "privacyConsiderations":["De flow vereist geen locatiehistorie of gebruikersprofiel."]
                 }"""
-                "story_writer" -> """{
+                "story_writer" -> if (scenario == Scenario.CROSS_KEY_DEPENDENCY) """{
+                    "candidates":[
+                      {
+                        "candidateKey":"locatie-broncontrole",
+                        "title":"Locatie broncontrole",
+                        "description":"Controleer per historische locatie of de bron- en rechteninformatie klopt voordat die getoond wordt.",
+                        "acceptanceCriteria":["De rechtenindicatie staat naast de bron"],
+                        "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                        "dependsOn":["locatie-verhaal-basis"],
+                        "risks":["Bronrechten kunnen per object verschillen"]
+                      },
+                      {
+                        "candidateKey":"locatie-verhaal-basis",
+                        "title":"Locatie verhaal basis",
+                        "description":"Toon voor één historische locatie een kort verhaal met herleidbare bron- en rechteninformatie.",
+                        "acceptanceCriteria":["De gebruiker ziet de bron-URL"],
+                        "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                        "dependsOn":["locatie-broncontrole"],
+                        "risks":["Bronrechten kunnen per object verschillen"]
+                      }
+                    ]
+                }""" else if (scenario == Scenario.LEGACY_POSITIONAL_DEPENDSON) """{
                     "candidates":[{
+                      "candidateKey":"bronnenkaart-voor-locatie",
+                      "title":"Bronnenkaart voor één locatie",
+                      "description":"Toon voor één historische locatie een verhaal met herleidbare bron- en rechteninformatie.",
+                      "acceptanceCriteria":["De gebruiker ziet de bron-URL", "De rechtenindicatie staat naast de bron"],
+                      "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                      "dependsOn":["Kandidaat 0"],
+                      "risks":["Bronrechten kunnen per object verschillen"]
+                    }]
+                }""" else """{
+                    "candidates":[{
+                      "candidateKey":"bronnenkaart-voor-locatie",
                       "title":"${when {
                           different -> "Brede erfgoedportal"
                           scenario == Scenario.REVISE_THEN_ACCEPT -> "Herziene bronnenkaart voor één locatie"
@@ -222,7 +311,15 @@ class ShadowIterationEngineTest(
                       "sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Bronrechten kunnen per object verschillen"]
                     }]
                 }"""
-                "critic" -> if (scenario == Scenario.WARNING_ONLY_REVISE) """{
+                "critic" -> if (scenario == Scenario.CROSS_KEY_DEPENDENCY) """{
+                    "overallVerdict":"ACCEPT","summary":"Beide onderling afhankelijke kandidaten zijn klein en herleidbaar.",
+                    "issues":[],
+                    "candidateReviews":[
+                      {"candidateIndex":0,"verdict":"ACCEPT","reason":"Kleine toetsbare scope met expliciete broninformatie."},
+                      {"candidateIndex":1,"verdict":"ACCEPT","reason":"Kleine toetsbare scope met expliciete broninformatie."}
+                    ],
+                    "requiredChanges":[]
+                }""" else if (scenario == Scenario.WARNING_ONLY_REVISE) """{
                     "overallVerdict":"REVISE","summary":"De kandidaat is veilig, maar kan later preciezer.",
                     "issues":[{"severity":"WARNING","category":"ACCESSIBILITY","description":"Controleer de aankondiging ook handmatig.","candidateIndex":0}],
                     "candidateReviews":[{"candidateIndex":0,"verdict":"REVISE","reason":"Leg de waarschuwing vast voor vervolgwerk."}],

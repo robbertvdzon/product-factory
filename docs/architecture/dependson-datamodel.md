@@ -7,10 +7,24 @@ publish-mechanism-supports-symbolic-keys: false
 # `dependsOn`-datamodel in storykandidaten
 
 Deze pagina legt vast hoe het `dependsOn`-veld van storykandidaten in de shadow-iteratiecyclus
-op dit moment daadwerkelijk werkt: is een verwijzing zoals "Kandidaat 0" een stabiele sleutel of
-een tijdelijk, batch-relatief volgnummer? De inspectie is uitsluitend een leesactie; er is geen
-productiecode gewijzigd. Latere stories die hierop voortbouwen kunnen deze pagina herkennen aan de
-batchsleutel `verify-dependson-datamodel` (zie YAML-frontmatter hierboven).
+op het moment van inspectie daadwerkelijk werkte: is een verwijzing zoals "Kandidaat 0" een
+stabiele sleutel of een tijdelijk, batch-relatief volgnummer? De inspectie zelf was uitsluitend een
+leesactie; er is toen geen productiecode gewijzigd. Latere stories die hierop voortbouwen kunnen
+deze pagina herkennen aan de batchsleutel `verify-dependson-datamodel` (zie YAML-frontmatter
+hierboven).
+
+> **Update (product-factory-8):** de hieronder beschreven `outcome: uses-positional-index` is
+> inmiddels opgelost. Elk storykandidaat krijgt sindsdien bij aanmaak een verplichte, stabiele
+> `candidateKey` (kebab-case-slug, uniek binnen de batch; schema in `ShadowSchemas.kt`, validatie
+> in `ShadowIterationEngine.validateStories`), en `dependsOn`-verwijzingen binnen dezelfde batch
+> worden via die sleutel gekoppeld (`resolveCandidateDependencies` in `ShadowDossierRenderer.kt`)
+> in plaats van via de arrayvolgorde. Het oude, batch-relatieve patroon `"Kandidaat <n>"` wordt nu
+> actief afgewezen. De sectie "Publicatiepad: leest `dependsOn` nergens" hieronder blijft wél
+> onverkort van toepassing: `WorkspacePublisher.kt`, `AutonomousDelivery.kt` en
+> `StoryCandidateApi.kt` lezen `dependsOn` nog steeds nergens — `publish-mechanism-supports-symbolic-keys`
+> stond op `false` en is niet alsnog gebouwd, dat viel expliciet buiten de scope van
+> product-factory-8. De rest van dit document beschrijft, ongewijzigd, de situatie zoals die vóór
+> product-factory-8 was en dient als historische onderbouwing van dat besluit.
 
 ## Uitkomst
 

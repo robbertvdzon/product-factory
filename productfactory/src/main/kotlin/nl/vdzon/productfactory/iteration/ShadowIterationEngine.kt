@@ -300,11 +300,20 @@ class ShadowIterationEngine(
     private fun validateStories(output: JsonNode, maximum: Int, sourceUrls: Set<String>) {
         val candidates = output.path("candidates")
         require(candidates.size() in 1..maximum.coerceAtMost(3)) { "Ongeldig aantal storykandidaten" }
+        val candidateKeys = mutableSetOf<String>()
         candidates.forEach { candidate ->
             require(candidate.path("title").asText().isNotBlank() && candidate.path("description").asText().isNotBlank()) { "Storytitel en omschrijving zijn verplicht" }
             require(candidate.path("acceptanceCriteria").size() > 0) { "Acceptatiecriteria ontbreken" }
             require(textList(candidate.path("sourceUrls")).let { it.isNotEmpty() && it.all(sourceUrls::contains) }) {
                 "Storykandidaten moeten naar onderzoeksbronnen verwijzen"
+            }
+            val candidateKey = candidate.path("candidateKey").asText().trim()
+            require(candidateKey.isNotBlank() && CANDIDATE_KEY_PATTERN.matches(candidateKey)) {
+                "candidateKey is verplicht en moet een kebab-case-slug zijn (bv. 'stabiele-review-sleutel')"
+            }
+            require(candidateKeys.add(candidateKey)) { "candidateKey '$candidateKey' is niet uniek binnen deze batch" }
+            require(textList(candidate.path("dependsOn")).none { LEGACY_POSITIONAL_DEPENDSON_PATTERN.containsMatchIn(it) }) {
+                "dependsOn mag niet meer naar het oude batch-relatieve volgnummer ('Kandidaat <n>') verwijzen; gebruik de candidateKey van de kandidaat"
             }
         }
     }
@@ -383,18 +392,21 @@ class ShadowIterationEngine(
 
     private fun reviewedCandidates(productSlug: String, stories: JsonNode, critic: JsonNode): List<ReviewedCandidate> {
         val reviews = critic.path("candidateReviews").associateBy { it.path("candidateIndex").asInt() }
-        return stories.path("candidates").mapIndexed { index, candidate ->
+        val draft = stories.path("candidates").mapIndexed { index, candidate ->
             val title = candidate.path("title").asText().trim()
             val description = candidate.path("description").asText().trim()
             val fingerprint = fingerprint(title, description)
             val review = reviews.getValue(index)
             ReviewedCandidate(
-                index, title, description, textList(candidate.path("acceptanceCriteria")),
+                index, candidate.path("candidateKey").asText().trim(), title, description, textList(candidate.path("acceptanceCriteria")),
                 textList(candidate.path("sourceUrls")), textList(candidate.path("dependsOn")), textList(candidate.path("risks")),
                 review.path("verdict").asText(), review.path("reason").asText(), fingerprint,
                 repository.findDuplicate(productSlug, fingerprint),
             )
         }
+        // candidateKey-lookup i.p.v. arrayindex: de koppeling blijft dus geldig ongeacht batch-/reviewvolgorde.
+        val byKey = draft.associateBy(ReviewedCandidate::candidateKey)
+        return draft.map { it.copy(resolvedDependsOn = resolveCandidateDependencies(byKey, it.dependsOn).map(ReviewedCandidate::candidateKey)) }
     }
 
     private fun persistValidatedResults(
@@ -527,6 +539,13 @@ class ShadowIterationEngine(
         zelf niets. De huidige modus is $mode. Gebruik alleen bron-URL's uit het onderzoek. Vermijd overlap met bestaande
         kandidaten en benoem afhankelijkheden en risico's.
 
+        CANDIDATEKEY: geef elke kandidaat een eigen candidateKey: een korte, mensleesbare kebab-case-slug
+        (alleen kleine letters, cijfers en koppeltekens, bv. "brontransparante-locatieflow") die uniek is
+        binnen deze batch en die kandidaat identificeert. Verwijst een kandidaat naar een andere kandidaat uit
+        dezelfde batch in dependsOn, gebruik dan exact diens candidateKey. Gebruik NOOIT een batch-relatief
+        volgnummer zoals "Kandidaat 0" of "Kandidaat 1": dat volgnummer verandert zodra de batch- of
+        reviewvolgorde wijzigt en de koppeling zou dan naar de verkeerde kandidaat kunnen wijzen.
+
         AUTONOMIEREGEL: iedere story en ieder acceptatiecriterium moet volledig door Product Factory- en Software
         Factory-agents uitvoerbaar en verifieerbaar zijn. Vraag geen handmatige test, schermlezercontrole, productkeuze,
         accountaanmaak, betaling, DNS-wijziging, apparaatcontrole of andere actie van de eigenaar. Alleen een concreet,
@@ -593,6 +612,11 @@ class ShadowIterationEngine(
         bouwbaar. Behoud correcte onderdelen, maar kopieer geen criterium dat strijdig is met de criticusfeedback.
         In shadow-modus blijven kandidaten intern; in autonomous-modus kunnen ze pas na een nieuwe ACCEPT worden
         geleverd. De huidige modus is $mode. Gebruik uitsluitend bron-URL's uit het oorspronkelijke onderzoek.
+
+        CANDIDATEKEY: behoud de candidateKey van iedere kandidaat die je herwerkt (verander 'm niet, tenzij je
+        een volledig nieuwe kandidaat toevoegt, die dan een eigen unieke kebab-case-slug krijgt). Verwijst een
+        kandidaat naar een andere kandidaat uit dezelfde batch in dependsOn, gebruik dan exact diens
+        candidateKey en nooit een batch-relatief volgnummer zoals "Kandidaat 0".
 
         AUTONOMIEREGEL: verwijder iedere afhankelijkheid van handmatige tests, menselijke beslissingen of acties van de
         eigenaar. Vervang die door agent-uitvoerbare of geautomatiseerde verificatie. Alleen een concreet, onvermijdelijk
@@ -666,5 +690,7 @@ class ShadowIterationEngine(
             """(?i)\b(handmatig(?:e)?\s+(?:test|toets|controle|validatie|beoordeling|goedkeuring|actie)|menselijk(?:e)?\s+(?:test|controle|validatie|beoordeling|goedkeuring|actie)|door (?:de )?eigenaar|beschikbaar (?:worden )?gesteld|NVDA|VoiceOver|schermlezer(?:test|controle))\b""",
         )
         private val ACCESS_TOKEN_PATTERN = Regex("""(?i)\b(access[ -]?token|api[ -]?key|oauth[ -]?secret|credential)\b""")
+        private val CANDIDATE_KEY_PATTERN = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
+        private val LEGACY_POSITIONAL_DEPENDSON_PATTERN = Regex("""(?i)\bkandidaat\s*\d+\b""")
     }
 }
