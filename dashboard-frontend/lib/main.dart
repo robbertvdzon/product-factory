@@ -1110,14 +1110,63 @@ List<Widget> _buildStoryQueueSections(
                     delivery?['errorMessage'] != null)
                   '${delivery!['errorMessage']}',
               ];
-              return Card(
-                child: ListTile(
-                  leading: Icon(icon),
-                  title: Text('${story['title']}'),
-                  subtitle: Text(subtitleParts.join(' · ')),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () =>
-                      _showStoryCandidateDetails(context, story, delivery),
+              final blockedReason = '${story['blockedReason'] ?? ''}'.trim();
+              final isBlocked = story['blocked'] == true && blockedReason.isNotEmpty;
+              final blockedColors = kClassificationColors[kGuardrailConflict]!;
+              // MergeSemantics zorgt dat titel/subtitle/blokkeerlabel als één toegankelijke
+              // naam/beschrijving van de kaart opvraagbaar zijn, zonder de bestaande
+              // Card/ListTile-elementen of het tap-gedrag te wijzigen.
+              return MergeSemantics(
+                child: Card(
+                  child: ListTile(
+                    leading: Icon(icon),
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('${story['title']}'),
+                        if (isBlocked)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: blockedColors.background,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.block,
+                                    size: 14,
+                                    color: blockedColors.foreground,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      'Geblokkeerd: $blockedReason',
+                                      style: TextStyle(
+                                        color: blockedColors.foreground,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    subtitle: Text(subtitleParts.join(' · ')),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () =>
+                        _showStoryCandidateDetails(context, story, delivery),
+                  ),
                 ),
               );
             },
@@ -1659,12 +1708,17 @@ class MetricCard extends StatelessWidget {
           children: [
             Icon(icon, size: 36),
             const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(value, style: Theme.of(context).textTheme.headlineMedium),
-                Text(label),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  Text(label),
+                ],
+              ),
             ),
           ],
         ),
