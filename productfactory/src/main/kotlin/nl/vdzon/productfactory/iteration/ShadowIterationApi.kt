@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
 data class StartCycleRequest(val focus: String? = null)
+data class CancelIterationRequest(val reason: String? = null)
 data class ShadowIterationStarted(val iterationId: String)
 data class ShadowIterationArtifactView(
     val artifactType: String,
@@ -55,6 +56,16 @@ class ShadowIterationController(private val service: ShadowIterationService) {
     @GetMapping("/api/shadow-iterations/{id}/artifacts")
     fun artifacts(@PathVariable id: String, @RequestParam productSlug: String): List<ShadowIterationArtifactView> =
         service.artifacts(productSlug, id)
+
+    /**
+     * Markeert een QUEUED/RUNNING iteratie als FAILED zodat een nieuwe cyclus voor dit product kan
+     * starten. Stopt geen achtergrondthread die nog met de agentworker bezig is; een eventuele late
+     * afronding daarvan wordt genegeerd door de write-once-guard op de terminale status (zie
+     * ShadowIterationRepository.markAccepted/markReviewed/markFailed).
+     */
+    @PostMapping("/api/shadow-iterations/{id}/cancel")
+    fun cancel(@PathVariable id: String, @RequestParam productSlug: String, @RequestBody(required = false) request: CancelIterationRequest?): ShadowIterationView =
+        service.cancel(productSlug, id, request?.reason)
 }
 
 @Service
@@ -100,6 +111,16 @@ class ShadowIterationService(
     fun artifacts(productSlug: String, id: String): List<ShadowIterationArtifactView> {
         require(productSlug, id)
         return repository.artifacts(productSlug, id)
+    }
+
+    @Transactional
+    fun cancel(productSlug: String, id: String, reason: String?): ShadowIterationView {
+        val iteration = require(productSlug, id)
+        if (iteration.status !in setOf("QUEUED", "RUNNING")) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Iteratie is al afgerond (${iteration.status})")
+        }
+        repository.markFailed(id, reason?.trim()?.ifBlank { null } ?: "Handmatig geannuleerd")
+        return require(productSlug, id)
     }
 }
 
