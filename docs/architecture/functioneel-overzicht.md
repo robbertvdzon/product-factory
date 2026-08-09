@@ -174,8 +174,14 @@ beneden:
   Escape klapt het paneel weer in en herstelt de focus op de badge; het paneel bevat geen link
   naar een externe iteratielog-route. Aanklikken van de rij buiten de badge opent nog steeds een
   detailscherm met de opdracht, alle vijf agentstappen (status, start-/eindtijd, foutmelding), het
-  volledige gepubliceerde dossier en de ruwe JSON-output per rol — dit scherm ververst zichzelf
-  elke 3 seconden zolang de cyclus loopt. Dit detailscherm (`IterationSessionDialog`,
+  volledige gepubliceerde dossier en per rol (Onderzoeker, Product owner, UX-ontwerp, Story writer,
+  Criticus) zowel een leesbare samenvatting van de bekende tekstvelden (bv. `summary`, `findings`,
+  `decisions`/`rationale`, `steps`, `candidates`, `issues`) als de bestaande ruwe JSON-output — dit
+  scherm ververst zichzelf elke 3 seconden zolang de cyclus loopt. De leesbare samenvatting
+  verschijnt direct zodra de roltegel wordt uitgeklapt (geen extra klik) en laat lege/`null`-velden
+  weg; bij een onherkende of niet-decodeerbare structuur toont het dialoog uitsluitend de bestaande
+  ruwe JSON, zonder te crashen. Retry-pogingen (`artifactType` met `-2`/`-3`-suffix) gebruiken
+  dezelfde leesbare weergave als de eerste poging. Dit detailscherm (`IterationSessionDialog`,
   `dashboard-frontend/lib/main.dart`) toont bovenaan dezelfde `ClassificationBadge` (zelfde
   `classifyIterationOutcome`-uitkomst, zelfde badge-tekst en `kClassificationColors`-kleurenpaar) als
   de lijstkaart-rij, in plaats van de ruwe backend-statuswaarde (bv. 'NEEDS_REVISION') als losse
