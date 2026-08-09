@@ -166,14 +166,20 @@ class ShadowIterationEngineTest(
                     "sources":[
                       {"url":"https://noord-hollandsarchief.nl/","consultedOn":"$today","rightsIndication":"Rechten verschillen per object en moeten op de objectpagina worden gecontroleerd.","rationale":"Regionale bron voor Noord-Hollandse archiefcollecties."},
                       {"url":"https://www.rijksmuseum.nl/nl/rijksstudio","consultedOn":"$today","rightsIndication":"Beschikbaarheid en rechten staan per object vermeld.","rationale":"Voorbeeld van een doorzoekbare Nederlandse erfgoedcollectie."}
-                    ]
+                    ],
+                    "currentState":{"purpose":"De applicatie helpt bewoners lokale geschiedenis herleidbaar te ontdekken.","gaps":["Geen brontransparantie bij zoekresultaten"]},
+                    "improvementOpportunities":["Toon rechten- en broninformatie direct bij ieder resultaat"],
+                    "inspiration":[]
                 }""" else """{
                     "summary":"Open erfgoedbronnen kunnen een controleerbare eerste zoekervaring ondersteunen.",
                     "findings":[{"title":"Open collecties","finding":"Noord-Hollands Archief en Rijksmuseum bieden publiek beschreven collecties met herleidbare objectpagina's.","sourceUrls":["https://noord-hollandsarchief.nl/","https://www.rijksmuseum.nl/nl/rijksstudio"]}],
                     "sources":[
                       {"url":"https://noord-hollandsarchief.nl/","consultedOn":"$today","rightsIndication":"Rechten verschillen per object en moeten op de objectpagina worden gecontroleerd.","rationale":"Regionale bron voor Noord-Hollandse archiefcollecties."},
                       {"url":"https://www.rijksmuseum.nl/nl/rijksstudio","consultedOn":"$today","rightsIndication":"Beschikbaarheid en rechten staan per object vermeld.","rationale":"Voorbeeld van een doorzoekbare Nederlandse erfgoedcollectie."}
-                    ]
+                    ],
+                    "currentState":{"purpose":"De applicatie helpt bewoners lokale geschiedenis herleidbaar te ontdekken.","gaps":["Geen brontransparantie bij zoekresultaten"]},
+                    "improvementOpportunities":["Toon rechten- en broninformatie direct bij ieder resultaat"],
+                    "inspiration":[{"name":"Rijksstudio","url":"https://www.rijksmuseum.nl/nl/rijksstudio","relevance":"Toont hoe broninformatie naast beeldmateriaal gepresenteerd kan worden."}]
                 }"""
                 "product_owner" -> """{
                     "productDirection":"Begin met een brontransparante verkenning van historische locaties.",

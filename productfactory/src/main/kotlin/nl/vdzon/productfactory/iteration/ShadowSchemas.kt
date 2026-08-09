@@ -5,9 +5,12 @@ internal object ShadowSchemas {
         """
         "summary":{"type":"string","minLength":40,"maxLength":4000},
         "findings":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"object","additionalProperties":false,"required":["title","finding","sourceUrls"],"properties":{"title":{"type":"string","minLength":3,"maxLength":200},"finding":{"type":"string","minLength":20,"maxLength":3000},"sourceUrls":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string"}}}}},
-        "sources":{"type":"array","minItems":2,"maxItems":12,"items":{"type":"object","additionalProperties":false,"required":["url","consultedOn","rightsIndication","rationale"],"properties":{"url":{"type":"string"},"consultedOn":{"type":"string"},"rightsIndication":{"type":"string","minLength":3,"maxLength":500},"rationale":{"type":"string","minLength":10,"maxLength":1000}}}}
+        "sources":{"type":"array","minItems":2,"maxItems":12,"items":{"type":"object","additionalProperties":false,"required":["url","consultedOn","rightsIndication","rationale"],"properties":{"url":{"type":"string"},"consultedOn":{"type":"string"},"rightsIndication":{"type":"string","minLength":3,"maxLength":500},"rationale":{"type":"string","minLength":10,"maxLength":1000}}}},
+        "currentState":{"type":"object","additionalProperties":false,"required":["purpose","gaps"],"properties":{"purpose":{"type":"string","minLength":20,"maxLength":1500},"gaps":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","minLength":5,"maxLength":1000}}}},
+        "improvementOpportunities":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","minLength":10,"maxLength":1000}},
+        "inspiration":{"type":"array","maxItems":8,"items":{"type":"object","additionalProperties":false,"required":["name","url","relevance"],"properties":{"name":{"type":"string","minLength":2,"maxLength":200},"url":{"type":"string"},"relevance":{"type":"string","minLength":10,"maxLength":1000}}}}
         """.trimIndent(),
-        listOf("summary", "findings", "sources"),
+        listOf("summary", "findings", "sources", "currentState", "improvementOpportunities", "inspiration"),
     )
 
     val productOwner = schema(

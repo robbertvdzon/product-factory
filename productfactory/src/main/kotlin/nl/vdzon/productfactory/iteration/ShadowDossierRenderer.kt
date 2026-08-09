@@ -64,6 +64,28 @@ internal object ShadowDossierRenderer {
             appendLine("Bronnen: ${finding.path("sourceUrls").map { "[${it.asText()}](${it.asText()})" }.joinToString(", ")}")
         }
         appendLine()
+        appendLine("### Huidige applicatie")
+        appendLine()
+        appendLine("**Doel:** ${research.path("currentState").path("purpose").asText()}")
+        appendLine()
+        appendLine("**Wat ontbreekt:**")
+        research.path("currentState").path("gaps").forEach { appendLine("- ${it.asText()}") }
+        appendLine()
+        appendLine("### Verbetermogelijkheden")
+        appendLine()
+        research.path("improvementOpportunities").forEach { appendLine("- ${it.asText()}") }
+        if (research.path("inspiration").size() > 0) {
+            appendLine()
+            appendLine("### Inspiratiebronnen")
+            appendLine()
+            research.path("inspiration").forEach { inspiration ->
+                appendLine(
+                    "- [${inspiration.path("name").asText()}](${inspiration.path("url").asText()}) — " +
+                        inspiration.path("relevance").asText(),
+                )
+            }
+        }
+        appendLine()
         appendLine("### Bronverantwoording")
         appendLine()
         appendLine("| URL | Geraadpleegd | Rechtenindicatie | Onderbouwing |")
