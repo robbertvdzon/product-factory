@@ -85,6 +85,11 @@ data class SoftwareFactoryStoryRequest(
     val workspaceCommitSha: String,
     val artifactPath: String,
     val deliveryMode: String = "start-next",
+    // Product Factory handelt storyverloop zelf af (zie AutonomousQuestionResolver); alleen een ERROR
+    // is iets waar de eigenaar zelf voor moet ingrijpen, dus alleen dat event triggert een melding.
+    val notificationEvents: Set<String> = setOf("ERROR"),
+    val questionsAllowed: Boolean = true,
+    val approvalMode: String = "automatisch",
 )
 
 data class SoftwareFactoryStoryResponse(val storyKey: String, val created: Boolean, val deliveryMode: String)

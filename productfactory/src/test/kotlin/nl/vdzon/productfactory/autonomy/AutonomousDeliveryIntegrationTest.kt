@@ -55,6 +55,9 @@ class AutonomousDeliveryIntegrationTest(
         assertEquals(1, fake.requests.size)
         assertEquals("hkh-autopilot:candidate:$candidateId", fake.requests.single().second)
         assertEquals("start-next", fake.requests.single().first.deliveryMode)
+        assertEquals(setOf("ERROR"), fake.requests.single().first.notificationEvents)
+        assertEquals(true, fake.requests.single().first.questionsAllowed)
+        assertEquals("automatisch", fake.requests.single().first.approvalMode)
         assertEquals("SF-4242", jdbc.queryForObject("select external_story_key from story_delivery where candidate_id = ?", String::class.java, candidateId))
         assertEquals("PUBLISHED", jdbc.queryForObject("select status from story_candidate where id = ?", String::class.java, candidateId))
     }
