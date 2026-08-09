@@ -56,3 +56,28 @@ Toelichting:
   `expanded`-vlag.
 - `readableFields.isEmpty`-pad (fallback) blijft ongewijzigd: geen toggle, ruwe JSON direct
   zichtbaar, gedekt door een aparte AC5-test.
+
+## product-86 - Story-brede test
+
+Stappenplan:
+[x]: .task.md, docs/factory en agent-tips gelezen.
+[x]: diff geïnspecteerd (`git diff main...HEAD` op `dashboard-frontend/lib/main.dart`): matcht de
+     scope-beschrijving (readableFields.isNotEmpty -> TechnicalDetailsToggle, isEmpty -> ongewijzigd
+     direct zichtbaar).
+[x]: `flutter analyze` in dashboard-frontend: "No issues found!".
+[x]: `flutter test` in dashboard-frontend: alle 104 tests groen, exit code 0 (incl. de nieuwe
+     `test/iteration_technical_details_toggle_test.dart` met AC1-AC5-dekking, keyboard-navigatie via
+     `tester.sendKeyEvent`, Semantics-expanded-inspectie en jsonDecode-vergelijking tegen de
+     brondata).
+[x]: `mvn -B --no-transfer-progress clean verify` niet opnieuw gedraaid: diff raakt uitsluitend
+     `dashboard-frontend/` en de worklog, wat geen van beide een `pathPrefixes`-match geeft voor de
+     `repository-maven-verify`-command in `.factory/verification.yaml`.
+[x]: preview-omgeving (`https://product-factory-pr-49.vdzonsoftware.nl`) gesmoketest: frontend en
+     `/actuator/health` beide HTTP 200. Geen browsertool beschikbaar in de agentcontainer, dus
+     interactieve/toetsenbord-/screenshotverificatie in de preview was niet mogelijk (bekende
+     beperking, zie agent-tip `dashboard-frontend-preview-now-available`); leunt op de
+     widgettests hierboven voor AC2/AC3.
+
+Conclusie: alle acceptatiecriteria (AC1-AC7) zijn gedekt door geautomatiseerde tests die slagen; het
+volledige voorgeschreven vangnet (flutter analyze + flutter test) gaf exitcode 0 zonder failures.
+Goedgekeurd.
