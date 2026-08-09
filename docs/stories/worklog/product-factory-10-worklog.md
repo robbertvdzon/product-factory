@@ -57,3 +57,27 @@ Niet gedaan / buiten scope:
   door via de generieke `Map`-proxy in `dashboard-backend`).
 - Geen wijziging aan `resolveDependencyReferences`/`persistValidatedResults`/`ShadowIterationEngine` of
   aan schema/migraties: puur een read-only opzoeklaag op bestaande, al opgeslagen data.
+
+## Tester (product-56)
+
+Gedaan:
+- Diff geïnspecteerd (`Contracts.kt`, `StoryCandidateApi.kt`, `ProductFactoryApiTest.kt`): implementatie
+  komt overeen met de acceptatiecriteria — twee nieuwe read-only velden op `StoryCandidateView`,
+  afgeleid via `iteration_id` → `shadow_iteration_artifact` (`artifact_type = 'dependson_resolution'`)
+  → matchend `backlogId`-item, met `blockedReason` opgebouwd uit onopgeloste `dependsOn`-`rawValue`'s.
+  Geen wijziging aan resolve-logica, geen nieuwe kolom/schrijfoperatie, endpoint-URL/-methode ongewijzigd.
+- Vangnet gedraaid volgens `.factory/verification.yaml`: enige geraakte gate is `repository-maven-verify`
+  (`productfactory-contracts/`, `productfactory/` matchen `pathPrefixes`; `dashboard-frontend/` niet
+  aangeraakt, dus flutter-gates niet van toepassing) → `mvn -B --no-transfer-progress clean verify` op de
+  root: **BUILD SUCCESS**, alle 5 modules groen, 0 failures/errors.
+- Specifiek gecontroleerd: `ProductFactoryApiTest` 5/5 groen, incl. de nieuwe test
+  `story candidates expose blocked and blockedReason read-only via the existing dependson_resolution
+  artefact` — geverifieerd de drie AC-scenario's (meerdere onopgeloste sleutels →
+  `"verwijzing naar onbekende sleutels: onbekende-sleutel-x, onbekende-sleutel-y"`; artefact met
+  `blocked:false` → `blocked:false`/`blockedReason:null`; kandidaat zonder gekoppelde
+  iteratie/artefact → idem). Totaal over de module: 57 tests, 0 failures, 0 errors (surefire-reports).
+- Preview-smoketest: `SF_PREVIEW_URL` (https://product-factory-pr-44.vdzonsoftware.nl) en
+  `/actuator/health` beantwoorden beide met HTTP 200. Geen browsertool beschikbaar in de
+  agentcontainer voor interactieve verificatie; deze story heeft ook geen UI-component (geen
+  frontend-wijziging), dus dit is voldoende dekking naast de backend-tests.
+- Geen bugs gevonden; geen codewijzigingen aangebracht.
