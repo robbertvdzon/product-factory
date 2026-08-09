@@ -64,6 +64,27 @@ class AgentContractTest {
         assertTrue(command.last().contains("Wijzig geen bestanden"))
     }
 
+    @Test fun `codex command grants the researcher role a writable sandbox with network access`() {
+        val workspace = Files.createTempDirectory("pf-agent-workspace-researcher")
+        val settings = AgentWorkerSettings(
+            url = "wss://factory.example/agent-worker",
+            token = "secret",
+            workerId = "macbook",
+            version = "test",
+            workspacePath = workspace,
+            codexExecutable = "/opt/homebrew/bin/codex",
+            defaultModel = "gpt-5.6-terra",
+        )
+        val executor = CodexAgentTaskExecutor(settings) { _, _, _ -> error("niet uitvoeren") }
+        val command = executor.command(
+            AgentTask("run-2b", "hkh-autopilot", "shadow-researcher", "Onderzoek de acceptatieomgeving"),
+            workspace.resolve("last-message"),
+        )
+
+        assertTrue(command.containsAll(listOf("--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")))
+        assertFalse(command.contains("read-only"))
+    }
+
     @Test fun `codex command passes a structured output schema`() {
         val workspace = Files.createTempDirectory("pf-agent-schema")
         val executor = CodexAgentTaskExecutor(
@@ -111,6 +132,38 @@ class AgentContractTest {
         )
         assertTrue(command.last().contains("Onderzoek openbare archieven"))
         assertTrue(command.last().contains("Wijzig geen bestanden"))
+    }
+
+    @Test fun `claude command grants the researcher role the Bash tool for a headless browser`() {
+        val workspace = Files.createTempDirectory("pf-claude-workspace-researcher")
+        val settings = AgentWorkerSettings(
+            url = "wss://factory.example/agent-worker",
+            token = "secret",
+            workerId = "macbook",
+            version = "test",
+            workspacePath = workspace,
+            codexExecutable = "codex",
+            defaultModel = "gpt-5.6-terra",
+            claudeExecutable = "/opt/homebrew/bin/claude",
+        )
+        val executor = ClaudeAgentTaskExecutor(settings) { _, _, _ -> error("niet uitvoeren") }
+        val command = executor.command(AgentTask("run-3b", "hkh-autopilot", "shadow-researcher", "Onderzoek de acceptatieomgeving"))
+
+        assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch,Bash")))
+    }
+
+    @Test fun `claude command keeps non researcher roles read only`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-workspace-non-researcher"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+
+        val command = executor.command(AgentTask("run-3c", "hkh-autopilot", "shadow-critic", "Beoordeel"))
+
+        assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch")))
+        assertFalse(command.contains("WebSearch,WebFetch,Bash"))
     }
 
     @Test fun `claude command passes the response schema inline instead of via a file`() {

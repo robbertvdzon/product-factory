@@ -71,6 +71,13 @@ fun interface AgentTaskExecutor {
     fun execute(task: AgentTask): AgentResult
 }
 
+/**
+ * De RESEARCHER-rol moet de acceptatieomgeving kunnen bekijken via een echte (headless) browser, omdat
+ * Cloudflare's bot-bescherming daar WebFetch/websearch met HTTP 403 blokkeert. Alleen deze rol krijgt
+ * daarom Bash/schrijftoegang; alle andere rollen blijven read-only.
+ */
+internal fun isResearcherTask(task: AgentTask): Boolean = task.taskType == "shadow-researcher"
+
 /** Gedeelde veiligheidsinstructie voor iedere providerimplementatie: dezelfde grenzen, ongeacht de gekozen AI. */
 internal fun agentPrompt(task: AgentTask): String = """
     Je bent een autonome Product Factory-agent voor product '${task.productSlug}'.
@@ -98,7 +105,8 @@ class RoutingAgentTaskExecutor(
 /**
  * Voert een taak uit via de `claude`-CLI (Claude Code) met een abonnementslogin. Gebruikt `--json-schema` voor
  * gestructureerde output in plaats van Codex' `--output-schema`-bestand, en `--tools`/`--setting-sources` om de
- * agent read-only te houden in plaats van Codex' `--sandbox read-only`.
+ * agent read-only te houden in plaats van Codex' `--sandbox read-only` ([isResearcherTask] geeft de RESEARCHER-rol
+ * daarnaast Bash, zodat die de acceptatieomgeving via een headless browser kan bekijken).
  */
 class ClaudeAgentTaskExecutor(
     private val settings: AgentWorkerSettings,
@@ -130,7 +138,7 @@ class ClaudeAgentTaskExecutor(
         add("--setting-sources")
         add("")
         add("--tools")
-        add("WebSearch,WebFetch")
+        add(if (isResearcherTask(task)) "WebSearch,WebFetch,Bash" else "WebSearch,WebFetch")
         add("--permission-mode")
         add("bypassPermissions")
         task.model?.takeIf { it.isNotBlank() }?.let { model ->
@@ -273,8 +281,15 @@ class CodexAgentTaskExecutor(
         add("-c")
         add("shell_environment_policy.inherit=none")
         add("--json")
-        add("--sandbox")
-        add("read-only")
+        if (isResearcherTask(task)) {
+            add("--sandbox")
+            add("workspace-write")
+            add("-c")
+            add("sandbox_workspace_write.network_access=true")
+        } else {
+            add("--sandbox")
+            add("read-only")
+        }
         add("--ephemeral")
         add("--skip-git-repo-check")
         add("--output-last-message")

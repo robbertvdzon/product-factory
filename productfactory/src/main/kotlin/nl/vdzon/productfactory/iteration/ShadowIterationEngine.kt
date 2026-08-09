@@ -492,8 +492,15 @@ class ShadowIterationEngine(
             admin?.let { "het beheergedeelte op $it" },
         ).joinToString(" en ")
         return """
-        ACCEPTATIEOMGEVING: bekijk ook $places (met je webtool). Dit is een standing acceptatieomgeving
-        zonder login en met representatieve nepdata, geen productie. Dat is een bewuste ontwerpkeuze, geen
+        ACCEPTATIEOMGEVING: bekijk ook $places. Je webtool (WebFetch/websearch) wordt hier geblokkeerd door
+        bot-bescherming (HTTP 403) — gebruik in plaats daarvan je Bash-tool om een echte headless
+        Chromium-browser te besturen via Playwright (al globaal geïnstalleerd; voer zo nodig eerst
+        `npx playwright install chromium` uit). Schrijf een kort Node-scriptje (CommonJS, `require('playwright')`)
+        dat de pagina opent, wacht tot hij geladen is, en de zichtbare tekst/HTML uitleest, en gebruik dat
+        ook voor eventuele doorkliknavigatie binnen de omgeving. Playwright staat alleen globaal
+        geïnstalleerd, dus start het script met `NODE_PATH="$(npm root -g)" node jouw-script.cjs`, anders
+        vindt Node het package niet. Dit is een standing acceptatieomgeving zonder login
+        en met representatieve nepdata, geen productie. Dat is een bewuste ontwerpkeuze, geen
         beveiligingslek: de omgeving gebruikt dummy-data en alle externe koppelingen zijn gemockt,
         inclusief AI. Zie AI-gedreven onderdelen die je hier tegenkomt daarom als gescripte mockresponses,
         niet als representatief voor het echte AI-gedrag in productie. Loop actief door wat je ziet,
