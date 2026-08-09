@@ -10,6 +10,7 @@ import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
 import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
+import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
@@ -130,7 +131,7 @@ class ShadowIterationEngine(
         persistValidatedResults(iteration.id, product, research, productOwner, ux, sources, candidates)
 
         val verdict = critic.path("overallVerdict").asText()
-        val accepted = if (verdict == "ACCEPT") candidates.filter { it.verdict == "ACCEPT" && it.duplicateOfId == null } else emptyList()
+        val accepted = if (verdict == "ACCEPT") candidates.filter { it.verdict == "ACCEPT" && it.duplicateOfId == null && !it.blocked } else emptyList()
         runCatching { generateSummary(iteration, product, research, productOwner, critic, accepted, verdict) }
 
         if (verdict != "ACCEPT") {
@@ -312,9 +313,6 @@ class ShadowIterationEngine(
                 "candidateKey is verplicht en moet een kebab-case-slug zijn (bv. 'stabiele-review-sleutel')"
             }
             require(candidateKeys.add(candidateKey)) { "candidateKey '$candidateKey' is niet uniek binnen deze batch" }
-            require(textList(candidate.path("dependsOn")).none { LEGACY_POSITIONAL_DEPENDSON_PATTERN.containsMatchIn(it) }) {
-                "dependsOn mag niet meer naar het oude batch-relatieve volgnummer ('Kandidaat <n>') verwijzen; gebruik de candidateKey van de kandidaat"
-            }
         }
     }
 
@@ -405,9 +403,37 @@ class ShadowIterationEngine(
             )
         }
         // candidateKey-lookup i.p.v. arrayindex: de koppeling blijft dus geldig ongeacht batch-/reviewvolgorde.
+        // Lukt die niet, dan wordt de waarde geprobeerd als legacy batch-relatief volgnummer ("Kandidaat <n>"),
+        // vertaald via de positie binnen dezelfde batch (candidatesByPosition == draft, candidates[]-volgorde).
         val byKey = draft.associateBy(ReviewedCandidate::candidateKey)
-        return draft.map { it.copy(resolvedDependsOn = resolveCandidateDependencies(byKey, it.dependsOn).map(ReviewedCandidate::candidateKey)) }
+        return draft.map { candidate ->
+            val resolutions = resolveDependencyReferences(byKey, draft, candidate.dependsOn)
+            candidate.copy(
+                resolvedDependsOn = resolutions.mapNotNull(DependencyResolution::resolvedCandidateKey),
+                dependencyResolutions = resolutions,
+                blocked = resolutions.any { !it.resolved },
+            )
+        }
     }
+
+    /** Bouwt de duurzame, achteraf doorzoekbare sleutel-naar-backlog-ID-mapping voor het dossierartefact. */
+    private fun dependsOnResolutionLog(candidates: List<ReviewedCandidate>, backlogIds: Map<String, Long>): List<Map<String, Any?>> =
+        candidates.map { candidate ->
+            mapOf(
+                "candidateKey" to candidate.candidateKey,
+                "backlogId" to backlogIds[candidate.candidateKey],
+                "blocked" to candidate.blocked,
+                "dependsOn" to candidate.dependencyResolutions.map { resolution ->
+                    mapOf(
+                        "rawValue" to resolution.rawValue,
+                        "resolvedCandidateKey" to resolution.resolvedCandidateKey,
+                        "resolvedBacklogId" to resolution.resolvedCandidateKey?.let(backlogIds::get),
+                        "viaLegacyFallback" to resolution.viaLegacyFallback,
+                        "resolved" to resolution.resolved,
+                    )
+                },
+            )
+        }
 
     private fun persistValidatedResults(
         iterationId: String,
@@ -419,12 +445,31 @@ class ShadowIterationEngine(
         candidates: List<ReviewedCandidate>,
     ) {
         sources.forEach { repository.saveSource(iterationId, product.slug, it.url, it.consultedOn, it.rightsIndication, it.rationale) }
-        candidates.forEach {
-            repository.saveCandidate(
-                iterationId, product.slug, it.title, it.description, it.acceptanceCriteria.joinToString("\n") { criterion -> "- $criterion" },
-                it.fingerprint, it.verdict, it.reason, it.duplicateOfId,
+        val backlogIds = mutableMapOf<String, Long>()
+        candidates.forEach { candidate ->
+            if (candidate.blocked) {
+                val unresolved = candidate.dependencyResolutions.filter { !it.resolved }.joinToString { it.rawValue }
+                log.error(
+                    "Kandidaat '{}' (iteratie {}) wordt niet gepersisteerd/gepubliceerd: dependsOn kon niet vertaald worden naar een backlog-ID: {}",
+                    candidate.candidateKey,
+                    iterationId,
+                    unresolved,
+                )
+                return@forEach
+            }
+            val id = repository.saveCandidate(
+                iterationId, product.slug, candidate.title, candidate.description,
+                candidate.acceptanceCriteria.joinToString("\n") { criterion -> "- $criterion" },
+                candidate.fingerprint, candidate.verdict, candidate.reason, candidate.duplicateOfId,
             )
+            backlogIds[candidate.candidateKey] = id
         }
+        repository.saveArtifact(
+            iterationId,
+            product.slug,
+            DEPENDSON_RESOLUTION_ARTIFACT_TYPE,
+            mapper.writeValueAsString(dependsOnResolutionLog(candidates, backlogIds)),
+        )
         repository.saveKnowledge(
             iterationId = iterationId,
             productSlug = product.slug,
@@ -684,13 +729,14 @@ class ShadowIterationEngine(
     }
 
     companion object {
+        private val log = LoggerFactory.getLogger(ShadowIterationEngine::class.java)
         private const val ROLE_TIMEOUT_SECONDS = 900L
         private const val MAX_STORY_ATTEMPTS = 3
+        private const val DEPENDSON_RESOLUTION_ARTIFACT_TYPE = "dependson_resolution"
         private val OWNER_ACTION_PATTERN = Regex(
             """(?i)\b(handmatig(?:e)?\s+(?:test|toets|controle|validatie|beoordeling|goedkeuring|actie)|menselijk(?:e)?\s+(?:test|controle|validatie|beoordeling|goedkeuring|actie)|door (?:de )?eigenaar|beschikbaar (?:worden )?gesteld|NVDA|VoiceOver|schermlezer(?:test|controle))\b""",
         )
         private val ACCESS_TOKEN_PATTERN = Regex("""(?i)\b(access[ -]?token|api[ -]?key|oauth[ -]?secret|credential)\b""")
         private val CANDIDATE_KEY_PATTERN = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
-        private val LEGACY_POSITIONAL_DEPENDSON_PATTERN = Regex("""(?i)\bkandidaat\s*\d+\b""")
     }
 }
