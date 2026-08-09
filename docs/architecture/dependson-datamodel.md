@@ -49,6 +49,20 @@ hierboven).
 > "Publicatiepad: leest `dependsOn` nergens" hieronder blijft onverkort van toepassing —
 > `WorkspacePublisher.kt`, `AutonomousDelivery.kt` en `StoryCandidateApi.kt` zijn door
 > product-factory-9 niet gewijzigd en lezen `dependsOn` nog steeds nergens.
+>
+> **Update (product-factory-10):** de uitzondering hierboven voor `StoryCandidateApi.kt` is
+> inmiddels vervallen op één specifiek punt: `StoryCandidateController.list()` leest sindsdien wél
+> het `dependson_resolution`-artefact (`shadow_iteration_artifact`, per `iteration_id`) en haalt
+> daaruit, puur read-only, de `blocked`/`dependsOn[].rawValue`/`dependsOn[].resolved`-velden op om
+> de nieuwe, alleen-lezen response-velden `StoryCandidateView.blocked`/`blockedReason` te vullen
+> (`blockedReason` = samengevoegde `rawValue`'s van de onopgeloste `dependsOn`-items, "verwijzing
+> naar onbekende sleutels: X, Y"). Dit is uitsluitend een leeslaag op het al bestaande artefact;
+> `resolveDependencyReferences`, `persistValidatedResults`, `ShadowIterationEngine`,
+> `WorkspacePublisher.kt` en `AutonomousDelivery.kt` zijn ongewijzigd en lezen `dependsOn` nog
+> steeds nergens. Zoals de aanname in product-factory-10 vaststelt: omdat geblokkeerde kandidaten
+> nooit in `story_candidate` belanden (zie hierboven), is `blocked` via deze API in de praktijk
+> vandaag altijd `false` bij productiedata — het veld is getest met direct geseede fixture-data,
+> niet via de volledige pijplijn.
 
 ## Uitkomst
 
