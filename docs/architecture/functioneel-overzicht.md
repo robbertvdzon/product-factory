@@ -177,7 +177,13 @@ beneden:
   volledige gepubliceerde dossier en de ruwe JSON-output per rol — dit scherm ververst zichzelf
   elke 3 seconden zolang de cyclus loopt. De weergave van de workspace-publicatie/PR-referentie
   (`workspacePullRequestUrl`/`workspaceCommitSha`) in dit detailscherm is door de badge-/
-  indicator-toevoeging ongewijzigd gebleven.
+  indicator-toevoeging ongewijzigd gebleven. Heeft de iteratie zelf `status == 'FAILED'`, dan toont
+  dit detailscherm (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) direct onder het
+  'Opdracht'-blok een apart 'Foutreden'-blok met de inhoud van `iteration['errorMessage']`, of exact
+  de tekst 'Geen foutreden beschikbaar' als dat veld leeg of `null` is; bij elke andere status blijft
+  dit blok volledig verborgen. Net als de classificatiebadge communiceert dit blok zijn inhoud ook
+  via een expliciet `Semantics`-label (`'Foutreden: <tekst>'`), zodat het als afzonderlijk
+  betekenisvol blok wordt aangekondigd door schermlezers.
 - **Software Factory-stories**: elke levering met storysleutel, titel, status (`DELIVERING`,
   `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`, `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst
   bekende Software Factory-fase.
