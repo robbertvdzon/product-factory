@@ -495,9 +495,13 @@ class ShadowIterationEngine(
         ACCEPTATIEOMGEVING: bekijk ook $places. Je webtool (WebFetch/websearch) wordt hier geblokkeerd door
         bot-bescherming (HTTP 403) — gebruik in plaats daarvan je Bash-tool om een echte headless
         Chromium-browser te besturen via Playwright (al globaal geïnstalleerd; voer zo nodig eerst
-        `npx playwright install chromium` uit). Schrijf een kort Node-scriptje (CommonJS, `require('playwright')`)
-        dat de pagina opent, wacht tot hij geladen is, en de zichtbare tekst/HTML uitleest, en gebruik dat
-        ook voor eventuele doorkliknavigatie binnen de omgeving. Playwright staat alleen globaal
+        `npx playwright install chromium` uit). Deze applicatie rendert op canvas (Flutter Web/CanvasKit):
+        page.innerText()/page.content() geven daardoor geen bruikbare tekst terug, dus probeer dat niet.
+        Schrijf in plaats daarvan een kort Node-scriptje (CommonJS, `require('playwright')`) dat de pagina
+        opent, wacht tot hij geladen is, en met `page.screenshot({ path: ..., fullPage: true })` een
+        schermafbeelding opslaat; bekijk die vervolgens met je Read-tool zoals je een screenshot zou lezen,
+        precies zoals de tester dat ook doet. Gebruik hetzelfde screenshot-en-bekijken-patroon voor
+        eventuele doorkliknavigatie binnen de omgeving. Playwright staat alleen globaal
         geïnstalleerd, dus start het script met `NODE_PATH="$(npm root -g)" node jouw-script.cjs`, anders
         vindt Node het package niet. Dit is een standing acceptatieomgeving zonder login
         en met representatieve nepdata, geen productie. Dat is een bewuste ontwerpkeuze, geen

@@ -138,7 +138,7 @@ class ClaudeAgentTaskExecutor(
         add("--setting-sources")
         add("")
         add("--tools")
-        add(if (isResearcherTask(task)) "WebSearch,WebFetch,Bash" else "WebSearch,WebFetch")
+        add(if (isResearcherTask(task)) "WebSearch,WebFetch,Bash,Read" else "WebSearch,WebFetch")
         add("--permission-mode")
         add("bypassPermissions")
         task.model?.takeIf { it.isNotBlank() }?.let { model ->

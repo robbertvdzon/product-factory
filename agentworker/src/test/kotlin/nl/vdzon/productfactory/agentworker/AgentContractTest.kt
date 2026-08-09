@@ -134,7 +134,7 @@ class AgentContractTest {
         assertTrue(command.last().contains("Wijzig geen bestanden"))
     }
 
-    @Test fun `claude command grants the researcher role the Bash tool for a headless browser`() {
+    @Test fun `claude command grants the researcher role Bash and Read for a headless browser and screenshots`() {
         val workspace = Files.createTempDirectory("pf-claude-workspace-researcher")
         val settings = AgentWorkerSettings(
             url = "wss://factory.example/agent-worker",
@@ -149,7 +149,7 @@ class AgentContractTest {
         val executor = ClaudeAgentTaskExecutor(settings) { _, _, _ -> error("niet uitvoeren") }
         val command = executor.command(AgentTask("run-3b", "hkh-autopilot", "shadow-researcher", "Onderzoek de acceptatieomgeving"))
 
-        assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch,Bash")))
+        assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch,Bash,Read")))
     }
 
     @Test fun `claude command keeps non researcher roles read only`() {
@@ -163,7 +163,7 @@ class AgentContractTest {
         val command = executor.command(AgentTask("run-3c", "hkh-autopilot", "shadow-critic", "Beoordeel"))
 
         assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch")))
-        assertFalse(command.contains("WebSearch,WebFetch,Bash"))
+        assertFalse(command.contains("WebSearch,WebFetch,Bash,Read"))
     }
 
     @Test fun `claude command passes the response schema inline instead of via a file`() {
