@@ -6,6 +6,7 @@ import nl.vdzon.productfactory.contracts.WorkspacePublicationView
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
 import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -30,6 +31,14 @@ class ShadowIterationEngineTest(
     @Autowired private val workspace: FakeWorkspacePublicationPort,
     @Autowired private val jdbc: JdbcTemplate,
 ) {
+    // De fakes zijn Spring-singletons die alle testmethoden in deze klasse delen; zonder reset
+    // lekt de workspace-artefactenlijst (en het scenario) van de ene test naar de volgende.
+    @BeforeEach
+    fun resetFakes() {
+        workspace.artifacts.clear()
+        bridge.scenario = Scenario.ACCEPT
+    }
+
     @Test
     fun `candidate from a failed workspace publication does not block a retry`() {
         val iteration = repository.create("hkh-autopilot", "Simuleer een mislukte workspace-publicatie")
@@ -128,7 +137,21 @@ class ShadowIterationEngineTest(
         )
     }
 
-    enum class Scenario { ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE }
+    @Test
+    fun `a researcher validation failure is retried with the rejection reason instead of failing the cycle`() {
+        bridge.scenario = Scenario.RESEARCH_RETRY_THEN_ACCEPT
+        val iteration = repository.create("hkh-autopilot", "Herstel een onvolledige eerste onderzoekspoging")
+        engine.run(iteration.id)
+
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", iteration.id).status)
+        val researcherSteps = repository.steps("hkh-autopilot", iteration.id).filter { it.role == "RESEARCHER" }
+        assertEquals(2, researcherSteps.size)
+        assertEquals("FAILED", researcherSteps[0].status)
+        assertTrue(researcherSteps[0].errorMessage!!.contains("gevalideerde bron"))
+        assertEquals("COMPLETED", researcherSteps[1].status)
+    }
+
+    enum class Scenario { ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE, RESEARCH_RETRY_THEN_ACCEPT }
 
     class FakeShadowAgentBridge : ShadowAgentBridge {
         var scenario = Scenario.ACCEPT
@@ -137,7 +160,14 @@ class ShadowIterationEngineTest(
             val firstAttempt = task.runId.endsWith("-1")
             val different = scenario == Scenario.REVISE || (scenario == Scenario.REVISE_THEN_ACCEPT && firstAttempt)
             val json = when (task.taskType.removePrefix("shadow-")) {
-                "researcher" -> """{
+                "researcher" -> if (scenario == Scenario.RESEARCH_RETRY_THEN_ACCEPT && task.runId.endsWith("-researcher-1")) """{
+                    "summary":"Open erfgoedbronnen kunnen een controleerbare eerste zoekervaring ondersteunen.",
+                    "findings":[{"title":"Open collecties","finding":"Een bevinding die naar een niet-gevalideerde bron verwijst.","sourceUrls":["https://niet-in-sources.example/"]}],
+                    "sources":[
+                      {"url":"https://noord-hollandsarchief.nl/","consultedOn":"$today","rightsIndication":"Rechten verschillen per object en moeten op de objectpagina worden gecontroleerd.","rationale":"Regionale bron voor Noord-Hollandse archiefcollecties."},
+                      {"url":"https://www.rijksmuseum.nl/nl/rijksstudio","consultedOn":"$today","rightsIndication":"Beschikbaarheid en rechten staan per object vermeld.","rationale":"Voorbeeld van een doorzoekbare Nederlandse erfgoedcollectie."}
+                    ]
+                }""" else """{
                     "summary":"Open erfgoedbronnen kunnen een controleerbare eerste zoekervaring ondersteunen.",
                     "findings":[{"title":"Open collecties","finding":"Noord-Hollands Archief en Rijksmuseum bieden publiek beschreven collecties met herleidbare objectpagina's.","sourceUrls":["https://noord-hollandsarchief.nl/","https://www.rijksmuseum.nl/nl/rijksstudio"]}],
                     "sources":[
@@ -168,12 +198,14 @@ class ShadowIterationEngineTest(
                           scenario == Scenario.AUTONOMY_REVISE_THEN_ACCEPT && firstAttempt -> "Handmatig geteste bronnenkaart"
                           scenario == Scenario.AUTONOMY_REVISE_THEN_ACCEPT -> "Automatisch geteste bronnenkaart"
                           scenario == Scenario.WARNING_ONLY_REVISE -> "Toegankelijke bronnenkaart met waarschuwing"
+                          scenario == Scenario.RESEARCH_RETRY_THEN_ACCEPT -> "Bronnenkaart na onderzoekscorrectie"
                           else -> "Bronnenkaart voor één locatie"
                       }}",
                       "description":"${when {
                           different -> "Bouw in één keer zoeken, kaarten, tijdlijnen, beeldherkenning en reconstructies voor alle bronnen."
                           scenario == Scenario.REVISE_THEN_ACCEPT -> "Toon voor één historische locatie een herzien verhaal met herleidbare bron- en rechteninformatie."
                           scenario == Scenario.WARNING_ONLY_REVISE -> "Toon één historische locatie en bewaar een niet-blokkerende toegankelijkheidswaarschuwing."
+                          scenario == Scenario.RESEARCH_RETRY_THEN_ACCEPT -> "Toon voor één historische locatie een verhaal na een herstelde onderzoekspoging."
                           else -> "Toon voor één historische locatie een verhaal met herleidbare bron- en rechteninformatie."
                       }}",
                       "acceptanceCriteria":[${if (scenario == Scenario.AUTONOMY_REVISE_THEN_ACCEPT && firstAttempt) {

@@ -151,8 +151,15 @@ class ClaudeAgentTaskExecutor(
         val envelope = runCatching { mapper.readTree(commandResult.output) }.getOrNull()
             ?: return failed(task, commandResult.output.takeLast(FALLBACK_SUMMARY_CHARS).trim().ifBlank { "Claude gaf geen resultaat terug." })
         val resultText = envelope.path("result").asText("").trim()
-        val isError = envelope.path("is_error").asBoolean(false) || envelope.path("subtype").asText("success") != "success"
-        if (isError) return failed(task, resultText.ifBlank { "Claude-taak mislukte zonder verdere toelichting." })
+        val subtype = envelope.path("subtype").asText("success")
+        val isError = envelope.path("is_error").asBoolean(false) || subtype != "success"
+        if (isError) {
+            // "result" is vaak leeg bij een fout (bv. error_max_turns); val dan terug op de rauwe
+            // procesuitvoer zodat de opgeslagen reden nooit alleen "geen toelichting" is.
+            val detail = resultText.ifBlank { commandResult.output.takeLast(FALLBACK_SUMMARY_CHARS).trim() }
+            val reason = detail.ifBlank { "geen toelichting in de Claude-uitvoer" }
+            return failed(task, if (subtype != "success") "Claude-taak mislukte ($subtype): $reason" else "Claude-taak mislukte: $reason")
+        }
         if (task.responseSchema == null) return AgentResult(task.runId, "COMPLETED", resultText, completedAt = Instant.now())
         // Bij --json-schema levert Claude de gevalideerde data in het aparte "structured_output"-veld;
         // "result" blijft het vrije-tekst-antwoord (vaak een samenvatting in plaats van de JSON zelf).

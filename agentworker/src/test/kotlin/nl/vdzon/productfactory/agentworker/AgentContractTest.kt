@@ -217,6 +217,23 @@ class AgentContractTest {
         assertTrue(result.summary.contains("OAuth access token has been revoked"))
     }
 
+    @Test fun `claude result parsing falls back to raw output and subtype when result text is blank on error`() {
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                Files.createTempDirectory("pf-claude-parse-blank-error"), "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val task = AgentTask("run-9", "hkh-autopilot", "research", "Onderzoek")
+        val envelope = """{"type":"result","subtype":"error_max_turns","is_error":true,"result":""}"""
+
+        val result = executor.parseResult(task, AgentCommandResult(1, false, envelope))
+
+        assertEquals("FAILED", result.status)
+        assertTrue(result.summary.contains("error_max_turns"))
+        assertTrue(result.summary.contains(envelope))
+    }
+
     @Test fun `routing executor dispatches on task provider and defaults to codex`() {
         val calls = mutableListOf<String>()
         val router = RoutingAgentTaskExecutor(
