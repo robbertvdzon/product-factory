@@ -989,11 +989,24 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                     ),
                   ...artifacts.map((item) {
                     final artifact = item as Map<String, dynamic>;
+                    final readableFields = _readableArtifactFields(
+                      context,
+                      '${artifact['artifactType']}',
+                      '${artifact['contentJson']}',
+                    );
                     return ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       title: Text(_roleLabel('${artifact['artifactType']}')),
                       subtitle: Text(formatDateTime(artifact['createdAt'])),
                       children: [
+                        if (readableFields.isNotEmpty)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: readableFields,
+                            ),
+                          ),
                         Align(
                           alignment: Alignment.centerLeft,
                           child: SelectableText(
@@ -1048,6 +1061,276 @@ String _prettyJson(String value) {
   } catch (_) {
     return value;
   }
+}
+
+/// Bekende `contentJson`-velden per basisrol, bevestigd tegen
+/// `productfactory/.../iteration/ShadowSchemas.kt` (`additionalProperties:false`, dus deze lijst is
+/// autoritatief zolang dat schema niet wijzigt):
+/// - `researcher`: summary, findings[].{title,finding,sourceUrls[]}, currentState.{purpose,gaps[]},
+///   improvementOpportunities[], sources[].{url,rationale}, inspiration[].{name,url,relevance}.
+/// - `product_owner`: productDirection, rationale, priorities[],
+///   decisions[].{decision,rationale,sourceUrls[]}, rejectedOptions[].
+/// - `ux_designer`: flowName, userGoal, steps[], wireframe, hypotheses[], accessibility[],
+///   privacyConsiderations[].
+/// - `story_writer`: candidates[].{title,description,acceptanceCriteria[],dependsOn[],risks[]}.
+/// - `critic`: overallVerdict, summary, issues[].{severity,category,description},
+///   candidateReviews[].{verdict,reason}, requiredChanges[].
+///
+/// `artifact['artifactType']` draagt bij een retrypoging een `-2`/`-3`-suffix (zie
+/// `ShadowIterationApi.kt`); die wordt hier gestript zodat retries dezelfde leesbare velden
+/// gebruiken als de eerste poging.
+List<Widget> _readableArtifactFields(
+  BuildContext context,
+  String artifactType,
+  String contentJson,
+) {
+  final Map<String, dynamic> data;
+  try {
+    final decoded = jsonDecode(contentJson);
+    if (decoded is! Map) return const [];
+    data = decoded.cast<String, dynamic>();
+  } catch (_) {
+    return const [];
+  }
+
+  final baseRole = artifactType.replaceAll(RegExp(r'-\d+$'), '');
+  return switch (baseRole) {
+    'researcher' => [
+      ..._readableText(context, 'Samenvatting', data['summary']),
+      ..._readableObjectList(
+        context,
+        'Bevindingen',
+        data['findings'],
+        (context, item) => [
+          ..._readableSelectableText(item['title'], bold: true),
+          ..._readableSelectableText(item['finding']),
+          ..._bulletLines(item['sourceUrls']),
+        ],
+      ),
+      ..._readableObject(
+        context,
+        'Huidige situatie',
+        data['currentState'],
+        (context, item) => [
+          ..._readableSelectableText(item['purpose']),
+          ..._bulletLines(item['gaps']),
+        ],
+      ),
+      ..._readableBulletList(
+        context,
+        'Verbetermogelijkheden',
+        data['improvementOpportunities'],
+      ),
+      ..._readableObjectList(
+        context,
+        'Bronnen',
+        data['sources'],
+        (context, item) => [
+          ..._readableSelectableText(item['url'], bold: true),
+          ..._readableSelectableText(item['rationale']),
+        ],
+      ),
+      ..._readableObjectList(
+        context,
+        'Inspiratie',
+        data['inspiration'],
+        (context, item) => [
+          ..._readableSelectableText(item['name'], bold: true),
+          ..._readableSelectableText(item['url']),
+          ..._readableSelectableText(item['relevance']),
+        ],
+      ),
+    ],
+    'product_owner' => [
+      ..._readableText(context, 'Productrichting', data['productDirection']),
+      ..._readableText(context, 'Onderbouwing', data['rationale']),
+      ..._readableBulletList(context, 'Prioriteiten', data['priorities']),
+      ..._readableObjectList(
+        context,
+        'Besluiten',
+        data['decisions'],
+        (context, item) => [
+          ..._readableSelectableText(item['decision'], bold: true),
+          ..._readableSelectableText(item['rationale']),
+          ..._bulletLines(item['sourceUrls']),
+        ],
+      ),
+      ..._readableBulletList(
+        context,
+        'Afgewezen opties',
+        data['rejectedOptions'],
+      ),
+    ],
+    'ux_designer' => [
+      ..._readableText(context, 'Flow', data['flowName']),
+      ..._readableText(context, 'Gebruikersdoel', data['userGoal']),
+      ..._readableBulletList(context, 'Stappen', data['steps']),
+      ..._readableText(context, 'Wireframe', data['wireframe']),
+      ..._readableBulletList(context, 'Hypotheses', data['hypotheses']),
+      ..._readableBulletList(
+        context,
+        'Toegankelijkheid',
+        data['accessibility'],
+      ),
+      ..._readableBulletList(
+        context,
+        'Privacyoverwegingen',
+        data['privacyConsiderations'],
+      ),
+    ],
+    'story_writer' => [
+      ..._readableObjectList(
+        context,
+        'Storykandidaten',
+        data['candidates'],
+        (context, item) => [
+          ..._readableSelectableText(item['title'], bold: true),
+          ..._readableSelectableText(item['description']),
+          ..._bulletLines(item['acceptanceCriteria']),
+          ..._bulletLines(item['dependsOn']),
+          ..._bulletLines(item['risks']),
+        ],
+      ),
+    ],
+    'critic' => [
+      ..._readableText(context, 'Eindoordeel', data['overallVerdict']),
+      ..._readableText(context, 'Samenvatting', data['summary']),
+      ..._readableObjectList(
+        context,
+        'Aandachtspunten',
+        data['issues'],
+        (context, item) => [
+          ..._readableSelectableText(
+            [
+              '${item['severity'] ?? ''}'.trim(),
+              '${item['category'] ?? ''}'.trim(),
+            ].where((value) => value.isNotEmpty).join(' · '),
+            bold: true,
+          ),
+          ..._readableSelectableText(item['description']),
+        ],
+      ),
+      ..._readableObjectList(
+        context,
+        'Beoordeling per kandidaat',
+        data['candidateReviews'],
+        (context, item) => [
+          ..._readableSelectableText(item['verdict'], bold: true),
+          ..._readableSelectableText(item['reason']),
+        ],
+      ),
+      ..._readableBulletList(
+        context,
+        'Vereiste wijzigingen',
+        data['requiredChanges'],
+      ),
+    ],
+    _ => const <Widget>[],
+  };
+}
+
+/// Eén regel platte tekst binnen een objectitem (findings/decisions/etc.); leeg/null wordt
+/// weggelaten zodat er geen lege regels of het woord "null" verschijnen.
+List<Widget> _readableSelectableText(dynamic value, {bool bold = false}) {
+  final text = value == null ? '' : '$value'.trim();
+  if (text.isEmpty) return const [];
+  return [
+    SelectableText(
+      text,
+      style: bold ? const TextStyle(fontWeight: FontWeight.w600) : null,
+    ),
+  ];
+}
+
+/// Opsommingsregels ('• item') zonder eigen kopje, voor gebruik binnen een objectitem.
+List<Widget> _bulletLines(dynamic value) {
+  if (value is! List) return const [];
+  return value
+      .map((entry) => '$entry'.trim())
+      .where((entry) => entry.isNotEmpty)
+      .map((entry) => SelectableText('• $entry'))
+      .toList();
+}
+
+/// Kopje + tekstblok voor een scalar veld; lege/null waarden leveren niets op.
+List<Widget> _readableText(BuildContext context, String label, dynamic value) {
+  final text = value == null ? '' : '$value'.trim();
+  if (text.isEmpty) return const [];
+  return [
+    Text(label, style: Theme.of(context).textTheme.titleSmall),
+    const SizedBox(height: 4),
+    SelectableText(text),
+    const SizedBox(height: 12),
+  ];
+}
+
+/// Kopje + opsomming voor een array van strings; lege/ontbrekende arrays leveren niets op.
+List<Widget> _readableBulletList(
+  BuildContext context,
+  String label,
+  dynamic value,
+) {
+  final lines = _bulletLines(value);
+  if (lines.isEmpty) return const [];
+  return [
+    Text(label, style: Theme.of(context).textTheme.titleSmall),
+    const SizedBox(height: 4),
+    ...lines,
+    const SizedBox(height: 12),
+  ];
+}
+
+/// Kopje + lijst van objecten (bv. findings, decisions); elk object wordt via [itemBuilder] naar
+/// zijn eigen regels omgezet, objecten zonder inhoud worden overgeslagen.
+List<Widget> _readableObjectList(
+  BuildContext context,
+  String label,
+  dynamic value,
+  List<Widget> Function(BuildContext context, Map<String, dynamic> item)
+  itemBuilder,
+) {
+  if (value is! List) return const [];
+  final blocks = <Widget>[];
+  for (final entry in value) {
+    if (entry is! Map) continue;
+    final itemWidgets = itemBuilder(context, entry.cast<String, dynamic>());
+    if (itemWidgets.isEmpty) continue;
+    blocks.add(
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: itemWidgets,
+        ),
+      ),
+    );
+  }
+  if (blocks.isEmpty) return const [];
+  return [
+    Text(label, style: Theme.of(context).textTheme.titleSmall),
+    const SizedBox(height: 4),
+    ...blocks,
+    const SizedBox(height: 12),
+  ];
+}
+
+/// Kopje + regels voor één enkel genest object (bv. `currentState`); lege objecten leveren niets op.
+List<Widget> _readableObject(
+  BuildContext context,
+  String label,
+  dynamic value,
+  List<Widget> Function(BuildContext context, Map<String, dynamic> item)
+  itemBuilder,
+) {
+  if (value is! Map) return const [];
+  final itemWidgets = itemBuilder(context, value.cast<String, dynamic>());
+  if (itemWidgets.isEmpty) return const [];
+  return [
+    Text(label, style: Theme.of(context).textTheme.titleSmall),
+    const SizedBox(height: 4),
+    ...itemWidgets,
+    const SizedBox(height: 12),
+  ];
 }
 
 /// De onderliggende `mode` ('autonomous'/'shadow') is een door de backend afgeleide waarde, geen keuze van de
@@ -1147,7 +1430,8 @@ List<Widget> _buildStoryQueueSections(
                   '${delivery!['errorMessage']}',
               ];
               final blockedReason = '${story['blockedReason'] ?? ''}'.trim();
-              final isBlocked = story['blocked'] == true && blockedReason.isNotEmpty;
+              final isBlocked =
+                  story['blocked'] == true && blockedReason.isNotEmpty;
               final blockedColors = kClassificationColors[kGuardrailConflict]!;
               // MergeSemantics zorgt dat titel/subtitle/blokkeerlabel als één toegankelijke
               // naam/beschrijving van de kaart opvraagbaar zijn, zonder de bestaande
