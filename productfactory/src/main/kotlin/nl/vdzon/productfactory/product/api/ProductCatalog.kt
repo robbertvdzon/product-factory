@@ -169,6 +169,26 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         return requireProduct(normalized)
     }
 
+    /**
+     * Past de vaste identiteit van een product (GitHub-repo, acceptatie-URL) toe, zoals bijgehouden in het
+     * repo-bestand `projects.yaml` in plaats van via het dashboard. Werkt alleen op een reeds bestaand product;
+     * de aanroeper (de opstart-reconciler) beslist wat te doen als een slug nog niet is aangemaakt.
+     */
+    fun reconcileFixedFields(slug: String, targetRepositoryName: String?, acceptanceUrl: String?): ProductView {
+        val normalized = normalizeSlug(slug)
+        val current = requireProduct(normalized)
+        val repo = (targetRepositoryName?.trim()?.ifBlank { null } ?: current.targetRepositoryName)
+        val acc = acceptanceUrl?.trim()?.ifBlank { null } ?: current.acceptanceUrl
+        require(repo.matches(REPOSITORY)) { "Ongeldige repositorynaam" }
+        validateUrl(acc)
+
+        jdbc.update(
+            "update product_definition set target_repository_name = ?, acceptance_url = ?, updated_at = current_timestamp where slug = ?",
+            repo, acc, normalized,
+        )
+        return requireProduct(normalized)
+    }
+
     private fun replaceIterationTimes(slug: String, times: List<String>) {
         jdbc.update("delete from product_iteration_time where product_slug = ?", slug)
         times.distinct().forEach {
