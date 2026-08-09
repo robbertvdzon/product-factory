@@ -290,9 +290,9 @@ class _OverviewPageState extends State<OverviewPage> {
     try {
       await api.startCycle(slug);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Productcyclus voor $slug is gestart.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Productcyclus voor $slug is gestart.')),
+        );
         setState(_reload);
       }
     } catch (error) {
@@ -487,9 +487,13 @@ class _OverviewPageState extends State<OverviewPage> {
                           ),
                           Text('Repo: ${product['targetRepositoryName']}'),
                           Text('Workspace: ${product['workspaceOwnership']}'),
-                          Text('Max stories per cyclus: ${product['maxStoriesPerCycle']}'),
+                          Text(
+                            'Max stories per cyclus: ${product['maxStoriesPerCycle']}',
+                          ),
                           Text('WIP: ${product['wipLimit']}'),
-                          Text('AI: ${product['aiProvider']} · ${product['aiModel']}'),
+                          Text(
+                            'AI: ${product['aiProvider']} · ${product['aiModel']}',
+                          ),
                           Text(
                             'Cyclustijden: ${((product['iterationTimes'] as List<dynamic>?) ?? const []).join(', ')}',
                           ),
@@ -724,6 +728,7 @@ class IterationSessionDialog extends StatefulWidget {
 class _IterationSessionDialogState extends State<IterationSessionDialog> {
   late Future<Map<String, dynamic>> session;
   Timer? refreshTimer;
+  bool _cancelling = false;
 
   @override
   void initState() {
@@ -747,186 +752,257 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
     super.dispose();
   }
 
+  Future<void> _confirmCancel() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cyclus annuleren?'),
+        content: const Text(
+          'De cyclus wordt gemarkeerd als mislukt en het product is meteen weer vrij voor een nieuwe '
+          'cyclus. Een agentstap die nog bezig is, wordt niet hard afgebroken, maar de uitkomst ervan '
+          'telt niet meer mee.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Nee'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ja, annuleren'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _cancelling = true);
+    try {
+      await widget.api.cancelIteration(widget.productSlug, widget.iterationId);
+      if (mounted) {
+        setState(() {
+          _cancelling = false;
+          _reload();
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _cancelling = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text('Productcyclus ${widget.iterationId}'),
-    content: SizedBox(
-      width: 900,
-      height: 680,
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: session,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Text('Sessie kon niet laden: ${snapshot.error}'),
-              );
-            }
-            return const Center(child: CircularProgressIndicator());
-          }
-          final result = snapshot.data!;
-          final iteration = result['iteration'] as Map<String, dynamic>;
-          final steps = result['steps'] as List<dynamic>;
-          final artifacts = result['artifacts'] as List<dynamic>;
-          final status = '${iteration['status']}';
-          final running = status == 'QUEUED' || status == 'RUNNING';
-          final currentRole = iteration['currentRole'];
-          final dossier = result['dossier'] as String?;
-          final summary = iteration['summary'] as String?;
-          final timing = iterationTiming(iteration);
-          return ListView(
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+    future: session,
+    builder: (context, snapshot) {
+      final iteration = snapshot.data?['iteration'] as Map<String, dynamic>?;
+      final status = iteration == null ? null : '${iteration['status']}';
+      final running = status == 'QUEUED' || status == 'RUNNING';
+      return AlertDialog(
+        title: Text('Productcyclus ${widget.iterationId}'),
+        content: SizedBox(
+          width: 900,
+          height: 680,
+          child: Builder(
+            builder: (context) {
+              if (!snapshot.hasData) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Sessie kon niet laden: ${snapshot.error}'),
+                  );
+                }
+                return const Center(child: CircularProgressIndicator());
+              }
+              final result = snapshot.data!;
+              final iteration = result['iteration'] as Map<String, dynamic>;
+              final steps = result['steps'] as List<dynamic>;
+              final artifacts = result['artifacts'] as List<dynamic>;
+              final status = '${iteration['status']}';
+              final running = status == 'QUEUED' || status == 'RUNNING';
+              final currentRole = iteration['currentRole'];
+              final dossier = result['dossier'] as String?;
+              final summary = iteration['summary'] as String?;
+              final timing = iterationTiming(iteration);
+              return ListView(
                 children: [
-                  Chip(label: Text(status)),
-                  Chip(label: Text(_deliveryLabel('${iteration['mode']}'))),
-                  if (currentRole != null)
-                    Chip(label: Text('bezig: $currentRole')),
-                  Text('gestart ${timing.startLabel}'),
-                  if (timing.durationLabel != null) Text(timing.durationLabel!),
-                ],
-              ),
-              if (running) ...[
-                const SizedBox(height: 12),
-                const LinearProgressIndicator(),
-                const SizedBox(height: 8),
-                Text(
-                  currentRole == null
-                      ? 'De cyclus staat klaar om te beginnen.'
-                      : 'De agent $currentRole is nu bezig. Dit scherm wordt automatisch vernieuwd.',
-                ),
-              ],
-              if (summary != null && summary.trim().isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Card(
-                  color: Theme.of(context).colorScheme.secondaryContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.summarize_outlined),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Samenvatting voor jou',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SelectableText(summary),
-                      ],
-                    ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Chip(label: Text(status)),
+                      Chip(label: Text(_deliveryLabel('${iteration['mode']}'))),
+                      if (currentRole != null)
+                        Chip(label: Text('bezig: $currentRole')),
+                      Text('gestart ${timing.startLabel}'),
+                      if (timing.durationLabel != null)
+                        Text(timing.durationLabel!),
+                    ],
                   ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Text('Opdracht', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              SelectableText('${iteration['focus']}'),
-              const SizedBox(height: 20),
-              Text('Voortgang', style: Theme.of(context).textTheme.titleMedium),
-              if (steps.isEmpty)
-                const ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.schedule),
-                  title: Text('Nog geen agentstappen gestart'),
-                ),
-              ...steps.map((item) {
-                final step = item as Map<String, dynamic>;
-                final stepStatus = '${step['status']}';
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    stepStatus == 'COMPLETED'
-                        ? Icons.check_circle_outline
-                        : stepStatus == 'FAILED'
-                        ? Icons.error_outline
-                        : Icons.pending_outlined,
-                  ),
-                  title: Text(
-                    '${_roleLabel('${step['role']}')} · poging ${step['attempt']}',
-                  ),
-                  subtitle: Text(
-                    [
-                      stepStatus,
-                      if (step['startedAt'] != null)
-                        'start ${formatDateTime(step['startedAt'])}',
-                      if (step['completedAt'] != null)
-                        'klaar ${formatDateTime(step['completedAt'])}',
-                      if (step['errorMessage'] != null)
-                        '${step['errorMessage']}',
-                    ].join(' · '),
-                  ),
-                );
-              }),
-              const SizedBox(height: 12),
-              Text(
-                'Resultaat en onderbouwing',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              if (dossier != null)
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: const Text('Volledig productdossier'),
-                  subtitle: const Text(
-                    'Onderzoek, productbesluit, UX, criticus en geaccepteerde stories',
-                  ),
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: SelectableText(dossier),
+                  if (running) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 8),
+                    Text(
+                      currentRole == null
+                          ? 'De cyclus staat klaar om te beginnen.'
+                          : 'De agent $currentRole is nu bezig. Dit scherm wordt automatisch vernieuwd.',
                     ),
                   ],
-                ),
-              if (artifacts.isEmpty)
-                const ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.hourglass_empty),
-                  title: Text('Nog geen agentresultaten beschikbaar'),
-                ),
-              ...artifacts.map((item) {
-                final artifact = item as Map<String, dynamic>;
-                return ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: Text(_roleLabel('${artifact['artifactType']}')),
-                  subtitle: Text(formatDateTime(artifact['createdAt'])),
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: SelectableText(
-                        _prettyJson('${artifact['contentJson']}'),
+                  if (summary != null && summary.trim().isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Card(
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.summarize_outlined),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Samenvatting voor jou',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            SelectableText(summary),
+                          ],
+                        ),
                       ),
                     ),
                   ],
-                );
-              }),
-              if (iteration['workspacePullRequestUrl'] != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Workspace-publicatie',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                SelectableText('${iteration['workspacePullRequestUrl']}'),
-                if (iteration['workspaceCommitSha'] != null)
-                  SelectableText('Commit: ${iteration['workspaceCommitSha']}'),
-              ],
-            ],
-          );
-        },
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Sluiten'),
-      ),
-    ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Opdracht',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  SelectableText('${iteration['focus']}'),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Voortgang',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (steps.isEmpty)
+                    const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.schedule),
+                      title: Text('Nog geen agentstappen gestart'),
+                    ),
+                  ...steps.map((item) {
+                    final step = item as Map<String, dynamic>;
+                    final stepStatus = '${step['status']}';
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        stepStatus == 'COMPLETED'
+                            ? Icons.check_circle_outline
+                            : stepStatus == 'FAILED'
+                            ? Icons.error_outline
+                            : Icons.pending_outlined,
+                      ),
+                      title: Text(
+                        '${_roleLabel('${step['role']}')} · poging ${step['attempt']}',
+                      ),
+                      subtitle: Text(
+                        [
+                          stepStatus,
+                          if (step['startedAt'] != null)
+                            'start ${formatDateTime(step['startedAt'])}',
+                          if (step['completedAt'] != null)
+                            'klaar ${formatDateTime(step['completedAt'])}',
+                          if (step['errorMessage'] != null)
+                            '${step['errorMessage']}',
+                        ].join(' · '),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Resultaat en onderbouwing',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (dossier != null)
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text('Volledig productdossier'),
+                      subtitle: const Text(
+                        'Onderzoek, productbesluit, UX, criticus en geaccepteerde stories',
+                      ),
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SelectableText(dossier),
+                        ),
+                      ],
+                    ),
+                  if (artifacts.isEmpty)
+                    const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.hourglass_empty),
+                      title: Text('Nog geen agentresultaten beschikbaar'),
+                    ),
+                  ...artifacts.map((item) {
+                    final artifact = item as Map<String, dynamic>;
+                    return ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: Text(_roleLabel('${artifact['artifactType']}')),
+                      subtitle: Text(formatDateTime(artifact['createdAt'])),
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SelectableText(
+                            _prettyJson('${artifact['contentJson']}'),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                  if (iteration['workspacePullRequestUrl'] != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Workspace-publicatie',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    SelectableText('${iteration['workspacePullRequestUrl']}'),
+                    if (iteration['workspaceCommitSha'] != null)
+                      SelectableText(
+                        'Commit: ${iteration['workspaceCommitSha']}',
+                      ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          if (running)
+            TextButton(
+              onPressed: _cancelling ? null : _confirmCancel,
+              child: _cancelling
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Cyclus annuleren'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Sluiten'),
+          ),
+        ],
+      );
+    },
   );
 }
 
@@ -1156,7 +1232,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
   String developmentMode = 'manual';
   String workspaceOwnership = 'owner';
   late String aiProvider = widget.aiCatalog.keys.first;
-  late String aiModel = (widget.aiCatalog[aiProvider] as List<dynamic>).first as String;
+  late String aiModel =
+      (widget.aiCatalog[aiProvider] as List<dynamic>).first as String;
   List<String> iterationTimes = ['03:00'];
 
   @override
@@ -1235,7 +1312,9 @@ class _AddProductDialogState extends State<AddProductDialog> {
             ),
             DropdownButtonFormField<String>(
               initialValue: workspaceOwnership,
-              decoration: const InputDecoration(labelText: 'Workspace-eigenaar'),
+              decoration: const InputDecoration(
+                labelText: 'Workspace-eigenaar',
+              ),
               items: const [
                 DropdownMenuItem(value: 'owner', child: Text('Eigenaar')),
                 DropdownMenuItem(
@@ -1356,7 +1435,8 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Max stories per cyclus',
-                helperText: 'Hoeveel storykandidaten de story writer per cyclus mag schrijven.',
+                helperText:
+                    'Hoeveel storykandidaten de story writer per cyclus mag schrijven.',
               ),
             ),
             TextField(
@@ -1364,7 +1444,8 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'WIP-limiet',
-                helperText: 'Hoeveel stories er tegelijk in levering mogen zijn.',
+                helperText:
+                    'Hoeveel stories er tegelijk in levering mogen zijn.',
               ),
             ),
             const SizedBox(height: 8),
@@ -1413,7 +1494,9 @@ class AiProviderModelFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final providers = aiCatalog.keys.toList();
-    final models = (aiCatalog[provider] as List<dynamic>?)?.cast<String>() ?? const <String>[];
+    final models =
+        (aiCatalog[provider] as List<dynamic>?)?.cast<String>() ??
+        const <String>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1423,14 +1506,20 @@ class AiProviderModelFields extends StatelessWidget {
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                initialValue: providers.contains(provider) ? provider : providers.first,
+                initialValue: providers.contains(provider)
+                    ? provider
+                    : providers.first,
                 decoration: const InputDecoration(labelText: 'Provider'),
                 items: providers
-                    .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                    .map(
+                      (value) =>
+                          DropdownMenuItem(value: value, child: Text(value)),
+                    )
                     .toList(),
                 onChanged: (value) {
                   if (value == null) return;
-                  final nextModels = (aiCatalog[value] as List<dynamic>).cast<String>();
+                  final nextModels = (aiCatalog[value] as List<dynamic>)
+                      .cast<String>();
                   onChanged(value, nextModels.first);
                 },
               ),
@@ -1441,7 +1530,10 @@ class AiProviderModelFields extends StatelessWidget {
                 initialValue: models.contains(model) ? model : models.first,
                 decoration: const InputDecoration(labelText: 'Model'),
                 items: models
-                    .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                    .map(
+                      (value) =>
+                          DropdownMenuItem(value: value, child: Text(value)),
+                    )
                     .toList(),
                 onChanged: (value) {
                   if (value == null) return;

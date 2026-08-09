@@ -112,6 +112,26 @@ class DashboardApi {
     }
   }
 
+  Future<void> cancelIteration(
+    String productSlug,
+    String iterationId, {
+    String? reason,
+  }) async {
+    final query = 'productSlug=${Uri.encodeQueryComponent(productSlug)}';
+    final response = await http.post(
+      Uri.parse(
+        '$baseUrl/api/shadow-iterations/${Uri.encodeComponent(iterationId)}/cancel?$query',
+      ),
+      headers: headers,
+      body: jsonEncode({'reason': reason}),
+    );
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Cyclus kon niet worden geannuleerd (${response.statusCode}).',
+      );
+    }
+  }
+
   Future<void> completeHumanAction(int id, String result) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/autonomy/human-actions/$id/complete'),
