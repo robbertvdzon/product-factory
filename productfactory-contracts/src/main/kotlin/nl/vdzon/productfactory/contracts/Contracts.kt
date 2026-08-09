@@ -77,6 +77,7 @@ data class ProductView(
     val liveUrl: String?,
     val previewUrlPattern: String?,
     val acceptanceUrl: String?,
+    val adminUrl: String?,
     val status: String,
     val developmentMode: String,
     val iterationTimes: List<String>,

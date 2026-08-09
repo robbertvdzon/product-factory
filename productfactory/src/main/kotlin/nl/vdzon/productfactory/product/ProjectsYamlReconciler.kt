@@ -9,11 +9,11 @@ import org.springframework.stereotype.Component
 import org.yaml.snakeyaml.Yaml
 
 /**
- * Past bij het opstarten de vaste projectgegevens (GitHub-repo, acceptatie-URL) uit `projects.yaml` toe op
- * reeds bestaande producten. De database blijft de bron voor alles wat via het dashboard wijzigt (status,
- * cyclustijden, AI-instellingen); dit bestand is de bron voor wat in de praktijk nooit los van een
- * codewijziging verandert, zodat die gegevens met een gewone pull request te herstellen zijn in plaats van
- * met een handmatige aanroep op de draaiende runtime.
+ * Past bij het opstarten de vaste projectgegevens (GitHub-repo, acceptatie-URL, admin-URL) uit
+ * `projects.yaml` toe op reeds bestaande producten. De database blijft de bron voor alles wat via het
+ * dashboard wijzigt (status, cyclustijden, AI-instellingen); dit bestand is de bron voor wat in de praktijk
+ * nooit los van een codewijziging verandert, zodat die gegevens met een gewone pull request te herstellen
+ * zijn in plaats van met een handmatige aanroep op de draaiende runtime.
  *
  * Een slug die hier staat maar nog geen product heeft, wordt overgeslagen: dit bestand kan geen product
  * aanmaken (daarvoor zijn meer velden nodig dan hier bijgehouden worden), alleen bijwerken.
@@ -40,6 +40,7 @@ class ProjectsYamlReconciler(private val catalog: ProductCatalog) {
                     slug,
                     entry["targetRepositoryName"] as? String,
                     entry["acceptanceUrl"] as? String,
+                    entry["adminUrl"] as? String,
                 )
             }.onFailure { logger.warn("projects.yaml-entry voor '$slug' kon niet worden toegepast: ${it.message}") }
         }

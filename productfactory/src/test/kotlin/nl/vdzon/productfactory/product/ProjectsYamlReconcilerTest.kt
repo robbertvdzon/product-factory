@@ -21,15 +21,32 @@ class ProjectsYamlReconcilerTest(@Autowired private val catalog: ProductCatalog)
     @Test
     fun `reconcileFixedFields rejects an invalid repository name`() {
         assertFailsWith<IllegalArgumentException> {
-            catalog.reconcileFixedFields("hkh-autopilot", "niet een geldige repo naam met spaties", null)
+            catalog.reconcileFixedFields("hkh-autopilot", "niet een geldige repo naam met spaties", null, null)
         }
+    }
+
+    @Test
+    fun `reconcileFixedFields rejects an invalid admin url`() {
+        assertFailsWith<IllegalArgumentException> {
+            catalog.reconcileFixedFields("hkh-autopilot", null, null, "niet-een-url")
+        }
+    }
+
+    @Test
+    fun `reconcileFixedFields sets and keeps the admin url`() {
+        val updated = catalog.reconcileFixedFields("hkh-autopilot", null, null, "https://hkh-autopilot.vdzonsoftware.nl/admin")
+        assertEquals("https://hkh-autopilot.vdzonsoftware.nl/admin", updated.adminUrl)
+
+        val kept = catalog.reconcileFixedFields("hkh-autopilot", null, null, null)
+        assertEquals("https://hkh-autopilot.vdzonsoftware.nl/admin", kept.adminUrl)
     }
 
     @Test
     fun `reconcileFixedFields keeps the current value when a field is not supplied`() {
         val before = catalog.requireProduct("hkh-autopilot")
-        val after = catalog.reconcileFixedFields("hkh-autopilot", null, null)
+        val after = catalog.reconcileFixedFields("hkh-autopilot", null, null, null)
         assertEquals(before.targetRepositoryName, after.targetRepositoryName)
         assertEquals(before.acceptanceUrl, after.acceptanceUrl)
+        assertEquals(before.adminUrl, after.adminUrl)
     }
 }

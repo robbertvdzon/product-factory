@@ -1,4 +1,4 @@
-# Vaste projectgegevens: GitHub-repo en acceptatieomgeving per product.
+# Vaste projectgegevens: GitHub-repo, acceptatieomgeving en admin-URL per product (adminUrl is optioneel).
 # Wordt bij het opstarten toegepast op reeds bestaande producten (nl.vdzon.productfactory.product.ProjectsYamlReconciler).
 # Alles wat via het dashboard wijzigt (status, cyclustijden, AI-instellingen) staat alleen in de database.
 # Een slug die hier nog niet als product bestaat, wordt overgeslagen totdat die via de API is aangemaakt.
