@@ -26,16 +26,47 @@ internal data class ReviewedCandidate(
     val duplicateOfId: Long?,
     /** Sleutels uit [dependsOn] die binnen dezelfde batch daadwerkelijk naar een candidateKey verwijzen. */
     val resolvedDependsOn: List<String> = emptyList(),
+    /** Resolutiedetail per dependsOn-waarde, inclusief legacy-fallback- en blokkade-informatie voor de mapping-log. */
+    val dependencyResolutions: List<DependencyResolution> = emptyList(),
+    /** True zodra minstens één dependsOn-waarde niet naar een kandidaat binnen deze batch kon worden vertaald. */
+    val blocked: Boolean = false,
 )
 
+/** Resultaat van het vertalen van één dependsOn-waarde naar een kandidaat binnen dezelfde batch. */
+internal data class DependencyResolution(
+    val rawValue: String,
+    val resolvedCandidateKey: String?,
+    val viaLegacyFallback: Boolean,
+) {
+    val resolved: Boolean get() = resolvedCandidateKey != null
+}
+
+/** Herkent het oude batch-relatieve volgnummerformaat "Kandidaat <n>" (case-insensitive). */
+internal val LEGACY_POSITIONAL_DEPENDSON_PATTERN = Regex("""(?i)\bkandidaat\s*(\d+)\b""")
+
 /**
- * Koppelt dependsOn-waarden aan de bijbehorende kandidaat via een candidateKey-lookup (kaart, geen
- * arrayindex), zodat de koppeling stabiel blijft ongeacht batch- of reviewvolgorde.
+ * Vertaalt elke dependsOn-waarde naar de kandidaat binnen dezelfde batch waar hij naar verwijst.
+ * Probeert eerst een candidateKey-lookup (kaart, geen arrayindex, dus stabiel ongeacht batch-/
+ * reviewvolgorde). Faalt die, dan wordt de waarde herkend als legacy batch-relatief volgnummer
+ * ("Kandidaat <n>") en automatisch vertaald naar het batch-item op die nulgebaseerde positie
+ * ([candidatesByPosition], dezelfde volgorde als candidates[]/candidateIndex). Lukt geen van beide,
+ * dan blijft de resolutie onopgelost (resolvedCandidateKey == null) zodat de aanroeper alleen die
+ * ene kandidaat kan blokkeren zonder de rest van de batch te raken.
  */
-internal fun resolveCandidateDependencies(
+internal fun resolveDependencyReferences(
     candidatesByKey: Map<String, ReviewedCandidate>,
+    candidatesByPosition: List<ReviewedCandidate>,
     dependsOn: List<String>,
-): List<ReviewedCandidate> = dependsOn.mapNotNull(candidatesByKey::get)
+): List<DependencyResolution> = dependsOn.map { raw ->
+    val direct = candidatesByKey[raw]
+    if (direct != null) {
+        DependencyResolution(raw, direct.candidateKey, viaLegacyFallback = false)
+    } else {
+        val legacyPosition = LEGACY_POSITIONAL_DEPENDSON_PATTERN.find(raw)?.groupValues?.get(1)?.toIntOrNull()
+        val legacyCandidate = legacyPosition?.let(candidatesByPosition::getOrNull)
+        DependencyResolution(raw, legacyCandidate?.candidateKey, viaLegacyFallback = legacyCandidate != null)
+    }
+}
 
 internal object ShadowDossierRenderer {
     fun render(

@@ -25,6 +25,30 @@ hierboven).
 > stond op `false` en is niet alsnog gebouwd, dat viel expliciet buiten de scope van
 > product-factory-8. De rest van dit document beschrijft, ongewijzigd, de situatie zoals die vóór
 > product-factory-8 was en dient als historische onderbouwing van dat besluit.
+>
+> **Update (product-factory-9):** de harde, batch-brede afwijzing van het legacy `"Kandidaat <n>"`-
+> patroon uit de vorige update is vervangen door een resolve-stap die dat patroon juist automatisch
+> vertaalt. `resolveCandidateDependencies` (`ShadowDossierRenderer.kt`) heet nu
+> `resolveDependencyReferences` en probeert per `dependsOn`-waarde eerst een `candidateKey`-lookup
+> binnen de batch; matcht de waarde bij het uitblijven daarvan `LEGACY_POSITIONAL_DEPENDSON_PATTERN`
+> ("Kandidaat <n>", case-insensitive), dan valt de resolver terug op het batch-item op die
+> nulgebaseerde positie (`candidatesByPosition`, dezelfde volgorde als `candidates[]`/
+> `candidateIndex` — exact het mechanisme dat sectie 3 hieronder als enige beschikbare identiteit
+> ten tijde van schrijven beschrijft). `ShadowIterationEngine.validateStories` wijst een batch met
+> zo'n legacy-verwijzing dus niet langer af. Blijft een `dependsOn`-waarde ook via de legacy-fallback
+> onopgelost (onbekende sleutel of positie buiten bereik), dan wordt niet meer de hele batch
+> geblokkeerd maar uitsluitend de afhankelijke kandidaat: die wordt niet opgeslagen in
+> `story_candidate` en niet meegenomen in het gepubliceerde dossier (`ShadowIterationEngine.run`
+> sluit `blocked`-kandidaten uit van `accepted`), terwijl de rest van de batch normaal doorloopt —
+> geen cascaderende blokkade. De volledige sleutel-naar-`story_candidate.id`-mapping (inclusief welke
+> resoluties via de legacy-fallback verliepen en welke kandidaten geblokkeerd zijn) wordt per iteratie
+> duurzaam vastgelegd als nieuw artifact_type `dependson_resolution` in de bestaande
+> `shadow_iteration_artifact`-tabel (`ShadowIterationRepository.saveArtifact`,
+> `ShadowIterationEngine.persistValidatedResults`) — dus niet alleen als vluchtig applicatielog. Dit
+> raakt uitsluitend Product Factory's eigen `story_candidate`-persistentiestap; de sectie
+> "Publicatiepad: leest `dependsOn` nergens" hieronder blijft onverkort van toepassing —
+> `WorkspacePublisher.kt`, `AutonomousDelivery.kt` en `StoryCandidateApi.kt` zijn door
+> product-factory-9 niet gewijzigd en lezen `dependsOn` nog steeds nergens.
 
 ## Uitkomst
 

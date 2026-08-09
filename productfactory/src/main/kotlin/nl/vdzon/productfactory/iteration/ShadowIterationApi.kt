@@ -7,6 +7,7 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.support.GeneratedKeyHolder
 import org.springframework.stereotype.Repository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -249,6 +250,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         fingerprint,
     )
 
+    /** @return het door de database toegekende, blijvende `story_candidate.id` van de opgeslagen kandidaat. */
     fun saveCandidate(
         iterationId: String,
         productSlug: String,
@@ -259,27 +261,47 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         criticStatus: String,
         criticReason: String,
         duplicateOfId: Long?,
-    ) {
+    ): Long {
         val status = when {
             duplicateOfId != null -> "DUPLICATE"
             criticStatus == "ACCEPT" -> "INTERNAL"
             else -> "REJECTED"
         }
+        val keyHolder = GeneratedKeyHolder()
         jdbc.update(
-            """insert into story_candidate(
-                product_slug, title, description, status, iteration_id, fingerprint,
-                acceptance_criteria, critic_status, critic_reason, duplicate_of_id
-            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
-            productSlug,
-            title,
-            description,
-            status,
+            { connection ->
+                val statement = connection.prepareStatement(
+                    """insert into story_candidate(
+                        product_slug, title, description, status, iteration_id, fingerprint,
+                        acceptance_criteria, critic_status, critic_reason, duplicate_of_id
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                    arrayOf("id"),
+                )
+                statement.setString(1, productSlug)
+                statement.setString(2, title)
+                statement.setString(3, description)
+                statement.setString(4, status)
+                statement.setString(5, iterationId)
+                statement.setString(6, fingerprint)
+                statement.setString(7, acceptanceCriteria)
+                statement.setString(8, criticStatus)
+                statement.setString(9, criticReason)
+                if (duplicateOfId != null) statement.setLong(10, duplicateOfId) else statement.setNull(10, java.sql.Types.BIGINT)
+                statement
+            },
+            keyHolder,
+        )
+        return keyHolder.key!!.toLong()
+    }
+
+    /** Generieke opslag voor een niet-agentgebonden dossierartefact (bv. de dependsOn-resolutiemapping). */
+    fun saveArtifact(iterationId: String, productSlug: String, artifactType: String, contentJson: String) {
+        jdbc.update(
+            "insert into shadow_iteration_artifact(iteration_id, product_slug, artifact_type, content_json) values (?, ?, ?, ?)",
             iterationId,
-            fingerprint,
-            acceptanceCriteria,
-            criticStatus,
-            criticReason,
-            duplicateOfId,
+            productSlug,
+            artifactType,
+            contentJson,
         )
     }
 

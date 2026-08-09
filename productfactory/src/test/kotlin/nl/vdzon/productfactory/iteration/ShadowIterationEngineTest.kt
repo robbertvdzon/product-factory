@@ -66,8 +66,11 @@ class ShadowIterationEngineTest(
         assertEquals("ACCEPTED", repository.require("hkh-autopilot", accepted.id).status)
         assertEquals("Dit is een korte, voor-dummies samenvatting van de testcyclus.", repository.require("hkh-autopilot", accepted.id).summary)
         assertEquals(6, repository.steps("hkh-autopilot", accepted.id).size)
-        assertEquals(6, repository.artifacts("hkh-autopilot", accepted.id).size)
+        // 6 rolartefacten (research/product_owner/ux_designer/story_writer/critic/summary) plus de
+        // dependson_resolution-mapping die persistValidatedResults altijd na afloop van de batch vastlegt.
+        assertEquals(7, repository.artifacts("hkh-autopilot", accepted.id).size)
         assertTrue(repository.artifacts("hkh-autopilot", accepted.id).any { it.artifactType == "product_owner" })
+        assertTrue(repository.artifacts("hkh-autopilot", accepted.id).any { it.artifactType == "dependson_resolution" })
         assertEquals(1, workspace.artifacts.size)
         assertTrue(workspace.artifacts.single().content.contains("Rechtenindicatie"))
         assertTrue(workspace.artifacts.single().content.contains("run_id: ${accepted.id}"))
@@ -169,7 +172,7 @@ class ShadowIterationEngineTest(
     }
 
     @Test
-    fun `resolveCandidateDependencies looks up by candidateKey regardless of map insertion order`() {
+    fun `resolveDependencyReferences looks up by candidateKey regardless of map insertion order`() {
         val a = ReviewedCandidate(
             0, "kandidaat-a", "Kandidaat A", "Omschrijving A", listOf("criterium"), listOf("https://bron.example/"),
             listOf("kandidaat-b"), listOf(), "ACCEPT", "ok", "fingerprint-a", null,
@@ -178,36 +181,95 @@ class ShadowIterationEngineTest(
             1, "kandidaat-b", "Kandidaat B", "Omschrijving B", listOf("criterium"), listOf("https://bron.example/"),
             listOf("kandidaat-a"), listOf(), "ACCEPT", "ok", "fingerprint-b", null,
         )
+        val byPosition = listOf(a, b)
 
         val forwardOrder = linkedMapOf(a.candidateKey to a, b.candidateKey to b)
         val reverseOrder = linkedMapOf(b.candidateKey to b, a.candidateKey to a)
 
-        assertEquals(listOf(b), resolveCandidateDependencies(forwardOrder, a.dependsOn))
-        assertEquals(listOf(b), resolveCandidateDependencies(reverseOrder, a.dependsOn))
-        assertEquals(listOf(a), resolveCandidateDependencies(forwardOrder, b.dependsOn))
-        assertEquals(listOf(a), resolveCandidateDependencies(reverseOrder, b.dependsOn))
+        assertEquals(listOf(DependencyResolution("kandidaat-b", "kandidaat-b", false)), resolveDependencyReferences(forwardOrder, byPosition, a.dependsOn))
+        assertEquals(listOf(DependencyResolution("kandidaat-b", "kandidaat-b", false)), resolveDependencyReferences(reverseOrder, byPosition, a.dependsOn))
+        assertEquals(listOf(DependencyResolution("kandidaat-a", "kandidaat-a", false)), resolveDependencyReferences(forwardOrder, byPosition, b.dependsOn))
+        assertEquals(listOf(DependencyResolution("kandidaat-a", "kandidaat-a", false)), resolveDependencyReferences(reverseOrder, byPosition, b.dependsOn))
     }
 
     @Test
-    fun `dependsOn using the old positional Kandidaat N format is rejected`() {
-        bridge.scenario = Scenario.LEGACY_POSITIONAL_DEPENDSON
-        val iteration = repository.create("hkh-autopilot", "Wijs een verouderde positionele dependsOn-verwijzing af")
-
-        val failure = runCatching { engine.run(iteration.id) }.exceptionOrNull()
-        assertTrue(failure != null && (failure.message ?: "").contains("Kandidaat"))
-        assertEquals(
-            0,
-            jdbc.queryForObject(
-                "select count(*) from story_candidate where iteration_id = ?",
-                Int::class.java,
-                iteration.id,
-            ),
+    fun `resolveDependencyReferences falls back to the batch position for the legacy Kandidaat N format`() {
+        val a = ReviewedCandidate(
+            0, "locatie-basisverhaal", "Locatie basisverhaal", "Omschrijving A", listOf("criterium"), listOf("https://bron.example/"),
+            listOf(), listOf(), "ACCEPT", "ok", "fingerprint-a", null,
         )
+        val b = ReviewedCandidate(
+            1, "locatie-detailverhaal", "Locatie detailverhaal", "Omschrijving B", listOf("criterium"), listOf("https://bron.example/"),
+            listOf("Kandidaat 0"), listOf(), "ACCEPT", "ok", "fingerprint-b", null,
+        )
+        val byPosition = listOf(a, b)
+        val byKey = byPosition.associateBy(ReviewedCandidate::candidateKey)
+
+        val resolutions = resolveDependencyReferences(byKey, byPosition, b.dependsOn)
+
+        assertEquals(listOf(DependencyResolution("Kandidaat 0", "locatie-basisverhaal", viaLegacyFallback = true)), resolutions)
+    }
+
+    @Test
+    fun `resolveDependencyReferences leaves an unknown key and an out-of-range legacy position unresolved`() {
+        val a = ReviewedCandidate(
+            0, "locatie-basisverhaal", "Locatie basisverhaal", "Omschrijving A", listOf("criterium"), listOf("https://bron.example/"),
+            listOf("niet-bestaande-sleutel"), listOf(), "ACCEPT", "ok", "fingerprint-a", null,
+        )
+        val byPosition = listOf(a)
+        val byKey = byPosition.associateBy(ReviewedCandidate::candidateKey)
+
+        val unknownKey = resolveDependencyReferences(byKey, byPosition, a.dependsOn)
+        val outOfRangeLegacy = resolveDependencyReferences(byKey, byPosition, listOf("Kandidaat 5"))
+
+        assertTrue(unknownKey.single().let { !it.resolved && !it.viaLegacyFallback })
+        assertTrue(outOfRangeLegacy.single().let { !it.resolved })
+    }
+
+    @Test
+    fun `a dependsOn value that cannot be resolved to a backlog-ID blocks only that candidate`() {
+        bridge.scenario = Scenario.UNKNOWN_DEPENDSON_KEY
+        val iteration = repository.create("hkh-autopilot", "Blokkeer alleen de kandidaat met een onvertaalbare dependsOn-sleutel")
+        engine.run(iteration.id)
+
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", iteration.id).status)
+        val persisted = jdbc.query(
+            "select title, status from story_candidate where iteration_id = ?",
+            { row, _ -> row.getString("title") to row.getString("status") },
+            iteration.id,
+        )
+        assertEquals(listOf("Locatie basisverhaal" to "INTERNAL"), persisted)
+
+        val dossier = workspace.artifacts.single().content
+        assertTrue(dossier.contains("Locatie basisverhaal"))
+        assertTrue(!dossier.contains("Locatie detailverhaal"))
+
+        val mappingLog = repository.artifact(iteration.id, "dependson_resolution")!!
+        assertTrue(mappingLog.contains("\"blocked\":true"))
+        assertTrue(mappingLog.contains("niet-bestaande-sleutel"))
+    }
+
+    @Test
+    fun `a dependsOn value in the legacy Kandidaat N format resolves via the positional fallback and is marked as such`() {
+        bridge.scenario = Scenario.LEGACY_POSITIONAL_DEPENDSON
+        val iteration = repository.create("hkh-autopilot", "Vertaal een legacy positionele dependsOn-verwijzing automatisch")
+        engine.run(iteration.id)
+
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", iteration.id).status)
+        assertEquals(
+            2,
+            jdbc.queryForObject("select count(*) from story_candidate where iteration_id = ?", Int::class.java, iteration.id),
+        )
+
+        val mappingLog = repository.artifact(iteration.id, "dependson_resolution")!!
+        assertTrue(mappingLog.contains("\"viaLegacyFallback\":true"))
+        assertTrue(mappingLog.contains("\"resolvedCandidateKey\":\"locatie-basisverhaal\""))
+        assertTrue(mappingLog.contains("\"blocked\":false"))
     }
 
     enum class Scenario {
         ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE,
-        RESEARCH_RETRY_THEN_ACCEPT, CROSS_KEY_DEPENDENCY, LEGACY_POSITIONAL_DEPENDSON,
+        RESEARCH_RETRY_THEN_ACCEPT, CROSS_KEY_DEPENDENCY, LEGACY_POSITIONAL_DEPENDSON, UNKNOWN_DEPENDSON_KEY,
     }
 
     class FakeShadowAgentBridge : ShadowAgentBridge {
@@ -275,15 +337,47 @@ class ShadowIterationEngineTest(
                       }
                     ]
                 }""" else if (scenario == Scenario.LEGACY_POSITIONAL_DEPENDSON) """{
-                    "candidates":[{
-                      "candidateKey":"bronnenkaart-voor-locatie",
-                      "title":"Bronnenkaart voor één locatie",
-                      "description":"Toon voor één historische locatie een verhaal met herleidbare bron- en rechteninformatie.",
-                      "acceptanceCriteria":["De gebruiker ziet de bron-URL", "De rechtenindicatie staat naast de bron"],
-                      "sourceUrls":["https://noord-hollandsarchief.nl/"],
-                      "dependsOn":["Kandidaat 0"],
-                      "risks":["Bronrechten kunnen per object verschillen"]
-                    }]
+                    "candidates":[
+                      {
+                        "candidateKey":"locatie-basisverhaal",
+                        "title":"Locatie basisverhaal",
+                        "description":"Toon voor één historische locatie een kort verhaal met herleidbare bron- en rechteninformatie.",
+                        "acceptanceCriteria":["De gebruiker ziet de bron-URL"],
+                        "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                        "dependsOn":[],
+                        "risks":["Bronrechten kunnen per object verschillen"]
+                      },
+                      {
+                        "candidateKey":"locatie-detailverhaal",
+                        "title":"Locatie detailverhaal",
+                        "description":"Toon aanvullende details bij het basisverhaal van diezelfde historische locatie.",
+                        "acceptanceCriteria":["De gebruiker ziet de bron-URL", "De rechtenindicatie staat naast de bron"],
+                        "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                        "dependsOn":["Kandidaat 0"],
+                        "risks":["Bronrechten kunnen per object verschillen"]
+                      }
+                    ]
+                }""" else if (scenario == Scenario.UNKNOWN_DEPENDSON_KEY) """{
+                    "candidates":[
+                      {
+                        "candidateKey":"locatie-basisverhaal",
+                        "title":"Locatie basisverhaal",
+                        "description":"Toon voor één historische locatie een kort verhaal met herleidbare bron- en rechteninformatie.",
+                        "acceptanceCriteria":["De gebruiker ziet de bron-URL"],
+                        "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                        "dependsOn":[],
+                        "risks":["Bronrechten kunnen per object verschillen"]
+                      },
+                      {
+                        "candidateKey":"locatie-detailverhaal",
+                        "title":"Locatie detailverhaal",
+                        "description":"Toon aanvullende details bij het basisverhaal van diezelfde historische locatie.",
+                        "acceptanceCriteria":["De gebruiker ziet de bron-URL", "De rechtenindicatie staat naast de bron"],
+                        "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                        "dependsOn":["niet-bestaande-sleutel"],
+                        "risks":["Bronrechten kunnen per object verschillen"]
+                      }
+                    ]
                 }""" else """{
                     "candidates":[{
                       "candidateKey":"bronnenkaart-voor-locatie",
@@ -311,8 +405,8 @@ class ShadowIterationEngineTest(
                       "sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Bronrechten kunnen per object verschillen"]
                     }]
                 }"""
-                "critic" -> if (scenario == Scenario.CROSS_KEY_DEPENDENCY) """{
-                    "overallVerdict":"ACCEPT","summary":"Beide onderling afhankelijke kandidaten zijn klein en herleidbaar.",
+                "critic" -> if (scenario == Scenario.CROSS_KEY_DEPENDENCY || scenario == Scenario.LEGACY_POSITIONAL_DEPENDSON || scenario == Scenario.UNKNOWN_DEPENDSON_KEY) """{
+                    "overallVerdict":"ACCEPT","summary":"Beide kandidaten zijn klein en herleidbaar.",
                     "issues":[],
                     "candidateReviews":[
                       {"candidateIndex":0,"verdict":"ACCEPT","reason":"Kleine toetsbare scope met expliciete broninformatie."},
