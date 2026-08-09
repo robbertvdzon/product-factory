@@ -5,6 +5,7 @@ import nl.vdzon.productfactory.contracts.ShadowIterationView
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
+import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.stereotype.Service
@@ -326,34 +327,43 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         pullRequestUrl: String?,
         commitSha: String?,
     ) {
-        jdbc.update(
+        val updated = jdbc.update(
             """update shadow_iteration set status = 'ACCEPTED', current_agent_role = null, critic_verdict = ?,
                 workspace_run_id = ?, workspace_pull_request_url = ?, workspace_commit_sha = ?,
-                completed_at = current_timestamp where id = ?""".trimIndent(),
+                completed_at = current_timestamp where id = ? and status not in ($TERMINAL_STATUSES_SQL)""".trimIndent(),
             criticVerdict,
             workspaceRunId,
             pullRequestUrl,
             commitSha,
             iterationId,
         )
+        if (updated == 0) {
+            log.warn("Genegeerde schrijfpoging: iteratie {} staat al in een terminale staat, ACCEPTED-conclusie wordt niet overschreven", iterationId)
+        }
     }
 
     fun markReviewed(iterationId: String, verdict: String, status: String) {
         require(status in setOf("NEEDS_REVISION", "REJECTED"))
-        jdbc.update(
-            "update shadow_iteration set status = ?, current_agent_role = null, critic_verdict = ?, completed_at = current_timestamp where id = ?",
+        val updated = jdbc.update(
+            "update shadow_iteration set status = ?, current_agent_role = null, critic_verdict = ?, completed_at = current_timestamp where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
             status,
             verdict,
             iterationId,
         )
+        if (updated == 0) {
+            log.warn("Genegeerde schrijfpoging: iteratie {} staat al in een terminale staat, $status-conclusie wordt niet overschreven", iterationId)
+        }
     }
 
     fun markFailed(iterationId: String, error: String) {
-        jdbc.update(
-            "update shadow_iteration set status = 'FAILED', current_agent_role = null, error_message = ?, completed_at = current_timestamp where id = ?",
+        val updated = jdbc.update(
+            "update shadow_iteration set status = 'FAILED', current_agent_role = null, error_message = ?, completed_at = current_timestamp where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
             error.take(MAX_ERROR_CHARS),
             iterationId,
         )
+        if (updated == 0) {
+            log.warn("Genegeerde schrijfpoging: iteratie {} staat al in een terminale staat, FAILED-conclusie wordt niet overschreven", iterationId)
+        }
     }
 
     /** Voor dummies geschreven samenvatting van de cyclus (onderzoek, productbesluit, resulterende stories). */
@@ -372,10 +382,14 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
     }
 
     companion object {
+        private val log = LoggerFactory.getLogger(ShadowIterationRepository::class.java)
         private const val MAX_AGENT_OUTPUT_CHARS = 200_000
         private const val MAX_ERROR_CHARS = 4_000
         private const val VIEW_SELECT = """select i.*,
             (select count(*) from story_candidate s where s.iteration_id = i.id) as candidate_count
             from shadow_iteration i"""
+
+        /** Terminale statussen: de conclusie (status/critic_verdict) van een iteratie mag hierna niet meer overschreven worden. */
+        private const val TERMINAL_STATUSES_SQL = "'ACCEPTED', 'NEEDS_REVISION', 'REJECTED', 'FAILED'"
     }
 }
