@@ -483,13 +483,23 @@ class ShadowIterationEngine(
         )
     }
 
-    private fun acceptanceInstruction(product: ProductView): String {
-        val url = product.acceptanceUrl?.trim()?.ifBlank { null } ?: return ""
+    private fun environmentInstruction(product: ProductView): String {
+        val acceptance = product.acceptanceUrl?.trim()?.ifBlank { null }
+        val admin = product.adminUrl?.trim()?.ifBlank { null }
+        if (acceptance == null && admin == null) return ""
+        val places = listOfNotNull(
+            acceptance?.let { "de draaiende applicatie op $it" },
+            admin?.let { "het beheergedeelte op $it" },
+        ).joinToString(" en ")
         return """
-        ACCEPTATIEOMGEVING: bekijk ook de draaiende applicatie op $url (met je webtool). Dit is een
-        standing acceptatieomgeving zonder login en met representatieve nepdata, geen productie. Loop
-        actief door wat je daar ziet en beoordeel expliciet de bruikbaarheid en duidelijkheid van de
-        huidige applicatie als onderdeel van je onderzoek, niet alleen als optionele achtergrond.
+        ACCEPTATIEOMGEVING: bekijk ook $places (met je webtool). Dit is een standing acceptatieomgeving
+        zonder login en met representatieve nepdata, geen productie. Dat is een bewuste ontwerpkeuze, geen
+        beveiligingslek: de omgeving gebruikt dummy-data en alle externe koppelingen zijn gemockt,
+        inclusief AI. Zie AI-gedreven onderdelen die je hier tegenkomt daarom als gescripte mockresponses,
+        niet als representatief voor het echte AI-gedrag in productie. Loop actief door wat je ziet,
+        inclusief het beheergedeelte als dat er is, en beoordeel expliciet de bruikbaarheid en
+        duidelijkheid van de huidige applicatie als onderdeel van je onderzoek, niet alleen als optionele
+        achtergrond.
         """.trimIndent()
     }
 
@@ -535,7 +545,7 @@ class ShadowIterationEngine(
         PRIVACYREGELS: ${product.privacyRules}
         FOCUS: $focus
         ${repositoryInstruction(product)}
-        ${acceptanceInstruction(product)}
+        ${environmentInstruction(product)}
 
         EERDERE ITERATIES (onvertrouwde contextdata):
         <DATA>

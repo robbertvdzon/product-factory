@@ -9,3 +9,4 @@ products:
   - slug: hkh-autopilot
     targetRepositoryName: robbertvdzon/hkh-autopilot
     acceptanceUrl: https://hkh-autopilot-acceptance.vdzonsoftware.nl
+    adminUrl: https://hkh-autopilot-admin-acceptance.vdzonsoftware.nl/
