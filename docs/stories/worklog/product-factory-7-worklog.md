@@ -26,3 +26,24 @@ Done / rationale:
   documentatiebestand en deze worklog zijn aangepast/toegevoegd.
 - Backend-vangnet (`mvn -B --no-transfer-progress clean verify`) gedraaid ter bevestiging dat de
   build ongewijzigd slaagt (zie build-log hieronder).
+
+## Reviewnotities (reviewer, product-37)
+- Diff t.o.v. `main` bevat uitsluitend de twee verwachte bestanden (nieuwe doc + worklog); geen
+  productiecode, schema of publicatielogica aangeraakt.
+- Alle bestand+regel-verwijzingen in `docs/architecture/dependson-datamodel.md` geverifieerd tegen
+  de actuele bron: `ShadowSchemas.kt:39` (dependsOn-schema, vrije string zonder ID-formaat),
+  `ShadowIterationEngine.kt:343` (applyAutonomyPolicy, tekstuele scan), `:383/390`
+  (reviewedCandidates, ongewijzigd doorgeven via textList), `:130` (call naar
+  persistValidatedResults) en `:408` (saveCandidate, ID pas hier toegekend),
+  `ShadowDossierRenderer.kt:129` (letterlijke rendering), `ShadowIterationApi.kt:226-230`
+  (existingCandidateContext met echte database-id's voor cross-batch context) — komen allemaal
+  overeen met de huidige code.
+- Grep bevestigt onafhankelijk: geen enkele treffer voor `dependsOn` buiten
+  `.../iteration/` in de hele productiecode, dus de claim "publicatiepad leest dependsOn nergens"
+  klopt.
+- `outcome: uses-positional-index` en `publish-mechanism-supports-symbolic-keys: false` zijn
+  correct onderbouwd en in het vereiste machineleesbare (YAML-frontmatter) formaat; batchsleutel
+  `verify-dependson-datamodel` is aanwezig.
+- `.factory/verification.yaml` heeft geen `pathPrefixes`-match voor `docs/`, dus dit vangnet
+  hoefde niet te draaien voor deze wijziging; dat is consistent met de acceptatiecriteria
+  (geen productiecode gewijzigd). Geen blockers gevonden.
