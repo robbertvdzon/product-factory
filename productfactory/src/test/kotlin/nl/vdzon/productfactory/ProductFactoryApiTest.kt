@@ -6,16 +6,21 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class ProductFactoryApiTest(
     @Autowired private val mvc: MockMvc,
     @Autowired private val mapper: ObjectMapper,
+    @Autowired private val jdbc: JdbcTemplate,
 ) {
     @Test
     fun `HKH is absent and HKH Autopilot is initially configured`() {
@@ -140,6 +145,54 @@ class ProductFactoryApiTest(
             status { isOk() }
             jsonPath("$.aiModel") { value("claude-sonnet-5") }
         }
+    }
+
+    @Test
+    fun `story candidates expose blocked and blockedReason read-only via the existing dependson_resolution artifact`() {
+        createProduct("blocked-flow", "Blokkadeflow", "Test blokkade-afgeleide velden")
+        val blockedCandidateId = createStory("blocked-flow", "Geblokkeerde story")
+        val resolvedCandidateId = createStory("blocked-flow", "Vrije story met artefact")
+        val noArtifactCandidateId = createStory("blocked-flow", "Story zonder gekoppelde iteratie")
+
+        jdbc.update(
+            """insert into shadow_iteration(id, product_slug, sequence_number, focus, status)
+                values ('blocked-test-iter', 'blocked-flow', 1, 'test', 'ACCEPTED')""".trimIndent(),
+        )
+        jdbc.update(
+            "update story_candidate set iteration_id = 'blocked-test-iter' where id in (?, ?)",
+            blockedCandidateId,
+            resolvedCandidateId,
+        )
+        val artifactJson = """
+            [
+              {"candidateKey":"story-a","backlogId":$blockedCandidateId,"blocked":true,"dependsOn":[
+                {"rawValue":"onbekende-sleutel-x","resolvedCandidateKey":null,"resolvedBacklogId":null,"viaLegacyFallback":false,"resolved":false},
+                {"rawValue":"onbekende-sleutel-y","resolvedCandidateKey":null,"resolvedBacklogId":null,"viaLegacyFallback":false,"resolved":false}
+              ]},
+              {"candidateKey":"story-b","backlogId":$resolvedCandidateId,"blocked":false,"dependsOn":[]}
+            ]
+        """.trimIndent()
+        jdbc.update(
+            "insert into shadow_iteration_artifact(iteration_id, product_slug, artifact_type, content_json) values (?, ?, 'dependson_resolution', ?)",
+            "blocked-test-iter",
+            "blocked-flow",
+            artifactJson,
+        )
+
+        val result = mvc.get("/api/story-candidates?productSlug=blocked-flow").andExpect { status { isOk() } }.andReturn()
+        val byId = mapper.readTree(result.response.contentAsString).associateBy { it.path("id").asLong() }
+
+        val blocked = byId.getValue(blockedCandidateId)
+        assertTrue(blocked.path("blocked").asBoolean())
+        assertEquals("verwijzing naar onbekende sleutels: onbekende-sleutel-x, onbekende-sleutel-y", blocked.path("blockedReason").asText())
+
+        val resolved = byId.getValue(resolvedCandidateId)
+        assertFalse(resolved.path("blocked").asBoolean())
+        assertTrue(resolved.path("blockedReason").isNull)
+
+        val withoutArtifact = byId.getValue(noArtifactCandidateId)
+        assertFalse(withoutArtifact.path("blocked").asBoolean())
+        assertTrue(withoutArtifact.path("blockedReason").isNull)
     }
 
     private fun createProduct(slug: String, name: String, mission: String) {

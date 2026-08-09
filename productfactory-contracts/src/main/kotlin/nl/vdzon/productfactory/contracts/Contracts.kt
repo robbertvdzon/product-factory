@@ -106,6 +106,8 @@ data class StoryCandidateView(
     val iterationSequenceNumber: Int? = null,
     val acceptanceCriteria: String? = null,
     val criticReason: String? = null,
+    val blocked: Boolean = false,
+    val blockedReason: String? = null,
 )
 data class ProductRecordView(
     val id: Long,
