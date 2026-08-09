@@ -83,3 +83,35 @@ Done / rationale:
   (volledige compile van de betrokken modules); de resterende Kotlin-warnings in
   `AutonomousDeliveryIntegrationTest.kt` zijn pre-existing en niet door deze subtaak geraakt.
 - Geen blockers gevonden. Akkoord.
+
+## Tester-notities (product-50)
+
+- Diff main...HEAD geïnspecteerd: `ShadowDossierRenderer.kt` (nieuwe `resolveDependencyReferences`/
+  `DependencyResolution`, `LEGACY_POSITIONAL_DEPENDSON_PATTERN` met capture-group), `ShadowIterationEngine.kt`
+  (batch-brede `require`-afwijzing voor "Kandidaat <n>" verwijderd; `persistValidatedResults` blokkeert
+  per-kandidaat en logt de mapping als `dependson_resolution`-artefact; `accepted`-filter sluit
+  `blocked` kandidaten uit), `ShadowIterationApi.kt` (`saveCandidate` retourneert nu het
+  gegenereerde `story_candidate.id` via `GeneratedKeyHolder`; nieuwe generieke `saveArtifact`).
+  Bevestigd dat `shadow_iteration_artifact` al bestaat (V3__shadow_iterations.sql) — geen
+  ontbrekende migratie. Geen restverwijzingen naar de oude functienaam
+  `resolveCandidateDependencies` meer in de repo.
+- Volledig vangnet gedraaid: `mvn -B --no-transfer-progress clean verify` (root, volledige reactor,
+  op de voorschreven manier tot het einde laten doorlopen) → **BUILD SUCCESS**, alle modules groen.
+  `ShadowIterationEngineTest`: 9/9 groen, incl. de twee vereiste nieuwe tests ("a dependsOn value
+  that cannot be resolved to a backlog-ID blocks only that candidate" en "a dependsOn value in the
+  legacy Kandidaat N format resolves via the positional fallback and is marked as such"). Reactor-
+  totaal 0 failures/0 errors.
+- Geen wijzigingen onder `dashboard-frontend/`, dus de flutter-analyze/-test-commando's uit
+  `.factory/verification.yaml` zijn niet path-getriggerd (bevestigd via de diff-stat main...HEAD).
+- Preview-omgeving (`https://product-factory-pr-43.vdzonsoftware.nl` en
+  `.../actuator/health` op de API) reageert met HTTP 200; deze story betreft uitsluitend interne
+  backend-persistentielogica zonder UI-oppervlak, dus verdere browserverificatie is niet van
+  toepassing — codeverificatie + het gedraaide testvangnet dekken de acceptatiecriteria.
+- Acceptatiecriteria puntsgewijs geverifieerd tegen de diff en de teststubs: candidateKey-lookup
+  vóór legacy-fallback, legacy-patroon leidt niet meer tot batch-brede afwijzing, onbekende sleutel/
+  buiten-bereik-legacy-positie blokkeert alléén die kandidaat (niet-blokkerende kandidaten publiceren
+  normaal, ook zichtbaar in de dossier-inhoud in de nieuwe test), en de mapping is duurzaam
+  vastgelegd via het `dependson_resolution`-artefact (ook voor niet-geaccepteerde iteraties, want
+  `persistValidatedResults` loopt onvoorwaardelijk). Geen wijzigingen aangetroffen in
+  `WorkspacePublisher.kt`, `AutonomousDelivery.kt`, `StoryCandidateApi.kt` of hkh/hkh-autopilot.
+- Geen bugs gevonden. Akkoord — `tested`.
