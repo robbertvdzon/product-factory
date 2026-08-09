@@ -28,7 +28,7 @@ spec:
           volumeMounts: [{name: workspace, mountPath: /workspace}]
       containers:
         - name: runtime
-          image: ghcr.io/robbertvdzon/product-factory-runtime:sha-4742f8e4db653918e6f1f2f58c29dd82f3d4e06b
+          image: ghcr.io/robbertvdzon/product-factory-runtime:sha-6694b41c085bfc19c5d33a039a3338d6c071c324
           imagePullPolicy: Always
           envFrom:
             - configMapRef: {name: product-factory-config}
