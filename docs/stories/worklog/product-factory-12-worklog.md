@@ -36,3 +36,22 @@ Done / rationale:
   `pubspec.lock` is ongewijzigd gebleven na `flutter pub get`. `.factory/verification.yaml` hoefde
   niet te wijzigen; deze story raakt alleen bestanden die al onder de bestaande
   `dashboard-flutter-analyze`/`dashboard-flutter-test`-commando's vallen.
+
+Testernotitie (product-68):
+- Code-review van de diff tegen `main`: alleen `dashboard-frontend/lib/main.dart` (30 regels,
+  uitsluitend binnen `IterationSessionDialog`), de nieuwe testfile en de worklog zijn gewijzigd.
+  Voldoet aan de scope-restrictie (geen wijziging aan api.dart/classification.dart/DTO's).
+- Geverifieerd dat het Foutreden-blok exact voldoet aan AC1-AC6: FAILED+tekst → label+inhoud,
+  FAILED+leeg/null (incl. whitespace-only) → 'Geen foutreden beschikbaar', niet-FAILED → blok
+  afwezig, Semantics-label 'Foutreden: <tekst>', contracttest op /api/shadow-iterations-velden,
+  step/delivery errorMessage-blokken ongewijzigd.
+- Vangnet opnieuw gedraaid (alleen dashboard-frontend/ gewijzigd, dus geen mvn nodig volgens
+  `.factory/verification.yaml`-pathPrefixes): `flutter analyze` → "No issues found!";
+  `flutter test` → 79/79 groen, exit 0 (de herhaalde testregels in de compact-reporteroutput zijn
+  het bekende shard-interleaving-weergaveartefact, geen echte herhalingen; eindtotaal +79 klopt).
+- Preview-smoketest: `curl` op frontend (`https://product-factory-pr-46.vdzonsoftware.nl`) en
+  backend-health (`https://product-factory-api-pr-46.vdzonsoftware.nl/actuator/health`) geven
+  beide HTTP 200. Geen browsertool beschikbaar in de agentcontainer, dus interactieve/screenshot-
+  verificatie in de preview is niet uitgevoerd; geverifieerd is met de Flutter widget-/semantics-
+  tests plus codeverificatie tegen de story-eisen.
+- Conclusie: gedrag komt overeen met de story-eisen, geen bugs gevonden.
