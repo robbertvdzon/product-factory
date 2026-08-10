@@ -21,6 +21,7 @@ class _FakeApi extends DashboardApi {
 Map<String, dynamic> _sessionWith({
   required String status,
   List<dynamic>? artifacts,
+  String? criticVerdict,
 }) => <String, dynamic>{
   'iteration': {
     'id': 'iter-1',
@@ -30,7 +31,7 @@ Map<String, dynamic> _sessionWith({
     'mode': 'autonomous',
     'status': status,
     'currentRole': null,
-    'criticVerdict': null,
+    'criticVerdict': criticVerdict,
     'candidateCount': 2,
     'workspaceRunId': null,
     'workspacePullRequestUrl': null,
@@ -153,6 +154,63 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('Eerste poging.'), findsNothing);
+
+      await tester.tap(find.text('Sluiten'));
+      await tester.pump(const Duration(milliseconds: 300));
+    },
+  );
+
+  testWidgets(
+    'toont de guardrail-toelichtingszin bij REJECTED met criticVerdict ACCEPT',
+    (tester) async {
+      await _openDialog(
+        tester,
+        _sessionWith(
+          status: 'REJECTED',
+          criticVerdict: 'ACCEPT',
+          artifacts: [
+            _criticArtifact(
+              'critic',
+              '{"overallVerdict":"ACCEPT","summary":"Prima onderbouwd."}',
+            ),
+          ],
+        ),
+      );
+
+      expect(find.text('Reden'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Let op: Alle voorgestelde kandidaten zijn geblokkeerd '
+          '(duplicaat of guardrail), waardoor deze cyclus niet doorgaat '
+          'ondanks een positief criticusoordeel.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Sluiten'));
+      await tester.pump(const Duration(milliseconds: 300));
+    },
+  );
+
+  testWidgets(
+    'toont geen guardrail-toelichtingszin bij regulier REJECTED (criticVerdict != ACCEPT)',
+    (tester) async {
+      await _openDialog(
+        tester,
+        _sessionWith(
+          status: 'REJECTED',
+          criticVerdict: 'REJECT',
+          artifacts: [
+            _criticArtifact(
+              'critic',
+              '{"overallVerdict":"REJECT","summary":"Onvoldoende onderbouwd."}',
+            ),
+          ],
+        ),
+      );
+
+      expect(find.text('Reden'), findsOneWidget);
+      expect(find.textContaining('Let op:'), findsNothing);
 
       await tester.tap(find.text('Sluiten'));
       await tester.pump(const Duration(milliseconds: 300));

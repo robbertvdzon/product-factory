@@ -1075,9 +1075,19 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                             : criticReasonSummary(
                                 '${criticArtifact['contentJson']}',
                               );
-                        final displayText = reasonText.trim().isEmpty
+                        final baseDisplayText = reasonText.trim().isEmpty
                             ? 'Criticus-oordeel ontbreekt voor deze cyclus'
                             : reasonText;
+                        final isGuardrailRejection =
+                            status == 'REJECTED' &&
+                            iteration['criticVerdict'] == 'ACCEPT';
+                        const guardrailNote =
+                            'Let op: Alle voorgestelde kandidaten zijn geblokkeerd '
+                            '(duplicaat of guardrail), waardoor deze cyclus niet '
+                            'doorgaat ondanks een positief criticusoordeel.';
+                        final displayText = isGuardrailRejection
+                            ? '$baseDisplayText\n\n$guardrailNote'
+                            : baseDisplayText;
                         return Semantics(
                           label: 'Reden: $displayText',
                           child: ExcludeSemantics(
