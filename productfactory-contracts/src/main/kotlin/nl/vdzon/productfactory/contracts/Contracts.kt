@@ -169,6 +169,9 @@ data class MeetingView(
     val outcomeSummary: String?,
     val createdAt: Instant,
     val closedAt: Instant?,
+    val workspaceRunId: String? = null,
+    val workspacePullRequestUrl: String? = null,
+    val workspaceCommitSha: String? = null,
 )
 
 data class MeetingMessageView(

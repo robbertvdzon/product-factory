@@ -98,6 +98,35 @@ class _MeetingDialogState extends State<MeetingDialog> {
     }
   }
 
+  Future<void> _showMinutes(String runId) async {
+    try {
+      final content = await widget.api.artifact(widget.productSlug, runId);
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Notulen'),
+          content: SizedBox(
+            width: 640,
+            child: SingleChildScrollView(child: SelectableText(content)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Sluiten'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
+
   Future<void> _close() async {
     setState(() => _closing = true);
     try {
@@ -133,6 +162,8 @@ class _MeetingDialogState extends State<MeetingDialog> {
       final topics =
           ((meeting?['requestedTopics'] as List<dynamic>?) ?? const [])
               .cast<String>();
+      final outcomeSummary = meeting?['outcomeSummary'] as String?;
+      final workspaceRunId = meeting?['workspaceRunId'] as String?;
 
       if (messages.length > _lastRenderedMessageCount) {
         _lastRenderedMessageCount = messages.length;
@@ -167,6 +198,37 @@ class _MeetingDialogState extends State<MeetingDialog> {
               }
               return Column(
                 children: [
+                  if (!open && outcomeSummary != null) ...[
+                    Card(
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Samenvatting',
+                                    style: Theme.of(context).textTheme.titleSmall,
+                                  ),
+                                ),
+                                if (workspaceRunId != null)
+                                  TextButton.icon(
+                                    onPressed: () => _showMinutes(workspaceRunId),
+                                    icon: const Icon(Icons.description_outlined),
+                                    label: const Text('Volledige notulen'),
+                                  ),
+                              ],
+                            ),
+                            Text(outcomeSummary),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Expanded(
                     child: messages.isEmpty
                         ? const Center(

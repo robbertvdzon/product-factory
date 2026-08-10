@@ -330,6 +330,36 @@ class _OverviewPageState extends State<OverviewPage> {
     if (mounted) setState(_reload);
   }
 
+  Future<void> _showMeetingMinutes(String productSlug, String runId) async {
+    try {
+      final content = await api.artifact(productSlug, runId);
+      if (mounted) {
+        showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Notulen'),
+            content: SizedBox(
+              width: 720,
+              child: SingleChildScrollView(child: SelectableText(content)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Sluiten'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
+
   Future<void> _startMeeting(String slug) async {
     try {
       final meeting = await api.startMeeting(slug);
@@ -702,6 +732,7 @@ class _OverviewPageState extends State<OverviewPage> {
             _limitedSection('meetings', meetings, (meeting) {
               final meetingStatus = '${meeting['status']}';
               final outcome = meeting['outcomeSummary'] as String?;
+              final workspaceRunId = meeting['workspaceRunId'] as String?;
               return Card(
                 child: ListTile(
                   leading: Icon(
@@ -722,7 +753,21 @@ class _OverviewPageState extends State<OverviewPage> {
                             : outcome,
                     ].join(' · '),
                   ),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (workspaceRunId != null)
+                        IconButton(
+                          tooltip: 'Notulen bekijken',
+                          icon: const Icon(Icons.description_outlined),
+                          onPressed: () => _showMeetingMinutes(
+                            '${meeting['productSlug']}',
+                            workspaceRunId,
+                          ),
+                        ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
                   onTap: () => _openMeeting(
                     '${meeting['productSlug']}',
                     '${meeting['id']}',

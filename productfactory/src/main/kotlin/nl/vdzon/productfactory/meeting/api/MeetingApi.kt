@@ -87,10 +87,26 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         ).first()
     }
 
-    fun close(productSlug: String, id: String, outcomeSummary: String): MeetingView {
+    /**
+     * De workspace-velden zijn optioneel: notulenpublicatie is best-effort (zie
+     * MeetingChatService.closeOut) en mag het afsluiten van het overleg zelf nooit blokkeren.
+     */
+    fun close(
+        productSlug: String,
+        id: String,
+        outcomeSummary: String,
+        workspaceRunId: String? = null,
+        workspacePullRequestUrl: String? = null,
+        workspaceCommitSha: String? = null,
+    ): MeetingView {
         val updated = jdbc.update(
-            "update meeting set status = 'CLOSED', closed_at = current_timestamp, outcome_summary = ? where product_slug = ? and id = ? and status = 'OPEN'",
+            """update meeting set status = 'CLOSED', closed_at = current_timestamp, outcome_summary = ?,
+                workspace_run_id = ?, workspace_pull_request_url = ?, workspace_commit_sha = ?
+                where product_slug = ? and id = ? and status = 'OPEN'""".trimIndent(),
             outcomeSummary,
+            workspaceRunId,
+            workspacePullRequestUrl,
+            workspaceCommitSha,
             productSlug,
             id,
         )
@@ -146,6 +162,9 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         outcomeSummary = row.getString("outcome_summary"),
         createdAt = row.getTimestamp("created_at").toInstant(),
         closedAt = row.getTimestamp("closed_at")?.toInstant(),
+        workspaceRunId = row.getString("workspace_run_id"),
+        workspacePullRequestUrl = row.getString("workspace_pull_request_url"),
+        workspaceCommitSha = row.getString("workspace_commit_sha"),
     )
 
     private fun mapMessage(row: ResultSet, ignored: Int) = MeetingMessageView(

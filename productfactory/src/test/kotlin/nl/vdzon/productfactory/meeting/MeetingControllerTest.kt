@@ -3,8 +3,10 @@ package nl.vdzon.productfactory.meeting
 import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.contracts.AgentResult
+import nl.vdzon.productfactory.contracts.WorkspacePublicationView
 import nl.vdzon.productfactory.product.CreateProductRequest
 import nl.vdzon.productfactory.product.api.ProductCatalog
+import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -84,6 +86,7 @@ class MeetingControllerTest(
             status { isOk() }
             jsonPath("$.status") { value("CLOSED") }
             jsonPath("$.outcomeSummary") { value("Nepsamenvatting van het overleg.") }
+            jsonPath("$.workspaceCommitSha") { value("test-commit-sha") }
         }
 
         mvc.get("/api/products/$slug/meetings").andExpect {
@@ -121,6 +124,22 @@ class MeetingControllerTest(
                 else -> """{"summary":"onbekend"}"""
             }
             AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)
+        }
+
+        // Vermijdt een echte Git-workspace-checkout in deze REST-laag-test; de echte publicatielogica
+        // (git-commit, front-matter, padvalidatie) wordt al gedekt door WorkspacePublisherIntegrationTest.
+        @Bean
+        @Primary
+        fun fakeWorkspacePublicationPort(): WorkspacePublicationPort = WorkspacePublicationPort { artifact ->
+            WorkspacePublicationView(
+                runId = artifact.runId,
+                productSlug = artifact.productSlug,
+                artifactPath = artifact.relativePath,
+                contentHash = "test-hash",
+                status = "COMMITTED_LOCAL",
+                pullRequestUrl = null,
+                commitSha = "test-commit-sha",
+            )
         }
     }
 }

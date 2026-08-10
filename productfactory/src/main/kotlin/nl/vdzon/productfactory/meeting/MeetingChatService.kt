@@ -9,7 +9,12 @@ import nl.vdzon.productfactory.contracts.MeetingView
 import nl.vdzon.productfactory.contracts.ProductView
 import nl.vdzon.productfactory.meeting.api.MeetingCatalog
 import nl.vdzon.productfactory.product.api.ProductCatalog
+import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
+import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.ZoneId
 
 internal object MeetingSchemas {
     val reply = schema(
@@ -44,6 +49,7 @@ class MeetingChatService(
     private val products: ProductCatalog,
     private val agents: AgentDispatchPort,
     private val agentRuns: AgentRunRegistry,
+    private val workspace: WorkspacePublicationPort,
     private val mapper: ObjectMapper,
 ) {
     fun sendTurn(productSlug: String, meetingId: String, ownerMessage: String): MeetingMessageView {
@@ -86,7 +92,8 @@ class MeetingChatService(
     fun closeOut(productSlug: String, meetingId: String): MeetingView {
         val meeting = catalog.requireOpen(productSlug, meetingId)
         val product = products.requireProduct(productSlug)
-        val transcript = renderTranscript(catalog.messages(productSlug, meetingId))
+        val messages = catalog.messages(productSlug, meetingId)
+        val transcript = renderTranscript(messages)
 
         val runId = "$meetingId-close"
         agentRuns.register(runId, product.slug, "meeting-close")
@@ -114,8 +121,34 @@ class MeetingChatService(
         val outcomeSummary = mapper.readTree(result.summary).path("outcomeSummary").asText().trim()
         require(outcomeSummary.isNotBlank()) { "AI gaf geen samenvatting" }
         agentRuns.complete(product.slug, runId, "COMPLETED", "meeting:$meetingId")
-        return catalog.close(productSlug, meetingId, outcomeSummary)
+
+        val publication = publishMinutes(product, meeting, messages, outcomeSummary)
+        return catalog.close(productSlug, meetingId, outcomeSummary, publication?.runId, publication?.pullRequestUrl, publication?.commitSha)
     }
+
+    /**
+     * Publiceert de notulen naar product-factory-workspace, net als een cyclus-dossier, zodat ze
+     * buiten het dashboard leesbaar en linkbaar zijn. Best-effort: een product zonder
+     * workspace-eigenaarschap 'product-factory' (of een andere publicatiefout) mag het afsluiten van
+     * het overleg zelf niet blokkeren — het overleg blijft dan gewoon zonder workspace-link.
+     */
+    private fun publishMinutes(
+        product: ProductView,
+        meeting: MeetingView,
+        messages: List<MeetingMessageView>,
+        outcomeSummary: String,
+    ) = runCatching {
+        workspace.publish(
+            WorkspaceArtifact(
+                runId = meeting.id,
+                productSlug = product.slug,
+                relativePath = "product-memory/meeting-${meeting.sequenceNumber.toString().padStart(4, '0')}.md",
+                content = MeetingMinutesRenderer.render(meeting, messages, outcomeSummary, LocalDate.now(ZoneId.of(product.timezone))),
+            ),
+        )
+    }.onFailure {
+        logger.warn("Kon notulen voor overleg {} niet publiceren naar de workspace: {}", meeting.id, it.message)
+    }.getOrNull()
 
     private fun renderTranscript(messages: List<MeetingMessageView>): String = messages
         .joinToString("\n") { "${if (it.sender == "owner") "EIGENAAR" else "JIJ"}: ${it.content}" }
@@ -171,6 +204,39 @@ class MeetingChatService(
     """.trimIndent()
 
     companion object {
+        private val logger = LoggerFactory.getLogger(MeetingChatService::class.java)
         private const val MEETING_TURN_TIMEOUT_SECONDS = 300L
     }
+}
+
+/** Rendert de notulen van een afgesloten overleg als leesbaar Markdown-dossier, in dezelfde front-matter/opmaakstijl als ShadowDossierRenderer. */
+internal object MeetingMinutesRenderer {
+    fun render(meeting: MeetingView, messages: List<MeetingMessageView>, outcomeSummary: String, date: LocalDate): String = buildString {
+        appendLine("---")
+        appendLine("product: ${meeting.productSlug}")
+        appendLine("artifact_type: meeting")
+        appendLine("run_id: ${meeting.id}")
+        appendLine("date: $date")
+        appendLine("status: closed")
+        appendLine("---")
+        appendLine("# Overleg ${meeting.sequenceNumber}")
+        appendLine()
+        appendLine("**Initiator:** ${if (meeting.initiator == "product") "het product zelf (aangevraagd)" else "de eigenaar"}")
+        if (meeting.requestedTopics.isNotEmpty()) {
+            appendLine()
+            appendLine("**Onderwerpen bij aanvraag:**")
+            meeting.requestedTopics.forEach { appendLine("- $it") }
+        }
+        appendLine()
+        appendLine("## Samenvatting")
+        appendLine()
+        appendLine(outcomeSummary)
+        appendLine()
+        appendLine("## Volledig gesprek")
+        appendLine()
+        messages.forEach { message ->
+            appendLine("**${if (message.sender == "owner") "Eigenaar" else "AI"}:** ${message.content}")
+            appendLine()
+        }
+    }.trim()
 }
