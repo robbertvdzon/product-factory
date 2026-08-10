@@ -1413,6 +1413,36 @@ String _roleLabel(String value) => switch (value.toLowerCase()) {
   _ => value.replaceAll('_', ' '),
 };
 
+/// Zet een JSON-veldnaam (zoals gebruikt in shadow-iteratie-artefacten, zie
+/// `_readableArtifactFields` hierboven, main.dart regel ~1143) om naar een leesbaar label.
+/// Puur en side-effectvrij: geen state, widgets of netwerkverkeer. Nog niet gekoppeld aan
+/// bestaande rendercode ([_readableArtifactFields]/[_roleLabel]) — dat is scope van een
+/// vervolgstory.
+///
+/// Bewust top-level en publiek (geen `_`-prefix): Dart-privacy is per bestand, dus een private
+/// functie zou vanuit een los testbestand niet aanroepbaar zijn. Volgt hiermee hetzelfde patroon
+/// als de publieke pure functies in `formatting.dart`.
+String humanizeFieldKey(String key) {
+  const knownLabels = {
+    'findings': 'Bevindingen',
+    'decision': 'Besluit',
+    'story': 'Story',
+    'verdict': 'Eindoordeel',
+    'reason': 'Reden',
+  };
+  final knownLabel = knownLabels[key];
+  if (knownLabel != null) return knownLabel;
+
+  final withSpaces = key
+      .replaceAll('_', ' ')
+      .replaceAllMapped(RegExp(r'(?<=[a-z0-9])(?=[A-Z])'), (match) => ' ');
+  return withSpaces
+      .split(' ')
+      .where((word) => word.isNotEmpty)
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .join(' ');
+}
+
 /// Bouwt de wachtrij-secties (Fout / Bezig / In wachtrij / Klaar) voor de storykandidaten die de backend al
 /// filtert op niet-afgekeurd (zie `StoryCandidateController.list`). Elke kandidaat wordt gekoppeld aan zijn
 /// Software Factory-levering (indien aanwezig) om de fase te bepalen; zonder levering staat hij nog in de wachtrij.
