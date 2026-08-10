@@ -44,3 +44,27 @@ Done / rationale:
   (repo-root, in achtergrond gedraaid conform agent-tip) -> BUILD SUCCESS, alle modules groen
   (geen backend-bestanden gewijzigd in deze story, maar volledig vangnet toch gedraaid conform
   developer-instructies).
+
+## Review (product-91)
+
+- Diff t.o.v. main is beperkt tot: nieuwe pure top-level functie `humanizeFieldKey` in
+  `dashboard-frontend/lib/main.dart` (na `_roleLabel`, regel ~1420), nieuw testbestand
+  `dashboard-frontend/test/humanize_field_key_test.dart`, en deze worklog. Geen wijzigingen aan
+  `_readableArtifactFields`/`_roleLabel` of bestaande rendering; geen koppeling van de nieuwe
+  functie aan bestaande code.
+- Gecontroleerd dat alle acceptatiecriteria zijn afgedekt door de nieuwe tests: vaste labels voor
+  `findings`/`decision`/`story`/`verdict`/`reason` (afwijkend van rauwe sleutel, geen underscore/
+  camelCase), `source_urls` -> `Source Urls`, `unexpectedFieldName` -> `Unexpected Field Name`,
+  en determinisme bij herhaalde aanroep.
+- Gerichte checks zelf herhaald (niet het volledige vangnet): `flutter test
+  test/humanize_field_key_test.dart` (8/8 groen), `flutter analyze lib/main.dart
+  test/humanize_field_key_test.dart` ("No issues found!"), `dart format --set-exit-if-changed`
+  op beide bestanden (0 changed). `git status` na deze runs blijft schoon (pubspec.lock niet
+  herschreven).
+- Bestaand testbestand `iteration_readable_artifact_fields_test.dart` is ongewijzigd (geen diff
+  t.o.v. main).
+- Afwijking van de voorbeeldnaam (`humanizeFieldKey` i.p.v. `_humanizeFieldKey`) is onderbouwd en
+  gedocumenteerd (Dart-privacy per bestand); story noemde de naam expliciet als voorbeeld.
+- PR-samenvatting (issue comment 2894) benoemt expliciet `_readableArtifactFields`
+  (main.dart:1143) als aansluitpunt, conform AC.
+- Geen bugs, regressies of scope-overschrijding gevonden. Akkoord.
