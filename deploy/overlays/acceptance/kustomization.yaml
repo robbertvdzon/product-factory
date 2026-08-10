@@ -62,6 +62,9 @@ resources:
     # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
     # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
     # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
 patches:
 - patch: |-
     $patch: delete
@@ -139,4 +142,4 @@ patches:
 images:
 - name: ghcr.io/robbertvdzon/product-factory-dashboard-frontend
   newName: ghcr.io/robbertvdzon/product-factory-dashboard-frontend
-  newTag: sha-e603b7172447f13db1ee67ff120d73151e7f15f6-acceptance
+  newTag: sha-20474db7ab99f37515364779af87e02c900241b1-acceptance
