@@ -48,3 +48,24 @@ Implementatie:
   zijn niet aangeraakt).
 - `flutter analyze` en `flutter test` groen; `mvn -B --no-transfer-progress clean verify` groen (geen
   backendwijzigingen).
+
+## Review product-97 (2026-08-10)
+
+- Diff tegen main beperkt tot main.dart (nieuwe `_readableGenericFields` helper +
+  default-branch switch), bijbehorende tests, en worklog. Komt exact overeen met de
+  storybeschrijving en subtaak-omschrijving.
+- Implementatie geverifieerd: null-waarden en niet-matchende types worden correct
+  overgeslagen; lege string/lege lijst leveren geen regel op omdat de al bestaande
+  `_readableText`/`_readableBulletList` dat zelf al filteren (geen dubbele logica nodig).
+- Bestaande fixtures met een los top-level `someWeirdField`-string (in beide
+  testbestanden) zijn terecht aangepast naar uitsluitend geneste data, anders zouden ze
+  door het nieuwe gedrag een vals-positieve "geen leesbare content"-verwachting hebben.
+  Geen scope-overlap, hoort bij deze wijziging.
+- Alle AC's gedekt door tests (findings/decision/story/verdict+reason, regressie
+  researcher, geneste-objecten-fallback zonder toggle, gemengde lijst zonder toggle).
+- Gerichte re-run: `flutter test test/iteration_readable_artifact_fields_test.dart
+  test/iteration_technical_details_toggle_test.dart` → 16/16 groen. `dart format
+  --output=none --set-exit-if-changed lib/main.dart` → geen wijzigingen.
+- Geen bugs, regressies of scope-afwijkingen gevonden.
+
+[info] Akkoord, geen blockers.
