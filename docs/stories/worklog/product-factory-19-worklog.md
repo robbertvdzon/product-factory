@@ -31,3 +31,23 @@ Done / rationale:
 
 Niet gedaan / aangepast:
 - Geen. De wijziging is exact conform de scope: één regel productiecode en één test-assertie toegevoegd.
+
+## Tester (product-110)
+
+- Diff geverifieerd tegen story-scope: `ShadowIterationEngine.kt` regel 187 wijzigt exact
+  `repository.markReviewed(iteration.id, "REJECT", "REJECTED")` naar
+  `repository.markReviewed(iteration.id, verdict, "REJECTED")`; tweede argument ongewijzigd.
+  Geen andere `markReviewed`-aanroepen, geen wijzigingen aan `Contracts.kt`/`ShadowIterationApi.kt`/schema.
+- Test-uitbreiding geverifieerd: `ShadowIterationEngineTest.kt` bevat nu
+  `assertEquals("ACCEPT", repository.require("hkh-autopilot", duplicate.id).criticVerdict)` in het
+  bestaande DUPLICATE-scenario (ACCEPT-verdict, lege accepted-lijst), naast de bestaande
+  `status == "REJECTED"`-assertie — dekt precies het acceptatiecriterium.
+- Vangnet gedraaid vanuit repo-root: `mvn -B --no-transfer-progress clean verify` → BUILD SUCCESS,
+  alle 6 modules groen. `ShadowIterationEngineTest`: 9/9 geslaagd (0 failures, 0 errors).
+  Geen enkele rode test in de volledige run.
+  Diff raakt uitsluitend `productfactory/` (pathPrefix in `.factory/verification.yaml`), dus
+  flutter-analyze/-test zijn niet van toepassing; dashboard-frontend/ is niet gewijzigd.
+- Geen preview-/E2E-verificatie mogelijk voor dit scenario (backend-only unit-logica in een
+  guardrail-pad, geen frontend-zichtbaar gedrag om via browser te verifiëren); codeverificatie +
+  het vangnet zijn hier het passende testniveau.
+- Conclusie: alle acceptatiecriteria van de story zijn aantoonbaar voldaan. Akkoord.
