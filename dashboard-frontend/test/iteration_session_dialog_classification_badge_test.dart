@@ -99,7 +99,7 @@ final Map<String, Map<String, dynamic>> _sampleIterationByClassification = {
     'criticVerdict': 'REVISE',
   },
   kRichtingVerworpen: {'status': 'REJECTED', 'criticVerdict': 'REJECT'},
-  kGuardrailConflict: {
+  kTechnischeFout: {
     'status': 'FAILED',
     'errorMessage': 'Workspace-publicatie tijdelijk niet beschikbaar.',
   },

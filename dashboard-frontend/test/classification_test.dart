@@ -27,14 +27,15 @@ void main() {
       );
     });
 
-    test('FAILED wordt guardrail-conflict', () {
-      expect(
-        classifyIterationOutcome(
-          status: 'FAILED',
-          errorMessage: 'Workspace-publicatie tijdelijk niet beschikbaar.',
-        ),
-        kGuardrailConflict,
+    test('FAILED wordt technische fout', () {
+      final classification = classifyIterationOutcome(
+        status: 'FAILED',
+        errorMessage: 'Workspace-publicatie tijdelijk niet beschikbaar.',
       );
+      expect(classification, kTechnischeFout);
+      expect(classification, isNot(kGuardrailConflict));
+      expect(classification, contains('technische fout'));
+      expect(classification, isNot(contains('guardrail')));
     });
 
     test(

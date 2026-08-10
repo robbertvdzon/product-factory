@@ -160,7 +160,7 @@ beneden:
   (geen nieuwe databron): iteraties die nog lopen of in de wachtrij staan (`status` QUEUED/RUNNING)
   tonen een neutrale voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge;
   elke andere status toont een vaste classificatiebadge — `onderzoek-onvoldoende`,
-  `guardrail-conflict`, `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` —
+  `technische fout`, `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` —
   afgeleid uit de velden `status`, `criticVerdict` en `errorMessage`. Elke onvoorziene of
   ontbrekende statuswaarde (inclusief een tijdens uitvoering afgebroken iteratie, waarvoor geen
   apart CANCELLED-statusveld bestaat) mapt naar `niet-classificeerbaar`. De badge toont de

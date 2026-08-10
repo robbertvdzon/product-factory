@@ -19,7 +19,7 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    daarnaast exact één van twee dingen, afgeleid uit het bestaande `status`-veld (geen nieuwe
    databron): een iteratie met `status` QUEUED of RUNNING (nog lopend) toont een neutrale
    voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge; elke andere status
-   toont een vaste classificatiebadge — `onderzoek-onvoldoende`, `guardrail-conflict`,
+   toont een vaste classificatiebadge — `onderzoek-onvoldoende`, `technische fout`,
    `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` — afgeleid uit de bestaande
    velden `status`, `criticVerdict` en `errorMessage`. `niet-classificeerbaar` verschijnt voor elke
    ruwe statuswaarde die het systeem niet als een van de vier bekende categorieën herkent
@@ -132,7 +132,7 @@ en hoe ze zich tot elkaar verhouden, als zelfstandige uitleg naast de badge-besc
 - **Er bestaat geen apart `conclusion`-veld in het datamodel.** De term "conclusion" verwijst naar
   het geheel van de bestaande velden `status`, `criticVerdict` (en `errorMessage` bij een FAILED
   iteratie), samen vertaald naar één van de vijf vaste badges — `onderzoek-onvoldoende`,
-  `guardrail-conflict`, `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` — via
+  `technische fout`, `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` — via
   `classifyIterationOutcome` in `dashboard-frontend/lib/classification.dart`. Dit wijkt af van een
   eventueel aspirational onderzoeksmodel waarin "conclusion" als apart databaseveld wordt
   gesuggereerd: dat veld bestaat niet en is ook niet nodig, omdat `status`/`criticVerdict`/
