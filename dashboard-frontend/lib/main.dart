@@ -1065,6 +1065,40 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                       },
                     ),
                   ],
+                  if (status == 'NEEDS_REVISION' || status == 'REJECTED') ...[
+                    const SizedBox(height: 16),
+                    Builder(
+                      builder: (context) {
+                        final criticArtifact = latestCriticArtifact(artifacts);
+                        final reasonText = criticArtifact == null
+                            ? ''
+                            : criticReasonSummary(
+                                '${criticArtifact['contentJson']}',
+                              );
+                        final displayText = reasonText.trim().isEmpty
+                            ? 'Criticus-oordeel ontbreekt voor deze cyclus'
+                            : reasonText;
+                        return Semantics(
+                          label: 'Reden: $displayText',
+                          child: ExcludeSemantics(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Reden',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 4),
+                                SelectableText(displayText),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Text(
                     'Voortgang',
@@ -1282,6 +1316,57 @@ class _TechnicalDetailsToggleState extends State<TechnicalDetailsToggle> {
 /// `artifact['artifactType']` draagt bij een retrypoging een `-2`/`-3`-suffix (zie
 /// `ShadowIterationApi.kt`); die wordt hier gestript zodat retries dezelfde leesbare velden
 /// gebruiken als de eerste poging.
+/// Zoekt in [artifacts] naar het criticus-artefact (`artifactType` `critic` of `critic-<n>`)
+/// voor de huidige iteratie en geeft de meest recente terug (hoogste retry-suffix; bij een
+/// gelijk of hoger suffix wint de laatst voorkomende in de lijst). Geeft `null` als er geen
+/// criticus-artefact aanwezig is.
+Map<String, dynamic>? latestCriticArtifact(List<dynamic> artifacts) {
+  Map<String, dynamic>? latest;
+  var latestAttempt = -1;
+  for (final item in artifacts) {
+    final artifact = item as Map<String, dynamic>;
+    final artifactType = '${artifact['artifactType']}';
+    final baseRole = artifactType.replaceAll(RegExp(r'-\d+$'), '');
+    if (baseRole != 'critic') continue;
+    final match = RegExp(r'-(\d+)$').firstMatch(artifactType);
+    final attempt = match != null ? int.parse(match.group(1)!) : 1;
+    if (attempt >= latestAttempt) {
+      latestAttempt = attempt;
+      latest = artifact;
+    }
+  }
+  return latest;
+}
+
+/// Bouwt leesbare, lopende tekst (géén rauwe JSON) uit een criticus-artefact's `contentJson`,
+/// volgens het schema uit `ShadowSchemas.kt` (`overallVerdict`, `summary`, `requiredChanges[]`).
+/// Geeft een lege string terug als het artefact niet parseerbaar is of geen van deze velden
+/// bruikbare inhoud bevat.
+String criticReasonSummary(String contentJson) {
+  final Map<String, dynamic> data;
+  try {
+    final decoded = jsonDecode(contentJson);
+    if (decoded is! Map) return '';
+    data = decoded.cast<String, dynamic>();
+  } catch (_) {
+    return '';
+  }
+
+  final lines = <String>[];
+  final verdict = '${data['overallVerdict'] ?? ''}'.trim();
+  if (verdict.isNotEmpty) lines.add('Eindoordeel: $verdict');
+  final summary = '${data['summary'] ?? ''}'.trim();
+  if (summary.isNotEmpty) lines.add(summary);
+  final requiredChanges = data['requiredChanges'];
+  if (requiredChanges is List) {
+    for (final entry in requiredChanges) {
+      final text = '$entry'.trim();
+      if (text.isNotEmpty) lines.add('• $text');
+    }
+  }
+  return lines.join('\n');
+}
+
 List<Widget> _readableArtifactFields(
   BuildContext context,
   String artifactType,
