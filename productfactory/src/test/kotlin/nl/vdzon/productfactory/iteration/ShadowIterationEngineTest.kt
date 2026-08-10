@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.iteration
 
+import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.contracts.AgentResult
 import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.WorkspacePublicationView
@@ -272,7 +273,7 @@ class ShadowIterationEngineTest(
         RESEARCH_RETRY_THEN_ACCEPT, CROSS_KEY_DEPENDENCY, LEGACY_POSITIONAL_DEPENDSON, UNKNOWN_DEPENDSON_KEY,
     }
 
-    class FakeShadowAgentBridge : ShadowAgentBridge {
+    class FakeShadowAgentBridge : AgentDispatchPort {
         var scenario = Scenario.ACCEPT
         override fun execute(task: AgentTask): AgentResult {
             val today = LocalDate.now(ZoneId.of("Europe/Amsterdam"))

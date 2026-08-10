@@ -65,6 +65,9 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
     @GetMapping("/autonomy/human-actions")
     fun humanActions(): Any = runtime.products().flatMap { product -> runtime.humanActions(product["slug"].toString()) }
 
+    @GetMapping("/meetings")
+    fun meetings(): Any = runtime.products().flatMap { product -> runtime.meetings(product["slug"].toString()) }
+
     @PostMapping("/products/{slug}/cycles")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun startCycle(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =

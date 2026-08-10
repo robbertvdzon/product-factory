@@ -88,6 +88,32 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/autonomy/human-actions/{id}/complete", id)
         .body(mapOf("result" to result)).retrieve().toBodilessEntity()
 
+    fun meetings(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/meetings", slug)
+        .retrieve().body(listType).orEmpty()
+
+    fun meeting(slug: String, id: String): Map<String, Any?> = runtime.get()
+        .uri("/api/products/{slug}/meetings/{id}", slug, id)
+        .retrieve().body(object : ParameterizedTypeReference<Map<String, Any?>>() {})
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+    fun meetingMessages(slug: String, id: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/meetings/{id}/messages", slug, id)
+        .retrieve().body(listType).orEmpty()
+
+    fun startMeeting(slug: String): Any = runtime.post()
+        .uri("/api/products/{slug}/meetings", slug)
+        .retrieve().body(Any::class.java)!!
+
+    fun sendMeetingMessage(slug: String, id: String, content: String): Any = runtime.post()
+        .uri("/api/products/{slug}/meetings/{id}/messages", slug, id)
+        .body(mapOf("content" to content))
+        .retrieve().body(Any::class.java)!!
+
+    fun closeMeeting(slug: String, id: String): Any = runtime.post()
+        .uri("/api/products/{slug}/meetings/{id}/close", slug, id)
+        .retrieve().body(Any::class.java)!!
+
     fun requireRunnableProduct(slug: String) {
         val product = product(slug)
         if (product["status"] != "active") throw ResponseStatusException(HttpStatus.CONFLICT, "Product is niet actief")

@@ -15,6 +15,11 @@ class DashboardApi {
   Future<List<dynamic>> shadowIterations() => _list('/api/shadow-iterations');
   Future<List<dynamic>> deliveries() => _list('/api/autonomy/deliveries');
   Future<List<dynamic>> humanActions() => _list('/api/autonomy/human-actions');
+  Future<List<dynamic>> meetings() => _list('/api/meetings');
+  Future<Map<String, dynamic>> meeting(String slug, String id) =>
+      _object('/api/products/$slug/meetings/$id');
+  Future<List<dynamic>> meetingMessages(String slug, String id) =>
+      _list('/api/products/$slug/meetings/$id/messages');
   Future<Map<String, dynamic>> aiCatalog() => _object('/api/ai-catalog');
   Future<Map<String, dynamic>> shadowIterationSession(
     String productSlug,
@@ -141,6 +146,51 @@ class DashboardApi {
     if (response.statusCode != 200) {
       throw StateError(
         'Menselijke actie kon niet worden afgerond (${response.statusCode}).',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> startMeeting(String slug) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/products/$slug/meetings'),
+      headers: headers,
+      body: '{}',
+    );
+    if (response.statusCode != 201) {
+      throw StateError(
+        'Overleg kon niet worden gestart (${response.statusCode}).',
+      );
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> sendMeetingMessage(
+    String slug,
+    String id,
+    String content,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/products/$slug/meetings/$id/messages'),
+      headers: headers,
+      body: jsonEncode({'content': content}),
+    );
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Bericht kon niet worden verstuurd (${response.statusCode}).',
+      );
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<void> closeMeeting(String slug, String id) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/products/$slug/meetings/$id/close'),
+      headers: headers,
+      body: '{}',
+    );
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Overleg kon niet worden afgesloten (${response.statusCode}).',
       );
     }
   }

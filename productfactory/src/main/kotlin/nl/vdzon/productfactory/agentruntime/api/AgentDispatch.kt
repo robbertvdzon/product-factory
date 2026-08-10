@@ -1,4 +1,4 @@
-package nl.vdzon.productfactory.iteration
+package nl.vdzon.productfactory.agentruntime.api
 
 import nl.vdzon.productfactory.contracts.AgentResult
 import nl.vdzon.productfactory.contracts.AgentTask
@@ -12,17 +12,17 @@ import org.springframework.web.client.RestClient
 import java.time.Duration
 import java.time.Instant
 
-fun interface ShadowAgentBridge {
+fun interface AgentDispatchPort {
     fun execute(task: AgentTask): AgentResult
 }
 
 @Component
 @Profile("!mock-agent-bridge")
-class HttpShadowAgentBridge(
+class HttpAgentDispatcher(
     @Value("\${product-factory.agent-bridge.base-url}") baseUrl: String,
     @Value("\${PF_AGENT_WORKER_TOKEN:}") private val token: String,
     @Value("\${product-factory.agent-bridge.poll-interval:PT2S}") private val pollInterval: Duration,
-) : ShadowAgentBridge {
+) : AgentDispatchPort {
     private val client = RestClient.builder().baseUrl(baseUrl)
         .defaultStatusHandler(HttpStatusCode::isError) { _, response ->
             error("Agentbridge gaf HTTP ${response.statusCode.value()}")

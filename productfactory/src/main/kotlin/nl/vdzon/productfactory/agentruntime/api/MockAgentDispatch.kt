@@ -1,4 +1,4 @@
-package nl.vdzon.productfactory.iteration
+package nl.vdzon.productfactory.agentruntime.api
 
 import nl.vdzon.productfactory.contracts.AgentArtifact
 import nl.vdzon.productfactory.contracts.AgentResult
@@ -39,7 +39,7 @@ class MockAgentResponseStore {
 
 @Component
 @Profile("mock-agent-bridge")
-class MockShadowAgentBridge(private val responses: MockAgentResponseStore) : ShadowAgentBridge {
+class MockAgentDispatch(private val responses: MockAgentResponseStore) : AgentDispatchPort {
     override fun execute(task: AgentTask): AgentResult {
         val response = responses.pollOrDefault()
         return AgentResult(

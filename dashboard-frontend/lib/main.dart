@@ -10,6 +10,7 @@ import 'google_button_stub.dart'
     if (dart.library.html) 'google_button_web.dart'
     as google_button;
 import 'limited_list.dart';
+import 'meeting_dialog.dart';
 import 'session.dart';
 
 void main() => runApp(const ProductFactoryDashboard());
@@ -248,6 +249,7 @@ class _OverviewPageState extends State<OverviewPage> {
     api.deliveries(),
     api.humanActions(),
     api.aiCatalog(),
+    api.meetings(),
   ]);
   Future<void> _changeStatus(String slug, String action) async {
     await api.changeProductStatus(slug, action);
@@ -314,6 +316,32 @@ class _OverviewPageState extends State<OverviewPage> {
       ),
     );
     if (mounted) setState(_reload);
+  }
+
+  Future<void> _openMeeting(String productSlug, String meetingId) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => MeetingDialog(
+        api: api,
+        productSlug: productSlug,
+        meetingId: meetingId,
+      ),
+    );
+    if (mounted) setState(_reload);
+  }
+
+  Future<void> _startMeeting(String slug) async {
+    try {
+      final meeting = await api.startMeeting(slug);
+      if (mounted) setState(_reload);
+      await _openMeeting(slug, '${meeting['id']}');
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
   }
 
   Future<void> _completeHumanAction(Map<String, dynamic> action) async {
@@ -391,6 +419,10 @@ class _OverviewPageState extends State<OverviewPage> {
           ['createdAt'],
         );
         final aiCatalog = snapshot.data![6] as Map<String, dynamic>;
+        final meetings = sortedByNewestFirst(
+          snapshot.data![7] as List<dynamic>,
+          ['closedAt', 'createdAt'],
+        );
         return ListView(
           padding: const EdgeInsets.all(24),
           children: [
@@ -454,6 +486,11 @@ class _OverviewPageState extends State<OverviewPage> {
               final slug = '${product['slug']}';
               final status = '${product['status']}';
               final active = status == 'active';
+              final pendingMeetingTopics =
+                  ((product['meetingRequestedTopics'] as List<dynamic>?) ??
+                          const [])
+                      .cast<String>();
+              final meetingRequested = product['meetingRequestedAt'] != null;
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -473,6 +510,21 @@ class _OverviewPageState extends State<OverviewPage> {
                           Chip(label: Text(status)),
                           const SizedBox(width: 8),
                           Chip(label: Text('${product['developmentMode']}')),
+                          if (meetingRequested) ...[
+                            const SizedBox(width: 8),
+                            Tooltip(
+                              message: pendingMeetingTopics.isEmpty
+                                  ? 'Het product wil overleg'
+                                  : pendingMeetingTopics
+                                        .map((topic) => '• $topic')
+                                        .join('\n'),
+                              child: ActionChip(
+                                avatar: const Icon(Icons.forum_outlined, size: 18),
+                                label: const Text('Overleg gevraagd'),
+                                onPressed: () => _startMeeting(slug),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -540,6 +592,13 @@ class _OverviewPageState extends State<OverviewPage> {
                                   _editProductSettings(product, aiCatalog),
                               icon: const Icon(Icons.tune),
                               label: const Text('Instellingen'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: active
+                                  ? () => _startMeeting(slug)
+                                  : null,
+                              icon: const Icon(Icons.forum_outlined),
+                              label: const Text('Start overleg'),
                             ),
                           ],
                         ),
@@ -630,6 +689,44 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
                 subtitle: Text(
                   '${delivery['productSlug']} · ${delivery['status']} · ${delivery['remotePhase'] ?? 'nog geen fase'}',
+                ),
+              );
+            }),
+            const SizedBox(height: 24),
+            Text('Overleggen', style: Theme.of(context).textTheme.titleLarge),
+            if (meetings.isEmpty)
+              const ListTile(
+                leading: Icon(Icons.hourglass_empty),
+                title: Text('Nog geen overleggen'),
+              ),
+            _limitedSection('meetings', meetings, (meeting) {
+              final meetingStatus = '${meeting['status']}';
+              final outcome = meeting['outcomeSummary'] as String?;
+              return Card(
+                child: ListTile(
+                  leading: Icon(
+                    meeting['initiator'] == 'product'
+                        ? Icons.forum
+                        : Icons.forum_outlined,
+                  ),
+                  title: Text(
+                    '${meeting['productSlug']} · overleg ${meeting['sequenceNumber']}',
+                  ),
+                  subtitle: Text(
+                    [
+                      meetingStatus,
+                      '${meeting['initiator']} gestart',
+                      if (outcome != null && outcome.isNotEmpty)
+                        outcome.length > 150
+                            ? '${outcome.substring(0, 150)}…'
+                            : outcome,
+                    ].join(' · '),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openMeeting(
+                    '${meeting['productSlug']}',
+                    '${meeting['id']}',
+                  ),
                 ),
               );
             }),

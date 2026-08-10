@@ -57,7 +57,9 @@ internal object ShadowSchemas {
 
     val summary = schema(
         """
-        "summary":{"type":"string","minLength":40,"maxLength":4000}
+        "summary":{"type":"string","minLength":40,"maxLength":4000},
+        "wantsMeeting":{"type":"boolean"},
+        "meetingTopics":{"type":"array","maxItems":5,"items":{"type":"string","minLength":5,"maxLength":300}}
         """.trimIndent(),
         listOf("summary"),
     )

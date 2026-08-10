@@ -7,7 +7,7 @@ import nl.vdzon.productfactory.autonomy.api.StoryDeliveryPort
 import nl.vdzon.productfactory.agentruntime.api.AgentRunRegistry
 import nl.vdzon.productfactory.iteration.ShadowIterationRepository
 import nl.vdzon.productfactory.iteration.ShadowIterationService
-import nl.vdzon.productfactory.iteration.ShadowAgentBridge
+import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.workspace.WorkspacePublisher
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
@@ -381,7 +381,7 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
 class AutonomousQuestionResolver(
     private val repository: AutonomousDeliveryRepository,
     private val products: ProductCatalog,
-    private val agents: ShadowAgentBridge,
+    private val agents: AgentDispatchPort,
     private val agentRuns: AgentRunRegistry,
     private val client: SoftwareFactoryGateway,
     private val mapper: ObjectMapper,

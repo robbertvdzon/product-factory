@@ -95,6 +95,8 @@ data class ProductView(
     val qualityRules: String,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val meetingRequestedAt: Instant? = null,
+    val meetingRequestedTopics: List<String> = emptyList(),
 )
 data class StoryCandidateView(
     val id: Long,
@@ -155,4 +157,24 @@ data class WorkspacePublicationView(
     val status: String,
     val pullRequestUrl: String?,
     val commitSha: String?,
+)
+
+data class MeetingView(
+    val id: String,
+    val productSlug: String,
+    val sequenceNumber: Int,
+    val initiator: String,
+    val status: String,
+    val requestedTopics: List<String>,
+    val outcomeSummary: String?,
+    val createdAt: Instant,
+    val closedAt: Instant?,
+)
+
+data class MeetingMessageView(
+    val id: Long,
+    val meetingId: String,
+    val sender: String,
+    val content: String,
+    val createdAt: Instant,
 )

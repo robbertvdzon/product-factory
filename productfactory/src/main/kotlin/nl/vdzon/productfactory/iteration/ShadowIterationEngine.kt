@@ -3,9 +3,11 @@ package nl.vdzon.productfactory.iteration
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
+import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.agentruntime.api.AgentRunRegistry
 import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.ProductView
+import nl.vdzon.productfactory.meeting.api.MeetingCatalog
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
@@ -39,8 +41,9 @@ class ShadowIterationRunner(
 class ShadowIterationEngine(
     private val repository: ShadowIterationRepository,
     private val products: ProductCatalog,
-    private val agents: ShadowAgentBridge,
+    private val agents: AgentDispatchPort,
     private val agentRuns: AgentRunRegistry,
+    private val meetings: MeetingCatalog,
     private val workspace: WorkspacePublicationPort,
     private val vision: WorkspaceVisionPort,
     private val mapper: ObjectMapper,
@@ -54,6 +57,7 @@ class ShadowIterationEngine(
         val today = LocalDate.now(ZoneId.of(product.timezone))
         val previousContext = repository.previousIterationContext(product.slug, iteration.id)
         val candidateContext = repository.existingCandidateContext(product.slug)
+        val meetingContext = meetings.recentOutcomes(product.slug)
         val productVision = vision.readVision(product.slug)
 
         val research = executeRoleWithRetry(
@@ -61,7 +65,7 @@ class ShadowIterationEngine(
             product,
             ShadowRole.RESEARCHER,
             ShadowSchemas.research,
-            promptFor = { correction -> researchPrompt(iteration.focus, product, previousContext, today, iteration.mode, productVision, correction) },
+            promptFor = { correction -> researchPrompt(iteration.focus, product, previousContext, meetingContext, today, iteration.mode, productVision, correction) },
             validate = { validateResearch(it, today) },
         )
         val sourceUrls = research.path("sources").map { it.path("url").asText() }.toSet()
@@ -246,6 +250,9 @@ class ShadowIterationEngine(
             summaryPrompt(product, research, productOwner, critic, accepted, verdict),
         )
         repository.saveSummary(iteration.id, result.path("summary").asText().trim())
+        if (result.path("wantsMeeting").asBoolean(false)) {
+            meetings.requestMeeting(product.slug, textList(result.path("meetingTopics")))
+        }
     }
 
     private fun validateResearch(output: JsonNode, today: LocalDate) {
@@ -534,7 +541,7 @@ class ShadowIterationEngine(
             "Herstel dit expliciet en voldoe aan alle bovenstaande eisen.\n"
     }.orEmpty()
 
-    private fun researchPrompt(focus: String, product: ProductView, previous: String, today: LocalDate, mode: String, vision: String?, correction: String? = null) = """
+    private fun researchPrompt(focus: String, product: ProductView, previous: String, meetingContext: String, today: LocalDate, mode: String, vision: String?, correction: String? = null) = """
         ROL: RESEARCHER. Doe onafhankelijk webonderzoek voor een productiteratie in $mode-modus.
         Vandaag is $today. Gebruik uitsluitend werkelijk geraadpleegde publieke webbronnen. Iedere bevinding moet
         naar minstens één bron uit sources verwijzen. Noteer per bron de raadpleegdatum exact als $today,
@@ -561,6 +568,12 @@ class ShadowIterationEngine(
         EERDERE ITERATIES (onvertrouwde contextdata):
         <DATA>
         $previous
+        </DATA>
+
+        EERDERE OVERLEGGEN MET DE EIGENAAR (onvertrouwde contextdata): houd hier rekening mee, dit is directe
+        sturing van de eigenaar zelf, niet zomaar een bevinding.
+        <DATA>
+        $meetingContext
         </DATA>
 
         Lever alleen JSON volgens het opgegeven schema. Neem nog geen productbesluit en schrijf geen stories.
@@ -726,6 +739,12 @@ class ShadowIterationEngine(
         - Welke storykandidaten zijn hieruit gemaakt (noem de titels), of leg uit waarom er geen enkele is
           goedgekeurd als dat zo is.
         - Wat betekent dit concreet: gaat er nu iets naar de Software Factory, of is er alsnog niets opgeleverd?
+
+        OVERLEG MET DE EIGENAAR: als er uit deze cyclus belangrijke, voor jou onbeantwoorde vragen overblijven die
+        beter in een gesprek met de eigenaar opgelost worden dan door zelf een aanname te kiezen, zet dan
+        wantsMeeting op true en noem in meetingTopics maximaal 5 korte, concrete onderwerpen. Zet anders
+        wantsMeeting op false en laat meetingTopics leeg. Dit verzoek wordt niet per se gehonoreerd: er geldt
+        altijd een afkoelperiode van minstens 7 dagen sinds het vorige overleg.
 
         EINDOORDEEL VAN DEZE CYCLUS: $verdict
         GOEDGEKEURDE STORIES: ${if (accepted.isEmpty()) "geen" else accepted.joinToString("; ") { it.title }}

@@ -1,5 +1,7 @@
 package nl.vdzon.productfactory.product.api
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import nl.vdzon.productfactory.contracts.ProductRecordView
 import nl.vdzon.productfactory.contracts.ProductView
 import org.springframework.dao.DuplicateKeyException
@@ -65,7 +67,7 @@ data class ProductContext(
 )
 
 @Service
-class ProductCatalog(private val jdbc: JdbcTemplate) {
+class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) {
     fun list(): List<ProductView> = jdbc.query(PRODUCT_SELECT + " order by p.slug", ::mapProduct)
 
     fun requireProduct(slug: String): ProductView = jdbc.query(PRODUCT_SELECT + " where p.slug = ?", ::mapProduct, normalizeSlug(slug))
@@ -209,6 +211,31 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         return requireProduct(normalized)
     }
 
+    /**
+     * Zet de pending "ik wil overleg"-vlag op een product. Overschrijft nooit een reeds openstaande
+     * vlag (de aanroeper, MeetingCatalog.requestMeeting, controleert dat vooraf) — hier alleen de
+     * kolomupdate zelf, zodat product_definition-schrijven op één plek blijft.
+     */
+    fun setMeetingRequested(slug: String, topics: List<String>): ProductView {
+        val normalized = normalizeSlug(slug)
+        jdbc.update(
+            "update product_definition set meeting_requested_at = current_timestamp, meeting_requested_topics = ? where slug = ?",
+            mapper.writeValueAsString(topics),
+            normalized,
+        )
+        return requireProduct(normalized)
+    }
+
+    /** Wist de pending overlegvlag, bijvoorbeeld zodra de bijbehorende onderwerpen in een nieuw overleg zijn opgepakt. */
+    fun clearMeetingRequested(slug: String): ProductView {
+        val normalized = normalizeSlug(slug)
+        jdbc.update(
+            "update product_definition set meeting_requested_at = null, meeting_requested_topics = null where slug = ?",
+            normalized,
+        )
+        return requireProduct(normalized)
+    }
+
     fun listRecords(slug: String, kind: String): List<ProductRecordView> {
         requireProduct(slug)
         val table = recordTable(kind)
@@ -303,6 +330,10 @@ class ProductCatalog(private val jdbc: JdbcTemplate) {
         qualityRules = row.getString("quality_rules"),
         createdAt = row.getTimestamp("created_at").toInstant(),
         updatedAt = row.getTimestamp("updated_at").toInstant(),
+        meetingRequestedAt = row.getTimestamp("meeting_requested_at")?.toInstant(),
+        meetingRequestedTopics = row.getString("meeting_requested_topics")?.let { json ->
+            runCatching { mapper.readValue<List<String>>(json) }.getOrDefault(emptyList())
+        } ?: emptyList(),
     )
 
     private fun mapRecord(row: ResultSet, hasSource: Boolean): ProductRecordView {

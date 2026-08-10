@@ -1,4 +1,4 @@
-package nl.vdzon.productfactory.iteration
+package nl.vdzon.productfactory.agentruntime.api
 
 import nl.vdzon.productfactory.contracts.AgentArtifact
 import nl.vdzon.productfactory.contracts.AgentTask
@@ -6,12 +6,12 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class MockAgentBridgeTest {
+class MockAgentDispatchTest {
     private val task = AgentTask(runId = "run-1", productSlug = "hkh-autopilot", taskType = "research", prompt = "test")
 
     @Test
     fun `returns a benign default when no response is queued`() {
-        val bridge = MockShadowAgentBridge(MockAgentResponseStore())
+        val bridge = MockAgentDispatch(MockAgentResponseStore())
         val result = bridge.execute(task)
         assertEquals("run-1", result.runId)
         assertEquals("COMPLETED", result.status)
@@ -22,7 +22,7 @@ class MockAgentBridgeTest {
         val store = MockAgentResponseStore()
         store.enqueue(MockAgentResponse(status = "FAILED", summary = "eerste"))
         store.enqueue(MockAgentResponse(status = "COMPLETED", summary = "tweede", artifacts = listOf(AgentArtifact("out.md", "text/markdown", "inhoud"))))
-        val bridge = MockShadowAgentBridge(store)
+        val bridge = MockAgentDispatch(store)
 
         val first = bridge.execute(task)
         assertEquals("FAILED", first.status)
