@@ -33,3 +33,32 @@ Done / rationale:
   repo-root (BUILD SUCCESS, 16 tests, 0 failures/errors) — allemaal exitcode 0.
 - `.factory/verification.yaml` ongewijzigd gelaten: bestaande `dashboard-flutter-analyze` en
   `dashboard-flutter-test` entries dekken deze wijziging al (pathPrefix `dashboard-frontend/`).
+
+## Tester (product-121) — 2026-08-10
+
+- Codeverificatie: `dashboard-frontend/lib/main.dart` (Reden-blok, Builder rond regel 1068-1101)
+  komt exact overeen met de story-eisen: `isGuardrailRejection` is alleen `true` bij
+  `status == 'REJECTED' && iteration['criticVerdict'] == 'ACCEPT'`; de vaste toelichtingszin
+  (letterlijk conform AC, prefix "Let op:") wordt als extra alinea (`\n\n`) aan `displayText`
+  geplakt binnen dezelfde `Semantics(label: 'Reden: $displayText', ...)`-scope. Voor alle overige
+  combinaties blijft `displayText` ongewijzigd (geen kleur-/icoon-only communicatie, puur tekst).
+- Testcoverage geverifieerd in `iteration_session_reason_block_test.dart`: guardrail-pad
+  (REJECTED + criticVerdict='ACCEPT' → toelichtingszin zichtbaar) en regulier REJECTED
+  (criticVerdict='REJECT' → toelichtingszin afwezig via `find.textContaining('Let op:')` ==
+  `findsNothing`) zijn beide aanwezig en onderscheidend; overige statussen/fallback-scenario's
+  blijven gedekt door bestaande tests.
+- Vangnet opnieuw gedraaid (geen `timeout`, volledig laten doorlopen):
+  - `mvn -B --no-transfer-progress clean verify` (repo-root): BUILD SUCCESS, Tests run: 16,
+    Failures: 0, Errors: 0, Skipped: 0. Exitcode 0.
+  - `flutter analyze` (dashboard-frontend): "No issues found!". Exitcode 0.
+  - `flutter test` (dashboard-frontend): "All tests passed!" — 135/135 groen (inclusief de 2
+    nieuwe guardrail-widgettests). Exitcode 0. (Bekend cosmetisch artefact uit agent-tips:
+    interleaved shard-output toont sommige testnamen meerdere keren in de log — teller en
+    eindtotaal kloppen, geen echte herhaling; geen afwijkend gedrag waargenomen.)
+- Preview-smoketest: `SF_PREVIEW_URL=https://product-factory-pr-55.vdzonsoftware.nl` — frontend
+  `/` en backend `/actuator/health` geven beide HTTP 200. Geen browsertool beschikbaar in de
+  agentcontainer, dus interactieve/screenshot-verificatie van het Reden-blok in de preview was
+  niet mogelijk; geen nieuwe screenshots toegevoegd (conform eerdere agent-tip
+  `dashboard-frontend-preview-now-available`).
+- Conclusie: implementatie en tests dekken alle acceptatiecriteria van de story, geen
+  regressies gevonden, volledig vangnet groen. Akkoord: `tested`.
