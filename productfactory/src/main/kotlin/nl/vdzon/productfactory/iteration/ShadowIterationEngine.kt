@@ -184,7 +184,7 @@ class ShadowIterationEngine(
             return
         }
         if (accepted.isEmpty()) {
-            repository.markReviewed(iteration.id, "REJECT", "REJECTED")
+            repository.markReviewed(iteration.id, verdict, "REJECTED")
             return
         }
 

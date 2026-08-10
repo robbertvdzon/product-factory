@@ -80,6 +80,7 @@ class ShadowIterationEngineTest(
         val duplicate = repository.create("hkh-autopilot", "Controleer een mogelijk dubbel voorstel")
         engine.run(duplicate.id)
         assertEquals("REJECTED", repository.require("hkh-autopilot", duplicate.id).status)
+        assertEquals("ACCEPT", repository.require("hkh-autopilot", duplicate.id).criticVerdict)
         assertEquals(1, workspace.artifacts.size)
         assertEquals(
             1,
