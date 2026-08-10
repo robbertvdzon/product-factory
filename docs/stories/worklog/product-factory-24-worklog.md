@@ -43,3 +43,33 @@ Done / rationale:
   SUCCESS, 0 failures/errors). `dart format` gedraaid op de gewijzigde bestanden.
 - Wijziging blijft volledig beperkt tot `dashboard-frontend/` (lib/main.dart + test/); geen
   backend-, schema- of HKH-Autopilot-wijzigingen.
+
+## product-139 (tester)
+
+- Diff geïnspecteerd (`git diff main...HEAD -- dashboard-frontend/lib/main.dart`): de nieuwe
+  helper `_roleSpecificFieldEntries` geeft per rolspecifiek top-level veld een
+  `MapEntry<String, List<Widget>>` terug; `_readableArtifactFields` past voor elke entry zonder
+  widgets (en voor onbekende extra top-level keys) `_readableGenericFieldEntry` toe. Dit dekt de
+  AC's uit product-139: per-veld fallback, geen vervanging van de rolspecifieke branch bij
+  conforme velden, geen nieuwe generieke rendering voor geneste structuren, en de bestaande
+  "Toon technische details"-toggle blijft ongewijzigd achter het leesbare blok.
+- Testbestand `iteration_readable_artifact_fields_test.dart` bevat de vereiste scenario's: exacte
+  reproductie van cyclus shadow-hkh-autopilot-0003 (researcher, findings als losse string, geen
+  `{`/`}`/`"findings":` in het primaire paneel, rauwe JSON blijft achter de toggle), regressie op
+  een conform researcher-artefact (findings als objectenlijst, geen dubbele rendering), en het
+  volledig-lege-fallback-geval (alleen geneste objecten → kale JSON zonder toggle).
+- Wijziging raakt uitsluitend `dashboard-frontend/lib/main.dart` en
+  `dashboard-frontend/test/iteration_readable_artifact_fields_test.dart` (plus worklogs) - geen
+  backend/schema/HKH-Autopilot-bestanden aangeraakt, conform AC7.
+- Vangnet gedraaid (alleen `dashboard-frontend/`-prefixmatch in `.factory/verification.yaml` is
+  van toepassing; de mvn-command en de twee docker-image-builds hebben geen pathPrefix-match resp.
+  zijn agentRunnable: false):
+  - `flutter analyze` vanuit `dashboard-frontend/`: "No issues found!" (exit 0).
+  - `flutter test` vanuit `dashboard-frontend/`: "All tests passed!", 156 tests, 0 failures,
+    exit 0. Inclusief de nieuwe product-138-testgroep.
+- Geen preview-omgeving met browsertool beschikbaar in de agentcontainer (zie agent-tip
+  `geen-preview-omgeving`/`dashboard-frontend-preview-now-available`); ondanks een gevulde
+  SF_PREVIEW_URL in dit run is een interactieve UI-check niet mogelijk, dus is geleund op de
+  widgettests die het exacte AC1/AC2-scenario end-to-end reproduceren (dialoog openen, tegel
+  uitklappen, tekstassertie op het gerenderde paneel).
+- Geen bugs gevonden; geen code/tests/infra gewijzigd. Alleen deze worklog bijgewerkt.
