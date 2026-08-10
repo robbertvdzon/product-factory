@@ -59,18 +59,22 @@ class DashboardSession {
     return response.statusCode == 200;
   }
 
+  /// Ruilt het Google ID-token (maar 1 uur geldig, van Google zelf) meteen in voor een eigen
+  /// sessie-token dat 30 dagen geldig blijft (`POST /api/auth/google`), zodat de bewaarde sessie
+  /// niet elk uur opnieuw een (soms zichtbare) herlogin nodig heeft.
   Future<AuthenticatedSession> _authenticate(GoogleSignInAccount account) async {
-    final token = (await account.authentication).idToken;
-    if (token == null) throw StateError('Google leverde geen ID-token.');
-    final response = await http.get(
-      Uri.parse('$apiBaseUrl/api/session'),
-      headers: {'Authorization': 'Bearer $token'},
+    final idToken = (await account.authentication).idToken;
+    if (idToken == null) throw StateError('Google leverde geen ID-token.');
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/api/auth/google'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
     );
     if (response.statusCode != 200) {
       throw StateError('Account heeft geen toegang.');
     }
     final json = jsonDecode(response.body) as Map<String, dynamic>;
-    final session = AuthenticatedSession(json['email'] as String, token);
+    final session = AuthenticatedSession(json['username'] as String, json['token'] as String);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenPrefsKey, session.token);
     await prefs.setString(_emailPrefsKey, session.email);

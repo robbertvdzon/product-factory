@@ -7,22 +7,35 @@ import org.springframework.mock.web.MockHttpServletResponse
 import kotlin.test.assertEquals
 
 class DashboardAuthenticationFilterTest {
-    private val verifier = GoogleTokenVerifier { DashboardIdentity("admin@example.test", "Admin") }
+    private val sessions = SessionTokenService("test-remember-secret")
     @Test fun `production api fails closed without bearer token`() {
         val response = MockHttpServletResponse()
-        DashboardAuthenticationFilter(verifier, true).doFilter(MockHttpServletRequest("GET", "/api/products"), response, MockFilterChain())
+        DashboardAuthenticationFilter(sessions, true).doFilter(MockHttpServletRequest("GET", "/api/products"), response, MockFilterChain())
         assertEquals(401, response.status)
     }
-    @Test fun `valid token reaches api`() {
-        val request = MockHttpServletRequest("GET", "/api/products").apply { addHeader("Authorization", "Bearer valid") }
+    @Test fun `valid session token reaches api`() {
+        val token = sessions.issue("admin@example.test")
+        val request = MockHttpServletRequest("GET", "/api/products").apply { addHeader("Authorization", "Bearer $token") }
         val response = MockHttpServletResponse()
-        DashboardAuthenticationFilter(verifier, true).doFilter(request, response, MockFilterChain())
+        DashboardAuthenticationFilter(sessions, true).doFilter(request, response, MockFilterChain())
         assertEquals(200, response.status)
+    }
+    @Test fun `a raw (non-exchanged) bearer value is rejected`() {
+        val request = MockHttpServletRequest("GET", "/api/products").apply { addHeader("Authorization", "Bearer not-a-session-token") }
+        val response = MockHttpServletResponse()
+        DashboardAuthenticationFilter(sessions, true).doFilter(request, response, MockFilterChain())
+        assertEquals(401, response.status)
     }
     @Test fun `cors preflight reaches api without bearer token`() {
         val request = MockHttpServletRequest("OPTIONS", "/api/session")
         val response = MockHttpServletResponse()
-        DashboardAuthenticationFilter(verifier, true).doFilter(request, response, MockFilterChain())
+        DashboardAuthenticationFilter(sessions, true).doFilter(request, response, MockFilterChain())
+        assertEquals(200, response.status)
+    }
+    @Test fun `the google exchange endpoint itself is reachable without a session token`() {
+        val request = MockHttpServletRequest("POST", "/api/auth/google")
+        val response = MockHttpServletResponse()
+        DashboardAuthenticationFilter(sessions, true).doFilter(request, response, MockFilterChain())
         assertEquals(200, response.status)
     }
 

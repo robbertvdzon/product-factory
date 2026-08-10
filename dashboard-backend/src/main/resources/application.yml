@@ -14,3 +14,4 @@ product-factory:
     auth-required: ${PF_DASHBOARD_AUTH_REQUIRED:false}
     google-client-id: ${PF_GOOGLE_CLIENT_ID:}
     allowed-emails: ${PF_ADMIN_EMAILS:}
+    remember-secret: ${PF_DASHBOARD_REMEMBER_SECRET:}
