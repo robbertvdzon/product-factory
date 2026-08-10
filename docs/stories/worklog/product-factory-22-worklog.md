@@ -49,3 +49,37 @@ Done / rationale:
   vanuit de repo-root (BUILD SUCCESS, alle modules groen — inclusief
   `nl.vdzon.productfactory.FunctionalSpecStatusConclusionDocTest`, die de bijgewerkte
   `functional-spec.md` meeleest en groen bleef). Geen bestaande rode tests aangetroffen.
+
+## Tester (product-127)
+
+- Diff-scope geverifieerd: alleen `dashboard-frontend/lib/classification.dart`,
+  drie testbestanden (`classification_test.dart`, `iteration_readable_artifact_fields_test.dart`,
+  `iteration_session_dialog_classification_badge_test.dart`), `docs/factory/functional-spec.md` en
+  deze worklog. Geen backend-/schema-/API-wijziging, conform AC.
+- `kBekendeStatuswaardenPerCategorie['FAILED']` wijst naar `kTechnischeFout` (badge-tekst
+  'technische fout'); `kGuardrailConflict` + kleurdefinitie blijven bestaan en `main.dart:1790`
+  gebruikt deze nog ongewijzigd voor het storyqueue-blokkeerlabel.
+  `kIterationClassifications`/`kClassificationColors` bevatten de nieuwe entry.
+- Contrastratio van het nieuwe kleurenpaar (bg `0xFFE4E1F5` / fg `0xFF33306B`) onafhankelijk
+  herberekend (WCAG 2.1-relatieve-luminantieformule): ≈ 9.23:1, ruim boven de vereiste 4.5:1.
+  `story_queue_blocked_label_test.dart` en `classification_badge_disclosure_test.dart` gebruiken
+  `kGuardrailConflict` bewust nog in resp. blokkeerlabel- en generieke disclosure-context; niet
+  gewijzigd, conform de aannames in de story.
+  functional-spec.md rond regel 21-22/134-135 noemt nu 'technische fout' i.p.v. 'guardrail-conflict'
+  voor de vaste badge-opsomming; de storyqueue-blokkeerlabel-passage is ongemoeid gelaten.
+- Alleen `dashboard-frontend/` en `docs/` zijn gewijzigd; dit matcht geen enkele `pathPrefixes` van
+  `repository-maven-verify` in `.factory/verification.yaml`, dus dat command hoort niet in het
+  vangnet voor deze revisie. Ter controle wel gecheckt dat de enige backend-test die
+  `functional-spec.md` leest (`FunctionalSpecStatusConclusionDocTest`) geen 'guardrail'/'technische
+  fout'-tekst toetst en dus niet door deze wijziging geraakt wordt.
+- Vangnet gedraaid vanuit `dashboard-frontend/`: `flutter analyze` → "No issues found!" en
+  `flutter test` → 139/139 groen, exit code 0, geen failures/errors.
+- Geen preview-browsertool beschikbaar in de agentcontainer (bekend, zie agent-tips); wel curl-
+  smoketest op de preview-omgeving (`SF_PREVIEW_URL`): frontend `/` → HTTP 200,
+  `/actuator/health` → HTTP 200. Interactieve a11y-inspectie (flt-semantics-placeholder/CDP AX
+  tree) op de FAILED-badge kon daardoor niet worden uitgevoerd; badge-tekst en semantics-inhoud
+  zijn wel afgedekt door de groene widgettests (`classification_test.dart`,
+  `iteration_readable_artifact_fields_test.dart`,
+  `iteration_session_dialog_classification_badge_test.dart`,
+  `classification_badge_disclosure_test.dart`).
+- Conclusie: gedrag komt overeen met de story-acceptatiecriteria, vangnet groen. Akkoord.
