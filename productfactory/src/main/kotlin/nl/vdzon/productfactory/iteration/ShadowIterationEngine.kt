@@ -13,12 +13,15 @@ import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
 import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
 import org.slf4j.LoggerFactory
+import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 import java.net.URI
 import java.security.MessageDigest
+import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -34,6 +37,40 @@ class ShadowIterationRunner(
     fun start(event: ShadowIterationStarted) {
         runCatching { engine.run(event.iterationId) }
             .onFailure { repository.markFailed(event.iterationId, it.message ?: it.javaClass.simpleName) }
+    }
+}
+
+/**
+ * Ruimt bij het opstarten iteraties op die door een vorig proces (bv. een herdeploy) zijn
+ * achtergelaten in QUEUED/RUNNING: het async-thread dat de rol uitvoerde is met dat proces gestorven,
+ * zonder ooit zijn eigen resultaat of timeout te kunnen wegschrijven — zonder deze opruimronde blijft
+ * zo'n rij voor altijd op RUNNING staan en blokkeert [ShadowIterationRepository.hasActive] daarmee
+ * permanent elke nieuwe cyclus voor dat product.
+ *
+ * De drempel van 2 uur is bewust ruim: een normale rolling update laat de oude en nieuwe pod hooguit
+ * enkele seconden overlappen, dus een 2 uur oude RUNNING-rij kan onmogelijk nog bij een op dit moment
+ * gracieus afsluitende oude pod horen — zo faalt deze opruimronde nooit per ongeluk een iteratie die
+ * in werkelijkheid nog gewoon loopt.
+ */
+@Component
+class OrphanedIterationReconciler(private val repository: ShadowIterationRepository) {
+    @EventListener(ApplicationReadyEvent::class)
+    fun reconcile() {
+        val orphaned = repository.failOrphaned(ORPHAN_REASON, ORPHAN_THRESHOLD)
+        if (orphaned.isNotEmpty()) {
+            logger.warn(
+                "Bij opstarten {} weeskind-iteratie(s) op FAILED gezet (langer dan {} in QUEUED/RUNNING): {}",
+                orphaned.size,
+                ORPHAN_THRESHOLD,
+                orphaned.joinToString(),
+            )
+        }
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(OrphanedIterationReconciler::class.java)
+        private val ORPHAN_THRESHOLD: Duration = Duration.ofHours(2)
+        private const val ORPHAN_REASON = "Cyclus afgebroken: het proces is herstart (bijvoorbeeld door een herdeploy) terwijl deze iteratie nog liep"
     }
 }
 

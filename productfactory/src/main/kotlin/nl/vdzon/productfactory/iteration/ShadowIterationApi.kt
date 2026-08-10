@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
+import java.sql.Timestamp
+import java.time.Duration
 import java.time.Instant
 
 data class StartCycleRequest(val focus: String? = null)
@@ -131,6 +133,38 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         Long::class.java,
         productSlug,
     ) ?: 0) > 0
+
+    /**
+     * Faalt QUEUED/RUNNING iteraties die al langer dan [olderThan] bezig zijn: zo'n rij kan nooit meer
+     * legitiem lopen, want er bestaat geen hervattingsmechanisme — het async-thread dat de rol
+     * uitvoerde is met een vorig proces (bv. een herdeploy) gestorven, zonder ooit zijn resultaat of
+     * eigen timeout te kunnen wegschrijven (zie OrphanedIterationReconciler). Werkt op ID's die vooraf
+     * zijn opgehaald, niet op een enkele bulk-UPDATE, zodat de aanroeper exact weet welke iteraties
+     * geraakt zijn en dat kan loggen.
+     */
+    fun failOrphaned(reason: String, olderThan: Duration): List<String> {
+        val cutoff = Timestamp.from(Instant.now().minus(olderThan))
+        val orphaned = jdbc.query(
+            "select id from shadow_iteration where status in ('QUEUED', 'RUNNING') and coalesce(started_at, created_at) < ?",
+            { row, _ -> row.getString("id") },
+            cutoff,
+        )
+        if (orphaned.isEmpty()) return orphaned
+        val truncated = reason.take(MAX_ERROR_CHARS)
+        orphaned.forEach { id ->
+            jdbc.update(
+                "update shadow_iteration set status = 'FAILED', current_agent_role = null, error_message = ?, completed_at = current_timestamp where id = ? and status in ('QUEUED', 'RUNNING')",
+                truncated,
+                id,
+            )
+            jdbc.update(
+                "update shadow_iteration_step set status = 'FAILED', error_message = ?, completed_at = current_timestamp where iteration_id = ? and status = 'RUNNING'",
+                truncated,
+                id,
+            )
+        }
+        return orphaned
+    }
 
     fun create(productSlug: String, focus: String, mode: String = "shadow"): ShadowIterationView {
         val sequence = (jdbc.queryForObject(
