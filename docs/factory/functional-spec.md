@@ -50,12 +50,20 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    van de in-/uitklapstatus van de roltegel zelf. Deze toggle is met muis én toetsenbord (Tab,
    Enter/Spatie) te bedienen en communiceert zijn open/dicht-status via `Semantics(expanded: ...)`
    (het Flutter-web-equivalent van `aria-expanded`). Matcht het rolresultaat geen van de vijf
-   rolspecifieke schema's hierboven, dan valt de weergave terug op een generieke leesbare
+   rolspecifieke schema's hierboven, dan valt de weergave volledig terug op een generieke leesbare
    weergave: elk top-level veld dat een string is, of een lijst die uitsluitend uit primitieve
    waarden (tekst, getal, boolean) bestaat, verschijnt als gelabelde regel — het label komt van
    dezelfde `humanizeFieldKey`-functie die ook de vaste labels voor `findings`, `decision`,
    `story`, `verdict` en `reason` levert — en ook dan verdwijnt de ruwe JSON achter de toggle
-   'Toon technische details'. Bevat het resultaat op het hoogste niveau uitsluitend geneste
+   'Toon technische details'. Dezelfde generieke fallback wordt ook toegepast per afzonderlijk
+   top-level veld binnen een wél herkende rol: wijkt het content_json van die rol af van het
+   verwachte schema (bv. `findings` als losse string in plaats van een objectenlijst bij de
+   Onderzoeker-rol), dan levert de rolspecifieke branch voor dat ene veld niets op, en verschijnt
+   het alsnog leesbaar via dezelfde generieke regel — de overige, wél conforme velden van diezelfde
+   rol blijven gewoon via hun rolspecifieke weergave zichtbaar. Alleen als noch de rolspecifieke
+   branch, noch deze per-veld generieke fallback voor een top-level veld iets oplevert (bv. geneste
+   objecten of arrays van objecten binnen een niet-conform artefact), blijft dat veld ongerenderd.
+   Bevat het resultaat op het hoogste niveau uitsluitend geneste
    objecten, arrays van objecten, of is de inhoud niet decodeerbaar of onherkend (of van een
    retry-poging met `-2`/`-3`-suffix op `artifactType`, die dezelfde weergave als de eerste
    poging krijgt), dan blijft uitsluitend de ruwe JSON direct zichtbaar zonder toggle, zonder
