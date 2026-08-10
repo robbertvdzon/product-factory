@@ -135,20 +135,39 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
     ) ?: 0) > 0
 
     /**
-     * Faalt QUEUED/RUNNING iteraties die al langer dan [olderThan] bezig zijn: zo'n rij kan nooit meer
-     * legitiem lopen, want er bestaat geen hervattingsmechanisme — het async-thread dat de rol
-     * uitvoerde is met een vorig proces (bv. een herdeploy) gestorven, zonder ooit zijn resultaat of
-     * eigen timeout te kunnen wegschrijven (zie OrphanedIterationReconciler). Werkt op ID's die vooraf
-     * zijn opgehaald, niet op een enkele bulk-UPDATE, zodat de aanroeper exact weet welke iteraties
-     * geraakt zijn en dat kan loggen.
+     * Faalt weeskind-iteraties: rijen die onmogelijk nog legitiem kunnen lopen (zie
+     * OrphanedIterationReconciler voor waarom zulke rijen ontstaan). Twee gevallen, elk met een eigen,
+     * zo scherp mogelijk gekozen drempel in plaats van één brede veiligheidsmarge:
+     *
+     * 1. Een `shadow_iteration_step` die nog op RUNNING staat terwijl zijn eigen rol-timeout (plus wat
+     *    marge) allang verstreken is. Zo'n stap kán niet meer legitiem lopen: was het uitvoerende
+     *    thread nog in leven, dan had nl.vdzon.productfactory.agentruntime.api.HttpAgentDispatcher
+     *    zichzelf allang op FAILED gezet via zijn eigen timeout. Dit vangt een weeskind dus al
+     *    binnen zijn eigen rol-timeout op — voor de meeste rollen ruim binnen een kwartier, voor
+     *    RESEARCHER binnen iets meer dan een uur — in plaats van pas na een losse, veel langere
+     *    veiligheidsmarge.
+     * 2. Een iteratie die nog op QUEUED staat zonder dat er ooit een stap voor is gestart: de
+     *    async-listener die een cyclus oppikt (zie ShadowIterationRunner) is dan nooit afgevuurd of is
+     *    meteen na het committen van de starttransactie gestorven. [queuedGrace] is bewust klein (de
+     *    listener reageert normaal binnen milliseconden na de commit).
      */
-    fun failOrphaned(reason: String, olderThan: Duration): List<String> {
-        val cutoff = Timestamp.from(Instant.now().minus(olderThan))
-        val orphaned = jdbc.query(
-            "select id from shadow_iteration where status in ('QUEUED', 'RUNNING') and coalesce(started_at, created_at) < ?",
-            { row, _ -> row.getString("id") },
-            cutoff,
+    fun failOrphaned(reason: String, queuedGrace: Duration = Duration.ofMinutes(10)): List<String> {
+        val researcherCutoff = Timestamp.from(Instant.now().minusSeconds(ShadowIterationEngine.RESEARCHER_TIMEOUT_SECONDS + TIMEOUT_GRACE_SECONDS))
+        val otherRoleCutoff = Timestamp.from(Instant.now().minusSeconds(ShadowIterationEngine.ROLE_TIMEOUT_SECONDS + TIMEOUT_GRACE_SECONDS))
+        val stuckSteps = jdbc.query(
+            """select distinct iteration_id from shadow_iteration_step
+                where status = 'RUNNING'
+                  and ((role = 'RESEARCHER' and started_at < ?) or (role <> 'RESEARCHER' and started_at < ?))""".trimIndent(),
+            { row, _ -> row.getString("iteration_id") },
+            researcherCutoff,
+            otherRoleCutoff,
         )
+        val stuckQueued = jdbc.query(
+            "select id from shadow_iteration where status = 'QUEUED' and created_at < ?",
+            { row, _ -> row.getString("id") },
+            Timestamp.from(Instant.now().minus(queuedGrace)),
+        )
+        val orphaned = (stuckSteps + stuckQueued).distinct()
         if (orphaned.isEmpty()) return orphaned
         val truncated = reason.take(MAX_ERROR_CHARS)
         orphaned.forEach { id ->
@@ -462,6 +481,9 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         private val log = LoggerFactory.getLogger(ShadowIterationRepository::class.java)
         private const val MAX_AGENT_OUTPUT_CHARS = 200_000
         private const val MAX_ERROR_CHARS = 4_000
+
+        /** Zelfde marge als AgentDispatchPort.BRIDGE_GRACE_SECONDS: geeft de poll-lus de tijd om zijn eigen timeout af te ronden voordat wij die stap als weeskind bestempelen. */
+        private const val TIMEOUT_GRACE_SECONDS = 30L
         private const val VIEW_SELECT = """select i.*,
             (select count(*) from story_candidate s where s.iteration_id = i.id) as candidate_count
             from shadow_iteration i"""

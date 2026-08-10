@@ -16,12 +16,12 @@ import org.slf4j.LoggerFactory
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 import java.net.URI
 import java.security.MessageDigest
-import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -41,35 +41,39 @@ class ShadowIterationRunner(
 }
 
 /**
- * Ruimt bij het opstarten iteraties op die door een vorig proces (bv. een herdeploy) zijn
- * achtergelaten in QUEUED/RUNNING: het async-thread dat de rol uitvoerde is met dat proces gestorven,
- * zonder ooit zijn eigen resultaat of timeout te kunnen wegschrijven — zonder deze opruimronde blijft
- * zo'n rij voor altijd op RUNNING staan en blokkeert [ShadowIterationRepository.hasActive] daarmee
- * permanent elke nieuwe cyclus voor dat product.
+ * Ruimt iteraties op die door een vorig of het huidige proces zijn achtergelaten in QUEUED/RUNNING
+ * terwijl ze onmogelijk nog legitiem kunnen lopen (zie [ShadowIterationRepository.failOrphaned] voor
+ * de precieze, per-rol-timeout-gebaseerde detectie). Dit gebeurt meestal doordat een herdeploy het
+ * async-thread doodt dat de rol uitvoerde, zonder dat het ooit zijn eigen resultaat of timeout heeft
+ * kunnen wegschrijven — zonder deze opruimronde blijft zo'n rij voor altijd op RUNNING staan en
+ * blokkeert [ShadowIterationRepository.hasActive] daarmee permanent elke nieuwe cyclus voor dat
+ * product.
  *
- * De drempel van 2 uur is bewust ruim: een normale rolling update laat de oude en nieuwe pod hooguit
- * enkele seconden overlappen, dus een 2 uur oude RUNNING-rij kan onmogelijk nog bij een op dit moment
- * gracieus afsluitende oude pod horen — zo faalt deze opruimronde nooit per ongeluk een iteratie die
- * in werkelijkheid nog gewoon loopt.
+ * Draait op twee momenten:
+ * - bij het opstarten, voor weeskinderen die al vóór deze pod bestonden;
+ * - elke tien minuten (`product-factory.iteration.orphan-reconcile-delay`), voor een iteratie die
+ *   per ongeluk vlak vóór de vorige herdeploy is gestart en daardoor bij het opstarten zelf nog te
+ *   vers was om als weeskind herkend te worden. Zo hoeft zo'n geval niet tot de volgende herdeploy
+ *   te wachten, maar wordt het al binnen zijn eigen rol-timeout (plus deze interval) automatisch
+ *   vrijgegeven.
  */
 @Component
 class OrphanedIterationReconciler(private val repository: ShadowIterationRepository) {
     @EventListener(ApplicationReadyEvent::class)
-    fun reconcile() {
-        val orphaned = repository.failOrphaned(ORPHAN_REASON, ORPHAN_THRESHOLD)
+    fun reconcileOnStartup() = reconcile()
+
+    @Scheduled(fixedDelayString = "\${product-factory.iteration.orphan-reconcile-delay:PT10M}")
+    fun reconcilePeriodically() = reconcile()
+
+    private fun reconcile() {
+        val orphaned = repository.failOrphaned(ORPHAN_REASON)
         if (orphaned.isNotEmpty()) {
-            logger.warn(
-                "Bij opstarten {} weeskind-iteratie(s) op FAILED gezet (langer dan {} in QUEUED/RUNNING): {}",
-                orphaned.size,
-                ORPHAN_THRESHOLD,
-                orphaned.joinToString(),
-            )
+            logger.warn("{} weeskind-iteratie(s) op FAILED gezet: {}", orphaned.size, orphaned.joinToString())
         }
     }
 
     companion object {
         private val logger = LoggerFactory.getLogger(OrphanedIterationReconciler::class.java)
-        private val ORPHAN_THRESHOLD: Duration = Duration.ofHours(2)
         private const val ORPHAN_REASON = "Cyclus afgebroken: het proces is herstart (bijvoorbeeld door een herdeploy) terwijl deze iteratie nog liep"
     }
 }
@@ -807,11 +811,13 @@ class ShadowIterationEngine(
 
     companion object {
         private val log = LoggerFactory.getLogger(ShadowIterationEngine::class.java)
-        private const val ROLE_TIMEOUT_SECONDS = 900L
+        // internal (niet private): OrphanedIterationReconciler hergebruikt dezelfde waarden om te bepalen
+        // wanneer een RUNNING-stap zijn eigen timeout onmogelijk nog kan halen.
+        internal const val ROLE_TIMEOUT_SECONDS = 900L
         // RESEARCHER bekijkt de acceptatieomgeving nu via een echte (headless) browser in plaats van WebFetch
         // (zie AgentTaskExecutor.isResearcherTask): browsernavigatie, paginalaadtijd en scriptuitvoering maken
         // die stap merkbaar trager dan de overige, puur tekst-/toolgedreven rollen, die ruim binnen 900s blijven.
-        private const val RESEARCHER_TIMEOUT_SECONDS = 3600L
+        internal const val RESEARCHER_TIMEOUT_SECONDS = 3600L
         private const val MAX_STORY_ATTEMPTS = 3
         private const val DEPENDSON_RESOLUTION_ARTIFACT_TYPE = "dependson_resolution"
         private val OWNER_ACTION_PATTERN = Regex(

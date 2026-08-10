@@ -29,3 +29,5 @@ product-factory:
   autonomy:
     enabled: ${PF_AUTONOMY_ENABLED:false}
     poll-delay: ${PF_AUTONOMY_POLL_DELAY:PT1M}
+  iteration:
+    orphan-reconcile-delay: ${PF_ORPHAN_RECONCILE_DELAY:PT10M}
