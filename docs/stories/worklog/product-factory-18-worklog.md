@@ -46,3 +46,26 @@ Done / rationale:
 - Niet gedaan / bewust buiten scope: geen wijziging aan de bredere hoofdschermherstructurering,
   geen onderzoek naar de live NEEDS_REVISION-iteratie zonder criticus-artefact op
   shadow-hkh-autopilot-0003 (expliciet buiten scope per de story-aannames).
+
+## Tester (product-104)
+
+- Diff van deze story raakt uitsluitend `dashboard-frontend/lib/main.dart`,
+  `dashboard-frontend/test/iteration_session_reason_block_test.dart` en de worklog; volgens
+  `.factory/verification.yaml`-pathPrefixes zijn alleen `dashboard-flutter-analyze` en
+  `dashboard-flutter-test` van toepassing.
+- `flutter analyze` (dashboard-frontend): No issues found!
+- `flutter test` (dashboard-frontend): 133/133 groen, exitcode 0, twee keer gedraaid (incl.
+  losse herrun) — geen failures/errors, ook niet flaky. Nieuwe testfile
+  `iteration_session_reason_block_test.dart` dekt alle acceptance criteria (Reden-blok bij
+  NEEDS_REVISION/REJECTED met leesbare tekst zonder rauwe JSON, fallback zonder criticus-artefact,
+  meest-recente-retry-selectie, afwezigheid bij ACCEPTED/PENDING/QUEUED/RUNNING, Semantics-boom,
+  regressie op bestaand FAILED-blok en criticus-roltegel).
+- Codeverificatie van `latestCriticArtifact`/`criticReasonSummary` en de renderlogica in
+  `IterationSessionDialog` tegen de story-scope: komt overeen met de acceptance criteria, geen
+  nieuwe API-velden, geen wijziging aan `classification.dart`/`ShadowSchemas.kt`.
+- Geen preview-omgeving beschikbaar in de agentcontainer (geen browsertool); zie bestaande
+  agent-tip `dashboard-frontend-preview-now-available`/`geen-preview-omgeving`. Interactieve
+  E2E-/screenshotverificatie was daarom niet mogelijk; verificatie leunt op widgettests +
+  codeinspectie, conform eerdere testerrondes in dit repo.
+- Oordeel: `tested` — vangnet voor deze diff (flutter analyze + flutter test) volledig groen,
+  geen regressies, gedrag komt overeen met de story.
