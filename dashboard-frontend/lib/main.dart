@@ -549,7 +549,10 @@ class _OverviewPageState extends State<OverviewPage> {
                                         .map((topic) => '• $topic')
                                         .join('\n'),
                               child: ActionChip(
-                                avatar: const Icon(Icons.forum_outlined, size: 18),
+                                avatar: const Icon(
+                                  Icons.forum_outlined,
+                                  size: 18,
+                                ),
                                 label: const Text('Overleg gevraagd'),
                                 onPressed: () => _startMeeting(slug),
                               ),
@@ -1070,11 +1073,17 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                     Builder(
                       builder: (context) {
                         final criticArtifact = latestCriticArtifact(artifacts);
-                        final reasonText = criticArtifact == null
-                            ? ''
-                            : criticReasonSummary(
+                        final missingCriticContext =
+                            status == 'NEEDS_REVISION' &&
+                            iteration['criticVerdict'] == null &&
+                            criticArtifact == null;
+                        final reasonText = criticArtifact != null
+                            ? criticReasonSummary(
                                 '${criticArtifact['contentJson']}',
-                              );
+                              )
+                            : missingCriticContext
+                            ? missingCriticReasonText(steps, artifacts)
+                            : '';
                         final baseDisplayText = reasonText.trim().isEmpty
                             ? 'Criticus-oordeel ontbreekt voor deze cyclus'
                             : reasonText;
@@ -1330,14 +1339,24 @@ class _TechnicalDetailsToggleState extends State<TechnicalDetailsToggle> {
 /// voor de huidige iteratie en geeft de meest recente terug (hoogste retry-suffix; bij een
 /// gelijk of hoger suffix wint de laatst voorkomende in de lijst). Geeft `null` als er geen
 /// criticus-artefact aanwezig is.
-Map<String, dynamic>? latestCriticArtifact(List<dynamic> artifacts) {
+Map<String, dynamic>? latestCriticArtifact(List<dynamic> artifacts) =>
+    latestArtifactForRole(artifacts, 'critic');
+
+/// Zoekt in [artifacts] het meest recente artefact (hoogste retry-suffix; bij een gelijk of hoger
+/// suffix wint het laatst voorkomende exemplaar in de lijst) voor de gegeven [role] (bv.
+/// 'researcher', 'product_owner', 'critic'). Algemene vorm van wat voorheen alleen
+/// [latestCriticArtifact] deed. Geeft `null` als er geen artefact voor die rol aanwezig is.
+Map<String, dynamic>? latestArtifactForRole(
+  List<dynamic> artifacts,
+  String role,
+) {
   Map<String, dynamic>? latest;
   var latestAttempt = -1;
   for (final item in artifacts) {
     final artifact = item as Map<String, dynamic>;
     final artifactType = '${artifact['artifactType']}';
     final baseRole = artifactType.replaceAll(RegExp(r'-\d+$'), '');
-    if (baseRole != 'critic') continue;
+    if (baseRole != role) continue;
     final match = RegExp(r'-(\d+)$').firstMatch(artifactType);
     final attempt = match != null ? int.parse(match.group(1)!) : 1;
     if (attempt >= latestAttempt) {
@@ -1346,6 +1365,134 @@ Map<String, dynamic>? latestCriticArtifact(List<dynamic> artifacts) {
     }
   }
   return latest;
+}
+
+/// Bepaalt de laatst voltooide (`status == 'COMPLETED'`) stap uit [steps], gesorteerd op
+/// `completedAt` (nieuwste eerst); ontbreekt `completedAt`, of zijn er gelijke tijdstippen, dan
+/// wint de laatst voorkomende COMPLETED-stap in de lijst — analoog aan de tie-break in
+/// [latestArtifactForRole]. Geeft `null` als geen enkele stap COMPLETED is.
+Map<String, dynamic>? lastCompletedStep(List<dynamic> steps) {
+  Map<String, dynamic>? latest;
+  DateTime? latestCompletedAt;
+  for (final item in steps) {
+    final step = item as Map<String, dynamic>;
+    if ('${step['status']}' != 'COMPLETED') continue;
+    final completedAtRaw = step['completedAt'];
+    final completedAt = completedAtRaw == null
+        ? null
+        : DateTime.tryParse('$completedAtRaw');
+    final isFirstMatch = latest == null;
+    final winsTie =
+        completedAt == null ||
+        latestCompletedAt == null ||
+        !completedAt.isBefore(latestCompletedAt);
+    if (isFirstMatch || winsTie) {
+      latest = step;
+      latestCompletedAt = completedAt;
+    }
+  }
+  return latest;
+}
+
+/// Bouwt een pure-tekst (geen widgets, geen rauwe JSON) resultaatsamenvatting voor [role] uit
+/// [contentJson], voor gebruik in het Reden-blok bij `NEEDS_REVISION` zonder `criticVerdict` en
+/// zonder criticus-artefact (product-132). Rollen met een `summary`-veld in hun
+/// `ShadowSchemas.kt`-schema (researcher, critic, summary) gebruiken dat veld; de rollen zonder
+/// `summary`-veld (product_owner, ux_designer, story_writer) krijgen een samenvatting opgebouwd
+/// uit hun belangrijkste velden — dezelfde velden als in [_readableArtifactFields] — met labels
+/// via [humanizeFieldKey], nooit rauwe JSON. Geeft een lege string terug als [contentJson] niet
+/// parseerbaar is, de rol onbekend is, of geen van de relevante velden bruikbare inhoud bevat.
+String roleResultSummaryText(String role, String contentJson) {
+  final Map<String, dynamic> data;
+  try {
+    final decoded = jsonDecode(contentJson);
+    if (decoded is! Map) return '';
+    data = decoded.cast<String, dynamic>();
+  } catch (_) {
+    return '';
+  }
+
+  String field(String key) => '${data[key] ?? ''}'.trim();
+  String bulletLine(String key) {
+    final value = data[key];
+    if (value is! List) return '';
+    final items = value
+        .map((entry) => '$entry'.trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList();
+    return items.isEmpty ? '' : '${humanizeFieldKey(key)}: ${items.join('; ')}';
+  }
+
+  final lines = <String>[];
+  switch (role) {
+    case 'researcher':
+    case 'critic':
+    case 'summary':
+      final summary = field('summary');
+      if (summary.isNotEmpty) lines.add(summary);
+      break;
+    case 'product_owner':
+      final direction = field('productDirection');
+      if (direction.isNotEmpty) lines.add(direction);
+      final rationale = field('rationale');
+      if (rationale.isNotEmpty) lines.add(rationale);
+      final priorities = bulletLine('priorities');
+      if (priorities.isNotEmpty) lines.add(priorities);
+      break;
+    case 'ux_designer':
+      final flow = field('flowName');
+      if (flow.isNotEmpty) lines.add(flow);
+      final goal = field('userGoal');
+      if (goal.isNotEmpty) lines.add(goal);
+      final steps = bulletLine('steps');
+      if (steps.isNotEmpty) lines.add(steps);
+      break;
+    case 'story_writer':
+      final candidates = data['candidates'];
+      if (candidates is List) {
+        final titles = candidates
+            .whereType<Map>()
+            .map((item) => '${item['title'] ?? ''}'.trim())
+            .where((title) => title.isNotEmpty)
+            .toList();
+        if (titles.isNotEmpty) {
+          lines.add('${humanizeFieldKey('candidates')}: ${titles.join('; ')}');
+        }
+      }
+      break;
+    default:
+      break;
+  }
+  return lines.join('\n');
+}
+
+/// Reden-tekst voor de deelcasus `NEEDS_REVISION` zonder `criticVerdict` en zonder
+/// criticus-artefact (product-132): toont de laatst voltooide rol (via [_roleLabel]) plus een
+/// leesbare resultaatsamenvatting ([roleResultSummaryText]), of — als geen enkele rol `COMPLETED`
+/// is — een aparte, expliciete fallbacktekst die dat meldt.
+///
+/// Onderzoek naar bewuste stop vs. timeout/technische fout (product-132): `steps`/`artifacts`
+/// geven hiervoor GEEN betrouwbaar onderscheid. Een rol die nooit gestart is, levert domweg geen
+/// step-record op — er bestaat geen expliciet 'overgeslagen'/'timeout'-statuswaarde of -veld die
+/// het stoppen van de pipeline na de laatste COMPLETED-stap verklaart. `errorMessage` staat alleen
+/// op stappen die zelf gestart en gefaald zijn, en zulke fouten leiden normaliter tot status
+/// `FAILED` (met het bestaande Foutreden-blok), niet tot deze `NEEDS_REVISION`-zonder-
+/// `criticVerdict`-casus. Zonder een veld dat de daadwerkelijke stopoorzaak vastlegt, blijft de
+/// tekst hieronder daarom beperkt tot rolnaam + resultaatsamenvatting, zonder gegokte oorzaak.
+String missingCriticReasonText(List<dynamic> steps, List<dynamic> artifacts) {
+  final lastStep = lastCompletedStep(steps);
+  if (lastStep == null) {
+    return 'Geen enkele agentrol is voltooid voor deze cyclus; er is geen '
+        'resultaat om te tonen.';
+  }
+  final role = '${lastStep['role']}';
+  final artifact = latestArtifactForRole(artifacts, role);
+  final contentJson = artifact == null ? '' : '${artifact['contentJson']}';
+  final summaryText = roleResultSummaryText(role, contentJson);
+  final summaryLine = summaryText.isEmpty
+      ? 'Geen leesbare samenvatting beschikbaar voor deze rol.'
+      : summaryText;
+  return 'Laatst voltooide rol: ${_roleLabel(role)}\n\n$summaryLine';
 }
 
 /// Bouwt leesbare, lopende tekst (géén rauwe JSON) uit een criticus-artefact's `contentJson`,

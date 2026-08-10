@@ -73,8 +73,21 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    waarbij het meest recente/hoogste-suffix-artefact wordt gebruikt), dan bevat het blok leesbare
    lopende tekst opgebouwd uit `overallVerdict`, `summary` en `requiredChanges[]` van dat artefact
    (`ShadowSchemas.kt`-schema `critic`) — nooit rauwe JSON. Ontbreekt zo'n criticus-artefact, dan
-   toont het blok in plaats daarvan exact de tekst 'Criticus-oordeel ontbreekt voor deze cyclus'.
-   Is de iteratiestatus `REJECTED` en is `iteration['criticVerdict'] == 'ACCEPT'` (het
+   toont het blok in plaats daarvan exact de tekst 'Criticus-oordeel ontbreekt voor deze cyclus' —
+   behalve voor de deelcasus hieronder. Is de status `NEEDS_REVISION`, is er géén
+   `iteration['criticVerdict']` (`null`) én ontbreekt het criticus-artefact, dan bepaalt het dialoog
+   uit `steps` (role/status/attempt/startedAt/completedAt/errorMessage) welke agentrol als laatste
+   `COMPLETED` is, en toont in plaats van de generieke fallbacktekst de naam van die rol (via de
+   bestaande `_roleLabel`-mapping) plus een leesbare resultaatsamenvatting uit het bijbehorende
+   artefact in `artifacts` — voor researcher/critic/summary het `summary`-veld, voor
+   product_owner/ux_designer/story_writer een samenvatting opgebouwd uit hun belangrijkste velden
+   (dezelfde weergavelogica/labels als de roltegels, via `humanizeFieldKey`) — nooit rauwe JSON. Is
+   geen enkele rol `COMPLETED`, dan toont het blok in plaats daarvan een aparte, expliciete
+   fallbacktekst die dat meldt (ongelijk aan de generieke 'Criticus-oordeel ontbreekt'-tekst).
+   `steps`/`artifacts` geven geen betrouwbaar onderscheid tussen een bewuste pipeline-stop en een
+   timeout/technische fout (een niet-gestarte rol levert domweg geen step-record op), dus benoemt
+   deze tekst uitsluitend rolnaam en resultaat, zonder een gegokte oorzaak. Is de iteratiestatus
+   `REJECTED` en is `iteration['criticVerdict'] == 'ACCEPT'` (het
    guardrail-pad: alle door de criticus goedgekeurde kandidaten zijn alsnog geblokkeerd op
    duplicaat/guardrail), dan wordt aan de criticus-tekst een extra, statische alinea toegevoegd
    met exact de tekst 'Let op: Alle voorgestelde kandidaten zijn geblokkeerd (duplicaat of
