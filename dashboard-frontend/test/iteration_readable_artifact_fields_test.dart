@@ -351,12 +351,14 @@ void main() {
   });
 
   testWidgets(
-    'artefact met onherkende JSON-vorm binnen een bekende rol valt terug op alleen rauwe JSON',
+    'artefact met onherkende JSON-vorm binnen een bekende rol valt per veld terug op de '
+    'generieke fallback (product-138)',
     (tester) async {
       _growTestWindow(tester);
       // 'findings' is hier een string i.p.v. een array: decodeerbaar als JSON, maar niet als het
-      // verwachte schema. De leesbare velden die wél passen (summary) mogen getoond worden; de
-      // niet-passende ('findings') moeten stilzwijgend overgeslagen worden zonder crash.
+      // verwachte schema van de rolspecifieke branch. De rolspecifieke branch levert voor
+      // 'findings' geen widgets op, dus die valt terug op de generieke fallback (label via
+      // humanizeFieldKey) i.p.v. stilzwijgend te verdwijnen.
       final artifact = _artifact('researcher', {
         'summary': 'Korte samenvatting.',
         'findings': 'niet een array',
@@ -367,11 +369,91 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Samenvatting'), findsOneWidget);
-      expect(find.text('Bevindingen'), findsNothing);
+      expect(find.text('Bevindingen'), findsOneWidget);
+      expect(find.text('niet een array'), findsOneWidget);
       await _expandTechnicalDetails(tester);
       expect(find.textContaining('"findings"'), findsOneWidget);
     },
   );
+
+  group('product-138: generieke fallback per top-level veld voor een bekende rol', () {
+    testWidgets(
+      'researcher-artefact met findings als losse string (cyclus shadow-hkh-autopilot-0003) '
+      'toont platte leesbare tekst zonder rauwe-JSON-patronen in het primaire paneel (AC1/AC2)',
+      (tester) async {
+        _growTestWindow(tester);
+        final artifact = _artifact('researcher', {
+          'findings':
+              'Onvoldoende gedateerde bronnen beschikbaar voor een sluitende tijdlijn.',
+        });
+
+        await _openDialog(tester, _sessionWith(artifacts: [artifact]));
+        await _expandArtifactTile(tester, 'Onderzoeker');
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('Bevindingen'), findsOneWidget);
+        expect(
+          find.text(
+            'Onvoldoende gedateerde bronnen beschikbaar voor een sluitende tijdlijn.',
+          ),
+          findsOneWidget,
+        );
+        // Buiten de toggle (dus in het primaire paneel) mag geen rauwe-JSON-patroon voorkomen.
+        expect(find.textContaining('{'), findsNothing);
+        expect(find.textContaining('}'), findsNothing);
+        expect(find.textContaining('"findings":'), findsNothing);
+
+        // De rauwe JSON blijft ongewijzigd beschikbaar achter de toggle (AC5).
+        expect(find.text('Toon technische details'), findsOneWidget);
+        await _expandTechnicalDetails(tester);
+        expect(find.textContaining('"findings"'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'conform researcher-artefact (findings als correcte objectenlijst) blijft ongewijzigd '
+      'via de rolspecifieke weergave gerenderd, geen dubbele generieke regel (AC4)',
+      (tester) async {
+        _growTestWindow(tester);
+        final artifact = _artifact('researcher', {
+          'findings': [
+            {
+              'title': 'Titel',
+              'finding': 'Een bevinding.',
+              'sourceUrls': <String>[],
+            },
+          ],
+        });
+
+        await _openDialog(tester, _sessionWith(artifacts: [artifact]));
+        await _expandArtifactTile(tester, 'Onderzoeker');
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('Bevindingen'), findsOneWidget);
+        expect(find.text('Titel'), findsOneWidget);
+        expect(find.text('Een bevinding.'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'artefact zonder enig herkend leesbaar of fallback-bruikbaar top-level veld toont nog '
+      'steeds de kale-JSON-weergave zonder toggle (AC6)',
+      (tester) async {
+        _growTestWindow(tester);
+        final artifact = _artifact('researcher', {
+          'currentState': {'purpose': '', 'gaps': <String>[]},
+          'nested': {'x': 1},
+        });
+
+        await _openDialog(tester, _sessionWith(artifacts: [artifact]));
+        await _expandArtifactTile(tester, 'Onderzoeker');
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('Toon technische details'), findsNothing);
+        expect(find.textContaining('"currentState"'), findsOneWidget);
+      },
+    );
+  });
 
   testWidgets(
     'artefact met niet-decodeerbare contentJson toont alleen de rauwe tekst, geen crash',
