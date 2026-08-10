@@ -131,7 +131,14 @@ class MeetingChatService(
         Reageer kort, concreet en in het Nederlands, alsof je met de eigenaar praat. Stel gerichte vragen als
         je iets nodig hebt om een goede productrichting te kiezen; geef duidelijke antwoorden als de eigenaar
         iets vraagt. Dit is een doorlopend gesprek: bouw voort op de eerdere berichten hieronder, herhaal
-        jezelf niet en herhaal ook niet letterlijk wat de eigenaar al zei.${topicsBlock(meeting)}
+        jezelf niet en herhaal ook niet letterlijk wat de eigenaar al zei.
+
+        BELANGRIJK OVER GEHEUGEN: jij hoeft zelf niets op te slaan of in te stellen. Zodra dit overleg wordt
+        afgesloten (de eigenaar klikt op "Overleg afsluiten"), maakt het systeem automatisch een samenvatting
+        van dit hele gesprek en geeft die vanzelf mee als context aan de eerstvolgende productcyclus voor dit
+        product. Als de eigenaar vraagt of dit gesprek "onthouden" wordt of meetelt bij de volgende cyclus:
+        bevestig dat gerust — dat gebeurt automatisch zodra het overleg wordt afgesloten, zonder dat er iets
+        elders geplakt of ingesteld hoeft te worden.${topicsBlock(meeting)}
 
         MISSIE: ${product.mission}
         GUARDRAILS: ${product.guardrails}
