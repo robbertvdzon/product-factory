@@ -69,3 +69,32 @@ Implementatie:
 - Geen bugs, regressies of scope-afwijkingen gevonden.
 
 [info] Akkoord, geen blockers.
+
+## Test product-98 (2026-08-10)
+
+- Diff tegen main beperkt tot `dashboard-frontend/lib/main.dart`,
+  `dashboard-frontend/test/iteration_readable_artifact_fields_test.dart`,
+  `dashboard-frontend/test/iteration_technical_details_toggle_test.dart` en de worklog. Geen
+  backendwijzigingen, dus `mvn clean verify` triggert niet via `.factory/verification.yaml`
+  pathPrefixes en is voor deze story niet van toepassing.
+- `flutter analyze` (dashboard-frontend): "No issues found!".
+- `flutter test` (dashboard-frontend, volledige suite): 117/117 groen, exit code 0. Compacte
+  reporter toonde interleaved herhaalde testregels door parallelle shard-uitvoer (bekend
+  cosmetisch artefact, zie agent-tip `flutter-test-compact-reporter-concurrent-output`); +N-teller
+  en eindtotaal (`All tests passed!`) zijn correct.
+- Codeverificatie `_readableGenericFields`/default-branch (main.dart ~1289-1313): matcht exact de
+  storybeschrijving — string-velden via `_readableText`, lijsten van uitsluitend
+  String/num/bool via `_readableBulletList`, labels via `humanizeFieldKey`, overige
+  types/`null` overgeslagen; lege fallback laat bestaand rauwe-JSON-pad zonder toggle intact.
+- Testdiff geverifieerd tegen alle AC's: losse findings/decision/story-fixtures en
+  verdict+reason-fixture tonen gelabelde regels + toggle; regressie op bestaande
+  researcher-fixture ongewijzigd; geneste-objecten/objectarray-fixture en
+  gemengde-lijst-fixture tonen beide alleen rauwe JSON zonder toggle. Alle scenario's uit de
+  acceptatiecriteria zijn gedekt en slagen.
+- Preview-smoketest: `https://product-factory-pr-51.vdzonsoftware.nl` → 200,
+  `https://product-factory-api-pr-51.vdzonsoftware.nl/actuator/health` → 200. Geen browsertool
+  in de agentcontainer beschikbaar; interactieve/screenshotverificatie van de gerenderde
+  velden niet mogelijk, geverifieerd via widgettests en codeinspectie.
+- Geen bugs of afwijkingen gevonden. Geen tijdelijke testdata aangemaakt, dus geen cleanup nodig.
+
+[info] Tested, geen blockers.
