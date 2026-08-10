@@ -65,7 +65,19 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    inhoud van `iteration['errorMessage']`, of exact de tekst 'Geen foutreden beschikbaar' als dat
    veld leeg of `null` is; bij elke andere status blijft dit blok volledig verborgen. Het blok heeft
    een expliciet `Semantics`-label `'Foutreden: <tekst>'`, zodat het als afzonderlijk betekenisvol
-   blok wordt aangekondigd door schermlezers.
+   blok wordt aangekondigd door schermlezers. Heeft de iteratie in plaats daarvan
+   `status == 'NEEDS_REVISION'` of `status == 'REJECTED'`, dan toont ditzelfde dialoog direct onder
+   het 'Opdracht'-blok en vóór de roltegels-sectie een 'Reden'-blok (titel + `SelectableText`,
+   dezelfde stijl als het 'Foutreden'-blok). Is er in `artifacts` een criticus-artefact voor deze
+   iteratie aanwezig (`artifactType` `critic` of, bij een retrypoging, `critic-2`/`critic-3`/…,
+   waarbij het meest recente/hoogste-suffix-artefact wordt gebruikt), dan bevat het blok leesbare
+   lopende tekst opgebouwd uit `overallVerdict`, `summary` en `requiredChanges[]` van dat artefact
+   (`ShadowSchemas.kt`-schema `critic`) — nooit rauwe JSON. Ontbreekt zo'n criticus-artefact, dan
+   toont het blok in plaats daarvan exact de tekst 'Criticus-oordeel ontbreekt voor deze cyclus'.
+   Ook dit blok heeft een expliciet `Semantics`-label `'Reden: <tekst>'`. Bij elke andere status
+   (o.a. `ACCEPTED`, `PENDING`, `QUEUED`, `RUNNING`) blijft het Reden-blok volledig verborgen; het
+   bestaande 'Foutreden'-blok en de standaard ingeklapte criticus-roltegel met volledig artefact
+   blijven ongewijzigd.
 4. **Software Factory-stories** — de leveringen met externe storykey, status en fase.
 5. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
 6. **Storywachtrij** — storykandidaten verdeeld over Fout / Bezig / In wachtrij / Klaar. Is een

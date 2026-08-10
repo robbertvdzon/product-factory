@@ -211,7 +211,19 @@ beneden:
   de tekst 'Geen foutreden beschikbaar' als dat veld leeg of `null` is; bij elke andere status blijft
   dit blok volledig verborgen. Net als de classificatiebadge communiceert dit blok zijn inhoud ook
   via een expliciet `Semantics`-label (`'Foutreden: <tekst>'`), zodat het als afzonderlijk
-  betekenisvol blok wordt aangekondigd door schermlezers.
+  betekenisvol blok wordt aangekondigd door schermlezers. Heeft de iteratie in plaats daarvan
+  `status == 'NEEDS_REVISION'` of `status == 'REJECTED'`, dan toont hetzelfde detailscherm direct
+  onder het 'Opdracht'-blok en vóór de roltegels-sectie een 'Reden'-blok, visueel gelijk aan het
+  'Foutreden'-blok (titel + `SelectableText`). Is er onder de `artifacts` van deze iteratie een
+  criticus-artefact (`artifactType` `critic`, of bij een retry `critic-2`/`critic-3`/…, waarbij het
+  meest recente/hoogste-suffix-artefact telt), dan bevat het blok leesbare lopende tekst opgebouwd
+  uit `overallVerdict`, `summary` en `requiredChanges[]` van dat artefact (schema `critic` uit
+  `ShadowSchemas.kt`) — nooit rauwe JSON-notatie. Ontbreekt zo'n criticus-artefact voor deze
+  iteratie, dan toont het blok in plaats daarvan exact de tekst 'Criticus-oordeel ontbreekt voor
+  deze cyclus'. Ook dit blok heeft een expliciet `Semantics`-label (`'Reden: <tekst>'`). Bij elke
+  andere status (o.a. `ACCEPTED`, `PENDING`, `QUEUED`, `RUNNING`) blijft het Reden-blok volledig
+  verborgen; het bestaande 'Foutreden'-blok en de standaard ingeklapte criticus-roltegel met
+  volledig artefact blijven ongewijzigd zichtbaar/functioneel.
 - **Software Factory-stories**: elke levering met storysleutel, titel, status (`DELIVERING`,
   `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`, `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst
   bekende Software Factory-fase.
