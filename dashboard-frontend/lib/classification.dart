@@ -14,14 +14,19 @@ const String kGuardrailConflict = 'guardrail-conflict';
 const String kRichtingGekozen = 'richting-gekozen';
 const String kRichtingVerworpen = 'richting-verworpen';
 const String kNietClassificeerbaar = 'niet-classificeerbaar';
+const String kTechnischeFout = 'technische fout';
 
-/// De vijf toegestane classificatiewaarden; een badge mag nooit iets anders tonen.
+/// De zes toegestane classificatiewaarden; een badge mag nooit iets anders tonen.
+/// [kGuardrailConflict] blijft hierin staan omdat `main.dart` deze onafhankelijk hergebruikt
+/// voor het "geblokkeerd"-label op storyqueue-kaarten (dependsOn-blokkade), ook al mapt geen
+/// enkele `status`-waarde er in [kBekendeStatuswaardenPerCategorie] nog naartoe.
 const List<String> kIterationClassifications = [
   kOnderzoekOnvoldoende,
   kGuardrailConflict,
   kRichtingGekozen,
   kRichtingVerworpen,
   kNietClassificeerbaar,
+  kTechnischeFout,
 ];
 
 /// Expliciete, uitbreidbare tabel van de daadwerkelijk voorkomende bekende ruwe `status`-waarden
@@ -34,7 +39,7 @@ const Map<String, List<String>> kBekendeStatuswaardenPerCategorie = {
   kRichtingGekozen: ['ACCEPTED'],
   kOnderzoekOnvoldoende: ['NEEDS_REVISION', 'QUEUED', 'RUNNING'],
   kRichtingVerworpen: ['REJECTED'],
-  kGuardrailConflict: ['FAILED'],
+  kTechnischeFout: ['FAILED'],
 };
 
 /// Bepaalt de classificatie van een iteratie op basis van `status` (en indirect `criticVerdict`/
@@ -94,6 +99,10 @@ const Map<String, ClassificationColors> kClassificationColors = {
   kNietClassificeerbaar: ClassificationColors(
     background: Color(0xFFCFE2FF),
     foreground: Color(0xFF073880),
+  ),
+  kTechnischeFout: ClassificationColors(
+    background: Color(0xFFE4E1F5),
+    foreground: Color(0xFF33306B),
   ),
 };
 

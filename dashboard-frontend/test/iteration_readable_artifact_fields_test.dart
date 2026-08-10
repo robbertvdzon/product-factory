@@ -422,7 +422,7 @@ void main() {
         final badge = tester.widget<ClassificationBadge>(
           find.byType(ClassificationBadge),
         );
-        expect(badge.classification, kGuardrailConflict);
+        expect(badge.classification, kTechnischeFout);
 
         expect(find.text('Foutreden'), findsOneWidget);
         expect(
