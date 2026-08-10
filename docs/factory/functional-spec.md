@@ -49,9 +49,16 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    technische details' (`TechnicalDetailsToggle`, `dashboard-frontend/lib/main.dart`), onafhankelijk
    van de in-/uitklapstatus van de roltegel zelf. Deze toggle is met muis én toetsenbord (Tab,
    Enter/Spatie) te bedienen en communiceert zijn open/dicht-status via `Semantics(expanded: ...)`
-   (het Flutter-web-equivalent van `aria-expanded`). Is de inhoud niet decodeerbaar of onherkend
-   (of van een retry-poging met `-2`/`-3`-suffix op `artifactType`, die dezelfde weergave als de
-   eerste poging krijgt), dan blijft uitsluitend de ruwe JSON direct zichtbaar zonder toggle, zonder
+   (het Flutter-web-equivalent van `aria-expanded`). Matcht het rolresultaat geen van de vijf
+   rolspecifieke schema's hierboven, dan valt de weergave terug op een generieke leesbare
+   weergave: elk top-level veld dat een string is, of een lijst die uitsluitend uit primitieve
+   waarden (tekst, getal, boolean) bestaat, verschijnt als gelabelde regel — het label komt van
+   dezelfde `humanizeFieldKey`-functie die ook de vaste labels voor `findings`, `decision`,
+   `story`, `verdict` en `reason` levert — en ook dan verdwijnt de ruwe JSON achter de toggle
+   'Toon technische details'. Bevat het resultaat op het hoogste niveau uitsluitend geneste
+   objecten, arrays van objecten, of is de inhoud niet decodeerbaar of onherkend (of van een
+   retry-poging met `-2`/`-3`-suffix op `artifactType`, die dezelfde weergave als de eerste
+   poging krijgt), dan blijft uitsluitend de ruwe JSON direct zichtbaar zonder toggle, zonder
    dat het dialoog crasht. Heeft de iteratie
    `status == 'FAILED'`, dan toont dit detaildialoog (`IterationSessionDialog`,
    `dashboard-frontend/lib/main.dart`) direct onder het 'Opdracht'-blok een 'Foutreden'-blok met de
