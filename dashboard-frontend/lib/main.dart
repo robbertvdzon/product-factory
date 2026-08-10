@@ -1539,139 +1539,248 @@ List<Widget> _readableArtifactFields(
   }
 
   final baseRole = artifactType.replaceAll(RegExp(r'-\d+$'), '');
-  return switch (baseRole) {
-    'researcher' => [
-      ..._readableText(context, 'Samenvatting', data['summary']),
-      ..._readableObjectList(
-        context,
-        'Bevindingen',
-        data['findings'],
-        (context, item) => [
-          ..._readableSelectableText(item['title'], bold: true),
-          ..._readableSelectableText(item['finding']),
-          ..._bulletLines(item['sourceUrls']),
-        ],
-      ),
-      ..._readableObject(
-        context,
-        'Huidige situatie',
-        data['currentState'],
-        (context, item) => [
-          ..._readableSelectableText(item['purpose']),
-          ..._bulletLines(item['gaps']),
-        ],
-      ),
-      ..._readableBulletList(
-        context,
-        'Verbetermogelijkheden',
-        data['improvementOpportunities'],
-      ),
-      ..._readableObjectList(
-        context,
-        'Bronnen',
-        data['sources'],
-        (context, item) => [
-          ..._readableSelectableText(item['url'], bold: true),
-          ..._readableSelectableText(item['rationale']),
-        ],
-      ),
-      ..._readableObjectList(
-        context,
-        'Inspiratie',
-        data['inspiration'],
-        (context, item) => [
-          ..._readableSelectableText(item['name'], bold: true),
-          ..._readableSelectableText(item['url']),
-          ..._readableSelectableText(item['relevance']),
-        ],
-      ),
-    ],
-    'product_owner' => [
-      ..._readableText(context, 'Productrichting', data['productDirection']),
-      ..._readableText(context, 'Onderbouwing', data['rationale']),
-      ..._readableBulletList(context, 'Prioriteiten', data['priorities']),
-      ..._readableObjectList(
-        context,
-        'Besluiten',
-        data['decisions'],
-        (context, item) => [
-          ..._readableSelectableText(item['decision'], bold: true),
-          ..._readableSelectableText(item['rationale']),
-          ..._bulletLines(item['sourceUrls']),
-        ],
-      ),
-      ..._readableBulletList(
-        context,
-        'Afgewezen opties',
-        data['rejectedOptions'],
-      ),
-    ],
-    'ux_designer' => [
-      ..._readableText(context, 'Flow', data['flowName']),
-      ..._readableText(context, 'Gebruikersdoel', data['userGoal']),
-      ..._readableBulletList(context, 'Stappen', data['steps']),
-      ..._readableText(context, 'Wireframe', data['wireframe']),
-      ..._readableBulletList(context, 'Hypotheses', data['hypotheses']),
-      ..._readableBulletList(
-        context,
-        'Toegankelijkheid',
-        data['accessibility'],
-      ),
-      ..._readableBulletList(
-        context,
-        'Privacyoverwegingen',
-        data['privacyConsiderations'],
-      ),
-    ],
-    'story_writer' => [
-      ..._readableObjectList(
-        context,
-        'Storykandidaten',
-        data['candidates'],
-        (context, item) => [
-          ..._readableSelectableText(item['title'], bold: true),
-          ..._readableSelectableText(item['description']),
-          ..._bulletLines(item['acceptanceCriteria']),
-          ..._bulletLines(item['dependsOn']),
-          ..._bulletLines(item['risks']),
-        ],
-      ),
-    ],
-    'critic' => [
-      ..._readableText(context, 'Eindoordeel', data['overallVerdict']),
-      ..._readableText(context, 'Samenvatting', data['summary']),
-      ..._readableObjectList(
-        context,
-        'Aandachtspunten',
-        data['issues'],
-        (context, item) => [
-          ..._readableSelectableText(
-            [
-              '${item['severity'] ?? ''}'.trim(),
-              '${item['category'] ?? ''}'.trim(),
-            ].where((value) => value.isNotEmpty).join(' · '),
-            bold: true,
+  final fieldEntries = _roleSpecificFieldEntries(context, baseRole, data);
+  if (fieldEntries.isEmpty) {
+    return _readableGenericFields(context, data);
+  }
+
+  final widgets = <Widget>[];
+  final handledKeys = <String>{};
+  for (final entry in fieldEntries) {
+    handledKeys.add(entry.key);
+    if (entry.value.isNotEmpty) {
+      widgets.addAll(entry.value);
+    } else if (data.containsKey(entry.key)) {
+      widgets.addAll(
+        _readableGenericFieldEntry(context, entry.key, data[entry.key]),
+      );
+    }
+  }
+  for (final entry in data.entries) {
+    if (handledKeys.contains(entry.key)) continue;
+    widgets.addAll(_readableGenericFieldEntry(context, entry.key, entry.value));
+  }
+  return widgets;
+}
+
+/// Rolspecifieke top-level velden voor een bekende [baseRole], elk als een key/widgets-paar zodat
+/// [_readableArtifactFields] per veld kan beoordelen of de rolspecifieke branch iets opleverde en,
+/// zo niet, de generieke fallback ([_readableGenericFieldEntry]) voor precies dat veld kan
+/// toepassen (product-138). Geeft een lege lijst terug voor een onbekende rol, waarna de aanroeper
+/// volledig op [_readableGenericFields] terugvalt (ongewijzigd gedrag van vóór deze wijziging).
+List<MapEntry<String, List<Widget>>> _roleSpecificFieldEntries(
+  BuildContext context,
+  String baseRole,
+  Map<String, dynamic> data,
+) {
+  switch (baseRole) {
+    case 'researcher':
+      return [
+        MapEntry(
+          'summary',
+          _readableText(context, 'Samenvatting', data['summary']),
+        ),
+        MapEntry(
+          'findings',
+          _readableObjectList(
+            context,
+            'Bevindingen',
+            data['findings'],
+            (context, item) => [
+              ..._readableSelectableText(item['title'], bold: true),
+              ..._readableSelectableText(item['finding']),
+              ..._bulletLines(item['sourceUrls']),
+            ],
           ),
-          ..._readableSelectableText(item['description']),
-        ],
-      ),
-      ..._readableObjectList(
-        context,
-        'Beoordeling per kandidaat',
-        data['candidateReviews'],
-        (context, item) => [
-          ..._readableSelectableText(item['verdict'], bold: true),
-          ..._readableSelectableText(item['reason']),
-        ],
-      ),
-      ..._readableBulletList(
-        context,
-        'Vereiste wijzigingen',
-        data['requiredChanges'],
-      ),
-    ],
-    _ => _readableGenericFields(context, data),
-  };
+        ),
+        MapEntry(
+          'currentState',
+          _readableObject(
+            context,
+            'Huidige situatie',
+            data['currentState'],
+            (context, item) => [
+              ..._readableSelectableText(item['purpose']),
+              ..._bulletLines(item['gaps']),
+            ],
+          ),
+        ),
+        MapEntry(
+          'improvementOpportunities',
+          _readableBulletList(
+            context,
+            'Verbetermogelijkheden',
+            data['improvementOpportunities'],
+          ),
+        ),
+        MapEntry(
+          'sources',
+          _readableObjectList(
+            context,
+            'Bronnen',
+            data['sources'],
+            (context, item) => [
+              ..._readableSelectableText(item['url'], bold: true),
+              ..._readableSelectableText(item['rationale']),
+            ],
+          ),
+        ),
+        MapEntry(
+          'inspiration',
+          _readableObjectList(
+            context,
+            'Inspiratie',
+            data['inspiration'],
+            (context, item) => [
+              ..._readableSelectableText(item['name'], bold: true),
+              ..._readableSelectableText(item['url']),
+              ..._readableSelectableText(item['relevance']),
+            ],
+          ),
+        ),
+      ];
+    case 'product_owner':
+      return [
+        MapEntry(
+          'productDirection',
+          _readableText(context, 'Productrichting', data['productDirection']),
+        ),
+        MapEntry(
+          'rationale',
+          _readableText(context, 'Onderbouwing', data['rationale']),
+        ),
+        MapEntry(
+          'priorities',
+          _readableBulletList(context, 'Prioriteiten', data['priorities']),
+        ),
+        MapEntry(
+          'decisions',
+          _readableObjectList(
+            context,
+            'Besluiten',
+            data['decisions'],
+            (context, item) => [
+              ..._readableSelectableText(item['decision'], bold: true),
+              ..._readableSelectableText(item['rationale']),
+              ..._bulletLines(item['sourceUrls']),
+            ],
+          ),
+        ),
+        MapEntry(
+          'rejectedOptions',
+          _readableBulletList(
+            context,
+            'Afgewezen opties',
+            data['rejectedOptions'],
+          ),
+        ),
+      ];
+    case 'ux_designer':
+      return [
+        MapEntry('flowName', _readableText(context, 'Flow', data['flowName'])),
+        MapEntry(
+          'userGoal',
+          _readableText(context, 'Gebruikersdoel', data['userGoal']),
+        ),
+        MapEntry(
+          'steps',
+          _readableBulletList(context, 'Stappen', data['steps']),
+        ),
+        MapEntry(
+          'wireframe',
+          _readableText(context, 'Wireframe', data['wireframe']),
+        ),
+        MapEntry(
+          'hypotheses',
+          _readableBulletList(context, 'Hypotheses', data['hypotheses']),
+        ),
+        MapEntry(
+          'accessibility',
+          _readableBulletList(
+            context,
+            'Toegankelijkheid',
+            data['accessibility'],
+          ),
+        ),
+        MapEntry(
+          'privacyConsiderations',
+          _readableBulletList(
+            context,
+            'Privacyoverwegingen',
+            data['privacyConsiderations'],
+          ),
+        ),
+      ];
+    case 'story_writer':
+      return [
+        MapEntry(
+          'candidates',
+          _readableObjectList(
+            context,
+            'Storykandidaten',
+            data['candidates'],
+            (context, item) => [
+              ..._readableSelectableText(item['title'], bold: true),
+              ..._readableSelectableText(item['description']),
+              ..._bulletLines(item['acceptanceCriteria']),
+              ..._bulletLines(item['dependsOn']),
+              ..._bulletLines(item['risks']),
+            ],
+          ),
+        ),
+      ];
+    case 'critic':
+      return [
+        MapEntry(
+          'overallVerdict',
+          _readableText(context, 'Eindoordeel', data['overallVerdict']),
+        ),
+        MapEntry(
+          'summary',
+          _readableText(context, 'Samenvatting', data['summary']),
+        ),
+        MapEntry(
+          'issues',
+          _readableObjectList(
+            context,
+            'Aandachtspunten',
+            data['issues'],
+            (context, item) => [
+              ..._readableSelectableText(
+                [
+                  '${item['severity'] ?? ''}'.trim(),
+                  '${item['category'] ?? ''}'.trim(),
+                ].where((value) => value.isNotEmpty).join(' · '),
+                bold: true,
+              ),
+              ..._readableSelectableText(item['description']),
+            ],
+          ),
+        ),
+        MapEntry(
+          'candidateReviews',
+          _readableObjectList(
+            context,
+            'Beoordeling per kandidaat',
+            data['candidateReviews'],
+            (context, item) => [
+              ..._readableSelectableText(item['verdict'], bold: true),
+              ..._readableSelectableText(item['reason']),
+            ],
+          ),
+        ),
+        MapEntry(
+          'requiredChanges',
+          _readableBulletList(
+            context,
+            'Vereiste wijzigingen',
+            data['requiredChanges'],
+          ),
+        ),
+      ];
+    default:
+      return const [];
+  }
 }
 
 /// Generieke vangnet-weergave (product-97) voor wanneer geen van de rolspecifieke branches
@@ -1686,19 +1795,28 @@ List<Widget> _readableGenericFields(
 ) {
   final widgets = <Widget>[];
   for (final entry in data.entries) {
-    final value = entry.value;
-    if (value is String) {
-      widgets.addAll(
-        _readableText(context, humanizeFieldKey(entry.key), value),
-      );
-    } else if (value is List &&
-        value.every((item) => item is String || item is num || item is bool)) {
-      widgets.addAll(
-        _readableBulletList(context, humanizeFieldKey(entry.key), value),
-      );
-    }
+    widgets.addAll(_readableGenericFieldEntry(context, entry.key, entry.value));
   }
   return widgets;
+}
+
+/// Genereert leesbare widgets voor één top-level veld ([key]/[value]), gebruikt zowel door
+/// [_readableGenericFields] (onbekende rol, alle velden) als door [_readableArtifactFields]
+/// (bekende rol, alleen velden waarvoor de rolspecifieke branch niets opleverde — product-138).
+/// Levert alleen iets op voor een string-waarde of een lijst van uitsluitend primitieve waarden;
+/// geneste objecten/arrays-van-objecten leveren bewust niets op (blijven buiten scope).
+List<Widget> _readableGenericFieldEntry(
+  BuildContext context,
+  String key,
+  dynamic value,
+) {
+  if (value is String) {
+    return _readableText(context, humanizeFieldKey(key), value);
+  } else if (value is List &&
+      value.every((item) => item is String || item is num || item is bool)) {
+    return _readableBulletList(context, humanizeFieldKey(key), value);
+  }
+  return const [];
 }
 
 /// Eén regel platte tekst binnen een objectitem (findings/decisions/etc.); leeg/null wordt

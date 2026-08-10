@@ -186,16 +186,26 @@ beneden:
   `Semantics(expanded: ...)` (het Flutter-web-equivalent van `aria-expanded`) die de open/dicht-status
   communiceert. Matcht het rolresultaat geen van de vijf rolspecifieke schema's (bv. omdat een rol
   een vereenvoudigd schema oplevert dat niet overeenkomt met het rijke schema per rol), dan valt de
-  weergave terug op een generieke leesbare weergave (`_readableGenericFields`,
+  weergave volledig terug op een generieke leesbare weergave (`_readableGenericFields`,
   `dashboard-frontend/lib/main.dart`): elk top-level veld dat een string is, of een lijst die
   uitsluitend uit primitieve waarden (tekst, getal, boolean) bestaat, verschijnt alsnog als
   gelabelde leesbare regel — het label komt via dezelfde `humanizeFieldKey`-functie die ook de
   vaste labels voor `findings`, `decision`, `story`, `verdict` en `reason` levert — en ook dan
-  verdwijnt de ruwe JSON achter de toggle 'Toon technische details'. Bevat het rolresultaat op het
-  hoogste niveau uitsluitend geneste objecten, arrays van objecten, of lijsten met gemengde/
-  niet-primitieve elementen (dus geen enkel top-level veld dat aan bovenstaande voorwaarde
-  voldoet), of is de structuur niet decodeerbaar/onherkend (`readableFields` leeg), dan toont het
-  dialoog uitsluitend de bestaande ruwe JSON direct zichtbaar, zonder toggle en zonder te crashen.
+  verdwijnt de ruwe JSON achter de toggle 'Toon technische details'. Deze generieke fallback
+  (`_readableGenericFieldEntry`) wordt sinds product-138 ook per afzonderlijk top-level veld
+  toegepast binnen een wél herkende rol: matcht het content_json van die rol niet het verwachte
+  type voor één specifiek veld (bv. `findings` als losse string in plaats van een objectenlijst bij
+  de Onderzoeker-rol), dan levert de rolspecifieke branch (`_roleSpecificFieldEntries`) alleen voor
+  dát veld geen widgets op, en verschijnt het alsnog via de generieke regel — de overige, wél
+  conforme velden van diezelfde rol blijven ongewijzigd via hun rolspecifieke weergave zichtbaar.
+  Levert noch de rolspecifieke branch, noch de per-veld generieke fallback iets op voor een
+  top-level veld (bv. geneste objecten of arrays van objecten binnen een niet-conform artefact),
+  dan blijft dat veld ongerenderd, zonder nieuwe generieke rendering voor geneste structuren. Bevat
+  het rolresultaat op het hoogste niveau uitsluitend geneste objecten, arrays van objecten, of
+  lijsten met gemengde/niet-primitieve elementen (dus geen enkel top-level veld dat aan
+  bovenstaande voorwaarde voldoet), of is de structuur niet decodeerbaar/onherkend
+  (`readableFields` leeg), dan toont het dialoog uitsluitend de bestaande ruwe JSON direct
+  zichtbaar, zonder toggle en zonder te crashen.
   Retry-pogingen (`artifactType` met `-2`/`-3`-suffix) gebruiken dezelfde leesbare weergave als de
   eerste poging. Dit detailscherm (`IterationSessionDialog`,
   `dashboard-frontend/lib/main.dart`) toont bovenaan dezelfde `ClassificationBadge` (zelfde
