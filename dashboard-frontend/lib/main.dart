@@ -1286,8 +1286,35 @@ List<Widget> _readableArtifactFields(
         data['requiredChanges'],
       ),
     ],
-    _ => const <Widget>[],
+    _ => _readableGenericFields(context, data),
   };
+}
+
+/// Generieke vangnet-weergave (product-97) voor wanneer geen van de rolspecifieke branches
+/// hierboven matcht: toont top-level string-velden en top-level lijsten die uitsluitend uit
+/// primitieve waarden (String/num/bool) bestaan alsnog leesbaar, met een label via
+/// [humanizeFieldKey]. Geneste objecten, arrays van objecten en lijsten met gemengde of
+/// niet-primitieve elementen worden overgeslagen; leveren die als enige data op, dan blijft de
+/// bestaande rauwe-JSON-fallback (`readableFields.isEmpty`, geen toggle) ongewijzigd.
+List<Widget> _readableGenericFields(
+  BuildContext context,
+  Map<String, dynamic> data,
+) {
+  final widgets = <Widget>[];
+  for (final entry in data.entries) {
+    final value = entry.value;
+    if (value is String) {
+      widgets.addAll(
+        _readableText(context, humanizeFieldKey(entry.key), value),
+      );
+    } else if (value is List &&
+        value.every((item) => item is String || item is num || item is bool)) {
+      widgets.addAll(
+        _readableBulletList(context, humanizeFieldKey(entry.key), value),
+      );
+    }
+  }
+  return widgets;
 }
 
 /// Eén regel platte tekst binnen een objectitem (findings/decisions/etc.); leeg/null wordt

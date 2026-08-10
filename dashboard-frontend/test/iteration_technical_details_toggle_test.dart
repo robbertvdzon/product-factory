@@ -66,10 +66,15 @@ Map<String, dynamic> _readableArtifact() => {
   }),
 };
 
+/// Bevat uitsluitend een genest object op top-level: dit blijft ook na product-97 (generieke
+/// fallback voor top-level strings/primitieve lijsten) buiten bereik van elke leesbare weergave,
+/// dus de rauwe JSON blijft hier zonder toggle direct zichtbaar.
 Map<String, dynamic> _fallbackArtifact() => {
   'artifactType': 'onbekende_rol',
   'createdAt': DateTime(2026, 1, 1).toIso8601String(),
-  'contentJson': jsonEncode({'someWeirdField': 'iets'}),
+  'contentJson': jsonEncode({
+    'nested': {'x': 1},
+  }),
 };
 
 void _growTestWindow(WidgetTester tester) {
@@ -210,7 +215,7 @@ void main() {
 
       expect(find.text('Toon technische details'), findsNothing);
       expect(find.byType(TechnicalDetailsToggle), findsNothing);
-      expect(find.textContaining('"someWeirdField"'), findsOneWidget);
+      expect(find.textContaining('"nested"'), findsOneWidget);
     },
   );
 }
