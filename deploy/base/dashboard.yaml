@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
         - name: dashboard-frontend
-          image: ghcr.io/robbertvdzon/product-factory-dashboard-frontend:sha-be77397eab6dffdee0459f6111a85f72aa3d00e2
+          image: ghcr.io/robbertvdzon/product-factory-dashboard-frontend:sha-68bb839faed6df3fa816ee04d18ff0dd875d502f
           imagePullPolicy: Always
           ports: [{containerPort: 8080}]
           readinessProbe: {httpGet: {path: /, port: 8080}, initialDelaySeconds: 5, periodSeconds: 10}
