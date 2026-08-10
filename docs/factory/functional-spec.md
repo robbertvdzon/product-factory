@@ -74,6 +74,14 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    lopende tekst opgebouwd uit `overallVerdict`, `summary` en `requiredChanges[]` van dat artefact
    (`ShadowSchemas.kt`-schema `critic`) — nooit rauwe JSON. Ontbreekt zo'n criticus-artefact, dan
    toont het blok in plaats daarvan exact de tekst 'Criticus-oordeel ontbreekt voor deze cyclus'.
+   Is de iteratiestatus `REJECTED` en is `iteration['criticVerdict'] == 'ACCEPT'` (het
+   guardrail-pad: alle door de criticus goedgekeurde kandidaten zijn alsnog geblokkeerd op
+   duplicaat/guardrail), dan wordt aan de criticus-tekst een extra, statische alinea toegevoegd
+   met exact de tekst 'Let op: Alle voorgestelde kandidaten zijn geblokkeerd (duplicaat of
+   guardrail), waardoor deze cyclus niet doorgaat ondanks een positief criticusoordeel.' — puur
+   tekstueel, binnen dezelfde `Semantics`-scope, zonder kleur of icoon. Voor alle overige
+   `REJECTED`-/`NEEDS_REVISION`-combinaties (`criticVerdict != 'ACCEPT'`, incl. `null`) blijft het
+   blok ongewijzigd zonder deze toelichtingszin.
    Ook dit blok heeft een expliciet `Semantics`-label `'Reden: <tekst>'`. Bij elke andere status
    (o.a. `ACCEPTED`, `PENDING`, `QUEUED`, `RUNNING`) blijft het Reden-blok volledig verborgen; het
    bestaande 'Foutreden'-blok en de standaard ingeklapte criticus-roltegel met volledig artefact
