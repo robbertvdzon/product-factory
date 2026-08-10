@@ -206,25 +206,149 @@ void main() {
   );
 
   testWidgets(
-    'artefact met een niet-herkende structuur toont uitsluitend de rauwe-JSON-fallback, geen crash',
+    'artefact met uitsluitend geneste objecten/objectarrays op top-level toont alleen de '
+    'rauwe-JSON-fallback zonder toggle, geen crash (product-97 AC4)',
     (tester) async {
       _growTestWindow(tester);
       final artifact = _artifact('onbekende_rol', {
-        'someWeirdField': 'iets',
         'nested': {'x': 1},
+        'items': [
+          {'a': 1},
+          {'b': 2},
+        ],
       });
 
       await _openDialog(tester, _sessionWith(artifacts: [artifact]));
       await _expandArtifactTile(tester, 'onbekende rol');
 
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('"someWeirdField"'), findsOneWidget);
+      // Geen enkel top-level veld is een string of een lijst van uitsluitend primitieven, dus de
+      // generieke fallback levert niets op: de rauwe JSON verschijnt direct, zonder toggle.
+      expect(find.textContaining('"nested"'), findsOneWidget);
+      expect(find.text('Toon technische details'), findsNothing);
       // Geen van de bekende-rol-kopjes verschijnt voor een onherkende structuur.
       expect(find.text('Samenvatting'), findsNothing);
       expect(find.text('Productrichting'), findsNothing);
       expect(find.text('Bevindingen'), findsNothing);
     },
   );
+
+  group('product-97: generieke fallback voor top-level velden', () {
+    testWidgets(
+      'alleen-findings-fixture toont gelabelde leesbare regel "Bevindingen", geen rauwe JSON als '
+      'primaire content',
+      (tester) async {
+        _growTestWindow(tester);
+        final artifact = _artifact('documenter', {
+          'findings':
+              'Vrijwilligers herkennen buurtgenoten vaak niet doordat huisnummers '
+              'op straat slecht leesbaar zijn.',
+        });
+
+        await _openDialog(tester, _sessionWith(artifacts: [artifact]));
+        await _expandArtifactTile(tester, 'documenter');
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('Bevindingen'), findsOneWidget);
+        expect(
+          find.text(
+            'Vrijwilligers herkennen buurtgenoten vaak niet doordat huisnummers '
+            'op straat slecht leesbaar zijn.',
+          ),
+          findsOneWidget,
+        );
+        // De rauwe JSON verdwijnt achter de standaard ingeklapte toggle, net als bij de rijke
+        // rolschema's.
+        expect(find.textContaining('"findings"'), findsNothing);
+        expect(find.text('Toon technische details'), findsOneWidget);
+        await _expandTechnicalDetails(tester);
+        expect(find.textContaining('"findings"'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'alleen-decision-fixture toont het veld als gelabelde leesbare regel',
+      (tester) async {
+        _growTestWindow(tester);
+        final artifact = _artifact('documenter', {
+          'decision': 'Gebruik grotere huisnummerstickers.',
+        });
+
+        await _openDialog(tester, _sessionWith(artifacts: [artifact]));
+        await _expandArtifactTile(tester, 'documenter');
+
+        expect(find.text('Besluit'), findsOneWidget);
+        expect(
+          find.text('Gebruik grotere huisnummerstickers.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'alleen-story-fixture toont het veld als gelabelde leesbare regel',
+      (tester) async {
+        _growTestWindow(tester);
+        final artifact = _artifact('documenter', {
+          'story': 'Als vrijwilliger wil ik huisnummers herkennen.',
+        });
+
+        await _openDialog(tester, _sessionWith(artifacts: [artifact]));
+        await _expandArtifactTile(tester, 'documenter');
+
+        expect(find.text('Story'), findsOneWidget);
+        expect(
+          find.text('Als vrijwilliger wil ik huisnummers herkennen.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'verdict- en reason-fixture toont beide velden als gelabelde leesbare regels',
+      (tester) async {
+        _growTestWindow(tester);
+        final artifact = _artifact('documenter', {
+          'verdict': 'ACCEPT',
+          'reason': 'Voldoet aan alle acceptatiecriteria.',
+        });
+
+        await _openDialog(tester, _sessionWith(artifacts: [artifact]));
+        await _expandArtifactTile(tester, 'documenter');
+
+        expect(find.text('Eindoordeel'), findsOneWidget);
+        expect(find.text('ACCEPT'), findsOneWidget);
+        expect(find.text('Reden'), findsOneWidget);
+        expect(
+          find.text('Voldoet aan alle acceptatiecriteria.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'top-level lijstveld met gemengde/niet-primitieve elementen levert geen generieke regel op '
+      'en valt terug op de rauwe-JSON-fallback',
+      (tester) async {
+        _growTestWindow(tester);
+        final artifact = _artifact('documenter', {
+          'mixedList': [
+            'tekst',
+            {'nested': true},
+          ],
+        });
+
+        await _openDialog(tester, _sessionWith(artifacts: [artifact]));
+        await _expandArtifactTile(tester, 'documenter');
+
+        expect(tester.takeException(), isNull);
+        // Geen enkel top-level veld voldoet (lijst is niet uitsluitend primitief), dus geen
+        // leesbare regel en geen toggle: de rauwe JSON is direct zichtbaar.
+        expect(find.text('Toon technische details'), findsNothing);
+        expect(find.textContaining('"mixedList"'), findsOneWidget);
+      },
+    );
+  });
 
   testWidgets(
     'artefact met onherkende JSON-vorm binnen een bekende rol valt terug op alleen rauwe JSON',
