@@ -54,3 +54,29 @@ Done / rationale:
   developer gemelde hoogtetoename bij zeer brede viewports valt buiten de letterlijke AC-eis en is
   transparant gedocumenteerd (zie agent tip `wrap-naar-eigen-rij-verhoogt-hoogte-tenzij-breedte-smal`).
 - Akkoord.
+
+## Test (product-157)
+
+- Diffcontrole: alleen `dashboard-frontend/` gewijzigd → vangnet volgens `.factory/verification.yaml`
+  is `flutter analyze` + `flutter test` (dashboard-frontend).
+- `flutter analyze` (dashboard-frontend): No issues found!.
+- `flutter test` (dashboard-frontend, volledige suite, geen timeout, tot einde laten lopen):
+  172/172 groen, "All tests passed!", 0 failures/errors. De vele herhaalde testregels in de
+  compact-reporteroutput zijn het bekende shard-interleaving-weergaveartefact (zie agent tip
+  `flutter-test-compact-reporter-concurrent-output`), geen echte herhalingen; eindtotaal en
+  "All tests passed!" zijn betrouwbaar.
+- `test/start_cycle_button_test.dart` (7 tests) dekt alle acceptatiecriteria uit product-156/27:
+  eigen rij + stijlverschil (rand) t.o.v. secundaire knoppen, WCAG AA-contrast (`contrastRatio`
+  op `kStartCycleButtonBackground`/`kStartCycleButtonForeground`; handmatig herberekend:
+  11.08:1, ruim boven 4.5:1), statuslabel als leesbare tekst, tab-/focusvolgorde (CTA eerst),
+  functionele gelijkheid van de tap (`POST /api/products/demo/cycles`), disabled-state, en
+  kaarthoogte vóór/na via `_LegacyProductCard` op vaste viewportbreedte.
+- Codecontrole diff `ce69785..HEAD`: alleen `dashboard-frontend/lib/main.dart` +
+  nieuwe testfile + worklog gewijzigd; overige zes homepage-secties en
+  `ProductSettingsDialog` niet aangeraakt; `onPressed`/`_startCycle`, icoon en label van de CTA
+  ongewijzigd.
+- Preview-smoketest: frontend `https://product-factory-pr-61.vdzonsoftware.nl` → HTTP 200; API
+  `https://product-factory-api-pr-61.vdzonsoftware.nl/actuator/health` → HTTP 200. Geen
+  browsertool in de agentcontainer beschikbaar, dus interactieve/toetsenbordverificatie in de
+  preview zelf blijft niet mogelijk; dit leunt op de widgettests hierboven.
+- Geen code/tests gewijzigd, geen testdata aangemaakt. Akkoord — `tested`.
