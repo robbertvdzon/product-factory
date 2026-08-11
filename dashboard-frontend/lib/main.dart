@@ -256,6 +256,7 @@ class _OverviewPageState extends State<OverviewPage> {
       api.meetings(),
       api.roadmapThemes(),
       api.roadmapSettledQuestions(),
+      api.roadmapSessions(),
     ]);
   }
 
@@ -386,6 +387,24 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
+  Future<void> _startRoadmapSession(String slug) async {
+    try {
+      await api.startRoadmapSession(slug);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Roadmap-sessie voor $slug is gestart.')),
+        );
+        setState(_reload);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
+
   Future<void> _completeHumanAction(Map<String, dynamic> action) async {
     final controller = TextEditingController();
     final result = await showDialog<String>(
@@ -480,6 +499,10 @@ class _OverviewPageState extends State<OverviewPage> {
         final settledQuestions = sortedByNewestFirst(
           snapshot.data![9] as List<dynamic>,
           ['createdAt'],
+        );
+        final roadmapSessions = sortedByNewestFirst(
+          snapshot.data![10] as List<dynamic>,
+          ['completedAt', 'createdAt'],
         );
         return ListView(
           padding: const EdgeInsets.all(24),
@@ -644,6 +667,13 @@ class _OverviewPageState extends State<OverviewPage> {
                                 icon: const Icon(Icons.forum_outlined),
                                 label: const Text('Start overleg'),
                               ),
+                              OutlinedButton.icon(
+                                onPressed: active
+                                    ? () => _startRoadmapSession(slug)
+                                    : null,
+                                icon: const Icon(Icons.map_outlined),
+                                label: const Text('Start roadmap-sessie nu'),
+                              ),
                             ],
                           ),
                         ),
@@ -791,6 +821,48 @@ class _OverviewPageState extends State<OverviewPage> {
                 );
               }),
             ],
+            const SizedBox(height: 24),
+            Text(
+              'Roadmap-sessies',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (roadmapSessions.isEmpty)
+              const ListTile(
+                leading: Icon(Icons.hourglass_empty),
+                title: Text('Nog geen roadmap-sessies'),
+              ),
+            _limitedSection('roadmapSessions', roadmapSessions, (session) {
+              final sessionStatus = '${session['status']}';
+              final summary = session['summary'] as String?;
+              final workspaceRunId = session['workspaceRunId'] as String?;
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.map_outlined),
+                  title: Text(
+                    '${session['productSlug']} · roadmap-sessie ${session['sequenceNumber']}',
+                  ),
+                  subtitle: Text(
+                    [
+                      sessionStatus,
+                      if (summary != null && summary.isNotEmpty)
+                        summary.length > 150
+                            ? '${summary.substring(0, 150)}…'
+                            : summary,
+                    ].join(' · '),
+                  ),
+                  trailing: workspaceRunId == null
+                      ? null
+                      : IconButton(
+                          tooltip: 'Verslag bekijken',
+                          icon: const Icon(Icons.description_outlined),
+                          onPressed: () => _showMeetingMinutes(
+                            '${session['productSlug']}',
+                            workspaceRunId,
+                          ),
+                        ),
+                ),
+              );
+            }),
             const SizedBox(height: 24),
             Text('Overleggen', style: Theme.of(context).textTheme.titleLarge),
             if (meetings.isEmpty)

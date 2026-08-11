@@ -37,4 +37,14 @@ class RoadmapApi(private val runtime: ProductFactoryRuntimeClient) {
     @ResponseStatus(HttpStatus.CREATED)
     fun addSettledQuestion(@PathVariable slug: String, @RequestBody body: Map<String, String>): Any =
         runtime.addRoadmapSettledQuestion(slug, body["content"].orEmpty())
+
+    @GetMapping("/sessions")
+    fun sessions(@PathVariable slug: String): Any = runtime.roadmapSessions(slug)
+
+    @GetMapping("/sessions/{id}")
+    fun session(@PathVariable slug: String, @PathVariable id: String): Any = runtime.roadmapSession(slug, id)
+
+    @PostMapping("/sessions")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun startSession(@PathVariable slug: String): Any = runtime.startRoadmapSession(slug)
 }

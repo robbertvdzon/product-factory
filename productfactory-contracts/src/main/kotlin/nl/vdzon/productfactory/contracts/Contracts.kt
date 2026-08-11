@@ -201,3 +201,18 @@ data class RoadmapSettledQuestionView(
     val content: String,
     val createdAt: Instant,
 )
+
+data class RoadmapSessionView(
+    val id: String,
+    val productSlug: String,
+    val sequenceNumber: Int,
+    val status: String,
+    val summary: String?,
+    val errorMessage: String?,
+    val createdAt: Instant,
+    val startedAt: Instant?,
+    val completedAt: Instant?,
+    val workspaceRunId: String? = null,
+    val workspacePullRequestUrl: String? = null,
+    val workspaceCommitSha: String? = null,
+)

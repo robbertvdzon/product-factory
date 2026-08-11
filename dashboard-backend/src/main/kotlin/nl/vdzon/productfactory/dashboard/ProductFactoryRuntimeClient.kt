@@ -146,6 +146,19 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .body(mapOf("content" to content))
         .retrieve().body(Any::class.java)!!
 
+    fun roadmapSessions(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/sessions", slug)
+        .retrieve().body(listType).orEmpty()
+
+    fun roadmapSession(slug: String, id: String): Map<String, Any?> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/sessions/{id}", slug, id)
+        .retrieve().body(object : ParameterizedTypeReference<Map<String, Any?>>() {})
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+    fun startRoadmapSession(slug: String): Any = runtime.post()
+        .uri("/api/products/{slug}/roadmap/sessions", slug)
+        .retrieve().body(Any::class.java)!!
+
     fun requireRunnableProduct(slug: String) {
         val product = product(slug)
         if (product["status"] != "active") throw ResponseStatusException(HttpStatus.CONFLICT, "Product is niet actief")

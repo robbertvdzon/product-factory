@@ -31,3 +31,7 @@ product-factory:
     poll-delay: ${PF_AUTONOMY_POLL_DELAY:PT1M}
   iteration:
     orphan-reconcile-delay: ${PF_ORPHAN_RECONCILE_DELAY:PT10M}
+  roadmap:
+    enabled: ${PF_ROADMAP_ENABLED:false}
+    poll-delay: ${PF_ROADMAP_POLL_DELAY:PT1H}
+    session-interval: ${PF_ROADMAP_SESSION_INTERVAL:P7D}

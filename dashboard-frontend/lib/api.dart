@@ -23,6 +23,7 @@ class DashboardApi {
   Future<List<dynamic>> roadmapThemes() => _list('/api/roadmap/themes');
   Future<List<dynamic>> roadmapSettledQuestions() =>
       _list('/api/roadmap/settled-questions');
+  Future<List<dynamic>> roadmapSessions() => _list('/api/roadmap/sessions');
   Future<Map<String, dynamic>> aiCatalog() => _object('/api/ai-catalog');
   Future<Map<String, dynamic>> shadowIterationSession(
     String productSlug,
@@ -180,6 +181,20 @@ class DashboardApi {
     if (response.statusCode != 200) {
       throw StateError(
         'Bericht kon niet worden verstuurd (${response.statusCode}).',
+      );
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> startRoadmapSession(String slug) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/products/$slug/roadmap/sessions'),
+      headers: headers,
+      body: '{}',
+    );
+    if (response.statusCode != 202) {
+      throw StateError(
+        'Roadmap-sessie kon niet worden gestart (${response.statusCode}).',
       );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
