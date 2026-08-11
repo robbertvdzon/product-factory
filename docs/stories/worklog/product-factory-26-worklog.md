@@ -87,3 +87,21 @@ Done / rationale:
   buiten scope volgens de Aannames-sectie van de story.
 - Geen wijziging aan de `AiProviderModelFields`/`IterationTimesField`-widgets zelf; alleen hun
   positie/omgeving in de dialoog is aangepast waar nodig voor de nieuwe layout.
+
+## Reviewnotities (product-150)
+
+- Diff tegen `main` beperkt tot `dashboard-frontend/lib/main.dart`, twee nieuwe testbestanden en
+  deze worklog; geen backend-/API-/database-wijzigingen — conform scope.
+- Zelf herdraaid in de werktree: `flutter analyze` → geen issues; `flutter test` → 165/165 groen
+  (incl. de twee nieuwe testbestanden); `dart format --set-exit-if-changed` op de drie gewijzigde
+  bestanden → geen wijzigingen. `pubspec.lock` ongewijzigd (geen toolchain-divergentie-risico).
+- Alle zes velden (missie, project-key, repo, workspace, max-stories, wip, AI, cyclustijden)
+  geverifieerd afwezig van de kaart; alleen-lezen sectie + bewerkbaar `targetRepositoryName`-veld
+  geverifieerd in `ProductSettingsDialog`; payload-sleutel `targetRepositoryName` komt overeen met
+  `UpdateProductSettingsRequest` in `ProductCatalog.kt`. `api.updateProductSettings` stuurt de
+  settings-map ongewijzigd als JSON-body, dus geen mapping-mismatch.
+- `traversalEdgeBehavior` op `showDialog` bestaat in de gebruikte Flutter-versie (geverifieerd in
+  de Flutter SDK-bron); geen API-misbruik.
+- Pauzeren/Hervatten/Start overleg-knoppen ongewijzigd qua gedrag; enige wijziging is de
+  Instellingen-knop die vervangen is door `SettingsButton` (focus-teruggave), gedekt door tests.
+- Geen blockers gevonden. Akkoord.
