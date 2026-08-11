@@ -81,8 +81,15 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    waarbij het meest recente/hoogste-suffix-artefact wordt gebruikt), dan bevat het blok leesbare
    lopende tekst opgebouwd uit `overallVerdict`, `summary` en `requiredChanges[]` van dat artefact
    (`ShadowSchemas.kt`-schema `critic`) — nooit rauwe JSON. Ontbreekt zo'n criticus-artefact, dan
-   toont het blok in plaats daarvan exact de tekst 'Criticus-oordeel ontbreekt voor deze cyclus' —
-   behalve voor de deelcasus hieronder. Is de status `NEEDS_REVISION`, is er géén
+   hangt de getoonde tekst af van `iteration['criticVerdict']`. Is `criticVerdict` wél gezet (niet
+   `null`), dan toont het blok een tekst die de letterlijke verdict-waarde expliciet benoemt samen
+   met een expliciete melding dat er geen onderliggend criticus-artefact beschikbaar is (bv.
+   'Criticusoordeel REVISE geregistreerd, maar geen onderliggend criticus-artefact beschikbaar.'),
+   in plaats van de onvoorwaardelijke 'Criticus-oordeel ontbreekt'-tekst — dit voorkomt een
+   tegenspraak met een elders in de UI getoonde criticus-badge, die uitsluitend op
+   `criticVerdict != null` is gebaseerd, ongeacht of er een artefact bestaat. Is `criticVerdict`
+   `null`, dan toont het blok in plaats daarvan exact de tekst 'Criticus-oordeel ontbreekt voor
+   deze cyclus' — behalve voor de deelcasus hieronder. Is de status `NEEDS_REVISION`, is er géén
    `iteration['criticVerdict']` (`null`) én ontbreekt het criticus-artefact, dan bepaalt het dialoog
    uit `steps` (role/status/attempt/startedAt/completedAt/errorMessage) welke agentrol als laatste
    `COMPLETED` is, en toont in plaats van de generieke fallbacktekst de naam van die rol (via de
@@ -94,7 +101,10 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    fallbacktekst die dat meldt (ongelijk aan de generieke 'Criticus-oordeel ontbreekt'-tekst).
    `steps`/`artifacts` geven geen betrouwbaar onderscheid tussen een bewuste pipeline-stop en een
    timeout/technische fout (een niet-gestarte rol levert domweg geen step-record op), dus benoemt
-   deze tekst uitsluitend rolnaam en resultaat, zonder een gegokte oorzaak. Is de iteratiestatus
+   deze tekst uitsluitend rolnaam en resultaat, zonder een gegokte oorzaak. Deze
+   `NEEDS_REVISION`-zonder-`criticVerdict`-deelcasus geldt uitsluitend als `criticVerdict` ontbreekt;
+   is `criticVerdict` wél gezet, dan geldt in plaats daarvan de verdict-tekst hierboven, ook zonder
+   een voltooide rol. Is de iteratiestatus
    `REJECTED` en is `iteration['criticVerdict'] == 'ACCEPT'` (het
    guardrail-pad: alle door de criticus goedgekeurde kandidaten zijn alsnog geblokkeerd op
    duplicaat/guardrail), dan wordt aan de criticus-tekst een extra, statische alinea toegevoegd
