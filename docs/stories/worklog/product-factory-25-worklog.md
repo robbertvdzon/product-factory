@@ -36,3 +36,26 @@ Done / rationale:
 - `.factory/verification.yaml` behoefde geen wijziging: alle gewijzigde bestanden vallen al onder
   bestaande `pathPrefixes` (`dashboard-frontend/`).
 - Geen nieuw API-veld, geen wijziging aan `ShadowIterationEngine.kt` of `PreviewDataSeeder.kt`.
+
+## Testnotities (product-145, tester)
+
+- Codeverificatie: diff in `dashboard-frontend/lib/main.dart` implementeert exact het derde
+  detectiepad zoals in de scope beschreven (`criticVerdict` los van `missingCriticContext`,
+  nieuwe helper `criticVerdictWithoutArtifactText`); de twee bestaande paden (artefact aanwezig,
+  en `criticVerdict == null` zonder artefact) en de guardrail-alinea (`REJECTED` +
+  `criticVerdict == 'ACCEPT'`, die nu combineert met de nieuwe verdict-tekst) zijn ongewijzigd.
+  `docs/factory/functional-spec.md` documenteert de drie deelcasussen correct en volledig.
+- Vangnet gedraaid (root, geen `timeout`/kill):
+  - `mvn -B --no-transfer-progress clean verify` → BUILD SUCCESS, alle 5 modules, 16/16 backendtests
+    groen (dashboard-backend is niet geraakt door deze story maar volledig meegedraaid).
+  - `flutter analyze` (dashboard-frontend) → "No issues found!".
+  - `flutter test` (dashboard-frontend) → exit 0, "All tests passed!", 158/158 groen, incl. de drie
+    nieuwe/aangepaste widgettests in `iteration_session_reason_block_test.dart` voor
+    NEEDS_REVISION+verdict-zonder-artefact, REJECTED+verdict-zonder-artefact/steps en de
+    guardrail-samenloop bij `criticVerdict == 'ACCEPT'`.
+- Preview-smoketest: `https://product-factory-pr-59.vdzonsoftware.nl/` → 200,
+  `https://product-factory-api-pr-59.vdzonsoftware.nl/actuator/health` → 200. Geen browsertool
+  beschikbaar in de agentcontainer voor interactieve/screenshotverificatie; gedragsverificatie
+  leunt op de flutter widgettests (conform bekende agent-tip `dashboard-frontend-preview-now-available`).
+- Geen bugs gevonden; acceptatiecriteria van product-144/product-145 zijn gedekt door de
+  gewijzigde tests. Geen code, tests of infra aangepast — alleen deze worklog bijgewerkt.
