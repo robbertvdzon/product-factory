@@ -39,3 +39,18 @@ Done / rationale:
 - Vangnet gedraaid: `flutter analyze` (0 issues), `flutter test` (172/172 groen),
   `mvn -B --no-transfer-progress clean verify` (backend ongewijzigd, 16/16 groen). Geen wijziging
   aan `.factory/verification.yaml` nodig (bestaande `dashboard-frontend/`-pathPrefixes dekken dit).
+
+## Review (product-156)
+
+- Diff beperkt tot twee hunks in `dashboard-frontend/lib/main.dart` (productkaart-knoppenrij +
+  nieuwe `StartCycleButton`-widget, additief na `_AddProductDialogState`) en de nieuwe testfile;
+  geen wijzigingen aan overige homepage-secties of `ProductSettingsDialog`.
+- `onPressed`/`_startCycle`-logica, icoon en label ongewijzigd; status-Chip (status,
+  developmentMode) ongewijzigd als tekstlabel.
+- Gerichte checks (niet het volledige vangnet): `dart format --set-exit-if-changed` op gewijzigde
+  bestanden (geen diff), `flutter analyze` op gewijzigde bestanden (0 issues), `flutter test
+  test/start_cycle_button_test.dart` (7/7 groen); geen pubspec.lock-drift na `pub get`.
+- Kaarthoogte-AC is getest op een vaste viewportbreedte (488px) conform de AC-tekst; de door de
+  developer gemelde hoogtetoename bij zeer brede viewports valt buiten de letterlijke AC-eis en is
+  transparant gedocumenteerd (zie agent tip `wrap-naar-eigen-rij-verhoogt-hoogte-tenzij-breedte-smal`).
+- Akkoord.
