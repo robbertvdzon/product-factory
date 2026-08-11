@@ -105,3 +105,28 @@ Done / rationale:
 - Pauzeren/Hervatten/Start overleg-knoppen ongewijzigd qua gedrag; enige wijziging is de
   Instellingen-knop die vervangen is door `SettingsButton` (focus-teruggave), gedekt door tests.
 - Geen blockers gevonden. Akkoord.
+
+## Testnotities (product-151, tester)
+
+- Diff tegen `main` is frontend-only: `dashboard-frontend/lib/main.dart`,
+  `dashboard-frontend/test/product_card_settings_fields_test.dart`,
+  `dashboard-frontend/test/product_settings_dialog_test.dart` en deze worklog. Volgens
+  `.factory/verification.yaml`-pathPrefixes triggert dit alleen `dashboard-flutter-analyze` en
+  `dashboard-flutter-test`; de mvn-reactor-verify heeft geen matchende pathPrefix voor deze diff.
+- `flutter analyze` (dashboard-frontend): exit 0, "No issues found!".
+- `flutter test` (dashboard-frontend): exit 0, 165/165 tests groen, inclusief beide nieuwe
+  testbestanden (`product_card_settings_fields_test.dart`, `product_settings_dialog_test.dart`)
+  met focus-trap-, Escape-terugkeer-, alleen-lezen-sectie- en opslag-payload-scenario's.
+- Codeverificatie tegen AC: productkaart toont de zeven velden (missie, projectKey, repo,
+  workspace, maxStoriesPerCycle, wipLimit, AI-provider/model, cyclustijden) niet meer standaard
+  (`main.dart` rond regel 571 verwijderd); `ProductSettingsDialog` toont missie/project/workspace
+  als alleen-lezen `TextField`s met "niet bewerkbaar"-toelichting en een bewerkbaar
+  `targetRepositoryName`-veld met payload-sleutel die overeenkomt met `UpdateProductSettingsRequest`
+  in `ProductCatalog.kt`; Pauzeren/Hervatten/Start overleg ongewijzigd (alleen de Instellingen-knop
+  is vervangen door `SettingsButton`, functioneel gelijk plus focus-teruggave).
+- Preview-smoketest: `https://product-factory-pr-60.vdzonsoftware.nl` → HTTP 200,
+  `https://product-factory-api-pr-60.vdzonsoftware.nl/actuator/health` → HTTP 200. Geen browsertool
+  beschikbaar in de agentcontainer, dus interactieve/toetsenbord-verificatie leunt op de
+  `flutter_test`-widgettests (focus-trap met 25 Tab-cycli, Escape+focus-teruggave, opslag-payload
+  per veld) zoals eerder in agent-tips vastgelegd.
+- Geen bugs gevonden. Geen tijdelijke testdata aangemaakt, dus geen cleanup nodig.
