@@ -352,8 +352,8 @@ void main() {
   );
 
   testWidgets(
-    'regressie: NEEDS_REVISION mét criticVerdict maar zonder criticus-artefact behoudt de '
-    'bestaande fallbacktekst, ook met een voltooide rol aanwezig',
+    'toont de verdict-waarde en een expliciete "geen artefact"-melding bij NEEDS_REVISION mét '
+    'criticVerdict maar zonder criticus-artefact, ook met een voltooide rol aanwezig',
     (tester) async {
       await _openDialog(
         tester,
@@ -374,7 +374,91 @@ void main() {
       expect(find.text('Reden'), findsOneWidget);
       expect(
         find.text('Criticus-oordeel ontbreekt voor deze cyclus'),
-        findsOneWidget,
+        findsNothing,
+      );
+      final textFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is SelectableText && (widget.data ?? '').contains('REVISE'),
+      );
+      expect(textFinder, findsOneWidget);
+      final shownText = tester.widget<SelectableText>(textFinder).data!;
+      expect(
+        shownText,
+        contains('geen onderliggend criticus-artefact beschikbaar'),
+      );
+
+      await tester.tap(find.text('Sluiten'));
+      await tester.pump(const Duration(milliseconds: 300));
+    },
+  );
+
+  testWidgets(
+    'toont de verdict-waarde en een expliciete "geen artefact"-melding bij REJECTED mét '
+    'criticVerdict maar zonder criticus-artefact of enige stap',
+    (tester) async {
+      await _openDialog(
+        tester,
+        _sessionWith(
+          status: 'REJECTED',
+          criticVerdict: 'REVISE',
+          artifacts: [],
+          steps: [],
+        ),
+      );
+
+      expect(find.text('Reden'), findsOneWidget);
+      expect(
+        find.text('Criticus-oordeel ontbreekt voor deze cyclus'),
+        findsNothing,
+      );
+      final textFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is SelectableText && (widget.data ?? '').contains('REVISE'),
+      );
+      expect(textFinder, findsOneWidget);
+      final shownText = tester.widget<SelectableText>(textFinder).data!;
+      expect(
+        shownText,
+        contains('geen onderliggend criticus-artefact beschikbaar'),
+      );
+
+      await tester.tap(find.text('Sluiten'));
+      await tester.pump(const Duration(milliseconds: 300));
+    },
+  );
+
+  testWidgets(
+    'combineert de verdict-tekst met de guardrail-toelichtingszin bij REJECTED met '
+    "criticVerdict 'ACCEPT' maar zonder criticus-artefact",
+    (tester) async {
+      await _openDialog(
+        tester,
+        _sessionWith(
+          status: 'REJECTED',
+          criticVerdict: 'ACCEPT',
+          artifacts: [],
+          steps: [],
+        ),
+      );
+
+      expect(find.text('Reden'), findsOneWidget);
+      final textFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is SelectableText && (widget.data ?? '').contains('ACCEPT'),
+      );
+      expect(textFinder, findsOneWidget);
+      final shownText = tester.widget<SelectableText>(textFinder).data!;
+      expect(
+        shownText,
+        contains('geen onderliggend criticus-artefact beschikbaar'),
+      );
+      expect(
+        shownText,
+        contains(
+          'Let op: Alle voorgestelde kandidaten zijn geblokkeerd '
+          '(duplicaat of guardrail), waardoor deze cyclus niet doorgaat '
+          'ondanks een positief criticusoordeel.',
+        ),
       );
 
       await tester.tap(find.text('Sluiten'));

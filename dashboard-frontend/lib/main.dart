@@ -1073,14 +1073,18 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                     Builder(
                       builder: (context) {
                         final criticArtifact = latestCriticArtifact(artifacts);
+                        final criticVerdict =
+                            iteration['criticVerdict'] as String?;
                         final missingCriticContext =
                             status == 'NEEDS_REVISION' &&
-                            iteration['criticVerdict'] == null &&
+                            criticVerdict == null &&
                             criticArtifact == null;
                         final reasonText = criticArtifact != null
                             ? criticReasonSummary(
                                 '${criticArtifact['contentJson']}',
                               )
+                            : criticVerdict != null
+                            ? criticVerdictWithoutArtifactText(criticVerdict)
                             : missingCriticContext
                             ? missingCriticReasonText(steps, artifacts)
                             : '';
@@ -1088,8 +1092,7 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                             ? 'Criticus-oordeel ontbreekt voor deze cyclus'
                             : reasonText;
                         final isGuardrailRejection =
-                            status == 'REJECTED' &&
-                            iteration['criticVerdict'] == 'ACCEPT';
+                            status == 'REJECTED' && criticVerdict == 'ACCEPT';
                         const guardrailNote =
                             'Let op: Alle voorgestelde kandidaten zijn geblokkeerd '
                             '(duplicaat of guardrail), waardoor deze cyclus niet '
@@ -1494,6 +1497,14 @@ String missingCriticReasonText(List<dynamic> steps, List<dynamic> artifacts) {
       : summaryText;
   return 'Laatst voltooide rol: ${_roleLabel(role)}\n\n$summaryLine';
 }
+
+/// Reden-tekst voor de deelcasus waarbij `iteration['criticVerdict']` wél gezet is, maar er geen
+/// onderliggend criticus-artefact (meer) beschikbaar is (product-144). Benoemt de letterlijke
+/// verdict-waarde expliciet, zodat deze tekst niet in tegenspraak is met een elders in de UI
+/// getoonde criticus-badge die uitsluitend op `criticVerdict != null` is gebaseerd.
+String criticVerdictWithoutArtifactText(String criticVerdict) =>
+    'Criticusoordeel $criticVerdict geregistreerd, maar geen onderliggend '
+    'criticus-artefact beschikbaar.';
 
 /// Bouwt leesbare, lopende tekst (géén rauwe JSON) uit een criticus-artefact's `contentJson`,
 /// volgens het schema uit `ShadowSchemas.kt` (`overallVerdict`, `summary`, `requiredChanges[]`).
