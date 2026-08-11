@@ -145,10 +145,17 @@ beneden:
   Software Factory-stories. Deze tegels tonen altijd het *totaal*, ook wanneer de lijst eronder is
   ingekort.
 - **Producten**: per product status (`draft`/`active`/gepauzeerd), ontwikkelmodus
-  (`manual`/`autonomous`/`observe-only`), project- en repositorykoppeling, `maxStoriesPerCycle` en
-  `wipLimit`, met knoppen om een cyclus of shadow-iteratie te starten of het product te
-  pauzeren/hervatten. Gepauzeerd betekent: geen nieuwe agents, stories of automatische antwoorden
-  meer, maar extern lopend werk wordt niet afgebroken.
+  (`manual`/`autonomous`/`observe-only`), met knoppen om een cyclus of shadow-iteratie te starten,
+  het product te pauzeren/hervatten, of de instellingen te openen. Gepauzeerd betekent: geen nieuwe
+  agents, stories of automatische antwoorden meer, maar extern lopend werk wordt niet afgebroken.
+  Missie, Software Factory-projectkoppeling, doelrepository, workspace, `maxStoriesPerCycle`,
+  `wipLimit`, AI-provider/model en cyclustijden staan niet meer los op de kaart, maar in het
+  Instellingen-scherm (`ProductSettingsDialog`) achter de Instellingen-knop: missie, project en
+  workspace als alleen-lezen tekst met een toelichting dat ze aan de Software Factory-integratie
+  gekoppeld en dus niet bewerkbaar zijn, de overige velden — inclusief de doelrepository — als
+  bewerkbaar en opslaanbaar veld. Het scherm opent met focus binnen de dialoog, houdt de tab-focus
+  binnen de dialoog (focus-trap) en sluit met Escape, waarbij de focus terugkeert naar de
+  Instellingen-knop.
 - **Productcycli en onderzoekssessies**: elke cyclus met status, huidige rol (als hij nog loopt),
   starttijd, doorlooptijd, aantal kandidaten en criticusoordeel. De starttijd komt uit `startedAt`,
   of uit `createdAt` zolang de cyclus nog niet gestart is. De doorlooptijd is het verschil tussen

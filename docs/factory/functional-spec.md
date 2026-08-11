@@ -12,8 +12,16 @@ elke 5 seconden en bestaat van boven naar beneden uit:
 1. **Metric-tegels** — totalen voor producten, interne storykandidaten, workspace-publicaties,
    shadow-iteraties en Software Factory-stories. Deze tellers tonen altijd het *totaal*, ook als de lijst
    eronder is ingekort.
-2. **Producten** — per product missie, status, ontwikkelmodus en knoppen voor pauzeren/hervatten,
-   instellingen en 'Start productcyclus nu'. Volgorde: zoals de backend hem levert (op slug).
+2. **Producten** — per product status, ontwikkelmodus en knoppen voor pauzeren/hervatten,
+   instellingen en 'Start productcyclus nu'. Missie, Software Factory-project, doelrepository,
+   workspace, `maxStoriesPerCycle`, `wipLimit`, AI-provider/model en cyclustijden staan niet meer
+   op de kaart zelf, maar in het Instellingen-scherm (`ProductSettingsDialog`, geopend via de
+   Instellingen-knop): missie, project en workspace als alleen-lezen tekst (gekoppeld aan de
+   Software Factory-integratie, dus niet bewerkbaar in dit scherm), de overige velden — inclusief
+   de doelrepository — bewerkbaar en opslaanbaar. Het scherm is met het toetsenbord te bedienen:
+   opent met focus binnen de dialoog, houdt de tab-focus binnen de dialoog (focus-trap) en sluit
+   met Escape waarbij de focus terugkeert naar de Instellingen-knop. Volgorde van de productenlijst:
+   zoals de backend hem levert (op slug).
 3. **Productcycli en onderzoekssessies** — per cyclus status, huidige rol, **starttijd** en
    **doorlooptijd**, aantal kandidaten en of de cyclus doorgezet mag worden. Elke iteratierij toont
    daarnaast exact één van twee dingen, afgeleid uit het bestaande `status`-veld (geen nieuwe

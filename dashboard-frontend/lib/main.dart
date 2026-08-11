@@ -241,16 +241,22 @@ class _OverviewPageState extends State<OverviewPage> {
     super.dispose();
   }
 
-  void _reload() => data = Future.wait<dynamic>([
-    api.products(),
-    api.stories(),
-    api.publications(),
-    api.shadowIterations(),
-    api.deliveries(),
-    api.humanActions(),
-    api.aiCatalog(),
-    api.meetings(),
-  ]);
+  // Blokvorm (i.p.v. `=>`) is bewust: een expressie-body geeft de Future van Future.wait terug
+  // aan de aanroeper, en setState() gooit dan 'setState() callback argument returned a Future'
+  // zodra _reload via setState(_reload) wordt doorgegeven (bv. in _changeStatus).
+  void _reload() {
+    data = Future.wait<dynamic>([
+      api.products(),
+      api.stories(),
+      api.publications(),
+      api.shadowIterations(),
+      api.deliveries(),
+      api.humanActions(),
+      api.aiCatalog(),
+      api.meetings(),
+    ]);
+  }
+
   Future<void> _changeStatus(String slug, String action) async {
     await api.changeProductStatus(slug, action);
     if (mounted) setState(_reload);
@@ -270,8 +276,12 @@ class _OverviewPageState extends State<OverviewPage> {
     Map<String, dynamic> product,
     Map<String, dynamic> aiCatalog,
   ) async {
+    // traversalEdgeBehavior.closedLoop dwingt de tab-focus-trap af: zonder deze parameter
+    // laat het framework (routes.dart _ModalScope) Tab bij de laatste/eerste focusbare widget
+    // standaard de dialoogscope verlaten (parentScope/leaveFlutterView).
     final settings = await showDialog<Map<String, dynamic>>(
       context: context,
+      traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
       builder: (_) =>
           ProductSettingsDialog(product: product, aiCatalog: aiCatalog),
     );
@@ -561,30 +571,6 @@ class _OverviewPageState extends State<OverviewPage> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text('${product['mission']}'),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 8,
-                        children: [
-                          Text(
-                            'Project: ${product['softwareFactoryProjectKey']}',
-                          ),
-                          Text('Repo: ${product['targetRepositoryName']}'),
-                          Text('Workspace: ${product['workspaceOwnership']}'),
-                          Text(
-                            'Max stories per cyclus: ${product['maxStoriesPerCycle']}',
-                          ),
-                          Text('WIP: ${product['wipLimit']}'),
-                          Text(
-                            'AI: ${product['aiProvider']} · ${product['aiModel']}',
-                          ),
-                          Text(
-                            'Cyclustijden: ${((product['iterationTimes'] as List<dynamic>?) ?? const []).join(', ')}',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
                       Text(
                         active
                             ? 'Active: geplande productcycli en leveringen mogen draaien.'
@@ -620,11 +606,9 @@ class _OverviewPageState extends State<OverviewPage> {
                               ),
                               label: Text(active ? 'Pauzeren' : 'Hervatten'),
                             ),
-                            OutlinedButton.icon(
+                            SettingsButton(
                               onPressed: () =>
                                   _editProductSettings(product, aiCatalog),
-                              icon: const Icon(Icons.tune),
-                              label: const Text('Instellingen'),
                             ),
                             OutlinedButton.icon(
                               onPressed: active
@@ -2360,6 +2344,40 @@ class _AddProductDialogState extends State<AddProductDialog> {
   );
 }
 
+/// Instellingen-knop op de productkaart die zijn focus expliciet bewaart: na het sluiten van
+/// [ProductSettingsDialog] (via Opslaan, Annuleren, klik op de barrier, of Escape) krijgt de knop
+/// zelf de focus terug, ongeacht of hij die vóór het openen al had (bv. bij muisklik).
+class SettingsButton extends StatefulWidget {
+  const SettingsButton({required this.onPressed, super.key});
+  final Future<void> Function() onPressed;
+
+  @override
+  State<SettingsButton> createState() => _SettingsButtonState();
+}
+
+class _SettingsButtonState extends State<SettingsButton> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'Instellingen-knop');
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handlePressed() async {
+    await widget.onPressed();
+    if (mounted) _focusNode.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    focusNode: _focusNode,
+    onPressed: _handlePressed,
+    icon: const Icon(Icons.tune),
+    label: const Text('Instellingen'),
+  );
+}
+
 class ProductSettingsDialog extends StatefulWidget {
   const ProductSettingsDialog({
     required this.product,
@@ -2380,6 +2398,9 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
   late final wipLimit = TextEditingController(
     text: '${widget.product['wipLimit']}',
   );
+  late final targetRepositoryName = TextEditingController(
+    text: '${widget.product['targetRepositoryName']}',
+  );
   late String aiProvider = '${widget.product['aiProvider']}';
   late String aiModel = '${widget.product['aiModel']}';
   late List<String> iterationTimes = List<String>.from(
@@ -2390,6 +2411,7 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
   void dispose() {
     maxStoriesPerCycle.dispose();
     wipLimit.dispose();
+    targetRepositoryName.dispose();
     super.dispose();
   }
 
@@ -2404,6 +2426,7 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
       'aiProvider': aiProvider,
       'aiModel': aiModel,
       'iterationTimes': iterationTimes,
+      'targetRepositoryName': targetRepositoryName.text.trim(),
     });
   }
 
@@ -2417,8 +2440,43 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Software Factory-koppeling',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            TextFormField(
+              readOnly: true,
+              initialValue: '${widget.product['mission']}',
+              maxLines: null,
+              decoration: const InputDecoration(
+                labelText: 'Missie',
+                helperText:
+                    'Gekoppeld aan de Software Factory-integratie; hier niet bewerkbaar.',
+              ),
+            ),
+            TextFormField(
+              readOnly: true,
+              initialValue: '${widget.product['softwareFactoryProjectKey']}',
+              decoration: const InputDecoration(
+                labelText: 'Software Factory-project',
+                helperText:
+                    'Gekoppeld aan de Software Factory-integratie; hier niet bewerkbaar.',
+              ),
+            ),
+            TextFormField(
+              readOnly: true,
+              initialValue: '${widget.product['workspaceOwnership']}',
+              decoration: const InputDecoration(
+                labelText: 'Workspace',
+                helperText:
+                    'Gekoppeld aan de Software Factory-integratie; hier niet bewerkbaar.',
+              ),
+            ),
+            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: developmentMode,
+              autofocus: true,
               decoration: const InputDecoration(labelText: 'Ontwikkelmodus'),
               items: const [
                 DropdownMenuItem(value: 'manual', child: Text('Handmatig')),
@@ -2429,6 +2487,14 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
                 ),
               ],
               onChanged: (value) => setState(() => developmentMode = value!),
+            ),
+            TextField(
+              controller: targetRepositoryName,
+              decoration: const InputDecoration(
+                labelText: 'Doelrepository',
+                helperText:
+                    'De Git-repository waarnaar de Software Factory wijzigingen publiceert.',
+              ),
             ),
             TextField(
               controller: maxStoriesPerCycle,
