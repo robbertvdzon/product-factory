@@ -114,6 +114,38 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/products/{slug}/meetings/{id}/close", slug, id)
         .retrieve().body(Any::class.java)!!
 
+    fun roadmapThemes(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/themes", slug)
+        .retrieve().body(listType).orEmpty()
+
+    fun roadmapTheme(slug: String, id: String): Map<String, Any?> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/themes/{id}", slug, id)
+        .retrieve().body(object : ParameterizedTypeReference<Map<String, Any?>>() {})
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+    fun createRoadmapTheme(slug: String, body: Map<String, Any?>): Any = runtime.post()
+        .uri("/api/products/{slug}/roadmap/themes", slug)
+        .body(body)
+        .retrieve().body(Any::class.java)!!
+
+    fun updateRoadmapTheme(slug: String, id: String, body: Map<String, Any?>): Any = runtime.put()
+        .uri("/api/products/{slug}/roadmap/themes/{id}", slug, id)
+        .body(body)
+        .retrieve().body(Any::class.java)!!
+
+    fun closeRoadmapTheme(slug: String, id: String): Any = runtime.post()
+        .uri("/api/products/{slug}/roadmap/themes/{id}/close", slug, id)
+        .retrieve().body(Any::class.java)!!
+
+    fun roadmapSettledQuestions(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/settled-questions", slug)
+        .retrieve().body(listType).orEmpty()
+
+    fun addRoadmapSettledQuestion(slug: String, content: String): Any = runtime.post()
+        .uri("/api/products/{slug}/roadmap/settled-questions", slug)
+        .body(mapOf("content" to content))
+        .retrieve().body(Any::class.java)!!
+
     fun requireRunnableProduct(slug: String) {
         val product = product(slug)
         if (product["status"] != "active") throw ResponseStatusException(HttpStatus.CONFLICT, "Product is niet actief")

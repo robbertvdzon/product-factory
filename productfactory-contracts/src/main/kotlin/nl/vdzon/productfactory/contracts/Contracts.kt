@@ -181,3 +181,23 @@ data class MeetingMessageView(
     val content: String,
     val createdAt: Instant,
 )
+
+data class RoadmapThemeView(
+    val id: String,
+    val productSlug: String,
+    val sequenceNumber: Int,
+    val title: String,
+    val description: String,
+    val priority: String,
+    val status: String,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+    val closedAt: Instant?,
+)
+
+data class RoadmapSettledQuestionView(
+    val id: Long,
+    val productSlug: String,
+    val content: String,
+    val createdAt: Instant,
+)
