@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
         - name: dashboard-backend
-          image: ghcr.io/robbertvdzon/product-factory-dashboard-backend:sha-e603b7172447f13db1ee67ff120d73151e7f15f6
+          image: ghcr.io/robbertvdzon/product-factory-dashboard-backend:sha-d3d45a7b1b95b5289fdf4027e44a5e1f69ed31f2
           imagePullPolicy: Always
           envFrom:
             - configMapRef: {name: product-factory-config}
