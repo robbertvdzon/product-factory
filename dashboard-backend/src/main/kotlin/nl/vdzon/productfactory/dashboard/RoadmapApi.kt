@@ -30,6 +30,9 @@ class RoadmapApi(private val runtime: ProductFactoryRuntimeClient) {
     @PostMapping("/themes/{id}/close")
     fun closeTheme(@PathVariable slug: String, @PathVariable id: String): Any = runtime.closeRoadmapTheme(slug, id)
 
+    @GetMapping("/themes/{id}/verifications")
+    fun themeVerifications(@PathVariable slug: String, @PathVariable id: String): Any = runtime.roadmapThemeVerifications(slug, id)
+
     @GetMapping("/settled-questions")
     fun settledQuestions(@PathVariable slug: String): Any = runtime.roadmapSettledQuestions(slug)
 

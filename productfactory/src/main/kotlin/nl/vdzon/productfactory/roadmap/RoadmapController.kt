@@ -1,7 +1,9 @@
 package nl.vdzon.productfactory.roadmap
 
+import nl.vdzon.productfactory.contracts.DeliveryVerificationView
 import nl.vdzon.productfactory.contracts.RoadmapSettledQuestionView
 import nl.vdzon.productfactory.contracts.RoadmapThemeView
+import nl.vdzon.productfactory.roadmap.api.DeliveryVerificationRepository
 import nl.vdzon.productfactory.roadmap.api.RoadmapCatalog
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -19,12 +21,21 @@ data class AddSettledQuestionRequest(val content: String)
 
 @RestController
 @RequestMapping("/api/products")
-class RoadmapController(private val catalog: RoadmapCatalog) {
+class RoadmapController(
+    private val catalog: RoadmapCatalog,
+    private val deliveryVerifications: DeliveryVerificationRepository,
+) {
     @GetMapping("/{slug}/roadmap/themes")
     fun themes(@PathVariable slug: String): List<RoadmapThemeView> = catalog.listThemes(slug)
 
     @GetMapping("/{slug}/roadmap/themes/{id}")
     fun theme(@PathVariable slug: String, @PathVariable id: String): RoadmapThemeView = catalog.requireTheme(slug, id)
+
+    @GetMapping("/{slug}/roadmap/themes/{id}/verifications")
+    fun verifications(@PathVariable slug: String, @PathVariable id: String): List<DeliveryVerificationView> {
+        catalog.requireTheme(slug, id)
+        return deliveryVerifications.forTheme(slug, id)
+    }
 
     @PostMapping("/{slug}/roadmap/themes")
     @ResponseStatus(HttpStatus.CREATED)

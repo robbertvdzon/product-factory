@@ -137,6 +137,10 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/products/{slug}/roadmap/themes/{id}/close", slug, id)
         .retrieve().body(Any::class.java)!!
 
+    fun roadmapThemeVerifications(slug: String, id: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/themes/{id}/verifications", slug, id)
+        .retrieve().body(listType).orEmpty()
+
     fun roadmapSettledQuestions(slug: String): List<Map<String, Any?>> = runtime.get()
         .uri("/api/products/{slug}/roadmap/settled-questions", slug)
         .retrieve().body(listType).orEmpty()

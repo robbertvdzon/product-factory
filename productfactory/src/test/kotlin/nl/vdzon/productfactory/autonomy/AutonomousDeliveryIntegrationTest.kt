@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
@@ -115,6 +116,41 @@ class AutonomousDeliveryIntegrationTest(
         assertEquals("NEW", recoveredQuestion.status)
         assertEquals(1, jdbc.queryForObject("select count(*) from story_question where id = ? and agent_run_id is null", Int::class.java, recoveredQuestion.id))
         assertEquals("manual-action-done", answerPhase("awaiting-human"))
+    }
+
+    @Test
+    fun `updateRemote persists the confirmed-deployed ground truth separately from workflow status`() {
+        jdbc.update(
+            """insert into shadow_iteration(id, product_slug, sequence_number, focus, mode, status, workspace_run_id)
+                values ('auto-test-deploy', 'hkh-autopilot', 993, 'test deploy', 'autonomous', 'ACCEPTED', 'auto-test-deploy')""".trimIndent(),
+        )
+        jdbc.update(
+            """insert into workspace_publication(run_id, product_slug, artifact_path, content_hash, status, commit_sha)
+                values ('auto-test-deploy', 'hkh-autopilot', 'research/auto-test-deploy.md', 'deploy-hash', 'MERGED', 'aaaaaaa1234567')""".trimIndent(),
+        )
+        jdbc.update(
+            """insert into story_candidate(product_slug, title, description, status, iteration_id, fingerprint,
+                acceptance_criteria, critic_status, critic_reason)
+                values ('hkh-autopilot', 'Toon leverstatus', 'Toon de deploy-status van een story.', 'INTERNAL',
+                'auto-test-deploy', 'fingerprint-auto-test-deploy', '- status is zichtbaar', 'ACCEPT', 'Testbaar')""".trimIndent(),
+        )
+        val candidateId = jdbc.queryForObject("select id from story_candidate where fingerprint = 'fingerprint-auto-test-deploy'", Long::class.java)!!
+        val candidate = repository.eligible("hkh-autopilot", candidateId)!!
+        val delivery = repository.reserve(candidate)!!
+        repository.markDelivered(delivery.id, candidateId, "SF-DEPLOY-TEST")
+
+        // Een goedgekeurde deploy-subtaak (remote_phase) is niet hetzelfde als een onafhankelijk
+        // bevestigde live-deploy: confirmedDeployed/deployedAt zijn een apart, strenger signaal.
+        repository.updateRemote(delivery.id, "DONE", "deploy-approved", confirmedDeployed = false, deployedAt = null)
+        val notYetDeployed = repository.list("hkh-autopilot").single { it.id == delivery.id }
+        assertFalse(notYetDeployed.confirmedDeployed)
+        assertEquals(null, notYetDeployed.deployedAt)
+
+        val deployedAt = java.time.Instant.now()
+        repository.updateRemote(delivery.id, "DONE", "deploy-approved", confirmedDeployed = true, deployedAt = deployedAt)
+        val deployed = repository.list("hkh-autopilot").single { it.id == delivery.id }
+        assertTrue(deployed.confirmedDeployed)
+        assertNotNull(deployed.deployedAt)
     }
 
     @TestConfiguration

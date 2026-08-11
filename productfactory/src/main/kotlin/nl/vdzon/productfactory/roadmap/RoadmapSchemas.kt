@@ -10,6 +10,14 @@ internal object RoadmapSchemas {
         listOf("summary", "themeUpdates", "settledQuestions"),
     )
 
+    val deliveryVerification = schema(
+        """
+        "verdict":{"type":"string","enum":["SATISFIES","DOES_NOT_SATISFY","INCONCLUSIVE"]},
+        "report":{"type":"string","minLength":20,"maxLength":4000}
+        """.trimIndent(),
+        listOf("verdict", "report"),
+    )
+
     private fun schema(properties: String, required: List<String>) =
         """{"type":"object","additionalProperties":false,"required":[${required.joinToString(",") { "\"$it\"" }}],"properties":{$properties}}"""
 }

@@ -46,6 +46,9 @@ data class StoryDeliveryView(
     val createdAt: Instant,
     val deliveredAt: Instant?,
     val completedAt: Instant?,
+    /** Onafhankelijk door Software Factory bevestigde live-deploy (deployRolloutStage == DEPLOYED), niet slechts een goedgekeurde deploy-subtaak. */
+    val confirmedDeployed: Boolean = false,
+    val deployedAt: Instant? = null,
 )
 
 data class HumanActionView(
@@ -206,13 +209,14 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
         jdbc.update("update story_delivery set error_message = ?, last_reconciled_at = current_timestamp where id = ?", message.take(4000), id)
     }
 
-    fun updateRemote(id: Long, status: String, phase: String?) {
+    fun updateRemote(id: Long, status: String, phase: String?, confirmedDeployed: Boolean, deployedAt: Instant?) {
         val complete = status == "DONE"
         jdbc.update(
             """update story_delivery set status = ?, remote_phase = ?, error_message = null,
-                last_reconciled_at = current_timestamp, completed_at = case when ? then current_timestamp else completed_at end
+                last_reconciled_at = current_timestamp, completed_at = case when ? then current_timestamp else completed_at end,
+                confirmed_deployed = ?, deployed_at = coalesce(?, deployed_at)
                 where id = ?""".trimIndent(),
-            status, phase, complete, id,
+            status, phase, complete, confirmedDeployed, deployedAt?.let(::databaseTimestamp), id,
         )
     }
 
@@ -251,13 +255,14 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
     fun list(productSlug: String): List<StoryDeliveryView> = jdbc.query(
         """select d.id, d.product_slug, d.candidate_id, d.iteration_id, c.title, d.external_story_key,
                   d.status, d.remote_phase, d.workspace_commit_sha, d.artifact_path, d.error_message,
-                  d.created_at, d.delivered_at, d.completed_at
+                  d.created_at, d.delivered_at, d.completed_at, d.confirmed_deployed, d.deployed_at
             from story_delivery d join story_candidate c on c.id = d.candidate_id
             where d.product_slug = ? order by d.id desc""".trimIndent(),
         { row, _ -> StoryDeliveryView(
             row.getLong(1), row.getString(2), row.getLong(3), row.getString(4), row.getString(5), row.getString(6),
             row.getString(7), row.getString(8), row.getString(9), row.getString(10), row.getString(11),
             row.getTimestamp(12).toInstant(), row.getTimestamp(13)?.toInstant(), row.getTimestamp(14)?.toInstant(),
+            row.getBoolean(15), row.getTimestamp(16)?.toInstant(),
         ) }, productSlug,
     )
 
@@ -674,7 +679,12 @@ class AutonomousCoordinator(
         val done = issue.path("status").asText().lowercase() in setOf("done", "finished", "closed") ||
             (detail.path("subtasks").size() > 0 && detail.path("subtasks").all { subtaskDone(it.path("fields").path("subtaskPhase").asText()) })
         val status = when { hasError -> "ERROR"; done -> "DONE"; awaitingHuman != null -> "WAITING_FOR_ANSWER"; else -> "RUNNING" }
-        deliveries.updateRemote(delivery.id, status, phase)
+        // Grondwaarheid voor "echt live": deployRolloutStage == DEPLOYED bevestigt dat Software Factory
+        // alle geraakte deploy-doelen (backend, frontend, ...) onafhankelijk heeft geverifieerd — een
+        // goedgekeurde deploy-subtaak (zie subtaskDone/"deploy-approved" hierboven) is daarvoor niet genoeg.
+        val confirmedDeployed = detail.path("deployRolloutStage").asText(null) == "DEPLOYED"
+        val deployedAt = detail.path("run").path("deployedAt").asText(null)?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+        deliveries.updateRemote(delivery.id, status, phase, confirmedDeployed, deployedAt)
         deliveries.closeSoftwareFactoryHumanActions(delivery.id)
         if (!hasError && !done) questionResolver.inspectAndResolve(delivery, detail)
     }

@@ -217,3 +217,16 @@ data class RoadmapSessionView(
     val workspacePullRequestUrl: String? = null,
     val workspaceCommitSha: String? = null,
 )
+
+data class DeliveryVerificationView(
+    val id: String,
+    val productSlug: String,
+    val themeId: String,
+    val candidateId: Long,
+    val candidateTitle: String,
+    val status: String,
+    val verdict: String?,
+    val report: String?,
+    val createdAt: Instant,
+    val completedAt: Instant?,
+)
