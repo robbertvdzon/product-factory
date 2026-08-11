@@ -581,43 +581,53 @@ class _OverviewPageState extends State<OverviewPage> {
                             ? 'Autonomous: de Product Factory mag geaccepteerde stories zelfstandig naar de Software Factory sturen.'
                             : 'Niet-autonoom: de Product Factory mag geen stories zelfstandig publiceren.',
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Wrap(
-                          spacing: 8,
-                          children: [
-                            FilledButton.icon(
-                              onPressed:
-                                  active &&
-                                      product['workspaceOwnership'] ==
-                                          'product-factory'
-                                  ? () => _startCycle(slug)
-                                  : null,
-                              icon: const Icon(Icons.auto_awesome),
-                              label: const Text('Start productcyclus nu'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: () => _changeStatus(
-                                slug,
-                                active ? 'pause' : 'resume',
+                      Row(
+                        children: [
+                          StartCycleButton(
+                            onPressed:
+                                active &&
+                                    product['workspaceOwnership'] ==
+                                        'product-factory'
+                                ? () => _startCycle(slug)
+                                : null,
+                          ),
+                        ],
+                      ),
+                      // Extra ruimte + verlaagde visuele dichtheid van de secundaire knoppen houdt
+                      // de CTA hierboven visueel dominant zonder de kaart per saldo hoger te maken.
+                      const SizedBox(height: 12),
+                      Theme(
+                        data: Theme.of(
+                          context,
+                        ).copyWith(visualDensity: VisualDensity.compact),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () => _changeStatus(
+                                  slug,
+                                  active ? 'pause' : 'resume',
+                                ),
+                                icon: Icon(
+                                  active ? Icons.pause : Icons.play_arrow,
+                                ),
+                                label: Text(active ? 'Pauzeren' : 'Hervatten'),
                               ),
-                              icon: Icon(
-                                active ? Icons.pause : Icons.play_arrow,
+                              SettingsButton(
+                                onPressed: () =>
+                                    _editProductSettings(product, aiCatalog),
                               ),
-                              label: Text(active ? 'Pauzeren' : 'Hervatten'),
-                            ),
-                            SettingsButton(
-                              onPressed: () =>
-                                  _editProductSettings(product, aiCatalog),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: active
-                                  ? () => _startMeeting(slug)
-                                  : null,
-                              icon: const Icon(Icons.forum_outlined),
-                              label: const Text('Start overleg'),
-                            ),
-                          ],
+                              OutlinedButton.icon(
+                                onPressed: active
+                                    ? () => _startMeeting(slug)
+                                    : null,
+                                icon: const Icon(Icons.forum_outlined),
+                                label: const Text('Start overleg'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -2341,6 +2351,52 @@ class _AddProductDialogState extends State<AddProductDialog> {
       ),
       FilledButton(onPressed: _submit, child: const Text('Toevoegen')),
     ],
+  );
+}
+
+/// Achtergrond-/tekstkleur van [StartCycleButton]. Losstaand van het thema-kleurenschema (dat via
+/// `seedColor` kan wijzigen) zodat de AA-contrastverhouding (>=4.5:1, zie
+/// `test/start_cycle_button_test.dart`) niet afhankelijk is van toekomstige themawijzigingen —
+/// zelfde aanpak als `kClassificationColors` in `classification.dart`.
+const Color kStartCycleButtonBackground = Color(0xFF1B4332);
+const Color kStartCycleButtonForeground = Colors.white;
+
+/// Primaire CTA 'Start productcyclus nu' op de productkaart: een eigen, losstaand knop-widget met
+/// een zichtbare rand (onderscheid door rand, niet uitsluitend kleur, t.o.v. de secundaire
+/// `OutlinedButton`-knoppen eronder) en een expliciete `FocusNode` voor een zichtbare focusring,
+/// naar analogie van het bestaande [SettingsButton]-patroon. `onPressed`/icoon/label komen
+/// ongewijzigd uit de aanroepende `_OverviewPageState`.
+class StartCycleButton extends StatefulWidget {
+  const StartCycleButton({required this.onPressed, super.key});
+  final VoidCallback? onPressed;
+
+  @override
+  State<StartCycleButton> createState() => _StartCycleButtonState();
+}
+
+class _StartCycleButtonState extends State<StartCycleButton> {
+  final FocusNode _focusNode = FocusNode(
+    debugLabel: 'Start-productcyclus-knop',
+  );
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FilledButton.icon(
+    focusNode: _focusNode,
+    onPressed: widget.onPressed,
+    style: FilledButton.styleFrom(
+      backgroundColor: kStartCycleButtonBackground,
+      foregroundColor: kStartCycleButtonForeground,
+      side: const BorderSide(color: kStartCycleButtonForeground, width: 2),
+      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+    ),
+    icon: const Icon(Icons.auto_awesome),
+    label: const Text('Start productcyclus nu'),
   );
 }
 
