@@ -21,6 +21,8 @@ class DashboardApi {
   Future<List<dynamic>> meetingMessages(String slug, String id) =>
       _list('/api/products/$slug/meetings/$id/messages');
   Future<List<dynamic>> roadmapThemes() => _list('/api/roadmap/themes');
+  Future<List<dynamic>> roadmapThemeVerifications(String slug, String id) =>
+      _list('/api/products/$slug/roadmap/themes/$id/verifications');
   Future<List<dynamic>> roadmapSettledQuestions() =>
       _list('/api/roadmap/settled-questions');
   Future<List<dynamic>> roadmapSessions() => _list('/api/roadmap/sessions');

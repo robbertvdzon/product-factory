@@ -778,27 +778,31 @@ class _OverviewPageState extends State<OverviewPage> {
               final priority = '${theme['priority']}';
               final status = '${theme['status']}';
               return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${theme['productSlug']} · ${theme['title']}',
-                              style: Theme.of(context).textTheme.titleMedium,
+                child: InkWell(
+                  onTap: () =>
+                      _showThemeDetail(context, api, theme, stories, deliveries),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${theme['productSlug']} · ${theme['title']}',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
                             ),
-                          ),
-                          _PriorityBadge(priority: priority),
-                          const SizedBox(width: 8),
-                          Chip(label: Text(_statusLabel(status))),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text('${theme['description']}'),
-                    ],
+                            _PriorityBadge(priority: priority),
+                            const SizedBox(width: 8),
+                            Chip(label: Text(_statusLabel(status))),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text('${theme['description']}'),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -2288,6 +2292,175 @@ List<Widget> _buildStoryQueueSections(
         title: Text('Nog geen storykandidaten'),
       ),
   ];
+}
+
+void _showThemeDetail(
+  BuildContext context,
+  DashboardApi api,
+  Map<String, dynamic> theme,
+  List<dynamic> stories,
+  List<dynamic> deliveries,
+) {
+  final productSlug = '${theme['productSlug']}';
+  final themeId = '${theme['id']}';
+
+  final deliveryByCandidate = <int, Map<String, dynamic>>{};
+  for (final item in deliveries) {
+    final delivery = item as Map<String, dynamic>;
+    final candidateId = delivery['candidateId'];
+    if (candidateId is int) deliveryByCandidate[candidateId] = delivery;
+  }
+  final linkedStories = stories
+      .cast<Map<String, dynamic>>()
+      .where(
+        (story) =>
+            story['themeId'] == themeId && story['productSlug'] == productSlug,
+      )
+      .toList();
+
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('${theme['title']}'),
+      content: SizedBox(
+        width: 720,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Wrap(
+                spacing: 8,
+                children: [
+                  _PriorityBadge(priority: '${theme['priority']}'),
+                  Chip(label: Text(_statusLabel('${theme['status']}'))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SelectableText('${theme['description']}'),
+              const SizedBox(height: 20),
+              Text(
+                'Gekoppelde stories (${linkedStories.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              if (linkedStories.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text('Nog geen stories aan dit thema gekoppeld.'),
+                )
+              else
+                ...linkedStories.map((story) {
+                  final delivery = deliveryByCandidate[story['id']];
+                  final confirmedDeployed = delivery?['confirmedDeployed'] == true;
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(
+                      confirmedDeployed ? Icons.cloud_done : Icons.cloud_outlined,
+                    ),
+                    title: Text('${story['title']}'),
+                    subtitle: Text(
+                      [
+                        delivery?['status'] ?? 'nog niet geleverd',
+                        if (delivery?['externalStoryKey'] != null)
+                          '${delivery!['externalStoryKey']}',
+                        confirmedDeployed
+                            ? 'bevestigd live'
+                            : 'nog niet bevestigd live',
+                      ].join(' · '),
+                    ),
+                  );
+                }),
+              const SizedBox(height: 20),
+              Text(
+                'Opleverchecker-rapporten',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              FutureBuilder<List<dynamic>>(
+                future: api.roadmapThemeVerifications(productSlug, themeId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: LinearProgressIndicator(),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return Text(
+                      'Rapporten konden niet worden geladen: ${snapshot.error}',
+                    );
+                  }
+                  final reports = snapshot.data ?? [];
+                  if (reports.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Nog geen opleverchecker-rapporten voor dit thema.',
+                      ),
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: reports.map((item) {
+                      final report = item as Map<String, dynamic>;
+                      final verdict = '${report['verdict'] ?? 'ONBEKEND'}';
+                      final (background, foreground) = switch (verdict) {
+                        'SATISFIES' => (
+                          Colors.green.shade100,
+                          Colors.green.shade900,
+                        ),
+                        'DOES_NOT_SATISFY' => (
+                          Colors.red.shade100,
+                          Colors.red.shade900,
+                        ),
+                        _ => (Colors.grey.shade200, Colors.grey.shade800),
+                      };
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${report['candidateTitle']}',
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ),
+                                Chip(
+                                  label: Text(verdict),
+                                  backgroundColor: background,
+                                  labelStyle: TextStyle(color: foreground),
+                                  side: BorderSide.none,
+                                ),
+                              ],
+                            ),
+                            if ('${report['report'] ?? ''}'.trim().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text('${report['report']}'),
+                              ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Sluiten'),
+        ),
+      ],
+    ),
+  );
 }
 
 void _showStoryCandidateDetails(
