@@ -254,6 +254,8 @@ class _OverviewPageState extends State<OverviewPage> {
       api.humanActions(),
       api.aiCatalog(),
       api.meetings(),
+      api.roadmapThemes(),
+      api.roadmapSettledQuestions(),
     ]);
   }
 
@@ -462,6 +464,22 @@ class _OverviewPageState extends State<OverviewPage> {
         final meetings = sortedByNewestFirst(
           snapshot.data![7] as List<dynamic>,
           ['closedAt', 'createdAt'],
+        );
+        // Open thema's eerst, en binnen elke status de recentst bijgewerkte bovenaan.
+        final roadmapThemes = (snapshot.data![8] as List<dynamic>)
+            .cast<Map<String, dynamic>>();
+        final openThemes =
+            sortedByNewestFirst(
+              roadmapThemes.where((theme) => theme['status'] != 'DONE').toList(),
+              ['updatedAt'],
+            ) +
+            sortedByNewestFirst(
+              roadmapThemes.where((theme) => theme['status'] == 'DONE').toList(),
+              ['closedAt', 'updatedAt'],
+            );
+        final settledQuestions = sortedByNewestFirst(
+          snapshot.data![9] as List<dynamic>,
+          ['createdAt'],
         );
         return ListView(
           padding: const EdgeInsets.all(24),
@@ -719,6 +737,60 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               );
             }),
+            const SizedBox(height: 24),
+            Text('Roadmap', style: Theme.of(context).textTheme.titleLarge),
+            if (openThemes.isEmpty)
+              const ListTile(
+                leading: Icon(Icons.hourglass_empty),
+                title: Text('Nog geen roadmapthema\'s'),
+              ),
+            _limitedSection('roadmapThemes', openThemes, (theme) {
+              final priority = '${theme['priority']}';
+              final status = '${theme['status']}';
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${theme['productSlug']} · ${theme['title']}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          _PriorityBadge(priority: priority),
+                          const SizedBox(width: 8),
+                          Chip(label: Text(_statusLabel(status))),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text('${theme['description']}'),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            if (settledQuestions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Afgehandelde onderzoeksvragen',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              _limitedSection('roadmapSettledQuestions', settledQuestions, (
+                question,
+              ) {
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.check, size: 18),
+                  title: Text(
+                    '${question['productSlug']} · ${question['content']}',
+                  ),
+                );
+              }),
+            ],
             const SizedBox(height: 24),
             Text('Overleggen', style: Theme.of(context).textTheme.titleLarge),
             if (meetings.isEmpty)
@@ -1934,6 +2006,13 @@ String _deliveryLabel(String mode) => mode == 'autonomous'
     ? 'kan doorgezet worden'
     : 'niet doorgezet (product staat niet op autonoom)';
 
+String _statusLabel(String value) => switch (value) {
+  'OPEN' => 'Open',
+  'IN_PROGRESS' => 'Bezig',
+  'DONE' => 'Afgerond',
+  _ => value,
+};
+
 String _roleLabel(String value) => switch (value.toLowerCase()) {
   'researcher' => 'Onderzoeker',
   'product_owner' => 'Product owner',
@@ -2798,4 +2877,26 @@ class MetricCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Kleurcodering voor een roadmapthema-prioriteit. Puur decoratief (label staat er ook altijd bij
+/// als tekst), dus geen aparte semantics nodig bovenop wat [Chip] al biedt.
+class _PriorityBadge extends StatelessWidget {
+  const _PriorityBadge({required this.priority});
+  final String priority;
+
+  @override
+  Widget build(BuildContext context) {
+    final (background, foreground, label) = switch (priority) {
+      'HIGH' => (Colors.red.shade100, Colors.red.shade900, 'Hoog'),
+      'MEDIUM' => (Colors.amber.shade100, Colors.amber.shade900, 'Gemiddeld'),
+      'LOW' => (Colors.grey.shade200, Colors.grey.shade800, 'Laag'),
+      _ => (Colors.grey.shade200, Colors.grey.shade800, priority),
+    };
+    return Chip(
+      label: Text(label, style: TextStyle(color: foreground)),
+      backgroundColor: background,
+      side: BorderSide.none,
+    );
+  }
 }

@@ -68,6 +68,12 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
     @GetMapping("/meetings")
     fun meetings(): Any = runtime.products().flatMap { product -> runtime.meetings(product["slug"].toString()) }
 
+    @GetMapping("/roadmap/themes")
+    fun roadmapThemes(): Any = runtime.products().flatMap { product -> runtime.roadmapThemes(product["slug"].toString()) }
+
+    @GetMapping("/roadmap/settled-questions")
+    fun roadmapSettledQuestions(): Any = runtime.products().flatMap { product -> runtime.roadmapSettledQuestions(product["slug"].toString()) }
+
     @PostMapping("/products/{slug}/cycles")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun startCycle(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =

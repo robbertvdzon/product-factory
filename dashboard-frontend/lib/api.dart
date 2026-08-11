@@ -20,6 +20,9 @@ class DashboardApi {
       _object('/api/products/$slug/meetings/$id');
   Future<List<dynamic>> meetingMessages(String slug, String id) =>
       _list('/api/products/$slug/meetings/$id/messages');
+  Future<List<dynamic>> roadmapThemes() => _list('/api/roadmap/themes');
+  Future<List<dynamic>> roadmapSettledQuestions() =>
+      _list('/api/roadmap/settled-questions');
   Future<Map<String, dynamic>> aiCatalog() => _object('/api/ai-catalog');
   Future<Map<String, dynamic>> shadowIterationSession(
     String productSlug,
