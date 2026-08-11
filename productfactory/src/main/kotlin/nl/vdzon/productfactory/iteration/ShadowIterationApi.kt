@@ -335,6 +335,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         criticStatus: String,
         criticReason: String,
         duplicateOfId: Long?,
+        themeId: String? = null,
     ): Long {
         val status = when {
             duplicateOfId != null -> "DUPLICATE"
@@ -347,8 +348,8 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
                 val statement = connection.prepareStatement(
                     """insert into story_candidate(
                         product_slug, title, description, status, iteration_id, fingerprint,
-                        acceptance_criteria, critic_status, critic_reason, duplicate_of_id
-                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                        acceptance_criteria, critic_status, critic_reason, duplicate_of_id, theme_id
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
                     arrayOf("id"),
                 )
                 statement.setString(1, productSlug)
@@ -361,6 +362,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
                 statement.setString(8, criticStatus)
                 statement.setString(9, criticReason)
                 if (duplicateOfId != null) statement.setLong(10, duplicateOfId) else statement.setNull(10, java.sql.Types.BIGINT)
+                statement.setString(11, themeId)
                 statement
             },
             keyHolder,

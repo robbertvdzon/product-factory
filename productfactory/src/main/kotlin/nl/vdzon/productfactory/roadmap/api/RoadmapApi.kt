@@ -90,6 +90,29 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         )
     }
 
+    /**
+     * Opgemaakte roadmapcontext voor cyclusprompts (RESEARCHER/PRODUCT_OWNER/STORY_WRITER): open
+     * thema's met hun ID (zodat STORY_WRITER exact kan verwijzen) plus afgehandelde onderzoeksvragen,
+     * zodat een cyclus niet nogmaals hoeft te onderzoeken wat al is uitgezocht.
+     */
+    fun contextForCycle(productSlug: String): String {
+        val openThemes = listThemes(productSlug).filter { it.status != "DONE" }
+        val settled = listSettledQuestions(productSlug)
+        val themesBlock = if (openThemes.isEmpty()) {
+            "Er zijn nog geen roadmapthema's vastgesteld."
+        } else {
+            openThemes.joinToString("\n") {
+                "themaId=${it.id} [${it.priority}, ${it.status}] ${it.title}: ${it.description}"
+            }
+        }
+        val settledBlock = if (settled.isEmpty()) {
+            "Geen afgehandelde onderzoeksvragen."
+        } else {
+            settled.joinToString("\n") { "- ${it.content}" }
+        }
+        return "OPEN ROADMAPTHEMA'S:\n$themesBlock\n\nAFGEHANDELDE ONDERZOEKSVRAGEN (niet opnieuw onderzoeken):\n$settledBlock"
+    }
+
     fun addSettledQuestion(productSlug: String, content: String): RoadmapSettledQuestionView {
         val product = products.requireActive(productSlug)
         require(content.isNotBlank()) { "Inhoud is verplicht" }

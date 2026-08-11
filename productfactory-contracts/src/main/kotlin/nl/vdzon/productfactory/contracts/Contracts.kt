@@ -110,6 +110,7 @@ data class StoryCandidateView(
     val criticReason: String? = null,
     val blocked: Boolean = false,
     val blockedReason: String? = null,
+    val themeId: String? = null,
 )
 data class ProductRecordView(
     val id: Long,

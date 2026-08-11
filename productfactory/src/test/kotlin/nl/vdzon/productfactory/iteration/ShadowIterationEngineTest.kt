@@ -4,6 +4,7 @@ import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.contracts.AgentResult
 import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.WorkspacePublicationView
+import nl.vdzon.productfactory.roadmap.api.RoadmapCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
 import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
@@ -31,6 +32,7 @@ class ShadowIterationEngineTest(
     @Autowired private val bridge: FakeShadowAgentBridge,
     @Autowired private val workspace: FakeWorkspacePublicationPort,
     @Autowired private val jdbc: JdbcTemplate,
+    @Autowired private val roadmap: RoadmapCatalog,
 ) {
     // De fakes zijn Spring-singletons die alle testmethoden in deze klasse delen; zonder reset
     // lekt de workspace-artefactenlijst (en het scenario) van de ene test naar de volgende.
@@ -38,6 +40,35 @@ class ShadowIterationEngineTest(
     fun resetFakes() {
         workspace.artifacts.clear()
         bridge.scenario = Scenario.ACCEPT
+        bridge.themeIdToEmit = null
+    }
+
+    @Test
+    fun `a candidate is linked to the roadmap theme the story writer chose`() {
+        bridge.scenario = Scenario.THEME_LINKED
+        val theme = roadmap.createTheme("hkh-autopilot", "Brontransparantie", "Toon rechten- en bronvermelding overal.", "HIGH")
+        bridge.themeIdToEmit = theme.id
+        val iteration = repository.create("hkh-autopilot", "Koppel de kandidaat aan een open roadmapthema")
+        engine.run(iteration.id)
+
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", iteration.id).status)
+        assertEquals(
+            theme.id,
+            jdbc.queryForObject("select theme_id from story_candidate where iteration_id = ?", String::class.java, iteration.id),
+        )
+    }
+
+    @Test
+    fun `an unknown themeId from the story writer is ignored instead of persisted`() {
+        bridge.scenario = Scenario.THEME_LINKED
+        bridge.themeIdToEmit = "theme-die-niet-bestaat"
+        val iteration = repository.create("hkh-autopilot", "Negeer een verzonnen themaId")
+        engine.run(iteration.id)
+
+        assertEquals("ACCEPTED", repository.require("hkh-autopilot", iteration.id).status)
+        assertNull(
+            jdbc.queryForObject("select theme_id from story_candidate where iteration_id = ?", String::class.java, iteration.id),
+        )
     }
 
     @Test
@@ -272,10 +303,12 @@ class ShadowIterationEngineTest(
     enum class Scenario {
         ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE,
         RESEARCH_RETRY_THEN_ACCEPT, CROSS_KEY_DEPENDENCY, LEGACY_POSITIONAL_DEPENDSON, UNKNOWN_DEPENDSON_KEY,
+        THEME_LINKED,
     }
 
     class FakeShadowAgentBridge : AgentDispatchPort {
         var scenario = Scenario.ACCEPT
+        var themeIdToEmit: String? = null
         override fun execute(task: AgentTask): AgentResult {
             val today = LocalDate.now(ZoneId.of("Europe/Amsterdam"))
             val firstAttempt = task.runId.endsWith("-1")
@@ -380,6 +413,15 @@ class ShadowIterationEngineTest(
                         "risks":["Bronrechten kunnen per object verschillen"]
                       }
                     ]
+                }""" else if (scenario == Scenario.THEME_LINKED) """{
+                    "candidates":[{
+                      "candidateKey":"themagekoppelde-bronnenkaart",
+                      "title":"Themagekoppelde bronnenkaart (${themeIdToEmit ?: "geen-thema"})",
+                      "description":"Toon voor één historische locatie een verhaal dat expliciet aan roadmapthema ${themeIdToEmit ?: "geen-thema"} is gekoppeld.",
+                      "acceptanceCriteria":["De gebruiker ziet de bron-URL"],
+                      "sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Bronrechten kunnen per object verschillen"],
+                      "themeId":${themeIdToEmit?.let { "\"$it\"" } ?: "null"}
+                    }]
                 }""" else """{
                     "candidates":[{
                       "candidateKey":"bronnenkaart-voor-locatie",

@@ -24,6 +24,7 @@ internal data class ReviewedCandidate(
     val reason: String,
     val fingerprint: String,
     val duplicateOfId: Long?,
+    val themeId: String? = null,
     /** Sleutels uit [dependsOn] die binnen dezelfde batch daadwerkelijk naar een candidateKey verwijzen. */
     val resolvedDependsOn: List<String> = emptyList(),
     /** Resolutiedetail per dependsOn-waarde, inclusief legacy-fallback- en blokkade-informatie voor de mapping-log. */

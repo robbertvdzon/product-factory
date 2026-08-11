@@ -30,7 +30,7 @@ class StoryCandidateController(
         val product = products.requireContext(productSlug)
         val rows = jdbc.query(
             """select c.id, c.product_slug, c.title, c.description, c.status, c.created_at,
-                      i.sequence_number, c.acceptance_criteria, c.critic_reason, i.id as iteration_id
+                      i.sequence_number, c.acceptance_criteria, c.critic_reason, i.id as iteration_id, c.theme_id
                  from story_candidate c
                  left join shadow_iteration i on i.id = c.iteration_id
                 where c.product_slug = ? and c.status not in ('REJECTED', 'DUPLICATE')
@@ -109,6 +109,7 @@ class StoryCandidateController(
         StoryCandidateView(
             row.getLong(1), row.getString(2), row.getString(3), row.getString(4), row.getString(5), row.getTimestamp(6).toInstant(),
             row.getObject(7, java.lang.Integer::class.java)?.toInt(), row.getString(8), row.getString(9),
+            themeId = row.getString(11),
         ) to row.getString(10)
     }
 
