@@ -146,8 +146,15 @@ beneden:
   ingekort.
 - **Producten**: per product status (`draft`/`active`/gepauzeerd), ontwikkelmodus
   (`manual`/`autonomous`/`observe-only`), met knoppen om een cyclus of shadow-iteratie te starten,
-  het product te pauzeren/hervatten, of de instellingen te openen. Gepauzeerd betekent: geen nieuwe
-  agents, stories of automatische antwoorden meer, maar extern lopend werk wordt niet afgebroken.
+  het product te pauzeren/hervatten, of de instellingen te openen. "Start productcyclus nu" (de
+  cyclus-CTA, alleen zichtbaar bij een actief, autonoom product met workspace-eigenaarschap
+  `product-factory`) staat als losstaande, visueel dominante knop (`StartCycleButton`) op een
+  eigen rij, boven en met extra ruimte gescheiden van de secundaire knoppenrij
+  (Pauzeren/Hervatten, Instellingen, Start overleg); onderscheidend door een eigen rand en
+  kleurenpaar met WCAG AA-contrast (≥4.5:1) en een zichtbare focusring, niet uitsluitend door
+  kleur. Gedrag, enabling-conditie, icoon en tekst van de knop zijn ongewijzigd. Gepauzeerd
+  betekent: geen nieuwe agents, stories of automatische antwoorden meer, maar extern lopend werk
+  wordt niet afgebroken.
   Missie, Software Factory-projectkoppeling, doelrepository, workspace, `maxStoriesPerCycle`,
   `wipLimit`, AI-provider/model en cyclustijden staan niet meer los op de kaart, maar in het
   Instellingen-scherm (`ProductSettingsDialog`) achter de Instellingen-knop: missie, project en

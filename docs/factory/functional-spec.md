@@ -13,7 +13,11 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    shadow-iteraties en Software Factory-stories. Deze tellers tonen altijd het *totaal*, ook als de lijst
    eronder is ingekort.
 2. **Producten** — per product status, ontwikkelmodus en knoppen voor pauzeren/hervatten,
-   instellingen en 'Start productcyclus nu'. Missie, Software Factory-project, doelrepository,
+   instellingen en 'Start productcyclus nu'. 'Start productcyclus nu' staat als losstaande,
+   visueel dominante CTA (`StartCycleButton`, eigen rand/kleurenpaar met WCAG AA-contrast
+   ≥4.5:1 en zichtbare focusring) op een eigen rij, boven en met extra ruimte gescheiden van
+   de secundaire knoppenrij (Pauzeren/Hervatten, Instellingen, Start overleg); enabling-conditie,
+   `_startCycle`-gedrag, icoon en tekst zijn ongewijzigd. Missie, Software Factory-project, doelrepository,
    workspace, `maxStoriesPerCycle`, `wipLimit`, AI-provider/model en cyclustijden staan niet meer
    op de kaart zelf, maar in het Instellingen-scherm (`ProductSettingsDialog`, geopend via de
    Instellingen-knop): missie, project en workspace als alleen-lezen tekst (gekoppeld aan de
