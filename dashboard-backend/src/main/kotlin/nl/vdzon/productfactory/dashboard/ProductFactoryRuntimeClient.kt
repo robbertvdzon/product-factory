@@ -52,6 +52,10 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .body(mapOf("reason" to reason))
         .retrieve().body(Any::class.java)!!
 
+    fun resumeShadowIteration(slug: String, id: String): Any = runtime.post()
+        .uri { it.path("/api/shadow-iterations/{id}/resume").queryParam("productSlug", slug).build(id) }
+        .retrieve().body(Any::class.java)!!
+
     fun deliveries(slug: String): List<Map<String, Any?>> = runtime.get()
         .uri { it.path("/api/autonomy/deliveries").queryParam("productSlug", slug).build() }
         .retrieve().body(listType).orEmpty()

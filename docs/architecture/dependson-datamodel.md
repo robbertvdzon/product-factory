@@ -72,6 +72,18 @@ hierboven).
 > zonder nieuwe call of berekening. Dit is uitsluitend een frontend-weergavelaag; de backend-kant
 > (inclusief de constatering dat `blocked` in productiedata vandaag altijd `false` is, zie hierboven)
 > is door deze story niet gewijzigd.
+>
+> **Update (herstel cross-batch-afhankelijkheden):** een `dependsOn`-verwijzing mag nu ook naar een
+> reeds `PUBLISHED` story van hetzelfde product wijzen. `existingCandidateContext` toont daarvoor
+> expliciet `story:<id>`; niet-gepubliceerde kandidaten worden als ongeschikt voor `dependsOn`
+> gemarkeerd. De resolver accepteert `story:<id>` en, voor compatibiliteit met bestaande agentoutput,
+> een kaal numeriek ID. Een ID van een ander product of een niet-gepubliceerde kandidaat blijft
+> onopgelost. Het `dependson_resolution`-artefact legt een cross-batch-match vast in
+> `resolvedBacklogId`; alleen same-batch-koppelingen gebruiken `resolvedCandidateKey`. Een volledig
+> geaccepteerde batch die uitsluitend door een onopgeloste leveringsafhankelijkheid uitvalt krijgt
+> status `FAILED` met `DELIVERY_DEPENDENCY_UNRESOLVED`, niet langer `REJECTED`, en kan vanaf de
+> bestaande artefacten worden hervat. Migratie V19 herclassificeert en ontsluit ook reeds getroffen
+> cycli.
 
 ## Uitkomst
 

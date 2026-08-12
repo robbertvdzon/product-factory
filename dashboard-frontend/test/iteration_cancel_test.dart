@@ -10,6 +10,7 @@ class _FakeApi extends DashboardApi {
 
   final Map<String, dynamic> session;
   bool cancelled = false;
+  bool resumed = false;
 
   @override
   Future<Map<String, dynamic>> shadowIterationSession(
@@ -25,32 +26,39 @@ class _FakeApi extends DashboardApi {
   }) async {
     cancelled = true;
   }
+
+  @override
+  Future<void> resumeIteration(String productSlug, String iterationId) async {
+    resumed = true;
+  }
 }
 
-Map<String, dynamic> _iterationData(String status) => <String, dynamic>{
-  'iteration': {
-    'id': 'iter-1',
-    'productSlug': 'demo',
-    'sequenceNumber': 1,
-    'focus': 'Onderzoek reizigersvoorkeuren',
-    'mode': 'shadow',
-    'status': status,
-    'currentRole': status == 'RUNNING' ? 'RESEARCHER' : null,
-    'criticVerdict': null,
-    'candidateCount': 0,
-    'workspaceRunId': null,
-    'workspacePullRequestUrl': null,
-    'workspaceCommitSha': null,
-    'errorMessage': null,
-    'summary': null,
-    'createdAt': DateTime(2026, 1, 1).toIso8601String(),
-    'startedAt': DateTime(2026, 1, 1).toIso8601String(),
-    'completedAt': null,
-  },
-  'steps': <dynamic>[],
-  'artifacts': <dynamic>[],
-  'dossier': null,
-};
+Map<String, dynamic> _iterationData(String status, {String? outcomeReason}) =>
+    <String, dynamic>{
+      'iteration': {
+        'id': 'iter-1',
+        'productSlug': 'demo',
+        'sequenceNumber': 1,
+        'focus': 'Onderzoek reizigersvoorkeuren',
+        'mode': 'shadow',
+        'status': status,
+        'currentRole': status == 'RUNNING' ? 'RESEARCHER' : null,
+        'criticVerdict': null,
+        'candidateCount': 0,
+        'workspaceRunId': null,
+        'workspacePullRequestUrl': null,
+        'workspaceCommitSha': null,
+        'errorMessage': null,
+        'summary': null,
+        'createdAt': DateTime(2026, 1, 1).toIso8601String(),
+        'startedAt': DateTime(2026, 1, 1).toIso8601String(),
+        'completedAt': null,
+        'outcomeReason': outcomeReason,
+      },
+      'steps': <dynamic>[],
+      'artifacts': <dynamic>[],
+      'dossier': null,
+    };
 
 Future<void> _openDialog(WidgetTester tester, _FakeApi api) async {
   await tester.pumpWidget(
@@ -111,6 +119,25 @@ void main() {
 
       await tester.tap(find.text('Sluiten'));
       await tester.pump(const Duration(milliseconds: 300));
+    },
+  );
+
+  testWidgets(
+    'herstelbare dependency-uitval toont Herstel levering en roept resume aan',
+    (tester) async {
+      final api = _FakeApi(
+        _iterationData(
+          'FAILED',
+          outcomeReason: 'DELIVERY_DEPENDENCY_UNRESOLVED',
+        ),
+      );
+      await _openDialog(tester, api);
+
+      expect(find.text('Herstel levering'), findsOneWidget);
+      await tester.tap(find.text('Herstel levering'));
+      await tester.pump();
+
+      expect(api.resumed, isTrue);
     },
   );
 }

@@ -27,6 +27,19 @@ const List<String> kBeslisbronnen = [
   kBeslisbronOnbekend,
 ];
 
+/// Alleen inhoudelijke revisies en technische uitval ná criticusacceptatie hebben voldoende
+/// herbruikbare artefacten om veilig bij de story-writer te worden hervat.
+bool canResumeIteration({
+  required String? status,
+  required String? outcomeReason,
+}) =>
+    status == 'NEEDS_REVISION' ||
+    (status == 'FAILED' &&
+        const {
+          'DELIVERY_DEPENDENCY_UNRESOLVED',
+          'NO_DELIVERABLE_CANDIDATE',
+        }.contains(outcomeReason));
+
 /// Leidt uitsluitend uit bewezen combinaties van de bestaande cyclusvelden af wie of wat de
 /// uitkomst bepaalde. Witruimte rondom waarden is niet betekenisvol; lege waarden gelden als
 /// afwezig. Iedere onbekende, ambigue of tegenstrijdige combinatie valt veilig terug op

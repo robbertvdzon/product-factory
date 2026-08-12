@@ -41,6 +41,7 @@ class ShadowIterationEngineTest(
         workspace.artifacts.clear()
         bridge.scenario = Scenario.ACCEPT
         bridge.themeIdToEmit = null
+        bridge.publishedDependencyId = null
     }
 
     @Test
@@ -253,8 +254,8 @@ class ShadowIterationEngineTest(
         // een candidateKey-lookup, niet via een op arrayvolgorde/positie gebaseerde koppeling.
         assertTrue(dossier.contains("Sleutel: `locatie-broncontrole`"))
         assertTrue(dossier.contains("Sleutel: `locatie-verhaal-basis`"))
-        assertTrue(dossier.contains("Afhankelijkheden (candidateKey): locatie-verhaal-basis (binnen deze batch herkend als: locatie-verhaal-basis)"))
-        assertTrue(dossier.contains("Afhankelijkheden (candidateKey): locatie-broncontrole (binnen deze batch herkend als: locatie-broncontrole)"))
+        assertTrue(dossier.contains("Afhankelijkheden: locatie-verhaal-basis (herkend als binnen deze batch: locatie-verhaal-basis)"))
+        assertTrue(dossier.contains("Afhankelijkheden: locatie-broncontrole (herkend als binnen deze batch: locatie-broncontrole)"))
     }
 
     @Test
@@ -353,15 +354,65 @@ class ShadowIterationEngineTest(
         assertTrue(mappingLog.contains("\"blocked\":false"))
     }
 
+    @Test
+    fun `a numeric dependency on an existing published story of the same product remains deliverable`() {
+        val previous = repository.create("hkh-autopilot", "Bestaande gepubliceerde afhankelijkheid")
+        val publishedId = repository.saveCandidate(
+            previous.id,
+            "hkh-autopilot",
+            "Bestaande bronbasis",
+            "Een eerder geleverde basis waarop een nieuwe story veilig mag voortbouwen.",
+            "- De bronbasis is beschikbaar",
+            "published-dependency-${previous.id}",
+            "ACCEPT",
+            "Eerder geaccepteerd",
+            null,
+        )
+        jdbc.update("update story_candidate set status = 'PUBLISHED' where id = ?", publishedId)
+        bridge.scenario = Scenario.EXISTING_PUBLISHED_DEPENDENCY
+        bridge.publishedDependencyId = publishedId
+
+        val iteration = repository.create("hkh-autopilot", "Bouw voort op een gepubliceerde story")
+        engine.run(iteration.id)
+
+        val stored = repository.require("hkh-autopilot", iteration.id)
+        assertEquals("ACCEPTED", stored.status)
+        assertEquals(1, stored.candidateCount)
+        assertEquals(1, stored.acceptedCandidateCount)
+        val mappingLog = repository.artifact(iteration.id, "dependson_resolution")!!
+        assertTrue(mappingLog.contains("\"rawValue\":\"$publishedId\""))
+        assertTrue(mappingLog.contains("\"resolvedBacklogId\":$publishedId"))
+        assertTrue(mappingLog.contains("\"blocked\":false"))
+    }
+
+    @Test
+    fun `an accepted candidate with an unknown dependency is a resumable technical failure`() {
+        bridge.scenario = Scenario.UNKNOWN_ONLY_DEPENDENCY
+        val iteration = repository.create("hkh-autopilot", "Classificeer een onvertaalbare levering technisch")
+
+        engine.run(iteration.id)
+
+        val stored = repository.require("hkh-autopilot", iteration.id)
+        assertEquals("FAILED", stored.status)
+        assertEquals("ACCEPT", stored.criticVerdict)
+        assertEquals("DELIVERY_DEPENDENCY_UNRESOLVED", stored.outcomeReason)
+        assertEquals(1, stored.candidateCount)
+        assertEquals(0, stored.acceptedCandidateCount)
+        assertTrue(isResumableIteration(stored.status, stored.outcomeReason))
+        assertTrue(workspace.artifacts.isEmpty())
+    }
+
     enum class Scenario {
         ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE,
         RESEARCH_RETRY_THEN_ACCEPT, CROSS_KEY_DEPENDENCY, LEGACY_POSITIONAL_DEPENDSON, UNKNOWN_DEPENDSON_KEY,
         THEME_LINKED, STORY_OUTPUT_REPAIR_THEN_ACCEPT, PARTIAL_ACCEPT, RESUME_THEN_ACCEPT,
+        EXISTING_PUBLISHED_DEPENDENCY, UNKNOWN_ONLY_DEPENDENCY,
     }
 
     class FakeShadowAgentBridge : AgentDispatchPort {
         var scenario = Scenario.ACCEPT
         var themeIdToEmit: String? = null
+        var publishedDependencyId: Long? = null
         override fun execute(task: AgentTask): AgentResult {
             val today = LocalDate.now(ZoneId.of("Europe/Amsterdam"))
             val firstAttempt = task.runId.endsWith("-1")
@@ -403,7 +454,27 @@ class ShadowIterationEngineTest(
                     "accessibility":["Alle onderdelen zijn met toetsenbord bereikbaar."],
                     "privacyConsiderations":["De flow vereist geen locatiehistorie of gebruikersprofiel."]
                 }"""
-                "story_writer" -> if (scenario == Scenario.PARTIAL_ACCEPT) """{
+                "story_writer" -> if (scenario == Scenario.EXISTING_PUBLISHED_DEPENDENCY) """{
+                    "candidates":[{
+                      "candidateKey":"bouw-voort-op-gepubliceerde-story",
+                      "title":"Bouw voort op een bestaande gepubliceerde bronbasis",
+                      "description":"Voeg een kleine bronweergave toe die aantoonbaar voortbouwt op de eerder gepubliceerde basisstory.",
+                      "acceptanceCriteria":["De bronweergave gebruikt de bestaande gepubliceerde basis"],
+                      "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                      "dependsOn":["${publishedDependencyId ?: error("publishedDependencyId ontbreekt")}"],
+                      "risks":[]
+                    }]
+                }""" else if (scenario == Scenario.UNKNOWN_ONLY_DEPENDENCY) """{
+                    "candidates":[{
+                      "candidateKey":"onbekende-externe-afhankelijkheid",
+                      "title":"Story met onbekende externe afhankelijkheid",
+                      "description":"Een inhoudelijk geldige story waarvan de leveringslaag de externe afhankelijkheid niet kent.",
+                      "acceptanceCriteria":["De story blijft technisch herstelbaar"],
+                      "sourceUrls":["https://noord-hollandsarchief.nl/"],
+                      "dependsOn":["story:999999"],
+                      "risks":[]
+                    }]
+                }""" else if (scenario == Scenario.PARTIAL_ACCEPT) """{
                     "candidates":[
                       {"candidateKey":"direct-leverbare-bronnenkaart","title":"Direct leverbare bronnenkaart","description":"Toon één bron met rechtenmetadata zonder gegevens te kopiëren.","acceptanceCriteria":["De gebruiker ziet de bron-URL"],"sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":[]},
                       {"candidateKey":"nog-te-brede-import","title":"Nog te brede import","description":"Importeer ineens alle persoonsgegevens uit iedere externe collectie.","acceptanceCriteria":["Alle externe persoonsgegevens worden opgeslagen"],"sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Privacygrondslag ontbreekt"]}

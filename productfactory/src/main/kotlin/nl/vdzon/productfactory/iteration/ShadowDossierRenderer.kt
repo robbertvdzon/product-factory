@@ -27,28 +27,31 @@ internal data class ReviewedCandidate(
     val themeId: String? = null,
     /** Sleutels uit [dependsOn] die binnen dezelfde batch daadwerkelijk naar een candidateKey verwijzen. */
     val resolvedDependsOn: List<String> = emptyList(),
-    /** Resolutiedetail per dependsOn-waarde, inclusief legacy-fallback- en blokkade-informatie voor de mapping-log. */
+    /** Resolutiedetail per dependsOn-waarde, inclusief cross-batch-, legacy- en blokkade-informatie. */
     val dependencyResolutions: List<DependencyResolution> = emptyList(),
-    /** True zodra minstens één dependsOn-waarde niet naar een kandidaat binnen deze batch kon worden vertaald. */
+    /** True zodra minstens één dependsOn-waarde niet naar een batchkandidaat of bestaande story kon worden vertaald. */
     val blocked: Boolean = false,
 )
 
-/** Resultaat van het vertalen van één dependsOn-waarde naar een kandidaat binnen dezelfde batch. */
+/** Resultaat van het vertalen van één dependsOn-waarde naar een batchkandidaat of bestaande story. */
 internal data class DependencyResolution(
     val rawValue: String,
     val resolvedCandidateKey: String?,
     val viaLegacyFallback: Boolean,
+    val resolvedBacklogId: Long? = null,
 ) {
-    val resolved: Boolean get() = resolvedCandidateKey != null
+    val resolved: Boolean get() = resolvedCandidateKey != null || resolvedBacklogId != null
 }
 
 /** Herkent het oude batch-relatieve volgnummerformaat "Kandidaat <n>" (case-insensitive). */
 internal val LEGACY_POSITIONAL_DEPENDSON_PATTERN = Regex("""(?i)\bkandidaat\s*(\d+)\b""")
+internal val EXISTING_STORY_DEPENDSON_PATTERN = Regex("""(?i)^(?:(?:story|backlog)[- #:]*)?(\d+)$""")
 
 /**
- * Vertaalt elke dependsOn-waarde naar de kandidaat binnen dezelfde batch waar hij naar verwijst.
- * Probeert eerst een candidateKey-lookup (kaart, geen arrayindex, dus stabiel ongeacht batch-/
- * reviewvolgorde). Faalt die, dan wordt de waarde herkend als legacy batch-relatief volgnummer
+ * Vertaalt elke dependsOn-waarde naar een kandidaat binnen dezelfde batch of een reeds gepubliceerde
+ * story van hetzelfde product. Probeert eerst een candidateKey-lookup (kaart, geen arrayindex, dus
+ * stabiel ongeacht batch-/reviewvolgorde), daarna een expliciete/bestaande story-ID. Faalt dat, dan
+ * wordt de waarde herkend als legacy batch-relatief volgnummer
  * ("Kandidaat <n>") en automatisch vertaald naar het batch-item op die nulgebaseerde positie
  * ([candidatesByPosition], dezelfde volgorde als candidates[]/candidateIndex). Lukt geen van beide,
  * dan blijft de resolutie onopgelost (resolvedCandidateKey == null) zodat de aanroeper alleen die
@@ -58,14 +61,21 @@ internal fun resolveDependencyReferences(
     candidatesByKey: Map<String, ReviewedCandidate>,
     candidatesByPosition: List<ReviewedCandidate>,
     dependsOn: List<String>,
+    publishedBacklogIds: Set<Long> = emptySet(),
 ): List<DependencyResolution> = dependsOn.map { raw ->
     val direct = candidatesByKey[raw]
     if (direct != null) {
         DependencyResolution(raw, direct.candidateKey, viaLegacyFallback = false)
     } else {
-        val legacyPosition = LEGACY_POSITIONAL_DEPENDSON_PATTERN.find(raw)?.groupValues?.get(1)?.toIntOrNull()
-        val legacyCandidate = legacyPosition?.let(candidatesByPosition::getOrNull)
-        DependencyResolution(raw, legacyCandidate?.candidateKey, viaLegacyFallback = legacyCandidate != null)
+        val existingId = EXISTING_STORY_DEPENDSON_PATTERN.matchEntire(raw.trim())
+            ?.groupValues?.get(1)?.toLongOrNull()?.takeIf(publishedBacklogIds::contains)
+        if (existingId != null) {
+            DependencyResolution(raw, null, viaLegacyFallback = false, resolvedBacklogId = existingId)
+        } else {
+            val legacyPosition = LEGACY_POSITIONAL_DEPENDSON_PATTERN.find(raw)?.groupValues?.get(1)?.toIntOrNull()
+            val legacyCandidate = legacyPosition?.let(candidatesByPosition::getOrNull)
+            DependencyResolution(raw, legacyCandidate?.candidateKey, viaLegacyFallback = legacyCandidate != null)
+        }
     }
 }
 
@@ -196,8 +206,13 @@ internal object ShadowDossierRenderer {
             appendLine("Bronnen: ${candidate.sourceUrls.joinToString(", ") { "[$it]($it)" }}")
             if (candidate.dependsOn.isNotEmpty()) {
                 val resolvedTitles = candidate.resolvedDependsOn.joinToString()
-                val suffix = if (resolvedTitles.isNotBlank()) " (binnen deze batch herkend als: $resolvedTitles)" else ""
-                appendLine("\nAfhankelijkheden (candidateKey): ${candidate.dependsOn.joinToString()}$suffix")
+                val resolvedBacklogIds = candidate.dependencyResolutions.mapNotNull(DependencyResolution::resolvedBacklogId).joinToString()
+                val resolutionDetails = listOfNotNull(
+                    resolvedTitles.takeIf(String::isNotBlank)?.let { "binnen deze batch: $it" },
+                    resolvedBacklogIds.takeIf(String::isNotBlank)?.let { "bestaande stories: $it" },
+                ).joinToString("; ")
+                val suffix = if (resolutionDetails.isNotBlank()) " (herkend als $resolutionDetails)" else ""
+                appendLine("\nAfhankelijkheden: ${candidate.dependsOn.joinToString()}$suffix")
             }
             if (candidate.risks.isNotEmpty()) appendLine("\nRisico's: ${candidate.risks.joinToString()}")
         }
