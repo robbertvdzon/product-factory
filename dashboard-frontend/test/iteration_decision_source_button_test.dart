@@ -132,6 +132,13 @@ void main() {
           expect(listTileFinder, findsOneWidget);
           expect(tester.widget<ListTile>(listTileFinder).onTap, isNull);
           expect(
+            find.descendant(
+              of: listTileFinder,
+              matching: find.byIcon(Icons.chevron_right),
+            ),
+            findsNothing,
+          );
+          expect(
             find.ancestor(of: button, matching: find.byType(ButtonStyleButton)),
             findsNothing,
           );

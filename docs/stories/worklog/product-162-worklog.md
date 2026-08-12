@@ -8,7 +8,8 @@ Stappenplan:
 - [x] Bestaande cycluslijst, detaildialoog en tests analyseren.
 - [x] Pure beslisbronclassificatie en native detailbutton implementeren.
 - [x] Unit- en widgettests toevoegen en gericht groen draaien.
-- [x] Self-review uitvoeren en het volledige factory-vangnet groen draaien.
+- [x] Reviewerfeedback verwerken en de actuele diff opnieuw self-reviewen.
+- [x] Het volledige factory-vangnet voor de actuele worktree groen draaien.
 
 Gedaan / rationale:
 - Worklog aan het begin van de developer-run aangemaakt, zodat aanpak en machinebewijs in de PR blijven staan.
@@ -21,3 +22,8 @@ Gedaan / rationale:
 - Self-review: wijziging blijft frontend-only/read-only; lijstcontainer heeft geen `onTap`, de native button heeft geen interactieve ancestor, overzicht toont geen ruwe fout/prompt/log/artefactinhoud, en badges, voortgang, detailinhoud en annuleren zijn behouden.
 - Volledig vangnet na de boyscout-fix: `mvn -B --no-transfer-progress clean verify` BUILD SUCCESS (0 failures, 0 errors), `flutter analyze` zonder issues en `flutter test` 217/217 groen.
 - `.factory/verification.yaml` gecontroleerd: stabiele id's, argv-lijsten zonder shell, bestaande relatieve working directories en begrensde timeouts zijn al actueel; geen wijziging nodig.
+- Nieuwe developer-run na reviewerfeedback gestart: het verplichte revisiongebonden bewijs wordt na deze run door de factory-harness geleverd; lokaal worden de actuele worktree en alle vangnetcommando's opnieuw gecontroleerd.
+- Reviewer-suggestie verwerkt: de navigatie-chevron is verwijderd van de niet-klikbare cyclusrij; een widgetassertie voorkomt regressie. Het merge-icoon blijft uitsluitend als bestaande PR-statusindicatie staan.
+- Gerichte hercontrole groen: 45/45 beslisbron- en detailbuttontests; `flutter analyze` zonder issues.
+- Actueel volledig vangnet groen: `mvn -B --no-transfer-progress clean verify` BUILD SUCCESS (0 failures, 0 errors), `flutter analyze` zonder issues en `flutter test` 217/217 groen.
+- Afsluitende self-review: geen conflictmarkers of whitespacefouten, geen lockfile-/contract-/backendwijziging en de verificatieconfig blijft geldig en ongewijzigd.

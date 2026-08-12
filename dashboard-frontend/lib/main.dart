@@ -751,7 +751,7 @@ class _OverviewPageState extends State<OverviewPage> {
                     ].join(' · '),
                   ),
                   trailing: pr == null
-                      ? const Icon(Icons.chevron_right)
+                      ? null
                       : const Icon(Icons.call_merge_outlined),
                 ),
               );
