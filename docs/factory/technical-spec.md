@@ -14,8 +14,9 @@
 ## Module-indeling
 
 - `productfactory-contracts` — gedeelde datacontracten (`Contracts.kt`) tussen runtime, agentworker en
-  dashboard. De view-types die het dashboard toont (`ShadowIterationView`, `StoryCandidateView`,
-  `WorkspacePublicationView`) staan hier; `StoryDeliveryView`/`HumanActionView` staan in
+  dashboard. De view-types die het dashboard toont (`ShadowIterationView`, de daarin optionele
+  `ShadowIterationDecisionView`, `StoryCandidateView`, `WorkspacePublicationView`) staan hier;
+  `StoryDeliveryView`/`HumanActionView` staan in
   `productfactory/.../autonomy/AutonomousDelivery.kt`.
 - `productfactory-common` — gedeelde infrastructuurcode.
 - `productfactory` — de runtime: productcycli (shadow iterations), storykandidaten, autonome levering.
@@ -23,14 +24,38 @@
 - `dashboard-backend` — Spring Boot API + Google-authenticatie; ontsluit de runtime voor het dashboard.
 - `dashboard-frontend` — de Flutter-webapp met het productoverzicht.
 
+## Beslisprovenance, opslag en API-contract
+
+- Flyway-migratie `V20__shadow_iteration_decision.sql` voegt de tabel
+  `shadow_iteration_decision` toe. `iteration_id` is zowel primary key als foreign key naar
+  `shadow_iteration(id)`, waardoor per cyclus maximaal één record bestaat. De overige verplichte
+  kolommen zijn `actor_type`, `mechanism`, `reason_code` en `decided_at`; er zijn bewust geen
+  actoridentiteit, aangeleverde reden of andere vrije-tekstkolommen.
+- `ShadowIterationView.decision` is nullable en bevat, wanneer aanwezig, exact
+  `iterationId`, `actorType`, `mechanism`, `reasonCode` en `decidedAt`. De bestaande lijst- en
+  detailroutes (`GET /api/shadow-iterations?productSlug=...` en
+  `GET /api/shadow-iterations/{id}?productSlug=...`) bouwen hun view via dezelfde left join en
+  leveren dus hetzelfde optionele record. De dashboard-backend geeft dit contract via zijn
+  bestaande proxy-routes ongewijzigd door. Cycli zonder record blijven geldig; de migratie voert
+  geen backfill uit.
+- `POST /api/shadow-iterations/{id}/cancel?productSlug=...` kan alleen QUEUED of RUNNING
+  beëindigen. `ShadowIterationService.cancel` is transactioneel: `markManuallyCancelled` zet de
+  status op FAILED en schrijft daarna het record met `HUMAN`, `MANUAL_CANCELLATION` en
+  `MANUALLY_CANCELLED`. Eén `Instant` wordt voor zowel `completed_at` als `decided_at` gebruikt.
+  Raakt de conditionele statusupdate geen rij of faalt de insert, dan resulteert dit in een conflict
+  respectievelijk rollback en blijft geen halve overgang achter. De optionele request-`reason`
+  blijft uitsluitend in het bestaande `error_message` en wordt niet naar provenance gekopieerd.
+
 ## Frontend-conventies (`dashboard-frontend/lib`)
 
 - `main.dart` — widgets en pagina's; `api.dart` — HTTP-client; `config.dart` — build-time config;
   `session.dart` — Google-login; `formatting.dart` — datum/tijd- en duurformattering;
-  `limited_list.dart` — de 5/+10-lijstbeperking; `classification.dart` — twee pure, gesloten
-  mappings op de bestaande velden `status`/`criticVerdict`/`errorMessage`: de vaste
+  `limited_list.dart` — de 5/+10-lijstbeperking; `classification.dart` — de bestaande pure
+  mappings op `status`/`criticVerdict`/`errorMessage` plus
+  `iterationDecisionPresentation`, dat eerst een aan het iteratie-id gekoppeld `decision`-record
+  selecteert en alleen bij ontbreken daarvan terugvalt op de afleiding. De vaste
   iteratie-uitkomstclassificatie naar één van vijf badge-waarden (inclusief de fallbackwaarde
-  `niet-classificeerbaar` voor onbekende statuswaarden) en `classifyDecisionSource` naar uitsluitend
+  `niet-classificeerbaar` voor onbekende statuswaarden) en `classifyDecisionSource` naar
   `Evaluatie-agent`, `Technische fout` of `Onbekend`. De beslisbronmapping trimt invoer, vergelijkt
   bekende waarden hoofdlettergevoelig, accepteert alleen de bewezen paren `ACCEPT`/`ACCEPTED`,
   `REVISE`/`NEEDS_REVISION` en `REJECT`/`REJECTED` als `Evaluatie-agent`, en alleen `FAILED` zonder
@@ -38,17 +63,19 @@
   Het bestand bevat daarnaast de AA-contrastkleuren en de `ClassificationBadge`-widget. Voor een
   iteratie met `status` QUEUED of RUNNING toont de iteratierij in plaats van de badge de
   `IterationProgressIndicator`-widget (`main.dart`), met `Semantics(liveRegion: true)` als
-  Flutter-web-equivalent van `aria-live="polite"`; elke andere status toont ongewijzigd exact één
-  `ClassificationBadge`. Dezelfde `ClassificationBadge` (met dezelfde `classifyIterationOutcome`-
-  uitkomst) staat ook in `IterationSessionDialog` — de detaildialoog toont er geen losse `Chip` met
-  de ruwe statuswaarde meer naast. Elke iteratierij bevat ook één
+  Flutter-web-equivalent van `aria-live="polite"`; elke andere status toont een
+  `ClassificationBadge`, behalve wanneer expliciete provenance aanwezig is. Dan krijgen bron en
+  reden voorrang en worden de afgeleide badge en `outcomeReason` zowel in lijst als detail
+  onderdrukt. `IterationSessionDialog` toont bij expliciete handmatige annulering daarnaast het
+  mechanisme en `decidedAt` via de bestaande lokale datum-/tijdformatter. Zonder expliciet record
+  toont lijst en detail de conservatief afgeleide bron zichtbaar en toegankelijk met `(Afgeleid)`.
+  Elke iteratierij bevat ook één
   `IterationDecisionSourceButton` (`main.dart`): een native `OutlinedButton` die de bestaande
   detaildialoog voor het gekoppelde iteratie-id opent. De `ListTile` zelf heeft geen `onTap` of
   navigatie-chevron, zodat er geen geneste of dubbele detailbediening is. De button bewaart een
   eigen `FocusNode`; na sluiten via de sluitactie of Escape keert de focus terug naar de opener.
   De dialoogtitel gebruikt het user-facing `sequenceNumber`, met het iteratie-id als fallback als
-  dat nummer ontbreekt. Deze interactie gebruikt uitsluitend de bestaande GET-calls en wijzigt
-  geen API of contract.
+  dat nummer ontbreekt. Openen en sluiten gebruikt uitsluitend de bestaande GET-calls.
 - Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
   `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
   `4m 12s`, `35s`). Backendtijdstempels zijn ISO-8601 in UTC; `parseInstant` is defensief en levert
@@ -69,6 +96,10 @@
   in hun `WHERE`-clausule, zodat een tweede schrijfpoging 0 rijen raakt in plaats van de bestaande
   conclusie stilzwijgend te overschrijven; zo'n genegeerde poging wordt gelogd (`log.warn`, met
   iteratie-id).
+- Handmatige annulering gebruikt een andere conditionele guard: alleen
+  `status in ('QUEUED', 'RUNNING')` mag naar FAILED overgaan. Houd de statusupdate en insert in
+  `shadow_iteration_decision` binnen dezelfde `@Transactional`-servicecall; anders kan de
+  write-once-garantie losraken van de provenance.
 - `WorkspacePublicationView` heeft geen tijdstempel; die lijst kan dus niet op 'nieuwste eerst'
   gesorteerd worden en houdt de volgorde van de backend.
 - Widgettests met lange lijsten hebben een hoog testvenster nodig (`tester.view.physicalSize`), anders

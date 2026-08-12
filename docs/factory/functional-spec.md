@@ -27,11 +27,10 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    met Escape waarbij de focus terugkeert naar de Instellingen-knop. Volgorde van de productenlijst:
    zoals de backend hem levert (op slug).
 3. **Productcycli en onderzoekssessies** — per cyclus status, huidige rol, **starttijd** en
-   **doorlooptijd**, aantal kandidaten en of de cyclus doorgezet mag worden. Elke iteratierij toont
-   daarnaast exact één van twee dingen, afgeleid uit het bestaande `status`-veld (geen nieuwe
-   databron): een iteratie met `status` QUEUED of RUNNING (nog lopend) toont een neutrale
-   voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge; elke andere status
-   toont een vaste classificatiebadge — `onderzoek-onvoldoende`, `technische fout`,
+   **doorlooptijd**, aantal kandidaten en of de cyclus doorgezet mag worden. Een iteratie met
+   `status` QUEUED of RUNNING (nog lopend) toont een neutrale voortgangsindicator
+   (`IterationProgressIndicator`) in plaats van een badge; elke andere status zonder expliciet
+   beslisrecord toont een vaste, afgeleide classificatiebadge — `onderzoek-onvoldoende`, `technische fout`,
    `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` — afgeleid uit de bestaande
    velden `status`, `criticVerdict` en `errorMessage`. `niet-classificeerbaar` verschijnt voor elke
    ruwe statuswaarde die het systeem niet als een van de vier bekende categorieën herkent
@@ -46,26 +45,39 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen pop-upvenster of dialoog,
    `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of Escape klapt het
    paneel weer in en herstelt de focus op de badge. Iedere cyclusregel toont daarnaast één native
-   button met exact `Beslisbron: Evaluatie-agent`, `Beslisbron: Technische fout` of
-   `Beslisbron: Onbekend`. De waarde wordt read-only afgeleid uit
-   `criticVerdict`, `status` en `errorMessage`: `ACCEPT`/`ACCEPTED`,
+   button met de beslisbron. Bij een expliciet handmatig-annuleringsrecord bevat de button de
+   zichtbare en toegankelijke teksten `Beslisbron: Mens` en `Reden: Handmatig geannuleerd`.
+   Dit record is gekoppeld via hetzelfde `iterationId` en heeft voorrang op de afleiding uit
+   status, criticusoordeel en foutmelding. Daarom worden voor deze cyclus de afgeleide
+   classificatiebadge en `outcomeReason`-verklaring niet getoond; een bestaande `errorMessage`
+   blijft wel als foutreden in het detail beschikbaar, maar geldt niet als provenance.
+   Voor cycli zonder gekoppeld record toont de button `Beslisbron: Evaluatie-agent (Afgeleid)`,
+   `Beslisbron: Technische fout (Afgeleid)` of `Beslisbron: Onbekend (Afgeleid)`. De fallbackwaarde
+   wordt read-only afgeleid uit `criticVerdict`, `status` en `errorMessage`: `ACCEPT`/`ACCEPTED`,
    `REVISE`/`NEEDS_REVISION` en `REJECT`/`REJECTED` leveren `Evaluatie-agent`; uitsluitend
    `FAILED` met een ontbrekend verdict en een niet-lege foutmelding levert `Technische fout`;
    iedere andere, ontbrekende, onbekende of tegenstrijdige combinatie levert `Onbekend`. Voor de
    vergelijking wordt omringende witruimte verwijderd, maar de bekende waarden blijven
    hoofdlettergevoelig. De button opent met klik, Enter of Spatie de bestaande detaildialoog van
-   precies die cyclus. De rijcontainer zelf is geen tweede detailbediening en toont daarom ook geen
-   navigatie-chevron; de afzonderlijke annuleeractie bij een lopende cyclus blijft ongewijzigd.
+   precies die cyclus. `Afgeleid` staat zowel in de zichtbare tekst als in de toegankelijke naam;
+   een gekoppeld expliciet record is eveneens met bron en reden toegankelijk en de betekenis wordt
+   niet uitsluitend via kleur gecommuniceerd. De rijcontainer zelf is geen tweede detailbediening
+   en toont daarom ook geen navigatie-chevron; de afzonderlijke annuleeractie bij een lopende
+   cyclus blijft ongewijzigd.
    Sluiten met de zichtbare sluitactie of Escape herstelt de focus naar de beslisbronbutton die het
    dialoog opende. Het cyclusoverzicht toont bij deze beslisbron geen ruwe foutmelding, prompt, log
    of artefactinhoud en openen/sluiten veroorzaakt alleen de bestaande leesverzoeken. Deze
-   detaildialoog
-   (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) toont dezelfde `ClassificationBadge`
-   met dezelfde `classifyIterationOutcome`-uitkomst als de lijstkaart-rij (identieke badge-tekst en
-   `kClassificationColors`-kleurenpaar) — geen losse `Chip` met de ruwe backend-statuswaarde (bv.
-   'NEEDS_REVISION') meer. De badge is het eerste focusbare element in het dialoog, vóór de secties
-   Voortgang, agentresultaten en workspace-publicaties, en is er via toetsenbord (Tab, Enter/Spatie)
-   op dezelfde manier te bedienen als op de lijstkaart. In de sectie agentresultaten toont elke
+   detaildialoog (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) toont voor een
+   expliciet handmatig-annuleringsrecord dezelfde bron en reden, plus
+   `Mechanisme: Handmatige annulering` en `Beslist op: <lokale datum en tijd>` uit `decidedAt`.
+   De afgeleide badge en uitkomstreden blijven daar eveneens verborgen. Voor een historische cyclus
+   zonder record toont het detail de beslisbron met `(Afgeleid)` en dezelfde
+   `ClassificationBadge` met dezelfde `classifyIterationOutcome`-uitkomst als de lijstkaart-rij
+   (identieke badge-tekst en `kClassificationColors`-kleurenpaar) — geen losse `Chip` met de ruwe
+   backend-statuswaarde (bv. 'NEEDS_REVISION') meer. Waar de badge aanwezig is, is deze het eerste
+   focusbare element in het dialoog, vóór de secties Voortgang, agentresultaten en
+   workspace-publicaties, en is er via toetsenbord (Tab, Enter/Spatie) op dezelfde manier te
+   bedienen als op de lijstkaart. In de sectie agentresultaten toont elke
    uitgeklapte roltegel (Onderzoeker, Product owner, UX-ontwerp, Story writer, Criticus) een
    leesbare samenvatting van de bekende tekstvelden van die rol (bv. `summary`, `findings`,
    `decisions`/`rationale`, `steps`, `candidates`, `issues`), direct zichtbaar zonder extra klik en
@@ -194,23 +206,35 @@ en hoe ze zich tot elkaar verhouden, als zelfstandige uitleg naast de badge-besc
   gesuggereerd: dat veld bestaat niet en is ook niet nodig, omdat `status`/`criticVerdict`/
   `errorMessage` de conclusion samen al volledig bepalen.
 - **Een tijdens uitvoering onderbroken iteratie wordt automatisch geclassificeerd, zonder apart
-  menselijk besluitmoment.** Er bestaat geen apart CANCELLED-statusveld voor dit geval. Zodra de
-  ruwe `status`-waarde niet QUEUED/RUNNING is en niet voorkomt in de bekende categorieën
-  (`kBekendeStatuswaardenPerCategorie` in `classification.dart`), valt `classifyIterationOutcome`
-  vanzelf terug op de badge `niet-classificeerbaar` — zonder dat iemand daar apart over hoeft te
-  beslissen.
-- **De beslisbron is iets anders dan de conclusion-badge.** `classifyDecisionSource` gebruikt
-  dezelfde bestaande invoervelden, maar kent bewust slechts drie uitkomsten: `Evaluatie-agent`,
-  `Technische fout` en `Onbekend`. Alleen exact bewezen verdict-/eindstatusparen wijzen naar de
-  evaluatie-agent; het guardrailpad `ACCEPT` met `REJECTED`, lopende statussen en alle ambigue
-  combinaties blijven `Onbekend`. De beslisbron voegt geen status, actor of conclusion toe aan het
-  datamodel.
+  menselijk besluitmoment.** Deze historische regel geldt voor onbekende onderbrekingen zonder
+  expliciet beslisrecord; er bestaat nog steeds geen apart CANCELLED-statusveld. Een geslaagde
+  handmatige annulering is de expliciete uitzondering: die zet een QUEUED- of RUNNING-cyclus naar
+  FAILED en legt daarnaast menselijke provenance vast. Andere onbekende of historische
+  onderbrekingen blijven via `classifyIterationOutcome` op `niet-classificeerbaar` of een andere
+  conservatieve fallback uitkomen; deze afleiding maakt geen beslisrecord aan.
+- **De beslisbron is iets anders dan de conclusion-badge.** Een optioneel, expliciet
+  `decision`-record bevat uitsluitend `iterationId`, `actorType`, `mechanism`, `reasonCode` en
+  `decidedAt`. Voor handmatige annulering zijn de drie codewaarden respectievelijk `HUMAN`,
+  `MANUAL_CANCELLATION` en `MANUALLY_CANCELLED`; dit record levert `Mens`, `Handmatig geannuleerd`
+  en `Handmatige annulering` in de UI en onderdrukt de afgeleide conclusion-badge en uitkomstreden.
+  Zonder gekoppeld record gebruikt `classifyDecisionSource` de bestaande invoervelden en kent de
+  fallback bewust slechts drie uitkomsten: `Evaluatie-agent`, `Technische fout` en `Onbekend`.
+  Alleen exact bewezen verdict-/eindstatusparen wijzen naar de evaluatie-agent; het guardrailpad
+  `ACCEPT` met `REJECTED`, lopende statussen en alle ambigue combinaties blijven `Onbekend`. Deze
+  waarden worden zichtbaar en toegankelijk als `Afgeleid` gemarkeerd.
+- **Handmatige annulering is atomair en privacy-minimaal.** De terminale status, `completedAt` en
+  het beslisrecord worden in één transactie opgeslagen, waarbij `decidedAt` exact dezelfde
+  tijdswaarde krijgt als `completedAt`. Een conflict, afgewezen annulering of rollback laat geen
+  los record of halve statusovergang achter. De tabel staat door `iterationId` als primary key
+  maximaal één record per cyclus toe. Er is geen historische backfill en het record bevat geen
+  naam, e-mailadres, account-id, aangeleverde annuleerreden of vrije tekst.
 - **Het eindoordeel van een iteratie wijzigt, na vaststelling, niet meer.** Dit geldt
-  onvoorwaardelijk: `markAccepted`, `markReviewed` en `markFailed` in
-  `productfactory/.../ShadowIterationApi.kt` weigeren sindsdien een tweede schrijfpoging op
-  `status`/`critic_verdict` zodra een iteratie al in een terminale staat staat (voorwaarde
-  `... where id = ? and status not in (TERMINAL_STATUSES_SQL)`), en loggen een genegeerde poging
-  als `log.warn` met het betrokken iteratie-id.
+  onvoorwaardelijk: `markAccepted`, `markReviewed`, `markFailed` en `markManuallyCancelled` in
+  `productfactory/.../ShadowIterationApi.kt` weigeren een tweede schrijfpoging op
+  `status`/`critic_verdict` zodra een iteratie al in een terminale staat staat. De eerste drie
+  methoden gebruiken `... status not in (TERMINAL_STATUSES_SQL)` en loggen een genegeerde poging;
+  handmatige annulering schrijft uitsluitend bij `status in ('QUEUED', 'RUNNING')` en retourneert
+  bij een gelijktijdige afronding een conflict zonder beslisrecord.
 
 ## Testerafspraken
 

@@ -78,6 +78,36 @@ curl -X POST http://localhost:8080/api/products/hkh-autopilot/shadow-iterations 
 curl 'http://localhost:8080/api/shadow-iterations?productSlug=hkh-autopilot'
 ```
 
+Een lopende cyclus handmatig annuleren kan via de bestaande runtime-route:
+
+```bash
+curl -X POST \
+  'http://localhost:8080/api/shadow-iterations/<iteration-id>/cancel?productSlug=hkh-autopilot' \
+  -H 'Content-Type: application/json' \
+  -d '{"reason":"Lokale testannulering"}'
+```
+
+Bij succes bevat zowel deze response als de lijst- en detailresponse een optioneel
+`decision`-object. Het relevante deel van de response ziet er zo uit:
+
+```json
+{
+  "status": "FAILED",
+  "completedAt": "2026-08-12T12:34:56.789Z",
+  "decision": {
+    "iterationId": "<iteration-id>",
+    "actorType": "HUMAN",
+    "mechanism": "MANUAL_CANCELLATION",
+    "reasonCode": "MANUALLY_CANCELLED",
+    "decidedAt": "2026-08-12T12:34:56.789Z"
+  }
+}
+```
+
+`decidedAt` is exact gelijk aan `completedAt`. De vrije `reason` blijft backward compatible als
+`errorMessage`, maar wordt niet in het privacy-minimale beslisrecord opgenomen. Historische cycli
+zonder record houden `decision: null`; er is geen backfill.
+
 De runtime verstuurt iedere rol via de interne, met `PF_AGENT_WORKER_TOKEN` beveiligde bridge naar
 de dashboardbackend. Dezelfde token moet dus in runtime, dashboardbackend en lokale agentworker
 staan; hij wordt niet doorgegeven aan het Codex-subproces. Zie
