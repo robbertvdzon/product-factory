@@ -138,6 +138,10 @@ data class ShadowIterationView(
     val createdAt: Instant,
     val startedAt: Instant?,
     val completedAt: Instant?,
+    val acceptedCandidateCount: Int = 0,
+    val revisionRounds: Int = 0,
+    val outcomeReason: String? = null,
+    val resumedFromIterationId: String? = null,
 )
 
 data class ShadowIterationStepView(

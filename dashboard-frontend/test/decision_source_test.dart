@@ -3,6 +3,16 @@ import 'package:product_factory_dashboard/classification.dart';
 
 void main() {
   group('classifyDecisionSource', () {
+    test('exact reeds geleverd resultaat blijft een evaluatiebesluit', () {
+      expect(
+        classifyDecisionSource(
+          criticVerdict: 'ACCEPT',
+          status: 'NO_CHANGE',
+          errorMessage: null,
+        ),
+        kBeslisbronEvaluatieAgent,
+      );
+    });
     const verdicts = ['ACCEPT', 'REVISE', 'REJECT', 'WARNING_ONLY_REVISE'];
     const statuses = ['ACCEPTED', 'NEEDS_REVISION', 'REJECTED', 'FAILED'];
     const provenCombinations = {

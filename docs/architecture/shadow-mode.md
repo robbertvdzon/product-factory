@@ -18,10 +18,19 @@ Een iteratie doorloopt vijf afzonderlijke agenttaken:
 5. `CRITIC` beoordeelt bronnen, rechten, privacy, toegankelijkheid, scope, conflicten en iedere
    kandidaat afzonderlijk.
 
-De criticus eindigt met `ACCEPT`, `REVISE` of `REJECT`. Alleen bij `ACCEPT` en minimaal één
-niet-dubbele geaccepteerde kandidaat maakt de workspace-publisher één dossier in
+De criticus eindigt met `ACCEPT`, `REVISE` of `REJECT`, maar de runtime bewaart het oordeel ook per
+kandidaat. Daardoor kan een onafhankelijke geaccepteerde kandidaat worden gepubliceerd terwijl een
+batchgenoot nog revisie nodig heeft. Waarschuwingen blokkeren niet. Een exact reeds geleverd
+resultaat eindigt als `NO_CHANGE` in plaats van als mislukte cyclus. Bij minimaal één leverbare
+kandidaat maakt de workspace-publisher één dossier in
 `products/<slug>/research/shadow-iteration-NNNN.md`. Ruwe JSON, verworpen voorstellen en dubbele
 kandidaten blijven uitsluitend in PostgreSQL.
+
+Storywriter- en criticusoutput die technisch onvolledig is krijgt eerst een aparte `OUTPUT_REPAIR`;
+die telt niet als inhoudelijke revisieronde. Na maximaal drie inhoudelijke rondes is één extra,
+begrensde reparatie toegestaan wanneer hoogstens twee lokale, oplosbare blockers overblijven.
+`NEEDS_REVISION` kan vanuit het dashboard worden hervat: onderzoek, productbesluit en UX worden dan
+hergebruikt en alleen de story-/criticuslus loopt opnieuw.
 
 ## Vertrouwensgrenzen
 
@@ -57,7 +66,8 @@ curl 'http://localhost:8080/api/shadow-iterations/shadow-hkh-autopilot-0001/step
 ```
 
 Per product kan maximaal één iteratie `QUEUED` of `RUNNING` zijn. Het overzicht toont de huidige
-rol, eindstatus, criticusoordeel, aantal kandidaten en de workspace-PR. Een nieuwe iteratie krijgt
+rol, eindstatus, criticusoordeel, aantal kandidaten, aantal leverbare kandidaten, revisierondes,
+uitkomstreden en de workspace-PR. Een nieuwe iteratie krijgt
 eerdere geaccepteerde uitkomsten en bestaande kandidaten als context. Exact gelijke titel- en
 omschrijvingcombinaties worden bovendien via een stabiele fingerprint geblokkeerd.
 

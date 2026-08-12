@@ -32,6 +32,13 @@ data class ShadowIterationArtifactView(
     val contentJson: String,
     val createdAt: Instant,
 )
+data class ResumeIterationContext(
+    val research: String,
+    val productOwner: String,
+    val ux: String,
+    val stories: String,
+    val critic: String,
+)
 
 @RestController
 class ShadowIterationController(private val service: ShadowIterationService) {
@@ -68,6 +75,11 @@ class ShadowIterationController(private val service: ShadowIterationService) {
     @PostMapping("/api/shadow-iterations/{id}/cancel")
     fun cancel(@PathVariable id: String, @RequestParam productSlug: String, @RequestBody(required = false) request: CancelIterationRequest?): ShadowIterationView =
         service.cancel(productSlug, id, request?.reason)
+
+    @PostMapping("/api/shadow-iterations/{id}/resume")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun resume(@PathVariable id: String, @RequestParam productSlug: String): ShadowIterationView =
+        service.resume(productSlug, id)
 }
 
 @Service
@@ -123,6 +135,30 @@ class ShadowIterationService(
         }
         repository.markFailed(id, reason?.trim()?.ifBlank { null } ?: "Handmatig geannuleerd")
         return require(productSlug, id)
+    }
+
+    @Transactional
+    fun resume(productSlug: String, id: String): ShadowIterationView {
+        val source = require(productSlug, id)
+        if (source.status != "NEEDS_REVISION") {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Alleen een cyclus met NEEDS_REVISION kan worden hervat")
+        }
+        val product = products.requireActive(productSlug)
+        if (product.workspaceOwnership != "product-factory") {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Productcycli vereisen workspace-eigenaarschap product-factory")
+        }
+        if (repository.hasActive(product.slug)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Er loopt al een productcyclus voor dit product")
+        }
+        repository.resumeContext(id) // controleer vóór het aanmaken dat alle herbruikbare artefacten bestaan
+        val iteration = repository.create(
+            product.slug,
+            "Hervat iteratie ${source.sequenceNumber}: ${source.focus}",
+            source.mode,
+            resumeFromIterationId = source.id,
+        )
+        events.publishEvent(ShadowIterationStarted(iteration.id))
+        return iteration
     }
 }
 
@@ -185,7 +221,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         return orphaned
     }
 
-    fun create(productSlug: String, focus: String, mode: String = "shadow"): ShadowIterationView {
+    fun create(productSlug: String, focus: String, mode: String = "shadow", resumeFromIterationId: String? = null): ShadowIterationView {
         val sequence = (jdbc.queryForObject(
             "select coalesce(max(sequence_number), 0) + 1 from shadow_iteration where product_slug = ?",
             Int::class.java,
@@ -193,12 +229,13 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         ) ?: 1)
         val id = "shadow-$productSlug-${sequence.toString().padStart(4, '0')}"
         jdbc.update(
-            "insert into shadow_iteration(id, product_slug, sequence_number, focus, mode, status) values (?, ?, ?, ?, ?, 'QUEUED')",
+            "insert into shadow_iteration(id, product_slug, sequence_number, focus, mode, status, resume_from_iteration_id) values (?, ?, ?, ?, ?, 'QUEUED', ?)",
             id,
             productSlug,
             sequence,
             focus,
             mode,
+            resumeFromIterationId,
         )
         return require(productSlug, id)
     }
@@ -298,6 +335,21 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         type.lowercase(),
     )
 
+    fun resumeContext(iterationId: String): ResumeIterationContext {
+        fun latest(role: String): String {
+            val artifacts = jdbc.query(
+                "select artifact_type, content_json from shadow_iteration_artifact where iteration_id = ? and (artifact_type = ? or artifact_type like ?) order by created_at, artifact_type",
+                { row, _ -> row.getString("artifact_type") to row.getString("content_json") },
+                iterationId,
+                role,
+                "$role-%",
+            )
+            return artifacts.maxByOrNull { (type, _) -> type.substringAfterLast('-', "1").toIntOrNull() ?: 1 }?.second
+                ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Cyclus mist het herbruikbare artefact $role")
+        }
+        return ResumeIterationContext(latest("researcher"), latest("product_owner"), latest("ux_designer"), latest("story_writer"), latest("critic"))
+    }
+
     fun existingCandidateContext(productSlug: String): String = jdbc.query(
         "select id, title, description, status from story_candidate where product_slug = ? order by id desc limit 20",
         { row, _ -> "${row.getLong(1)} | ${row.getString(2)} | ${row.getString(3)} | ${row.getString(4)}" },
@@ -307,7 +359,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
     fun previousIterationContext(productSlug: String, currentIterationId: String): String = jdbc.query(
         """select i.sequence_number, a.artifact_type, a.content_json
             from shadow_iteration i join shadow_iteration_artifact a on a.iteration_id = i.id
-            where i.product_slug = ? and i.id <> ? and i.status in ('ACCEPTED', 'NEEDS_REVISION', 'REJECTED')
+            where i.product_slug = ? and i.id <> ? and i.status in ('ACCEPTED', 'NO_CHANGE', 'NEEDS_REVISION', 'REJECTED')
             order by i.sequence_number desc, a.artifact_type limit 8""".trimIndent(),
         { row, _ -> "Iteratie ${row.getInt(1)} / ${row.getString(2)}: ${row.getString(3).take(3000)}" },
         productSlug,
@@ -440,6 +492,16 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         }
     }
 
+    fun recordOutcome(iterationId: String, acceptedCount: Int, revisionRounds: Int, reason: String) {
+        jdbc.update(
+            "update shadow_iteration set accepted_candidate_count = ?, revision_rounds = ?, outcome_reason = ? where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
+            acceptedCount,
+            revisionRounds,
+            reason,
+            iterationId,
+        )
+    }
+
     fun markReviewed(iterationId: String, verdict: String, status: String) {
         require(status in setOf("NEEDS_REVISION", "REJECTED"))
         val updated = jdbc.update(
@@ -453,9 +515,21 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         }
     }
 
+    /** Een exact reeds geleverd resultaat is nuttige bevestiging, geen mislukte cyclus. */
+    fun markNoChange(iterationId: String, verdict: String) {
+        val updated = jdbc.update(
+            "update shadow_iteration set status = 'NO_CHANGE', current_agent_role = null, critic_verdict = ?, completed_at = current_timestamp where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
+            verdict,
+            iterationId,
+        )
+        if (updated == 0) {
+            log.warn("Genegeerde schrijfpoging: iteratie {} staat al in een terminale staat, NO_CHANGE-conclusie wordt niet overschreven", iterationId)
+        }
+    }
+
     fun markFailed(iterationId: String, error: String) {
         val updated = jdbc.update(
-            "update shadow_iteration set status = 'FAILED', current_agent_role = null, error_message = ?, completed_at = current_timestamp where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
+            "update shadow_iteration set status = 'FAILED', current_agent_role = null, error_message = ?, outcome_reason = 'TECHNICAL_FAILURE', completed_at = current_timestamp where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
             error.take(MAX_ERROR_CHARS),
             iterationId,
         )
@@ -476,6 +550,8 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
             row.getString("workspace_run_id"), row.getString("workspace_pull_request_url"), row.getString("workspace_commit_sha"),
             row.getString("error_message"), row.getString("summary"), row.getTimestamp("created_at").toInstant(), row.getTimestamp("started_at")?.toInstant(),
             row.getTimestamp("completed_at")?.toInstant(),
+            row.getInt("accepted_candidate_count"), row.getInt("revision_rounds"), row.getString("outcome_reason"),
+            row.getString("resume_from_iteration_id"),
         )
     }
 
@@ -491,6 +567,6 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
             from shadow_iteration i"""
 
         /** Terminale statussen: de conclusie (status/critic_verdict) van een iteratie mag hierna niet meer overschreven worden. */
-        private const val TERMINAL_STATUSES_SQL = "'ACCEPTED', 'NEEDS_REVISION', 'REJECTED', 'FAILED'"
+        private const val TERMINAL_STATUSES_SQL = "'ACCEPTED', 'NO_CHANGE', 'NEEDS_REVISION', 'REJECTED', 'FAILED'"
     }
 }

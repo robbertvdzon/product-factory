@@ -490,11 +490,15 @@ class _OverviewPageState extends State<OverviewPage> {
             .cast<Map<String, dynamic>>();
         final openThemes =
             sortedByNewestFirst(
-              roadmapThemes.where((theme) => theme['status'] != 'DONE').toList(),
+              roadmapThemes
+                  .where((theme) => theme['status'] != 'DONE')
+                  .toList(),
               ['updatedAt'],
             ) +
             sortedByNewestFirst(
-              roadmapThemes.where((theme) => theme['status'] == 'DONE').toList(),
+              roadmapThemes
+                  .where((theme) => theme['status'] == 'DONE')
+                  .toList(),
               ['closedAt', 'updatedAt'],
             );
         final settledQuestions = sortedByNewestFirst(
@@ -745,6 +749,11 @@ class _OverviewPageState extends State<OverviewPage> {
                       'gestart ${timing.startLabel}',
                       if (timing.durationLabel != null) timing.durationLabel!,
                       '${iteration['candidateCount']} kandidaten',
+                      '${iteration['acceptedCandidateCount'] ?? 0} leverbaar',
+                      if ((iteration['revisionRounds'] ?? 0) != 0)
+                        '${iteration['revisionRounds']} revisierondes',
+                      if (iteration['outcomeReason'] != null)
+                        _outcomeReasonLabel('${iteration['outcomeReason']}'),
                       if (iteration['criticVerdict'] != null)
                         'criticus: ${iteration['criticVerdict']}',
                       _deliveryLabel('${iteration['mode']}'),
@@ -791,8 +800,13 @@ class _OverviewPageState extends State<OverviewPage> {
               final status = '${theme['status']}';
               return Card(
                 child: InkWell(
-                  onTap: () =>
-                      _showThemeDetail(context, api, theme, stories, deliveries),
+                  onTap: () => _showThemeDetail(
+                    context,
+                    api,
+                    theme,
+                    stories,
+                    deliveries,
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -1028,6 +1042,7 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
   late Future<Map<String, dynamic>> session;
   Timer? refreshTimer;
   bool _cancelling = false;
+  bool _resuming = false;
 
   @override
   void initState() {
@@ -1093,6 +1108,21 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
     }
   }
 
+  Future<void> _resumeRevision() async {
+    setState(() => _resuming = true);
+    try {
+      await widget.api.resumeIteration(widget.productSlug, widget.iterationId);
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _resuming = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
     future: session,
@@ -1150,6 +1180,17 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                       Text('gestart ${timing.startLabel}'),
                       if (timing.durationLabel != null)
                         Text(timing.durationLabel!),
+                      Chip(
+                        label: Text(
+                          '${iteration['acceptedCandidateCount'] ?? 0} van ${iteration['candidateCount']} leverbaar',
+                        ),
+                      ),
+                      if ((iteration['revisionRounds'] ?? 0) != 0)
+                        Chip(
+                          label: Text(
+                            '${iteration['revisionRounds']} revisierondes',
+                          ),
+                        ),
                     ],
                   ),
                   if (running) ...[
@@ -1197,6 +1238,23 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                   ),
                   const SizedBox(height: 4),
                   SelectableText('${iteration['focus']}'),
+                  if (iteration['resumedFromIterationId'] != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Hervat vanuit ${iteration['resumedFromIterationId']}',
+                    ),
+                  ],
+                  if (iteration['outcomeReason'] != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Uitkomstreden',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      _outcomeReasonLabel('${iteration['outcomeReason']}'),
+                    ),
+                  ],
                   if (status == 'FAILED') ...[
                     const SizedBox(height: 16),
                     Builder(
@@ -1397,6 +1455,18 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
           ),
         ),
         actions: [
+          if (status == 'NEEDS_REVISION')
+            FilledButton.icon(
+              onPressed: _resuming ? null : _resumeRevision,
+              icon: _resuming
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.restart_alt),
+              label: const Text('Hervat revisie'),
+            ),
           if (running)
             TextButton(
               onPressed: _cancelling ? null : _confirmCancel,
@@ -1417,6 +1487,20 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
     },
   );
 }
+
+String _outcomeReasonLabel(String reason) => switch (reason) {
+  'ACCEPT' => 'Alle kandidaten zijn leverbaar',
+  'PARTIAL_ACCEPT' =>
+    'Minstens één kandidaat is leverbaar; andere vragen nog werk',
+  'ALREADY_DELIVERED' => 'Het resultaat was al eerder geleverd',
+  'CANDIDATE_REVISE' =>
+    'Een kandidaat heeft nog een lokale inhoudelijke reparatie nodig',
+  'RESEARCH_GAP' => 'Noodzakelijke brononderbouwing ontbreekt',
+  'POLICY_CONFLICT' => 'Er is nog een privacy-, rechten- of beleidsconflict',
+  'OWNER_DECISION_REQUIRED' => 'Een echte beslissing van de eigenaar is nodig',
+  'REJECT' => 'De gekozen richting is fundamenteel afgewezen',
+  _ => reason,
+};
 
 /// Native detailbutton voor één cyclus. De [FocusNode] leeft even lang als de rijwidget, zodat
 /// zowel de zichtbare sluitactie als Escape na het sluiten van de dialoog de focus betrouwbaar
@@ -2415,11 +2499,14 @@ void _showThemeDetail(
               else
                 ...linkedStories.map((story) {
                   final delivery = deliveryByCandidate[story['id']];
-                  final confirmedDeployed = delivery?['confirmedDeployed'] == true;
+                  final confirmedDeployed =
+                      delivery?['confirmedDeployed'] == true;
                   return ListTile(
                     dense: true,
                     leading: Icon(
-                      confirmedDeployed ? Icons.cloud_done : Icons.cloud_outlined,
+                      confirmedDeployed
+                          ? Icons.cloud_done
+                          : Icons.cloud_outlined,
                     ),
                     title: Text('${story['title']}'),
                     subtitle: Text(
@@ -2489,7 +2576,9 @@ void _showThemeDetail(
                                 Expanded(
                                   child: Text(
                                     '${report['candidateTitle']}',
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
                                   ),
                                 ),
                                 Chip(

@@ -50,6 +50,9 @@ String classifyDecisionSource({
     'REVISE': 'NEEDS_REVISION',
     'REJECT': 'REJECTED',
   };
+  if (verdict == 'ACCEPT' && finalStatus == 'NO_CHANGE') {
+    return kBeslisbronEvaluatieAgent;
+  }
   if (verdict != null && provenEngineOutcomes[verdict] == finalStatus) {
     return kBeslisbronEvaluatieAgent;
   }
@@ -79,7 +82,7 @@ const List<String> kIterationClassifications = [
 /// worden; alles wat hier niet in voorkomt (inclusief `null`/leeg) is per definitie onbekend en
 /// valt terug op [kNietClassificeerbaar] in [classifyIterationOutcome].
 const Map<String, List<String>> kBekendeStatuswaardenPerCategorie = {
-  kRichtingGekozen: ['ACCEPTED'],
+  kRichtingGekozen: ['ACCEPTED', 'NO_CHANGE'],
   kOnderzoekOnvoldoende: ['NEEDS_REVISION', 'QUEUED', 'RUNNING'],
   kRichtingVerworpen: ['REJECTED'],
   kTechnischeFout: ['FAILED'],

@@ -44,8 +44,11 @@ strikt JSON-schema en eigen validatie:
 5. **CRITIC** — beoordeelt bronkwaliteit, rechten, privacy, toegankelijkheid, scope, duplicaten en
    iedere kandidaat afzonderlijk, en geeft een eindoordeel: `ACCEPT`, `REVISE` of `REJECT`.
 
-Bij `REVISE` (en minimaal één *blokkerende* bevinding) herschrijft STORY_WRITER de kandidaten met de
-criticusfeedback erin verwerkt, waarna CRITIC opnieuw beoordeelt — tot maximaal 3 pogingen. Elke
+Bij `REVISE` (en minimaal één *blokkerende* bevinding) past STORY_WRITER alleen de geraakte
+kandidaten/velden aan, waarna CRITIC opnieuw beoordeelt — tot maximaal 3 inhoudelijke pogingen.
+Kapotte of redactionele story-/criticoutput krijgt daarvoor een afzonderlijke technische
+`OUTPUT_REPAIR`, zodat modelslordigheid geen inhoudelijke poging verbruikt. Bij maximaal twee lokale,
+oplosbare resterende blockers mag één begrensde laatste reparatie volgen. Elke
 stap wordt vastgelegd als een `agent_run` en is per stap zichtbaar in het dashboard (status,
 starttijd, eindtijd, foutmelding).
 
@@ -58,9 +61,13 @@ moet de kandidaat herschreven worden.
 
 ## 3. Uitkomst van een cyclus
 
-- Alleen bij eindoordeel `ACCEPT` én minstens één geaccepteerde, niet-dubbele kandidaat wordt er
-  iets gepubliceerd. Anders eindigt de cyclus als `NEEDS_REVISION` of `REJECTED` en gebeurt er
-  verder niets.
+- Acceptatie gebeurt per kandidaat. Iedere onafhankelijke kandidaat met `ACCEPT` kan worden
+  gepubliceerd, ook als een andere kandidaat uit dezelfde batch nog `REVISE` heeft. Een exact reeds
+  geleverd resultaat wordt niet dubbel gepubliceerd en geeft de cyclusstatus `NO_CHANGE`, niet
+  `REJECTED`. Zonder leverbare kandidaat eindigt de cyclus als `NEEDS_REVISION` of `REJECTED`.
+- Een cyclus met `NEEDS_REVISION` kan via API of dashboard worden hervat. De nieuwe cyclus verwijst
+  naar de broncyclus, hergebruikt het gevalideerde onderzoek, productbesluit en UX-ontwerp en start
+  bij de gerichte storyrevisie.
 - Bij acceptatie schrijft de workspace-publisher één leesbaar dossier
   (`products/<slug>/research/shadow-iteration-NNNN.md`) met onderzoek, productbesluit, UX,
   criticusoordeel en de geaccepteerde storykandidaten, als pull request met auto-merge naar de
@@ -164,7 +171,8 @@ beneden:
   binnen de dialoog (focus-trap) en sluit met Escape, waarbij de focus terugkeert naar de
   Instellingen-knop.
 - **Productcycli en onderzoekssessies**: elke cyclus met status, huidige rol (als hij nog loopt),
-  starttijd, doorlooptijd, aantal kandidaten en criticusoordeel. De starttijd komt uit `startedAt`,
+  starttijd, doorlooptijd, aantal kandidaten, aantal leverbare kandidaten, revisierondes,
+  uitkomstreden en criticusoordeel. De starttijd komt uit `startedAt`,
   of uit `createdAt` zolang de cyclus nog niet gestart is. De doorlooptijd is het verschil tussen
   start en afronding, compact weergegeven als bijvoorbeeld `2u 13m`, `4m 12s` of `35s`; loopt de
   cyclus nog, dan staat er `loopt nog: <tijd sinds start>` en loopt die waarde mee met de

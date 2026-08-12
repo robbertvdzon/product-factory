@@ -143,6 +143,22 @@ class DashboardApi {
     }
   }
 
+  Future<void> resumeIteration(String productSlug, String iterationId) async {
+    final query = 'productSlug=${Uri.encodeQueryComponent(productSlug)}';
+    final response = await http.post(
+      Uri.parse(
+        '$baseUrl/api/shadow-iterations/${Uri.encodeComponent(iterationId)}/resume?$query',
+      ),
+      headers: headers,
+      body: '{}',
+    );
+    if (response.statusCode != 202) {
+      throw StateError(
+        'Revisie kon niet worden hervat (${response.statusCode}).',
+      );
+    }
+  }
+
   Future<void> completeHumanAction(int id, String result) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/autonomy/human-actions/$id/complete'),

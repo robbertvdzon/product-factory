@@ -104,8 +104,9 @@ class ShadowIterationEngine(
         val productVision = vision.readVision(product.slug)
         val roadmapContext = roadmap.contextForCycle(product.slug)
         val validThemeIds = roadmap.listThemes(product.slug).filter { it.status != "DONE" }.map { it.id }.toSet()
+        val resume = iteration.resumedFromIterationId?.let(repository::resumeContext)
 
-        val research = executeRoleWithRetry(
+        val research = resume?.research?.let(mapper::readTree) ?: executeRoleWithRetry(
             iteration,
             product,
             ShadowRole.RESEARCHER,
@@ -114,7 +115,7 @@ class ShadowIterationEngine(
             validate = { validateResearch(it, today) },
         )
 
-        val productOwner = executeRoleWithRetry(
+        val productOwner = resume?.productOwner?.let(mapper::readTree) ?: executeRoleWithRetry(
             iteration,
             product,
             ShadowRole.PRODUCT_OWNER,
@@ -123,7 +124,7 @@ class ShadowIterationEngine(
             validate = ::validateProductOwner,
         )
 
-        val ux = executeRoleWithRetry(
+        val ux = resume?.ux?.let(mapper::readTree) ?: executeRoleWithRetry(
             iteration,
             product,
             ShadowRole.UX_DESIGNER,
@@ -132,57 +133,124 @@ class ShadowIterationEngine(
             validate = ::validateUx,
         )
 
-        var storyAttempt = 1
-        var stories = executeRole(
-            iteration,
-            product,
-            ShadowRole.STORY_WRITER,
-            ShadowSchemas.stories,
-            storyPrompt(product, research, productOwner, ux, candidateContext, roadmapContext, iteration.mode),
-            storyAttempt,
-        ).also { validateStories(it, product.maxStoriesPerCycle) }
+        var contentRound = 1
+        var nextStoryAttempt = 1
+        var nextCriticAttempt = 1
+        if (resume != null) {
+            validateResearch(research, today, requireToday = false)
+            validateProductOwner(productOwner)
+            validateUx(ux)
+            repository.saveArtifact(iteration.id, product.slug, "researcher", mapper.writeValueAsString(research))
+            repository.saveArtifact(iteration.id, product.slug, "product_owner", mapper.writeValueAsString(productOwner))
+            repository.saveArtifact(iteration.id, product.slug, "ux_designer", mapper.writeValueAsString(ux))
+        }
+        val resumedStories = resume?.stories?.let(mapper::readTree)
+        val resumedCritic = resume?.critic?.let(mapper::readTree)
+        val initialStoryPrompt = if (resume == null) {
+            storyPrompt(product, research, productOwner, ux, candidateContext, roadmapContext, iteration.mode)
+        } else {
+            revisionPrompt(
+                product, research, productOwner, ux, resumedStories!!, resumedCritic!!,
+                candidateContext, roadmapContext, iteration.mode,
+            )
+        }
+        var storyExecution = executeValidatedRole(
+            iteration, product, ShadowRole.STORY_WRITER, ShadowSchemas.stories,
+            initialStoryPrompt,
+            nextStoryAttempt,
+            validate = {
+                validateStories(it, product.maxStoriesPerCycle)
+                if (resumedStories != null && resumedCritic != null) {
+                    validateAcceptedCandidatesUnchanged(resumedStories, resumedCritic, it)
+                }
+            },
+        )
+        var stories = storyExecution.output
+        nextStoryAttempt = storyExecution.attempt + 1
 
-        var critic = executeRole(
-            iteration,
-            product,
-            ShadowRole.CRITIC,
-            ShadowSchemas.critic,
+        var criticExecution = executeValidatedRole(
+            iteration, product, ShadowRole.CRITIC, ShadowSchemas.critic,
             criticPrompt(product, research, productOwner, ux, stories, candidateContext, iteration.mode),
-            storyAttempt,
-            { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it)) },
-        ).also { validateCritic(it, stories.path("candidates").size()) }
+            nextCriticAttempt,
+            transform = { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it)) },
+            validate = { validateCritic(it, stories.path("candidates").size()) },
+        )
+        var critic = criticExecution.output
+        nextCriticAttempt = criticExecution.attempt + 1
 
-        while (critic.path("overallVerdict").asText() == "REVISE" && storyAttempt < MAX_STORY_ATTEMPTS) {
-            storyAttempt += 1
+        while (critic.path("overallVerdict").asText() == "REVISE" && contentRound < MAX_STORY_ATTEMPTS) {
+            contentRound += 1
             val previousStories = stories
-            stories = executeRole(
-                iteration,
-                product,
-                ShadowRole.STORY_WRITER,
-                ShadowSchemas.stories,
+            storyExecution = executeValidatedRole(
+                iteration, product, ShadowRole.STORY_WRITER, ShadowSchemas.stories,
                 revisionPrompt(product, research, productOwner, ux, previousStories, critic, candidateContext, roadmapContext, iteration.mode),
-                storyAttempt,
-            ).also { validateStories(it, product.maxStoriesPerCycle) }
-            critic = executeRole(
-                iteration,
-                product,
-                ShadowRole.CRITIC,
-                ShadowSchemas.critic,
+                nextStoryAttempt,
+                validate = {
+                    validateStories(it, product.maxStoriesPerCycle)
+                    validateAcceptedCandidatesUnchanged(previousStories, critic, it)
+                },
+            )
+            stories = storyExecution.output
+            nextStoryAttempt = storyExecution.attempt + 1
+            criticExecution = executeValidatedRole(
+                iteration, product, ShadowRole.CRITIC, ShadowSchemas.critic,
                 criticPrompt(product, research, productOwner, ux, stories, candidateContext, iteration.mode),
-                storyAttempt,
-                { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it)) },
-            ).also { validateCritic(it, stories.path("candidates").size()) }
+                nextCriticAttempt,
+                transform = { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it)) },
+                validate = { validateCritic(it, stories.path("candidates").size()) },
+            )
+            critic = criticExecution.output
+            nextCriticAttempt = criticExecution.attempt + 1
         }
 
-        val sources = validatedSources(research, today)
+        // Een bijna opgeloste batch krijgt één begrensde laatste reparatie. Die extra ronde wordt alleen
+        // besteed aan maximaal twee lokale blockers, nooit aan privacy/rechten/bronbeleid of een eigenaarbesluit.
+        if (critic.path("overallVerdict").asText() == "REVISE" && eligibleForFinalRepair(critic)) {
+            contentRound += 1
+            val previousStories = stories
+            storyExecution = executeValidatedRole(
+                iteration, product, ShadowRole.STORY_WRITER, ShadowSchemas.stories,
+                revisionPrompt(product, research, productOwner, ux, previousStories, critic, candidateContext, roadmapContext, iteration.mode),
+                nextStoryAttempt,
+                validate = {
+                    validateStories(it, product.maxStoriesPerCycle)
+                    validateAcceptedCandidatesUnchanged(previousStories, critic, it)
+                },
+            )
+            stories = storyExecution.output
+            criticExecution = executeValidatedRole(
+                iteration, product, ShadowRole.CRITIC, ShadowSchemas.critic,
+                criticPrompt(product, research, productOwner, ux, stories, candidateContext, iteration.mode),
+                nextCriticAttempt,
+                transform = { applyAutonomyPolicy(stories, applyCriticSeverityPolicy(it)) },
+                validate = { validateCritic(it, stories.path("candidates").size()) },
+            )
+            critic = criticExecution.output
+        }
+
+        val sources = validatedSources(research, today, requireToday = resume == null)
         val candidates = reviewedCandidates(product.slug, stories, critic, validThemeIds)
         persistValidatedResults(iteration.id, product, research, productOwner, ux, sources, candidates)
 
         val verdict = critic.path("overallVerdict").asText()
-        val accepted = if (verdict == "ACCEPT") candidates.filter { it.verdict == "ACCEPT" && it.duplicateOfId == null && !it.blocked } else emptyList()
-        runCatching { generateSummary(iteration, product, research, productOwner, critic, accepted, verdict) }
+        val accepted = deliverableCandidates(candidates, critic)
+        val effectiveVerdict = if (accepted.isNotEmpty()) "ACCEPT" else verdict
+        val outcomeReason = when {
+            accepted.isNotEmpty() && accepted.size < candidates.size -> "PARTIAL_ACCEPT"
+            accepted.isNotEmpty() -> "ACCEPT"
+            candidates.isNotEmpty() && candidates.all { it.duplicateOfId != null } -> "ALREADY_DELIVERED"
+            verdict == "REVISE" -> classifyRevisionReason(critic)
+            verdict == "REJECT" -> "REJECT"
+            else -> "NO_DELIVERABLE_CANDIDATE"
+        }
+        repository.recordOutcome(iteration.id, accepted.size, contentRound - 1, outcomeReason)
+        runCatching { generateSummary(iteration, product, research, productOwner, critic, accepted, effectiveVerdict) }
 
-        if (verdict != "ACCEPT") {
+        if (accepted.isEmpty() && candidates.isNotEmpty() && candidates.all { it.duplicateOfId != null }) {
+            repository.markNoChange(iteration.id, "ACCEPT")
+            return
+        }
+        if (accepted.isEmpty() && verdict != "ACCEPT") {
             repository.markReviewed(iteration.id, verdict, if (verdict == "REVISE") "NEEDS_REVISION" else "REJECTED")
             return
         }
@@ -200,7 +268,7 @@ class ShadowIterationEngine(
                 content = dossier,
             ),
         )
-        repository.markAccepted(iteration.id, verdict, publication.runId, publication.pullRequestUrl, publication.commitSha)
+        repository.markAccepted(iteration.id, effectiveVerdict, publication.runId, publication.pullRequestUrl, publication.commitSha)
     }
 
     private fun executeRole(
@@ -279,6 +347,51 @@ class ShadowIterationEngine(
         error("onbereikbaar")
     }
 
+    /**
+     * Herstelt kapotte STORY_WRITER- en CRITIC-output zonder daarvoor een inhoudelijke revisieronde
+     * te verbruiken. De mislukte poging blijft als FAILED stap en artefact in de diagnose zichtbaar.
+     */
+    private fun executeValidatedRole(
+        iteration: nl.vdzon.productfactory.contracts.ShadowIterationView,
+        product: ProductView,
+        role: ShadowRole,
+        schema: String,
+        initialPrompt: String,
+        firstAttempt: Int,
+        transform: (JsonNode) -> JsonNode = { it },
+        validate: (JsonNode) -> Unit,
+    ): ValidatedRoleOutput {
+        var prompt = initialPrompt
+        var lastFailure: Exception? = null
+        for (offset in 0 until MAX_OUTPUT_REPAIR_ATTEMPTS) {
+            val attempt = firstAttempt + offset
+            try {
+                val output = executeRole(iteration, product, role, schema, prompt, attempt, transform)
+                try {
+                    validate(output)
+                } catch (validation: Exception) {
+                    repository.failStep(iteration.id, role.name, attempt, validation.message ?: validation.javaClass.simpleName)
+                    throw validation
+                }
+                return ValidatedRoleOutput(output, attempt)
+            } catch (exception: Exception) {
+                lastFailure = exception
+                if (offset + 1 < MAX_OUTPUT_REPAIR_ATTEMPTS) {
+                    prompt = outputRepairPrompt(initialPrompt, exception.message ?: exception.javaClass.simpleName)
+                }
+            }
+        }
+        throw lastFailure ?: IllegalStateException("$role gaf geen valide output")
+    }
+
+    private fun outputRepairPrompt(originalPrompt: String, failure: String) = """
+        $originalPrompt
+
+        OUTPUT_REPAIR: de vorige uitvoer voldeed technisch niet aan het contract: ${failure.take(800)}.
+        Geef de volledige uitvoer opnieuw. Verwijder redactionele notities, TODO's en afgebroken tekst.
+        Gebruik uitsluitend complete, concrete Nederlandse zinnen en behoud de bedoelde inhoud.
+    """.trimIndent()
+
     /** Laatste stap van de cyclus: een korte, voor-dummies samenvatting voor de producteigenaar. Blokkeert nooit de uitkomst. */
     private fun generateSummary(
         iteration: nl.vdzon.productfactory.contracts.ShadowIterationView,
@@ -299,9 +412,9 @@ class ShadowIterationEngine(
         }
     }
 
-    private fun validateResearch(output: JsonNode, today: LocalDate) {
+    private fun validateResearch(output: JsonNode, today: LocalDate, requireToday: Boolean = true) {
         require(output.path("summary").asText().isNotBlank()) { "Onderzoekssamenvatting ontbreekt" }
-        val sources = validatedSources(output, today)
+        val sources = validatedSources(output, today, requireToday)
         require(sources.size >= 2) { "Minimaal twee bronnen zijn verplicht" }
         require(output.path("findings").size() in 1..8) { "Onderzoek moet één tot acht bevindingen bevatten" }
         output.path("findings").forEach { finding ->
@@ -312,13 +425,13 @@ class ShadowIterationEngine(
         require(output.path("improvementOpportunities").size() > 0) { "Verbetermogelijkheden ontbreken" }
     }
 
-    private fun validatedSources(output: JsonNode, today: LocalDate): List<ValidatedSource> = output.path("sources").map { source ->
+    private fun validatedSources(output: JsonNode, today: LocalDate, requireToday: Boolean = true): List<ValidatedSource> = output.path("sources").map { source ->
         val url = source.path("url").asText()
         val uri = runCatching { URI(url) }.getOrElse { throw IllegalArgumentException("Ongeldige bron-URL") }
         require(uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()) { "Bron-URL moet HTTP(S) gebruiken" }
         val consultedOn = runCatching { LocalDate.parse(source.path("consultedOn").asText()) }
             .getOrElse { throw IllegalArgumentException("Ongeldige raadpleegdatum") }
-        require(consultedOn == today) { "Raadpleegdatum moet de uitvoerdatum zijn" }
+        require(!consultedOn.isAfter(today) && (!requireToday || consultedOn == today)) { "Raadpleegdatum moet de uitvoerdatum zijn" }
         val rights = source.path("rightsIndication").asText().trim()
         val rationale = source.path("rationale").asText().trim()
         require(rights.isNotBlank() && rationale.isNotBlank()) { "Rechtenindicatie en brononderbouwing zijn verplicht" }
@@ -347,7 +460,16 @@ class ShadowIterationEngine(
         val candidateKeys = mutableSetOf<String>()
         candidates.forEach { candidate ->
             require(candidate.path("title").asText().isNotBlank() && candidate.path("description").asText().isNotBlank()) { "Storytitel en omschrijving zijn verplicht" }
-            require(candidate.path("acceptanceCriteria").size() > 0) { "Acceptatiecriteria ontbreken" }
+            val criteria = textList(candidate.path("acceptanceCriteria"))
+            require(criteria.size == candidate.path("acceptanceCriteria").size() && criteria.isNotEmpty()) {
+                "Acceptatiecriteria bevatten een leeg item of ontbreken"
+            }
+            val textualFields = listOf(candidate.path("title").asText(), candidate.path("description").asText()) + criteria
+            require(textualFields.none(MODEL_META_TEXT_PATTERN::containsMatchIn)) {
+                "Story bevat redactionele modeltekst of een TODO"
+            }
+            require(textualFields.none(::hasUnbalancedDelimiters)) { "Story bevat ongebalanceerde haakjes of aanhalingstekens" }
+            require(textualFields.none { it.length >= STORY_FIELD_LIMIT }) { "Storyveld eindigt op de schemalimiet en lijkt afgebroken" }
             val candidateKey = candidate.path("candidateKey").asText().trim()
             require(candidateKey.isNotBlank() && CANDIDATE_KEY_PATTERN.matches(candidateKey)) {
                 "candidateKey is verplicht en moet een kebab-case-slug zijn (bv. 'stabiele-review-sleutel')"
@@ -356,11 +478,33 @@ class ShadowIterationEngine(
         }
     }
 
+    private fun hasUnbalancedDelimiters(text: String): Boolean =
+        text.count { it == '(' } != text.count { it == ')' } ||
+            text.count { it == '[' } != text.count { it == ']' } ||
+            text.count { it == '“' } != text.count { it == '”' }
+
+    private fun validateAcceptedCandidatesUnchanged(previousStories: JsonNode, critic: JsonNode, revisedStories: JsonNode) {
+        val acceptedKeys = critic.path("candidateReviews")
+            .filter { it.path("verdict").asText() == "ACCEPT" }
+            .mapNotNull { review -> previousStories.path("candidates").get(review.path("candidateIndex").asInt()) }
+            .associateBy { it.path("candidateKey").asText() }
+        if (acceptedKeys.isEmpty()) return
+        val revisedByKey = revisedStories.path("candidates").associateBy { it.path("candidateKey").asText() }
+        acceptedKeys.forEach { (key, previous) ->
+            require(revisedByKey[key] == previous) {
+                "Reeds geaccepteerde kandidaat '$key' is buiten de gerichte revisiescope gewijzigd of verwijderd"
+            }
+        }
+    }
+
     private fun validateCritic(output: JsonNode, candidateCount: Int) {
         val verdict = output.path("overallVerdict").asText()
         require(verdict in setOf("ACCEPT", "REVISE", "REJECT")) { "Ongeldig criticusoordeel" }
         val reviews = output.path("candidateReviews")
         require(reviews.size() == candidateCount) { "De criticus moet iedere kandidaat beoordelen" }
+        require(reviews.all { it.path("verdict").asText() in setOf("ACCEPT", "REVISE", "REJECT") }) {
+            "Ongeldig kandidaatoordeel van de criticus"
+        }
         val indices = reviews.map { it.path("candidateIndex").asInt(-1) }
         require(indices.toSet() == (0 until candidateCount).toSet()) { "Kandidaatbeoordelingen zijn onvolledig of dubbel" }
         if (verdict == "ACCEPT") {
@@ -392,7 +536,7 @@ class ShadowIterationEngine(
             val executionRequirements = (
                 textList(candidate.path("acceptanceCriteria")) + textList(candidate.path("dependsOn"))
                 ).filter { requirement ->
-                OWNER_ACTION_PATTERN.containsMatchIn(requirement) && !ACCESS_TOKEN_PATTERN.containsMatchIn(requirement)
+                requiresOwnerAction(requirement)
             }
             executionRequirements.takeIf(List<String>::isNotEmpty)?.let { index to it }
         }
@@ -426,6 +570,57 @@ class ShadowIterationEngine(
             normalized.path("summary").asText() + " De harde autonomiegate vereist revisie voordat levering is toegestaan.",
         )
         return normalized
+    }
+
+    /** Alleen een daadwerkelijk voorgeschreven eigenaarshandeling blokkeert; een expliciete ontkenning niet. */
+    internal fun requiresOwnerAction(requirement: String): Boolean {
+        if (ACCESS_TOKEN_PATTERN.containsMatchIn(requirement)) return false
+        val match = OWNER_ACTION_PATTERN.find(requirement) ?: return false
+        val clauseStart = requirement.lastIndexOfAny(charArrayOf('.', ';', ':', '\n'), match.range.first).let { it + 1 }
+        val prefix = requirement.substring(clauseStart, match.range.first)
+        if (NEGATED_ACTION_PATTERN.containsMatchIn(prefix)) return false
+        if (AUTOMATED_TEST_PATTERN.containsMatchIn(requirement)) return false
+        return true
+    }
+
+    private fun eligibleForFinalRepair(critic: JsonNode): Boolean {
+        val blockers = critic.path("issues").filter { it.path("severity").asText() == "BLOCKING" }
+        if (blockers.isEmpty() || blockers.size > 2) return false
+        return blockers.all { it.path("category").asText() in LOCAL_REPAIR_CATEGORIES } &&
+            blockers.none { OWNER_DECISION_PATTERN.containsMatchIn(it.path("description").asText()) }
+    }
+
+    private fun classifyRevisionReason(critic: JsonNode): String {
+        val blockers = critic.path("issues").filter { it.path("severity").asText() == "BLOCKING" }
+        if (blockers.any { OWNER_DECISION_PATTERN.containsMatchIn(it.path("description").asText()) }) {
+            return "OWNER_DECISION_REQUIRED"
+        }
+        val categories = blockers.map { it.path("category").asText() }.toSet()
+        return when {
+            "SOURCE" in categories -> "RESEARCH_GAP"
+            "RIGHTS" in categories || "PRIVACY" in categories -> "POLICY_CONFLICT"
+            else -> "CANDIDATE_REVISE"
+        }
+    }
+
+    private fun deliverableCandidates(candidates: List<ReviewedCandidate>, critic: JsonNode): List<ReviewedCandidate> {
+        if (critic.path("overallVerdict").asText() == "REJECT") return emptyList()
+        if (critic.path("issues").any {
+                it.path("severity").asText() == "BLOCKING" && it.path("candidateIndex").asInt(-1) == -1
+            }
+        ) return emptyList()
+        var deliverable = candidates.filter { it.verdict == "ACCEPT" && it.duplicateOfId == null && !it.blocked }
+        var changed: Boolean
+        do {
+            // Een batchafhankelijkheid mag ook wijzen naar een kandidaat die exact al geleverd is;
+            // die dependency hoeft niet nogmaals gepubliceerd te worden om de nieuwe kandidaat bruikbaar te maken.
+            val keys = (deliverable + candidates.filter { it.duplicateOfId != null })
+                .map(ReviewedCandidate::candidateKey).toSet()
+            val filtered = deliverable.filter { candidate -> candidate.resolvedDependsOn.all(keys::contains) }
+            changed = filtered.size != deliverable.size
+            deliverable = filtered
+        } while (changed)
+        return deliverable
     }
 
     private fun reviewedCandidates(productSlug: String, stories: JsonNode, critic: JsonNode, validThemeIds: Set<String>): List<ReviewedCandidate> {
@@ -705,11 +900,16 @@ class ShadowIterationEngine(
 
     private fun criticPrompt(product: ProductView, research: JsonNode, owner: JsonNode, ux: JsonNode, stories: JsonNode, existing: String, mode: String) = """
         ROL: CRITIC. Beoordeel onafhankelijk bronkwaliteit, rechten, privacy, toegankelijkheid, scope,
-        consistentie, duplicaten en conflicten. Beoordeel uitsluitend de kandidaten in het "candidates"-array
+        consistentie, duplicaten en conflicten. Blokkeer alleen een materieel probleem dat veilige bouw of
+        toetsing van de kleine MVP onmogelijk maakt. Een mogelijke uitbreiding, extra bron, cosmetische voorkeur,
+        randgeval buiten scope, gedeeltelijke overlap of niet-noodzakelijke documentatieverbetering is WARNING/INFO.
+        Beoordeel uitsluitend de kandidaten in het "candidates"-array
         van de STORIES-data hieronder, elk exact één keer met zijn nulgebaseerde index in dát array:
         candidateReviews moet dus exact evenveel items bevatten als er STORIES-kandidaten zijn, niet meer en
         niet minder. BESTAANDE KANDIDATEN hieronder dient uitsluitend als context voor duplicaatdetectie:
-        beoordeel deze niet en neem ze niet op in candidateReviews. Gebruik REVISE uitsluitend als minimaal één issue severity BLOCKING heeft en een gerichte nieuwe
+        beoordeel deze niet en neem ze niet op in candidateReviews. Overlap met open of eerder afgewezen werk is
+        geen automatische blokkade; een exact reeds geleverd resultaat is een informatieve duplicaatmelding.
+        Gebruik REVISE uitsluitend als minimaal één issue severity BLOCKING heeft en een gerichte nieuwe
         uitwerking nodig is. WARNING en INFO blijven zichtbaar, maar blokkeren niet: gebruik dan ACCEPT. Gebruik
         REJECT bij een fundamenteel probleem. ACCEPT mag alleen zonder blokkerende issues. In autonomous-modus is ACCEPT een vrijgave voor levering door de
         orchestrator; in shadow-modus blijft de kandidaat intern. De huidige modus is $mode.
@@ -718,6 +918,13 @@ class ShadowIterationEngine(
         test, menselijk productbesluit, accountaanmaak, betaling, DNS-wijziging, apparaatcontrole of andere actie van de
         eigenaar vereist. Alleen het verstrekken van een concreet, onvermijdelijk extern access token is toegestaan.
         Een kandidaat mag pas ACCEPT krijgen nadat alle overige uitvoering en verificatie agent-uitvoerbaar is gemaakt.
+
+        GEZAG VAN CONTEXT: alleen de actuele productvisie en de hieronder genoemde productregels zijn bindend.
+        Een aanname van RESEARCHER, PRODUCT_OWNER of UX_DESIGNER is niet vanzelf beleid. Eis nooit dat STORY_WRITER
+        nieuw juridisch of productbeleid bedenkt. Als zo'n onbewezen aanname niet nodig is, schrap haar en accepteer
+        de kleinste veilige variant; is een echte beleidskeuze onvermijdelijk, benoem expliciet dat een
+        eigenaarbesluit ontbreekt. Geef bij iedere lokale BLOCKING-bevinding in de beschrijving de kleinste veilige
+        wijziging waarmee de kandidaat wel leverbaar wordt.
 
         REGELS:
         privacy=${product.privacyRules}
@@ -749,8 +956,10 @@ class ShadowIterationEngine(
         mode: String,
     ) = """
         ROL: STORY_WRITER. Herwerk de vorige storykandidaten na een onafhankelijke criticusbeoordeling.
-        Verwerk iedere `requiredChanges` volledig en los alle BLOCKING issues op. Houd de scope klein en direct
-        bouwbaar. Behoud correcte onderdelen, maar kopieer geen criterium dat strijdig is met de criticusfeedback.
+        Wijzig uitsluitend kandidaten en velden waarop een BLOCKING issue of requiredChange betrekking heeft.
+        Laat reeds geaccepteerde kandidaten en correcte velden woordelijk intact. Verwerk iedere `requiredChanges`
+        volledig en los alle BLOCKING issues op. Houd de scope klein en direct bouwbaar. Kies waar mogelijk de
+        kleinste veilige variant uit de feedback; bedenk zelf geen nieuw juridisch of productbeleid.
         In shadow-modus blijven kandidaten intern; in autonomous-modus kunnen ze pas na een nieuwe ACCEPT worden
         geleverd. De huidige modus is $mode. Gebruik uitsluitend bron-URL's uit het oorspronkelijke onderzoek.
 
@@ -839,6 +1048,8 @@ class ShadowIterationEngine(
         return MessageDigest.getInstance("SHA-256").digest(normalized.toByteArray()).joinToString("") { "%02x".format(it) }
     }
 
+    private data class ValidatedRoleOutput(val output: JsonNode, val attempt: Int)
+
     companion object {
         private val log = LoggerFactory.getLogger(ShadowIterationEngine::class.java)
         // internal (niet private): OrphanedIterationReconciler hergebruikt dezelfde waarden om te bepalen
@@ -849,11 +1060,20 @@ class ShadowIterationEngine(
         // die stap merkbaar trager dan de overige, puur tekst-/toolgedreven rollen, die ruim binnen 900s blijven.
         internal const val RESEARCHER_TIMEOUT_SECONDS = 3600L
         private const val MAX_STORY_ATTEMPTS = 3
+        private const val MAX_OUTPUT_REPAIR_ATTEMPTS = 2
+        private const val STORY_FIELD_LIMIT = 2_000
         private const val DEPENDSON_RESOLUTION_ARTIFACT_TYPE = "dependson_resolution"
         private val OWNER_ACTION_PATTERN = Regex(
             """(?i)\b(handmatig(?:e)?\s+(?:test|toets|controle|validatie|beoordeling|goedkeuring|actie)|menselijk(?:e)?\s+(?:test|controle|validatie|beoordeling|goedkeuring|actie)|door (?:de )?eigenaar|beschikbaar (?:worden )?gesteld|NVDA|VoiceOver|schermlezer(?:test|controle))\b""",
         )
         private val ACCESS_TOKEN_PATTERN = Regex("""(?i)\b(access[ -]?token|api[ -]?key|oauth[ -]?secret|credential)\b""")
+        private val NEGATED_ACTION_PATTERN = Regex("""(?i)\b(zonder|geen|niet\s+(?:door|met|afhankelijk\s+van))\b""")
+        private val AUTOMATED_TEST_PATTERN = Regex("""(?i)\b(geautomatiseerd|unit-?test|widget-?test|integratie-?test|semantiek-?test|browser-?test|CI)\b""")
+        private val MODEL_META_TEXT_PATTERN = Regex(
+            """(?i)\b(need dutch only|fix mentally|todo(?:\s+for\s+(?:the\s+)?model)?|already output|remove typo|model note|assistant note)\b""",
+        )
+        private val OWNER_DECISION_PATTERN = Regex("""(?i)\b(eigenaar(?:sbesluit| moet| kiest?)|beleidskeuze|juridisch beleid)\b""")
+        private val LOCAL_REPAIR_CATEGORIES = setOf("ACCESSIBILITY", "SCOPE", "CONSISTENCY")
         private val CANDIDATE_KEY_PATTERN = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
     }
 }

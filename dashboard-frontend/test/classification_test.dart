@@ -10,6 +10,13 @@ void main() {
       );
     });
 
+    test('NO_CHANGE wordt richting-gekozen zonder dubbele levering', () {
+      expect(
+        classifyIterationOutcome(status: 'NO_CHANGE', criticVerdict: 'ACCEPT'),
+        kRichtingGekozen,
+      );
+    });
+
     test('NEEDS_REVISION wordt onderzoek-onvoldoende', () {
       expect(
         classifyIterationOutcome(
@@ -85,6 +92,7 @@ void main() {
     test('elke classificatiewaarde zit in de vaste toegestane lijst', () {
       for (final status in [
         'ACCEPTED',
+        'NO_CHANGE',
         'NEEDS_REVISION',
         'REJECTED',
         'FAILED',

@@ -110,7 +110,7 @@ class ShadowIterationEngineTest(
         bridge.scenario = Scenario.DUPLICATE
         val duplicate = repository.create("hkh-autopilot", "Controleer een mogelijk dubbel voorstel")
         engine.run(duplicate.id)
-        assertEquals("REJECTED", repository.require("hkh-autopilot", duplicate.id).status)
+        assertEquals("NO_CHANGE", repository.require("hkh-autopilot", duplicate.id).status)
         assertEquals("ACCEPT", repository.require("hkh-autopilot", duplicate.id).criticVerdict)
         assertEquals(1, workspace.artifacts.size)
         assertEquals(
@@ -128,7 +128,7 @@ class ShadowIterationEngineTest(
         assertEquals("NEEDS_REVISION", repository.require("hkh-autopilot", revision.id).status)
         assertEquals("REVISE", repository.require("hkh-autopilot", revision.id).criticVerdict)
         assertEquals("Dit is een korte, voor-dummies samenvatting van de testcyclus.", repository.require("hkh-autopilot", revision.id).summary)
-        assertEquals(10, repository.steps("hkh-autopilot", revision.id).size)
+        assertEquals(12, repository.steps("hkh-autopilot", revision.id).size)
         assertEquals(1, workspace.artifacts.size)
 
         bridge.scenario = Scenario.REVISE_THEN_ACCEPT
@@ -185,6 +185,59 @@ class ShadowIterationEngineTest(
         assertEquals("FAILED", researcherSteps[0].status)
         assertTrue(researcherSteps[0].errorMessage!!.contains("twee bronnen"))
         assertEquals("COMPLETED", researcherSteps[1].status)
+    }
+
+    @Test
+    fun `story output repair does not consume a critic revision round`() {
+        bridge.scenario = Scenario.STORY_OUTPUT_REPAIR_THEN_ACCEPT
+        val iteration = repository.create("hkh-autopilot", "Herstel redactionele modeltekst")
+        engine.run(iteration.id)
+
+        val stored = repository.require("hkh-autopilot", iteration.id)
+        assertEquals("ACCEPTED", stored.status)
+        assertEquals(0, stored.revisionRounds)
+        val storySteps = repository.steps("hkh-autopilot", iteration.id).filter { it.role == "STORY_WRITER" }
+        assertEquals(listOf("FAILED", "COMPLETED"), storySteps.map { it.status })
+        assertTrue(storySteps.first().errorMessage!!.contains("modeltekst"))
+    }
+
+    @Test
+    fun `negated human control does not trigger the autonomy gate`() {
+        assertTrue(!engine.requiresOwnerAction("De widgettest bewijst dit zonder browser of menselijke controle."))
+        assertTrue(engine.requiresOwnerAction("Een menselijke controle wordt door de eigenaar uitgevoerd."))
+    }
+
+    @Test
+    fun `an accepted candidate is published while an independent batch peer still needs revision`() {
+        bridge.scenario = Scenario.PARTIAL_ACCEPT
+        val iteration = repository.create("hkh-autopilot", "Lever het veilige deel van een gemengde batch")
+        engine.run(iteration.id)
+
+        val stored = repository.require("hkh-autopilot", iteration.id)
+        assertEquals("ACCEPTED", stored.status)
+        assertEquals(1, stored.acceptedCandidateCount)
+        assertEquals("PARTIAL_ACCEPT", stored.outcomeReason)
+        assertTrue(workspace.artifacts.single().content.contains("Direct leverbare bronnenkaart"))
+        assertTrue(!workspace.artifacts.single().content.contains("Nog te brede import"))
+    }
+
+    @Test
+    fun `a needs revision cycle can reuse context and resume at the story writer`() {
+        bridge.scenario = Scenario.REVISE
+        val source = repository.create("hkh-autopilot", "Bewaar een herstelbaar concept")
+        engine.run(source.id)
+        assertEquals("NEEDS_REVISION", repository.require("hkh-autopilot", source.id).status)
+
+        bridge.scenario = Scenario.RESUME_THEN_ACCEPT
+        val resumed = repository.create(
+            "hkh-autopilot", "Hervat het concept", resumeFromIterationId = source.id,
+        )
+        engine.run(resumed.id)
+
+        val stored = repository.require("hkh-autopilot", resumed.id)
+        assertEquals("ACCEPTED", stored.status)
+        assertEquals(source.id, stored.resumedFromIterationId)
+        assertTrue(repository.steps("hkh-autopilot", resumed.id).none { it.role in setOf("RESEARCHER", "PRODUCT_OWNER", "UX_DESIGNER") })
     }
 
     @Test
@@ -303,7 +356,7 @@ class ShadowIterationEngineTest(
     enum class Scenario {
         ACCEPT, DUPLICATE, REVISE, REVISE_THEN_ACCEPT, AUTONOMY_REVISE_THEN_ACCEPT, WARNING_ONLY_REVISE,
         RESEARCH_RETRY_THEN_ACCEPT, CROSS_KEY_DEPENDENCY, LEGACY_POSITIONAL_DEPENDSON, UNKNOWN_DEPENDSON_KEY,
-        THEME_LINKED,
+        THEME_LINKED, STORY_OUTPUT_REPAIR_THEN_ACCEPT, PARTIAL_ACCEPT, RESUME_THEN_ACCEPT,
     }
 
     class FakeShadowAgentBridge : AgentDispatchPort {
@@ -312,7 +365,8 @@ class ShadowIterationEngineTest(
         override fun execute(task: AgentTask): AgentResult {
             val today = LocalDate.now(ZoneId.of("Europe/Amsterdam"))
             val firstAttempt = task.runId.endsWith("-1")
-            val different = scenario == Scenario.REVISE || (scenario == Scenario.REVISE_THEN_ACCEPT && firstAttempt)
+            val different = scenario == Scenario.REVISE ||
+                (scenario in setOf(Scenario.REVISE_THEN_ACCEPT, Scenario.RESUME_THEN_ACCEPT) && firstAttempt)
             val json = when (task.taskType.removePrefix("shadow-")) {
                 "researcher" -> if (scenario == Scenario.RESEARCH_RETRY_THEN_ACCEPT && task.runId.endsWith("-researcher-1")) """{
                     "summary":"Open erfgoedbronnen kunnen een controleerbare eerste zoekervaring ondersteunen.",
@@ -349,7 +403,12 @@ class ShadowIterationEngineTest(
                     "accessibility":["Alle onderdelen zijn met toetsenbord bereikbaar."],
                     "privacyConsiderations":["De flow vereist geen locatiehistorie of gebruikersprofiel."]
                 }"""
-                "story_writer" -> if (scenario == Scenario.CROSS_KEY_DEPENDENCY) """{
+                "story_writer" -> if (scenario == Scenario.PARTIAL_ACCEPT) """{
+                    "candidates":[
+                      {"candidateKey":"direct-leverbare-bronnenkaart","title":"Direct leverbare bronnenkaart","description":"Toon één bron met rechtenmetadata zonder gegevens te kopiëren.","acceptanceCriteria":["De gebruiker ziet de bron-URL"],"sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":[]},
+                      {"candidateKey":"nog-te-brede-import","title":"Nog te brede import","description":"Importeer ineens alle persoonsgegevens uit iedere externe collectie.","acceptanceCriteria":["Alle externe persoonsgegevens worden opgeslagen"],"sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Privacygrondslag ontbreekt"]}
+                    ]
+                }""" else if (scenario == Scenario.CROSS_KEY_DEPENDENCY) """{
                     "candidates":[
                       {
                         "candidateKey":"locatie-broncontrole",
@@ -427,10 +486,13 @@ class ShadowIterationEngineTest(
                       "title":"${when {
                           different -> "Brede erfgoedportal"
                           scenario == Scenario.REVISE_THEN_ACCEPT -> "Herziene bronnenkaart voor één locatie"
+                          scenario == Scenario.RESUME_THEN_ACCEPT -> "Unieke hervatte bronnenkaart"
                           scenario == Scenario.AUTONOMY_REVISE_THEN_ACCEPT && firstAttempt -> "Handmatig geteste bronnenkaart"
                           scenario == Scenario.AUTONOMY_REVISE_THEN_ACCEPT -> "Automatisch geteste bronnenkaart"
                           scenario == Scenario.WARNING_ONLY_REVISE -> "Toegankelijke bronnenkaart met waarschuwing"
                           scenario == Scenario.RESEARCH_RETRY_THEN_ACCEPT -> "Bronnenkaart na onderzoekscorrectie"
+                          scenario == Scenario.STORY_OUTPUT_REPAIR_THEN_ACCEPT && firstAttempt -> "TODO for model"
+                          scenario == Scenario.STORY_OUTPUT_REPAIR_THEN_ACCEPT -> "Bronnenkaart na outputherstel"
                           else -> "Bronnenkaart voor één locatie"
                       }}",
                       "description":"${when {
@@ -448,7 +510,15 @@ class ShadowIterationEngineTest(
                       "sourceUrls":["https://noord-hollandsarchief.nl/"],"dependsOn":[],"risks":["Bronrechten kunnen per object verschillen"]
                     }]
                 }"""
-                "critic" -> if (scenario == Scenario.CROSS_KEY_DEPENDENCY || scenario == Scenario.LEGACY_POSITIONAL_DEPENDSON || scenario == Scenario.UNKNOWN_DEPENDSON_KEY) """{
+                "critic" -> if (scenario == Scenario.PARTIAL_ACCEPT) """{
+                    "overallVerdict":"REVISE","summary":"De eerste kandidaat is veilig; de tweede mist een privacygrondslag.",
+                    "issues":[{"severity":"BLOCKING","category":"PRIVACY","description":"Opslag van alle persoonsgegevens mist een actieve grondslag; beperk de story tot bronmetadata.","candidateIndex":1}],
+                    "candidateReviews":[
+                      {"candidateIndex":0,"verdict":"ACCEPT","reason":"Kleine veilige scope zonder gegevenskopie."},
+                      {"candidateIndex":1,"verdict":"REVISE","reason":"Privacygrondslag ontbreekt."}
+                    ],
+                    "requiredChanges":["Beperk kandidaat 1 tot bronmetadata zonder persoonsgegevens te kopiëren."]
+                }""" else if (scenario == Scenario.CROSS_KEY_DEPENDENCY || scenario == Scenario.LEGACY_POSITIONAL_DEPENDSON || scenario == Scenario.UNKNOWN_DEPENDSON_KEY) """{
                     "overallVerdict":"ACCEPT","summary":"Beide kandidaten zijn klein en herleidbaar.",
                     "issues":[],
                     "candidateReviews":[
@@ -461,7 +531,8 @@ class ShadowIterationEngineTest(
                     "issues":[{"severity":"WARNING","category":"ACCESSIBILITY","description":"Controleer de aankondiging ook handmatig.","candidateIndex":0}],
                     "candidateReviews":[{"candidateIndex":0,"verdict":"REVISE","reason":"Leg de waarschuwing vast voor vervolgwerk."}],
                     "requiredChanges":["Controleer later met een schermlezer."]
-                }""" else if (scenario == Scenario.REVISE || (scenario == Scenario.REVISE_THEN_ACCEPT && firstAttempt)) """{
+                }""" else if (scenario == Scenario.REVISE ||
+                    (scenario in setOf(Scenario.REVISE_THEN_ACCEPT, Scenario.RESUME_THEN_ACCEPT) && firstAttempt)) """{
                     "overallVerdict":"REVISE","summary":"Het voorstel is te breed voor één toetsbare iteratie.",
                     "issues":[{"severity":"BLOCKING","category":"SCOPE","description":"De kandidaat combineert vijf zelfstandige productrisico's.","candidateIndex":0}],
                     "candidateReviews":[{"candidateIndex":0,"verdict":"REVISE","reason":"Beperk tot één brontransparante locatieflow."}],
