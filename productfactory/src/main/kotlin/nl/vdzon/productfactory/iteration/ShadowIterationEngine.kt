@@ -718,8 +718,11 @@ class ShadowIterationEngine(
 
     private fun criticPrompt(product: ProductView, research: JsonNode, owner: JsonNode, ux: JsonNode, stories: JsonNode, existing: String, mode: String) = """
         ROL: CRITIC. Beoordeel onafhankelijk bronkwaliteit, rechten, privacy, toegankelijkheid, scope,
-        consistentie, duplicaten en conflicten. Beoordeel iedere kandidaat exact één keer met zijn nulgebaseerde
-        index. Gebruik REVISE uitsluitend als minimaal één issue severity BLOCKING heeft en een gerichte nieuwe
+        consistentie, duplicaten en conflicten. Beoordeel uitsluitend de kandidaten in het "candidates"-array
+        van de STORIES-data hieronder, elk exact één keer met zijn nulgebaseerde index in dát array:
+        candidateReviews moet dus exact evenveel items bevatten als er STORIES-kandidaten zijn, niet meer en
+        niet minder. BESTAANDE KANDIDATEN hieronder dient uitsluitend als context voor duplicaatdetectie:
+        beoordeel deze niet en neem ze niet op in candidateReviews. Gebruik REVISE uitsluitend als minimaal één issue severity BLOCKING heeft en een gerichte nieuwe
         uitwerking nodig is. WARNING en INFO blijven zichtbaar, maar blokkeren niet: gebruik dan ACCEPT. Gebruik
         REJECT bij een fundamenteel probleem. ACCEPT mag alleen zonder blokkerende issues. In autonomous-modus is ACCEPT een vrijgave voor levering door de
         orchestrator; in shadow-modus blijft de kandidaat intern. De huidige modus is $mode.

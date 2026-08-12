@@ -39,7 +39,7 @@ internal object ShadowSchemas {
 
     val stories = schema(
         """
-        "candidates":{"type":"array","minItems":1,"maxItems":3,"items":{"type":"object","additionalProperties":false,"required":["candidateKey","title","description","acceptanceCriteria","sourceUrls","dependsOn","risks","themeId"],"properties":{"candidateKey":{"type":"string","minLength":3,"maxLength":80,"pattern":"^[a-z0-9]+(-[a-z0-9]+)*$"},"title":{"type":"string","minLength":5,"maxLength":240},"description":{"type":"string","minLength":20,"maxLength":3000},"acceptanceCriteria":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","minLength":5,"maxLength":1000}},"sourceUrls":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string"}},"dependsOn":{"type":"array","maxItems":5,"items":{"type":"string","maxLength":500}},"risks":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":1000}},"themeId":{"type":["string","null"],"maxLength":120}}}}
+        "candidates":{"type":"array","minItems":1,"maxItems":3,"items":{"type":"object","additionalProperties":false,"required":["candidateKey","title","description","acceptanceCriteria","sourceUrls","dependsOn","risks","themeId"],"properties":{"candidateKey":{"type":"string","minLength":3,"maxLength":80,"pattern":"^[a-z0-9]+(-[a-z0-9]+)*$"},"title":{"type":"string","minLength":5,"maxLength":240},"description":{"type":"string","minLength":20,"maxLength":3000},"acceptanceCriteria":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","minLength":5,"maxLength":2000}},"sourceUrls":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string"}},"dependsOn":{"type":"array","maxItems":5,"items":{"type":"string","maxLength":500}},"risks":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":1000}},"themeId":{"type":["string","null"],"maxLength":120}}}}
         """.trimIndent(),
         listOf("candidates"),
     )
@@ -61,7 +61,7 @@ internal object ShadowSchemas {
         "wantsMeeting":{"type":"boolean"},
         "meetingTopics":{"type":"array","maxItems":5,"items":{"type":"string","minLength":5,"maxLength":300}}
         """.trimIndent(),
-        listOf("summary"),
+        listOf("summary", "wantsMeeting", "meetingTopics"),
     )
 
     private fun schema(properties: String, required: List<String>) =
