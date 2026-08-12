@@ -171,18 +171,18 @@ beneden:
   binnen de dialoog (focus-trap) en sluit met Escape, waarbij de focus terugkeert naar de
   Instellingen-knop.
 - **Productcycli en onderzoekssessies**: elke cyclus met status, huidige rol (als hij nog loopt),
-  starttijd, doorlooptijd, aantal kandidaten, aantal leverbare kandidaten, revisierondes,
-  uitkomstreden en criticusoordeel. De starttijd komt uit `startedAt`,
+  starttijd, doorlooptijd, aantal kandidaten, aantal leverbare kandidaten, revisierondes en,
+  wanneer van toepassing, uitkomstreden en criticusoordeel. De starttijd komt uit `startedAt`,
   of uit `createdAt` zolang de cyclus nog niet gestart is. De doorlooptijd is het verschil tussen
   start en afronding, compact weergegeven als bijvoorbeeld `2u 13m`, `4m 12s` of `35s`; loopt de
   cyclus nog, dan staat er `loopt nog: <tijd sinds start>` en loopt die waarde mee met de
   auto-refresh. Een nog niet gestarte cyclus toont geen doorlooptijd. Datum en tijd staan in de
   lokale tijdzone van de browser als `dd-MM-yyyy HH:mm`, nooit als ruwe ISO-string.
-  Elke iteratierij toont daarnaast exact één van twee dingen, puur afgeleid uit bestaande velden
-  (geen nieuwe databron): iteraties die nog lopen of in de wachtrij staan (`status` QUEUED/RUNNING)
+  Iteraties die nog lopen of in de wachtrij staan (`status` QUEUED/RUNNING)
   tonen een neutrale voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge;
-  elke andere status toont een vaste classificatiebadge — `onderzoek-onvoldoende`,
-  `technische fout`, `richting-gekozen`, `richting-verworpen` of `niet-classificeerbaar` —
+  elke andere status zonder expliciet beslisrecord toont een vaste, afgeleide
+  classificatiebadge — `onderzoek-onvoldoende`, `technische fout`, `richting-gekozen`,
+  `richting-verworpen` of `niet-classificeerbaar` —
   afgeleid uit de velden `status`, `criticVerdict` en `errorMessage`. Elke onvoorziene of
   ontbrekende statuswaarde (inclusief een tijdens uitvoering afgebroken iteratie, waarvoor geen
   apart CANCELLED-statusveld bestaat) mapt naar `niet-classificeerbaar`. De badge toont de
@@ -195,23 +195,42 @@ beneden:
   geen focus-trap, `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of
   Escape klapt het paneel weer in en herstelt de focus op de badge; het paneel bevat geen link
   naar een externe iteratielog-route.
-  Elke cyclusregel bevat daarnaast precies één beslisbronbutton met zichtbaar label
-  `Beslisbron: Evaluatie-agent`, `Beslisbron: Technische fout` of `Beslisbron: Onbekend`. De bron
-  wordt zonder nieuwe databron of statusmutatie conservatief afgeleid uit `criticVerdict`, `status`
-  en `errorMessage`: de bewezen paren `ACCEPT`/`ACCEPTED`, `REVISE`/`NEEDS_REVISION` en
-  `REJECT`/`REJECTED` wijzen naar de evaluatie-agent; alleen `FAILED` zonder verdict en met een
+  Elke cyclusregel bevat daarnaast precies één beslisbronbutton. Bij een gekoppeld expliciet
+  handmatig-annuleringsrecord toont die zichtbaar én toegankelijk `Beslisbron: Mens` en
+  `Reden: Handmatig geannuleerd`. Het record heeft voorrang op de velden waaruit historische
+  provenance wordt afgeleid; daarom blijven de afgeleide classificatiebadge en uitkomstreden voor
+  die cyclus verborgen. De bestaande foutmelding mag in het detail blijven staan, maar wordt niet
+  als beslisbron of vervangende verklaring gebruikt.
+  De bestaande annuleeractie accepteert nog steeds een optionele vrije reden, maar bewaart die
+  uitsluitend als bestaande foutmelding. Alleen als de overgang van QUEUED/RUNNING naar FAILED
+  slaagt, wordt in dezelfde transactie maximaal één privacy-minimaal beslisrecord opgeslagen met
+  `iterationId`, `actorType = HUMAN`, `mechanism = MANUAL_CANCELLATION`,
+  `reasonCode = MANUALLY_CANCELLED` en `decidedAt`. Die laatste waarde is exact gelijk aan
+  `completedAt`; een conflict of rollback laat geen los record of halve statusovergang achter.
+  Historische cycli krijgen geen backfill. Het record bevat geen naam, e-mailadres, account-id,
+  aangeleverde reden of andere vrije tekst.
+  Zonder gekoppeld record toont de button `Beslisbron: Evaluatie-agent (Afgeleid)`,
+  `Beslisbron: Technische fout (Afgeleid)` of `Beslisbron: Onbekend (Afgeleid)`. De bron wordt
+  conservatief afgeleid uit `criticVerdict`, `status` en `errorMessage`: de bewezen paren
+  `ACCEPT`/`ACCEPTED`, `REVISE`/`NEEDS_REVISION` en `REJECT`/`REJECTED` wijzen naar de
+  evaluatie-agent; alleen `FAILED` zonder verdict en met een
   niet-lege foutmelding wijst naar een technische fout; alle overige combinaties zijn onbekend.
   Ontbrekende, lege en alleen uit witruimte bestaande waarden gelden als afwezig. Omringende
   witruimte wordt genegeerd, maar afwijkend hoofdlettergebruik en onbekende of tegenstrijdige
-  waarden vallen terug op `Onbekend`.
+  waarden vallen terug op `Onbekend`. Ook deze onbekende fallback blijft zichtbaar en toegankelijk
+  als `Afgeleid` herkenbaar.
   De native button opent met muis, Enter of Spatie het detailscherm van precies de gekozen cyclus.
   De rij zelf is niet meer klikbaar en heeft geen navigatie-chevron; zo is er geen tweede of
   geneste detailbediening naast de afzonderlijke annuleeractie. Na sluiten via de zichtbare
   sluitactie of Escape keert de focus terug naar de gebruikte beslisbronbutton. De beslisbron toont
   in het overzicht geen ruwe foutmelding, prompt, log of artefactinhoud, en het openen en sluiten
-  doet uitsluitend de bestaande leesverzoeken. De titel van het detailscherm toont het
-  user-facing cyclusnummer (met het interne iteratie-id als fallback) en het scherm bevat de
-  opdracht, alle vijf agentstappen (status, start-/eindtijd, foutmelding), het
+  doet uitsluitend de bestaande leesverzoeken. Voor een expliciet handmatig-annuleringsrecord
+  toont het detailscherm dezelfde bron en reden, aangevuld met `Mechanisme: Handmatige annulering`
+  en het lokale beslissingstijdstip uit `decidedAt`; de afgeleide badge en uitkomstreden blijven
+  ook daar verborgen. Voor cycli zonder record toont het detail de bron met `(Afgeleid)`.
+  De titel van het detailscherm toont het user-facing cyclusnummer (met het interne iteratie-id als
+  fallback) en het scherm bevat de opdracht, alle vijf agentstappen (status, start-/eindtijd,
+  foutmelding), het
   volledige gepubliceerde dossier en per rol (Onderzoeker, Product owner, UX-ontwerp, Story writer,
   Criticus) een leesbare samenvatting van de bekende tekstvelden (bv. `summary`, `findings`,
   `decisions`/`rationale`, `steps`, `candidates`, `issues`) — dit scherm ververst zichzelf elke 3
@@ -245,13 +264,15 @@ beneden:
   (`readableFields` leeg), dan toont het dialoog uitsluitend de bestaande ruwe JSON direct
   zichtbaar, zonder toggle en zonder te crashen.
   Retry-pogingen (`artifactType` met `-2`/`-3`-suffix) gebruiken dezelfde leesbare weergave als de
-  eerste poging. Dit detailscherm (`IterationSessionDialog`,
-  `dashboard-frontend/lib/main.dart`) toont bovenaan dezelfde `ClassificationBadge` (zelfde
+  eerste poging. Voor een cyclus zonder expliciet beslisrecord toont dit detailscherm
+  (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) bovenaan dezelfde
+  `ClassificationBadge` (zelfde
   `classifyIterationOutcome`-uitkomst, zelfde badge-tekst en `kClassificationColors`-kleurenpaar) als
   de lijstkaart-rij, in plaats van de ruwe backend-statuswaarde (bv. 'NEEDS_REVISION') als losse
   `Chip`; de badge is er het eerste focusbare element, vóór Voortgang/agentresultaten/
   workspace-publicaties, en met toetsenbord (Tab, Enter/Spatie) op dezelfde manier bedienbaar als op
-  de lijstkaart. De weergave van de workspace-publicatie/PR-referentie
+  de lijstkaart. Voor een expliciete handmatige annulering ontbreekt deze afgeleide badge zoals
+  hierboven beschreven. De weergave van de workspace-publicatie/PR-referentie
   (`workspacePullRequestUrl`/`workspaceCommitSha`) in dit detailscherm is door de badge-/
   indicator-toevoeging ongewijzigd gebleven. Heeft de iteratie zelf `status == 'FAILED'`, dan toont
   dit detailscherm (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) direct onder het

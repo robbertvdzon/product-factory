@@ -120,6 +120,14 @@ data class ProductRecordView(
     val createdAt: Instant,
 )
 
+data class ShadowIterationDecisionView(
+    val iterationId: String,
+    val actorType: String,
+    val mechanism: String,
+    val reasonCode: String,
+    val decidedAt: Instant,
+)
+
 data class ShadowIterationView(
     val id: String,
     val productSlug: String,
@@ -142,6 +150,7 @@ data class ShadowIterationView(
     val revisionRounds: Int = 0,
     val outcomeReason: String? = null,
     val resumedFromIterationId: String? = null,
+    val decision: ShadowIterationDecisionView? = null,
 )
 
 data class ShadowIterationStepView(

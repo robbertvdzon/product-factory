@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:product_factory_dashboard/classification.dart';
 import 'package:product_factory_dashboard/main.dart';
 
 Map<String, dynamic> _iteration({
@@ -13,6 +14,7 @@ Map<String, dynamic> _iteration({
   required int sequenceNumber,
   required String errorMessage,
   required DateTime startedAt,
+  Map<String, dynamic>? decision,
 }) => {
   'id': id,
   'productSlug': 'demo',
@@ -27,6 +29,7 @@ Map<String, dynamic> _iteration({
   'workspacePullRequestUrl': null,
   'workspaceCommitSha': null,
   'errorMessage': errorMessage,
+  'outcomeReason': 'TECHNICAL_FAILURE',
   'summary': null,
   'prompt': 'Ruwe prompt voor cyclus $sequenceNumber',
   'logs': 'Ruwe logs voor cyclus $sequenceNumber',
@@ -34,6 +37,7 @@ Map<String, dynamic> _iteration({
   'createdAt': startedAt.toIso8601String(),
   'startedAt': startedAt.toIso8601String(),
   'completedAt': startedAt.add(const Duration(minutes: 1)).toIso8601String(),
+  if (decision != null) 'decision': decision,
 };
 
 final _iterations = <Map<String, dynamic>>[
@@ -42,6 +46,13 @@ final _iterations = <Map<String, dynamic>>[
     sequenceNumber: 34,
     errorMessage: 'Synthetische foutreden uitsluitend voor cyclus 34',
     startedAt: DateTime.utc(2026, 8, 12, 11),
+    decision: {
+      'iterationId': 'iter-34',
+      'actorType': 'HUMAN',
+      'mechanism': 'MANUAL_CANCELLATION',
+      'reasonCode': 'MANUALLY_CANCELLED',
+      'decidedAt': DateTime.utc(2026, 8, 12, 11, 1).toIso8601String(),
+    },
   ),
   _iteration(
     id: 'iter-12',
@@ -103,6 +114,9 @@ Future<void> _withDashboard(
 Finder _decisionButton(String id) =>
     find.byKey(ValueKey('iteration-decision-source-$id'));
 
+Finder _iterationRow(String id) =>
+    find.ancestor(of: _decisionButton(id), matching: find.byType(ListTile));
+
 Future<void> _finishDialogTransition(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
@@ -114,8 +128,53 @@ void main() {
     (tester) async {
       final callLog = <Map<String, String>>[];
       await _withDashboard(tester, callLog, () async {
+        final semantics = tester.ensureSemantics();
         expect(find.byType(IterationDecisionSourceButton), findsNWidgets(2));
-        expect(find.text('Beslisbron: Technische fout'), findsNWidgets(2));
+        expect(find.text('Beslisbron: Mens'), findsOneWidget);
+        expect(find.text('Reden: Handmatig geannuleerd'), findsOneWidget);
+        expect(
+          find.text('Beslisbron: Technische fout (Afgeleid)'),
+          findsOneWidget,
+        );
+        final explicitRow = _iterationRow('iter-34');
+        expect(
+          find.descendant(
+            of: explicitRow,
+            matching: find.byType(ClassificationBadge),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: explicitRow,
+            matching: find.textContaining(
+              'De cyclus is door een technische fout gestopt',
+            ),
+          ),
+          findsNothing,
+        );
+
+        final historicalRow = _iterationRow('iter-12');
+        expect(
+          tester
+              .widget<ClassificationBadge>(
+                find.descendant(
+                  of: historicalRow,
+                  matching: find.byType(ClassificationBadge),
+                ),
+              )
+              .classification,
+          kTechnischeFout,
+        );
+        expect(
+          find.descendant(
+            of: historicalRow,
+            matching: find.textContaining(
+              'De cyclus is door een technische fout gestopt',
+            ),
+          ),
+          findsOneWidget,
+        );
 
         for (final iteration in _iterations) {
           final button = _decisionButton('${iteration['id']}');
@@ -143,6 +202,30 @@ void main() {
             findsNothing,
           );
         }
+        expect(
+          tester
+              .getSemantics(
+                find.descendant(
+                  of: _decisionButton('iter-34'),
+                  matching: find.byType(OutlinedButton),
+                ),
+              )
+              .getSemanticsData()
+              .label,
+          contains('Beslisbron: Mens. Reden: Handmatig geannuleerd'),
+        );
+        expect(
+          tester
+              .getSemantics(
+                find.descendant(
+                  of: _decisionButton('iter-12'),
+                  matching: find.byType(OutlinedButton),
+                ),
+              )
+              .getSemanticsData()
+              .label,
+          contains('Beslisbron: Technische fout (Afgeleid)'),
+        );
 
         for (final forbiddenText in [
           'Synthetische foutreden uitsluitend voor cyclus 12',
@@ -153,6 +236,45 @@ void main() {
         ]) {
           expect(find.text(forbiddenText), findsNothing);
         }
+        semantics.dispose();
+      });
+    },
+  );
+
+  testWidgets(
+    'expliciete annulering toont in detail dezelfde bron en reden plus mechanisme en tijd',
+    (tester) async {
+      final callLog = <Map<String, String>>[];
+      await _withDashboard(tester, callLog, () async {
+        await tester.tap(
+          find.descendant(
+            of: _decisionButton('iter-34'),
+            matching: find.byType(OutlinedButton),
+          ),
+        );
+        await _finishDialogTransition(tester);
+
+        expect(find.text('Productcyclus 34'), findsOneWidget);
+        expect(find.text('Beslisbron: Mens'), findsNWidgets(2));
+        expect(find.text('Reden: Handmatig geannuleerd'), findsNWidgets(2));
+        expect(find.text('Mechanisme: Handmatige annulering'), findsOneWidget);
+        expect(find.text('Beslist op: 12-08-2026 11:01'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(ClassificationBadge),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text(
+              'De cyclus is door een technische fout gestopt',
+            ),
+          ),
+          findsNothing,
+        );
       });
     },
   );
@@ -180,6 +302,26 @@ void main() {
         expect(
           find.text('Synthetische foutreden uitsluitend voor cyclus 34'),
           findsNothing,
+        );
+        expect(
+          tester
+              .widget<ClassificationBadge>(
+                find.descendant(
+                  of: find.byType(AlertDialog),
+                  matching: find.byType(ClassificationBadge),
+                ),
+              )
+              .classification,
+          kTechnischeFout,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text(
+              'De cyclus is door een technische fout gestopt',
+            ),
+          ),
+          findsOneWidget,
         );
 
         await tester.tap(find.text('Sluiten'));

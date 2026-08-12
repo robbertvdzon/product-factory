@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.iteration
 
+import nl.vdzon.productfactory.contracts.ShadowIterationDecisionView
 import nl.vdzon.productfactory.contracts.ShadowIterationStepView
 import nl.vdzon.productfactory.contracts.ShadowIterationView
 import nl.vdzon.productfactory.product.api.ProductCatalog
@@ -133,7 +134,13 @@ class ShadowIterationService(
         if (iteration.status !in setOf("QUEUED", "RUNNING")) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Iteratie is al afgerond (${iteration.status})")
         }
-        repository.markFailed(id, reason?.trim()?.ifBlank { null } ?: "Handmatig geannuleerd")
+        val cancelled = repository.markManuallyCancelled(
+            id,
+            reason?.trim()?.ifBlank { null } ?: "Handmatig geannuleerd",
+        )
+        if (!cancelled) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Iteratie is ondertussen al afgerond")
+        }
         return require(productSlug, id)
     }
 
@@ -557,6 +564,31 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         }
     }
 
+    /**
+     * Schrijft de terminale overgang en de menselijke provenance met exact dezelfde tijdswaarde.
+     * De omringende servicetransactie rolt de statuswijziging terug als het unieke beslisrecord niet
+     * kan worden opgeslagen; een gelijktijdig afgeronde iteratie raakt geen van beide tabellen.
+     */
+    fun markManuallyCancelled(iterationId: String, error: String): Boolean {
+        val decidedAt = Timestamp.from(Instant.now())
+        val updated = jdbc.update(
+            """update shadow_iteration set status = 'FAILED', current_agent_role = null,
+                error_message = ?, outcome_reason = 'TECHNICAL_FAILURE', completed_at = ?
+                where id = ? and status in ('QUEUED', 'RUNNING')""".trimIndent(),
+            error.take(MAX_ERROR_CHARS),
+            decidedAt,
+            iterationId,
+        )
+        if (updated == 0) return false
+        jdbc.update(
+            """insert into shadow_iteration_decision(iteration_id, actor_type, mechanism, reason_code, decided_at)
+                values (?, 'HUMAN', 'MANUAL_CANCELLATION', 'MANUALLY_CANCELLED', ?)""".trimIndent(),
+            iterationId,
+            decidedAt,
+        )
+        return true
+    }
+
     /** Een geaccepteerde richting die pas in de leveringslaag uitvalt is een technische fout, geen afwijzing. */
     fun markDeliveryFailed(iterationId: String, criticVerdict: String, reason: String, error: String) {
         val updated = jdbc.update(
@@ -577,6 +609,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
     }
 
     private val mapper = { row: java.sql.ResultSet, _: Int ->
+        val decisionIterationId = row.getString("decision_iteration_id")
         ShadowIterationView(
             row.getString("id"), row.getString("product_slug"), row.getInt("sequence_number"), row.getString("focus"),
             row.getString("mode"), row.getString("status"), row.getString("current_agent_role"), row.getString("critic_verdict"), row.getInt("candidate_count"),
@@ -585,6 +618,15 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
             row.getTimestamp("completed_at")?.toInstant(),
             row.getInt("accepted_candidate_count"), row.getInt("revision_rounds"), row.getString("outcome_reason"),
             row.getString("resume_from_iteration_id"),
+            decisionIterationId?.let {
+                ShadowIterationDecisionView(
+                    it,
+                    row.getString("decision_actor_type"),
+                    row.getString("decision_mechanism"),
+                    row.getString("decision_reason_code"),
+                    row.getTimestamp("decision_decided_at").toInstant(),
+                )
+            },
         )
     }
 
@@ -596,8 +638,12 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         /** Zelfde marge als AgentDispatchPort.BRIDGE_GRACE_SECONDS: geeft de poll-lus de tijd om zijn eigen timeout af te ronden voordat wij die stap als weeskind bestempelen. */
         private const val TIMEOUT_GRACE_SECONDS = 30L
         private const val VIEW_SELECT = """select i.*,
-            greatest(i.generated_candidate_count, (select count(*) from story_candidate s where s.iteration_id = i.id)) as candidate_count
-            from shadow_iteration i"""
+            greatest(i.generated_candidate_count, (select count(*) from story_candidate s where s.iteration_id = i.id)) as candidate_count,
+            d.iteration_id as decision_iteration_id, d.actor_type as decision_actor_type,
+            d.mechanism as decision_mechanism, d.reason_code as decision_reason_code,
+            d.decided_at as decision_decided_at
+            from shadow_iteration i
+            left join shadow_iteration_decision d on d.iteration_id = i.id"""
 
         /** Terminale statussen: de conclusie (status/critic_verdict) van een iteratie mag hierna niet meer overschreven worden. */
         private const val TERMINAL_STATUSES_SQL = "'ACCEPTED', 'NO_CHANGE', 'NEEDS_REVISION', 'REJECTED', 'FAILED'"
