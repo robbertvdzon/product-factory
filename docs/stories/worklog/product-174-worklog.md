@@ -30,3 +30,22 @@ Gedaan / rationale:
 - Definitief vangnet: `mvn -B --no-transfer-progress clean verify` gaf `BUILD SUCCESS` met 0
   failures en 0 errors; `flutter analyze` gaf `No issues found`; `flutter test` gaf 243 tests,
   `All tests passed`.
+
+Review 2026-08-12:
+- [info] De volledige story-diff `main...HEAD` op revision
+  `dd9a6b4ed8f9a17348e52e2c66fdae57f3a98855` is beoordeeld. De gerichte regressieset voor
+  koppeling, cycluskaarten, gedeeltelijke/foutstatussen, beslisdetail en de prominente startactie
+  gaf 24/24 groen; de worktree bleef daarna ongewijzigd.
+- [bug] `main.dart:788` gebruikt alleen het cyclus-id als sibling-key voor de stateful kaart. Twee
+  geladen cycli met hetzelfde id — precies de fixture die een ambigue leveringskoppeling moet
+  afhandelen — leveren daardoor duplicate keys op in `LimitedListSection` in plaats van twee
+  defensief gerenderde kaarten met een niet-gekoppelde levering. De pure groeperingstest rendert
+  deze ambigue invoer niet en vangt de regressie daarom niet.
+- [blocker] De contrasttest in `iteration_cycle_card_test.dart:292` pompt geen enkele widget en
+  inspecteert geen gerenderde voorgrond/achtergrond. Hij vergelijkt uitsluitend geëxporteerde
+  kleurconstanten en bewijst daardoor niet het expliciete criterium voor daadwerkelijk gerenderde
+  gesloten, geopende, fout- en focustoestanden.
+- [blocker] In de beschikbare task-context en repository staat geen agentworker-gemeten bewijs met
+  commandresultaten die aan dezelfde HEAD/worktree-tree zijn gebonden. De developercomment en dit
+  worklog bevatten alleen handgeschreven groen proza; volgens de reviewer-regels is dat geen geldig
+  volledig testbewijs.
