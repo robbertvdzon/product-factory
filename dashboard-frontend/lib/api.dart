@@ -20,13 +20,46 @@ class DashboardApi {
       _object('/api/products/$slug/meetings/$id');
   Future<List<dynamic>> meetingMessages(String slug, String id) =>
       _list('/api/products/$slug/meetings/$id/messages');
-  Future<List<dynamic>> roadmapThemes() => _list('/api/roadmap/themes');
-  Future<List<dynamic>> roadmapThemeVerifications(String slug, String id) =>
-      _list('/api/products/$slug/roadmap/themes/$id/verifications');
+  Future<List<dynamic>> roadmapEpics() => _list('/api/roadmap/epics');
+  Future<List<dynamic>> roadmapEpicVerifications(String slug, String id) =>
+      _list('/api/products/$slug/roadmap/epics/$id/verifications');
   Future<List<dynamic>> roadmapSettledQuestions() =>
       _list('/api/roadmap/settled-questions');
   Future<List<dynamic>> roadmapSessions() => _list('/api/roadmap/sessions');
   Future<Map<String, dynamic>> aiCatalog() => _object('/api/ai-catalog');
+
+  Future<void> createRoadmapEpic(
+    String slug,
+    String title,
+    String description,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/products/$slug/roadmap/epics'),
+      headers: headers,
+      body: jsonEncode({'title': title, 'description': description}),
+    );
+    if (response.statusCode != 201) {
+      throw StateError(_errorMessage(response, 'Epic kon niet worden gemaakt'));
+    }
+  }
+
+  Future<void> updateRoadmapEpic(
+    String slug,
+    String id,
+    Map<String, dynamic> changes,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/products/$slug/roadmap/epics/$id'),
+      headers: headers,
+      body: jsonEncode(changes),
+    );
+    if (response.statusCode != 200) {
+      throw StateError(
+        _errorMessage(response, 'Epic kon niet worden opgeslagen'),
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> shadowIterationSession(
     String productSlug,
     String iterationId,
@@ -251,5 +284,16 @@ class DashboardApi {
       throw StateError('Dashboard API gaf ${response.statusCode}.');
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  String _errorMessage(http.Response response, String fallback) {
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = body['message'] ?? body['detail'] ?? body['error'];
+      if (message != null && '$message'.trim().isNotEmpty) return '$message';
+    } catch (_) {
+      // Niet iedere foutrespons bevat JSON.
+    }
+    return '$fallback (${response.statusCode}).';
   }
 }

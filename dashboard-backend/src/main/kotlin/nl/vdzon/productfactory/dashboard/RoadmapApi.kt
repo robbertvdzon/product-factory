@@ -13,25 +13,25 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/products/{slug}/roadmap")
 class RoadmapApi(private val runtime: ProductFactoryRuntimeClient) {
-    @GetMapping("/themes")
-    fun themes(@PathVariable slug: String): Any = runtime.roadmapThemes(slug)
+    @GetMapping("/epics", "/themes")
+    fun epics(@PathVariable slug: String): Any = runtime.roadmapEpics(slug)
 
-    @GetMapping("/themes/{id}")
-    fun theme(@PathVariable slug: String, @PathVariable id: String): Any = runtime.roadmapTheme(slug, id)
+    @GetMapping("/epics/{id}", "/themes/{id}")
+    fun epic(@PathVariable slug: String, @PathVariable id: String): Any = runtime.roadmapEpic(slug, id)
 
-    @PostMapping("/themes")
+    @PostMapping("/epics", "/themes")
     @ResponseStatus(HttpStatus.CREATED)
-    fun createTheme(@PathVariable slug: String, @RequestBody body: Map<String, Any?>): Any = runtime.createRoadmapTheme(slug, body)
+    fun createEpic(@PathVariable slug: String, @RequestBody body: Map<String, Any?>): Any = runtime.createRoadmapEpic(slug, body)
 
-    @PutMapping("/themes/{id}")
-    fun updateTheme(@PathVariable slug: String, @PathVariable id: String, @RequestBody body: Map<String, Any?>): Any =
-        runtime.updateRoadmapTheme(slug, id, body)
+    @PutMapping("/epics/{id}", "/themes/{id}")
+    fun updateEpic(@PathVariable slug: String, @PathVariable id: String, @RequestBody body: Map<String, Any?>): Any =
+        runtime.updateRoadmapEpic(slug, id, body)
 
-    @PostMapping("/themes/{id}/close")
-    fun closeTheme(@PathVariable slug: String, @PathVariable id: String): Any = runtime.closeRoadmapTheme(slug, id)
+    @PostMapping("/epics/{id}/close", "/themes/{id}/close")
+    fun closeEpic(@PathVariable slug: String, @PathVariable id: String): Any = runtime.closeRoadmapEpic(slug, id)
 
-    @GetMapping("/themes/{id}/verifications")
-    fun themeVerifications(@PathVariable slug: String, @PathVariable id: String): Any = runtime.roadmapThemeVerifications(slug, id)
+    @GetMapping("/epics/{id}/verifications", "/themes/{id}/verifications")
+    fun epicVerifications(@PathVariable slug: String, @PathVariable id: String): Any = runtime.roadmapEpicVerifications(slug, id)
 
     @GetMapping("/settled-questions")
     fun settledQuestions(@PathVariable slug: String): Any = runtime.roadmapSettledQuestions(slug)

@@ -118,32 +118,39 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/products/{slug}/meetings/{id}/close", slug, id)
         .retrieve().body(Any::class.java)!!
 
-    fun roadmapThemes(slug: String): List<Map<String, Any?>> = runtime.get()
-        .uri("/api/products/{slug}/roadmap/themes", slug)
+    fun roadmapEpics(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/epics", slug)
         .retrieve().body(listType).orEmpty()
 
-    fun roadmapTheme(slug: String, id: String): Map<String, Any?> = runtime.get()
-        .uri("/api/products/{slug}/roadmap/themes/{id}", slug, id)
+    fun roadmapEpic(slug: String, id: String): Map<String, Any?> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/epics/{id}", slug, id)
         .retrieve().body(object : ParameterizedTypeReference<Map<String, Any?>>() {})
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
-    fun createRoadmapTheme(slug: String, body: Map<String, Any?>): Any = runtime.post()
-        .uri("/api/products/{slug}/roadmap/themes", slug)
+    fun createRoadmapEpic(slug: String, body: Map<String, Any?>): Any = runtime.post()
+        .uri("/api/products/{slug}/roadmap/epics", slug)
         .body(body)
         .retrieve().body(Any::class.java)!!
 
-    fun updateRoadmapTheme(slug: String, id: String, body: Map<String, Any?>): Any = runtime.put()
-        .uri("/api/products/{slug}/roadmap/themes/{id}", slug, id)
+    fun updateRoadmapEpic(slug: String, id: String, body: Map<String, Any?>): Any = runtime.put()
+        .uri("/api/products/{slug}/roadmap/epics/{id}", slug, id)
         .body(body)
         .retrieve().body(Any::class.java)!!
 
-    fun closeRoadmapTheme(slug: String, id: String): Any = runtime.post()
-        .uri("/api/products/{slug}/roadmap/themes/{id}/close", slug, id)
+    fun closeRoadmapEpic(slug: String, id: String): Any = runtime.post()
+        .uri("/api/products/{slug}/roadmap/epics/{id}/close", slug, id)
         .retrieve().body(Any::class.java)!!
 
-    fun roadmapThemeVerifications(slug: String, id: String): List<Map<String, Any?>> = runtime.get()
-        .uri("/api/products/{slug}/roadmap/themes/{id}/verifications", slug, id)
+    fun roadmapEpicVerifications(slug: String, id: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/epics/{id}/verifications", slug, id)
         .retrieve().body(listType).orEmpty()
+
+    fun roadmapThemes(slug: String) = roadmapEpics(slug)
+    fun roadmapTheme(slug: String, id: String) = roadmapEpic(slug, id)
+    fun createRoadmapTheme(slug: String, body: Map<String, Any?>) = createRoadmapEpic(slug, body)
+    fun updateRoadmapTheme(slug: String, id: String, body: Map<String, Any?>) = updateRoadmapEpic(slug, id, body)
+    fun closeRoadmapTheme(slug: String, id: String) = closeRoadmapEpic(slug, id)
+    fun roadmapThemeVerifications(slug: String, id: String) = roadmapEpicVerifications(slug, id)
 
     fun roadmapSettledQuestions(slug: String): List<Map<String, Any?>> = runtime.get()
         .uri("/api/products/{slug}/roadmap/settled-questions", slug)

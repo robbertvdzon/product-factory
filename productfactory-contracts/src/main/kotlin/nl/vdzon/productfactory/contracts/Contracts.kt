@@ -195,14 +195,22 @@ data class MeetingMessageView(
     val createdAt: Instant,
 )
 
-data class RoadmapThemeView(
+data class RoadmapEpicView(
     val id: String,
     val productSlug: String,
     val sequenceNumber: Int,
     val title: String,
     val description: String,
+    /** Tijdelijke compatibiliteit voor oudere dashboardimages; nieuwe UI toont dit veld niet. */
     val priority: String,
     val status: String,
+    val customerRank: Int,
+    val processRank: Int,
+    val priorityScore: Int,
+    val roadmapRank: Int,
+    val dependencyIds: List<String>,
+    val blockedByIds: List<String>,
+    val blocksIds: List<String>,
     val createdAt: Instant,
     val updatedAt: Instant,
     val closedAt: Instant?,

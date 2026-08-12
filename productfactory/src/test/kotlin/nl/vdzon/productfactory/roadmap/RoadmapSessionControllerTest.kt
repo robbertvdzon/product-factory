@@ -106,7 +106,7 @@ class RoadmapSessionControllerTest(
         @Primary
         fun fakeAgentDispatch(): AgentDispatchPort = AgentDispatchPort { task ->
             val summary = when (task.taskType) {
-                "roadmap-session" -> """{"summary":"Nepsamenvatting van de roadmap-sessie.","themeUpdates":[{"action":"CREATE","themeId":null,"title":"UX verbeteren","description":"Navigatie begrijpelijker maken voor nieuwe bezoekers.","priority":"HIGH"}],"settledQuestions":["Archief X is publiek benaderbaar zonder token"]}"""
+                "roadmap-session" -> """{"summary":"Nepsamenvatting van de roadmap-sessie.","epicUpdates":[{"action":"CREATE","epicId":null,"title":"UX verbeteren","description":"Navigatie begrijpelijker maken voor nieuwe bezoekers.","processRank":1,"dependencyIds":[]}],"settledQuestions":["Archief X is publiek benaderbaar zonder token"]}"""
                 else -> """{"summary":"onbekend"}"""
             }
             AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)

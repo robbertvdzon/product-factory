@@ -4,10 +4,10 @@ internal object RoadmapSchemas {
     val session = schema(
         """
         "summary":{"type":"string","minLength":40,"maxLength":4000},
-        "themeUpdates":{"type":"array","maxItems":10,"items":{"type":"object","additionalProperties":false,"required":["action","themeId","title","description","priority"],"properties":{"action":{"type":"string","enum":["CREATE","UPDATE","CLOSE"]},"themeId":{"type":["string","null"]},"title":{"type":"string","minLength":3,"maxLength":240},"description":{"type":"string","minLength":10,"maxLength":2000},"priority":{"type":"string","enum":["HIGH","MEDIUM","LOW"]}}}},
+        "epicUpdates":{"type":"array","maxItems":10,"items":{"type":"object","additionalProperties":false,"required":["action","epicId","title","description","processRank","dependencyIds"],"properties":{"action":{"type":"string","enum":["CREATE","UPDATE","CLOSE"]},"epicId":{"type":["string","null"]},"title":{"type":"string","minLength":3,"maxLength":80},"description":{"type":"string","minLength":10,"maxLength":10000},"processRank":{"type":"integer","minimum":1,"maximum":1000},"dependencyIds":{"type":"array","maxItems":20,"items":{"type":"string","maxLength":120}}}}},
         "settledQuestions":{"type":"array","maxItems":10,"items":{"type":"string","minLength":10,"maxLength":1000}}
         """.trimIndent(),
-        listOf("summary", "themeUpdates", "settledQuestions"),
+        listOf("summary", "epicUpdates", "settledQuestions"),
     )
 
     val deliveryVerification = schema(

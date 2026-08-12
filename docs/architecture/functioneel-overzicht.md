@@ -327,6 +327,15 @@ beneden:
 - **Software Factory-stories**: elke levering met storysleutel, titel, status (`DELIVERING`,
   `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`, `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst
   bekende Software Factory-fase.
+- **Epic-roadmap**: per product een horizontale grafiek met compacte epic-kaarten in de berekende
+  uitvoervolgorde en pijlen voor afhankelijkheden. Elke kaart toont roadmap-rank,
+  prioriteitsscore (0–100), klant-rank, process-rank en of de epic uitvoerbaar, geblokkeerd of
+  afgerond is. De klant-rank weegt voor 75% en de door het roadmapproces onderhouden process-rank
+  voor 25%; afhankelijkheden zijn harde voorwaarden en gaan vóór de score. Een klik opent titel,
+  beschrijving, status, gekoppelde stories en opleverrapporten. Daar kan de klant titel,
+  beschrijving, eigen rank en dependencies aanpassen; de process-rank blijft alleen-lezen.
+  Circulaire dependencies worden atomair geweigerd. Een nieuwe epic krijgt een korte titel van
+  maximaal 80 tekens en wordt achteraan in beide ranglijsten toegevoegd.
 - **Benodigde access tokens**: alleen zichtbaar zodra er iets openstaat; met een knop "Gereed
   melden" per item.
 - **Storykandidaten**: alle interne kandidaten (ook afgewezen of nog niet geleverde) met status.

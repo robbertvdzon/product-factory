@@ -46,6 +46,28 @@
   respectievelijk rollback en blijft geen halve overgang achter. De optionele request-`reason`
   blijft uitsluitend in het bestaande `error_message` en wordt niet naar provenance gekopieerd.
 
+## Epic-roadmap, ranking en dependencies
+
+- Flyway-migratie `V21__roadmap_epic_ranking.sql` voegt `customer_rank` en `process_rank` toe aan
+  de bestaande `roadmap_theme`-tabel. De tabelnaam en bestaande epic-ID's blijven bewust behouden
+  zodat historische storykoppelingen geldig blijven; in contracten, API en UI heet het object een
+  epic. De migratie initialiseert beide ranglijsten deterministisch vanuit de oude
+  HIGH/MEDIUM/LOW-prioriteit en het volgnummer.
+- Beide ranks vormen per product een unieke, aaneengesloten volgorde. Verplaatsen gebeurt binnen
+  een transactie na een row lock op `product_definition`. Klant-API's kunnen alleen
+  `customerRank` wijzigen; de roadmap-session-agent kan alleen `processRank` wijzigen.
+- De score is een integer van 0 tot 100. Elke rank wordt lineair genormaliseerd binnen het actuele
+  aantal epics (rank 1 = 100; laatste rank = 0; één epic = 100), waarna
+  `round(0,75 × klantpunten + 0,25 × procespunten)` wordt toegepast.
+- `roadmap_epic_dependency` legt gerichte afhankelijkheden vast. De roadmapvolgorde is een
+  topologische sortering: alleen epics waarvan alle predecessors geplaatst zijn komen in
+  aanmerking; tussen die epics wint de hoogste score. Onbekende, self- en circulaire dependencies
+  worden geweigerd en de hele mutatie wordt teruggedraaid.
+- De primaire routes zijn `/api/products/{slug}/roadmap/epics`; de oude `/themes`-routes blijven
+  tijdelijk als rolloutcompatibiliteit bestaan. `RoadmapEpicView` levert onder andere
+  `customerRank`, `processRank`, `priorityScore`, `roadmapRank`, `dependencyIds`, `blockedByIds`
+  en `blocksIds`.
+
 ## Frontend-conventies (`dashboard-frontend/lib`)
 
 - `main.dart` — widgets en pagina's; `api.dart` — HTTP-client; `config.dart` — build-time config;
@@ -76,6 +98,9 @@
   eigen `FocusNode`; na sluiten via de sluitactie of Escape keert de focus terug naar de opener.
   De dialoogtitel gebruikt het user-facing `sequenceNumber`, met het iteratie-id als fallback als
   dat nummer ontbreekt. Openen en sluiten gebruikt uitsluitend de bestaande GET-calls.
+  `roadmap.dart` bevat het epic-contract voor de UI, de horizontale dependencygrafiek, kaartjes en
+  de maak-/detaildialogen. De process-rank en score zijn daar alleen-lezen; klant-rank,
+  dependencies, titel, beschrijving en status worden via de epic-routes opgeslagen.
 - Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
   `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
   `4m 12s`, `35s`). Backendtijdstempels zijn ISO-8601 in UTC; `parseInstant` is defensief en levert

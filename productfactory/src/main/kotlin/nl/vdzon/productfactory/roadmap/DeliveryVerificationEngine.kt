@@ -16,10 +16,10 @@ import org.springframework.stereotype.Component
  * De "opleverchecker": bezoekt de draaiende applicatie om te verifiëren of een door Software Factory
  * bevestigd opgeleverde story (zie [nl.vdzon.productfactory.autonomy.AutonomousDelivery.reconcileStory]
  * — `deployRolloutStage == DEPLOYED`) ook daadwerkelijk voldoet aan zijn acceptatiecriteria én de
- * bedoeling van het gekoppelde roadmapthema. Een agent-rol met browsertoegang, geen mechanische check:
+ * bedoeling van de gekoppelde roadmap-epic. Een agent-rol met browsertoegang, geen mechanische check:
  * "staat live" en "doet wat bedoeld was" zijn twee verschillende vragen. Het rapport is input voor de
- * PRODUCT_MANAGER-rol (zie RoadmapSessionEngine), die op basis daarvan een thema pas sluit nadat
- * bevestigd is dat de opgeleverde stories ook echt het thema waarmaken — niet doordat de PM het zelf
+ * PRODUCT_MANAGER-rol (zie RoadmapSessionEngine), die op basis daarvan een epic pas sluit nadat
+ * bevestigd is dat de opgeleverde stories ook echt de epic waarmaken — niet doordat de PM het zelf
  * in de applicatie test.
  */
 @Component
@@ -76,7 +76,7 @@ class DeliveryVerificationEngine(
         geraakte onderdelen (backend, frontend, ...) staan live met de juiste versie. Jouw taak is niet
         dat nogmaals te controleren, maar te verifiëren of wat er nu daadwerkelijk in de applicatie
         staat ook echt voldoet aan de acceptatiecriteria hieronder én bijdraagt aan de bedoeling van het
-        gekoppelde roadmapthema. Bezoek de draaiende applicatie zelf, gebruik hem zoals een eindgebruiker
+        gekoppelde roadmap-epic. Bezoek de draaiende applicatie zelf, gebruik hem zoals een eindgebruiker
         dat zou doen, en baseer je oordeel op wat je daadwerkelijk ziet, niet op de beschrijving alleen.
 
         ${environmentInstruction(product)}
@@ -86,11 +86,11 @@ class DeliveryVerificationEngine(
         ACCEPTATIECRITERIA:
         ${candidate.acceptanceCriteria?.ifBlank { "Geen expliciete criteria vastgelegd." } ?: "Geen expliciete criteria vastgelegd."}
 
-        ROADMAPTHEMA WAARAAN DEZE STORY MOET BIJDRAGEN: $themeTitle
-        THEMABESCHRIJVING: $themeDescription
+        ROADMAP-EPIC WAARAAN DEZE STORY MOET BIJDRAGEN: $themeTitle
+        EPICBESCHRIJVING: $themeDescription
 
         OORDEEL: zet verdict op "SATISFIES" als de acceptatiecriteria zijn behaald en het zichtbaar
-        bijdraagt aan het thema. Zet "DOES_NOT_SATISFY" als je een concrete tekortkoming vindt (benoem
+        bijdraagt aan de epic. Zet "DOES_NOT_SATISFY" als je een concrete tekortkoming vindt (benoem
         die expliciet in report). Zet "INCONCLUSIVE" als je het niet met voldoende zekerheid kunt
         beoordelen (bijvoorbeeld omdat de omgeving niet bereikbaar was) en leg uit waarom. Schrijf in
         report een kort, concreet verslag van wat je hebt gezien en waarom je tot dit oordeel komt.

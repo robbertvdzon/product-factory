@@ -13,7 +13,7 @@ import java.time.Instant
 /**
  * Repository voor één sessie van de Product Manager-rol (zie RoadmapSessionEngine, module-intern).
  * Bewust een eigen klasse naast [RoadmapCatalog]: een sessie is een agentaanroep met een levenscyclus
- * (QUEUED/RUNNING/COMPLETED/FAILED), geen CRUD-aggregaat zoals een thema.
+ * (QUEUED/RUNNING/COMPLETED/FAILED), geen CRUD-aggregaat zoals een epic.
  */
 @Service
 class RoadmapSessionRepository(private val jdbc: JdbcTemplate, private val products: ProductCatalog) {

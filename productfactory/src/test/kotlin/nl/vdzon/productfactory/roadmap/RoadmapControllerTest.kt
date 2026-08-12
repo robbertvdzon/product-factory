@@ -39,37 +39,49 @@ class RoadmapControllerTest(
             )
         }
         jdbc.update("delete from roadmap_settled_question where product_slug = ?", slug)
+        jdbc.update(
+            "delete from roadmap_epic_dependency where epic_id in (select id from roadmap_theme where product_slug = ?)",
+            slug,
+        )
         jdbc.update("delete from roadmap_theme where product_slug = ?", slug)
     }
 
     @Test
-    fun `a theme can be created, updated, closed and read back via the REST API`() {
-        val created = mvc.post("/api/products/$slug/roadmap/themes") {
+    fun `an epic can be created ranked updated closed and read back via the REST API`() {
+        mvc.post("/api/products/$slug/roadmap/epics") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"title":"UX verbeteren","description":"Navigatie begrijpelijker maken","priority":"HIGH"}"""
+            content = """{"title":"Fundament","description":"Technisch fundament neerzetten"}"""
+        }.andExpect { status { isCreated() } }
+        val created = mvc.post("/api/products/$slug/roadmap/epics") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"UX verbeteren","description":"Navigatie begrijpelijker maken"}"""
         }.andExpect {
             status { isCreated() }
             jsonPath("$.status") { value("OPEN") }
+            jsonPath("$.customerRank") { value(2) }
+            jsonPath("$.processRank") { value(2) }
+            jsonPath("$.priorityScore") { value(0) }
         }.andReturn()
         val id = mapper.readTree(created.response.contentAsString).path("id").asText()
 
-        mvc.put("/api/products/$slug/roadmap/themes/$id") {
+        mvc.put("/api/products/$slug/roadmap/epics/$id") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"priority":"LOW"}"""
+            content = """{"customerRank":1}"""
         }.andExpect {
             status { isOk() }
-            jsonPath("$.priority") { value("LOW") }
+            jsonPath("$.customerRank") { value(1) }
+            jsonPath("$.priorityScore") { value(75) }
             jsonPath("$.title") { value("UX verbeteren") }
         }
 
-        mvc.post("/api/products/$slug/roadmap/themes/$id/close").andExpect {
+        mvc.post("/api/products/$slug/roadmap/epics/$id/close").andExpect {
             status { isOk() }
             jsonPath("$.status") { value("DONE") }
         }
 
-        mvc.get("/api/products/$slug/roadmap/themes").andExpect {
+        mvc.get("/api/products/$slug/roadmap/epics").andExpect {
             status { isOk() }
-            jsonPath("$.length()") { value(1) }
+            jsonPath("$.length()") { value(2) }
             jsonPath("$[0].status") { value("DONE") }
         }
     }
@@ -89,10 +101,12 @@ class RoadmapControllerTest(
     }
 
     @Test
-    fun `an invalid priority is rejected with a 400`() {
-        mvc.post("/api/products/$slug/roadmap/themes") {
+    fun `a title longer than the compact card limit is rejected`() {
+        mvc.post("/api/products/$slug/roadmap/epics") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"title":"Iets","description":"Iets anders","priority":"URGENT"}"""
+            content = mapper.writeValueAsString(
+                mapOf("title" to "x".repeat(81), "description" to "Iets anders"),
+            )
         }.andExpect { status { isBadRequest() } }
     }
 }
