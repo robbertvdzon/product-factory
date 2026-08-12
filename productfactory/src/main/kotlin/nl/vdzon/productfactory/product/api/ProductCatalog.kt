@@ -40,7 +40,6 @@ data class ProductConfiguration(
     val dailyBudgetCents: Int,
     val monthlyBudgetCents: Int,
     val escalationPolicy: String,
-    val sourceRules: String,
     val privacyRules: String,
     val accessibilityRules: String,
     val qualityRules: String,
@@ -117,9 +116,9 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
                     target_repository_name, workspace_directory, workspace_ownership, live_url,
                     preview_url_pattern, acceptance_url, admin_url, status, development_mode, timezone,
                     max_stories_per_cycle, wip_limit, ai_provider, ai_model, daily_budget_cents,
-                    monthly_budget_cents, escalation_policy, source_rules, privacy_rules,
+                    monthly_budget_cents, escalation_policy, privacy_rules,
                     accessibility_rules, quality_rules
-                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
                 "pf-${UUID.randomUUID()}", product.slug, product.name.trim(), product.mission.trim(),
                 product.description.trim(), product.guardrails.trim(), product.softwareFactoryProjectKey.trim(),
                 product.targetRepositoryName.trim(), "products/${product.slug}", product.workspaceOwnership,
@@ -128,7 +127,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
                 product.status, product.developmentMode, product.timezone.trim(),
                 product.maxStoriesPerCycle, product.wipLimit, product.aiProvider.trim(), product.aiModel.trim(),
                 product.dailyBudgetCents, product.monthlyBudgetCents, product.escalationPolicy.trim(),
-                product.sourceRules.trim(), product.privacyRules.trim(), product.accessibilityRules.trim(), product.qualityRules.trim(),
+                product.privacyRules.trim(), product.accessibilityRules.trim(), product.qualityRules.trim(),
             )
         } catch (_: DuplicateKeyException) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Productslug bestaat al")
@@ -324,7 +323,6 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         dailyBudgetCents = row.getInt("daily_budget_cents"),
         monthlyBudgetCents = row.getInt("monthly_budget_cents"),
         escalationPolicy = row.getString("escalation_policy"),
-        sourceRules = row.getString("source_rules"),
         privacyRules = row.getString("privacy_rules"),
         accessibilityRules = row.getString("accessibility_rules"),
         qualityRules = row.getString("quality_rules"),

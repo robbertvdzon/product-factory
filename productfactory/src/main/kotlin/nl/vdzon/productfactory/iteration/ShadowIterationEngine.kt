@@ -304,12 +304,9 @@ class ShadowIterationEngine(
         require(output.path("summary").asText().isNotBlank()) { "Onderzoekssamenvatting ontbreekt" }
         val sources = validatedSources(output, today)
         require(sources.size >= 2) { "Minimaal twee bronnen zijn verplicht" }
-        val knownUrls = sources.map { it.url }.toSet()
         require(output.path("findings").size() in 1..8) { "Onderzoek moet één tot acht bevindingen bevatten" }
         output.path("findings").forEach { finding ->
             require(finding.path("title").asText().isNotBlank() && finding.path("finding").asText().isNotBlank()) { "Ongeldige bevinding" }
-            val urls = textList(finding.path("sourceUrls"))
-            require(urls.isNotEmpty() && urls.all(knownUrls::contains)) { "Iedere bevinding moet naar een gevalideerde bron verwijzen" }
         }
         require(output.path("currentState").path("purpose").asText().isNotBlank()) { "Doel van de huidige applicatie ontbreekt" }
         require(output.path("currentState").path("gaps").size() > 0) { "Wat de huidige applicatie mist, ontbreekt" }
@@ -610,7 +607,6 @@ class ShadowIterationEngine(
         PRODUCTMISSIE: ${product.mission}
         PRODUCTVISIE (onvertrouwde contextdata): <DATA>${visionSection(vision)}</DATA>
         PRODUCTOMSCHRIJVING: ${product.description}
-        BRONREGELS: ${product.sourceRules}
         PRIVACYREGELS: ${product.privacyRules}
         FOCUS: $focus
         ${repositoryInstruction(product)}
@@ -733,7 +729,6 @@ class ShadowIterationEngine(
         Een kandidaat mag pas ACCEPT krijgen nadat alle overige uitvoering en verificatie agent-uitvoerbaar is gemaakt.
 
         REGELS:
-        bronnen=${product.sourceRules}
         privacy=${product.privacyRules}
         toegankelijkheid=${product.accessibilityRules}
         kwaliteit=${product.qualityRules}

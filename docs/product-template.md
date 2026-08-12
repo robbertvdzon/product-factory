@@ -27,7 +27,6 @@ Gebruik het beheerdashboard of stuur onderstaand contract naar `POST /api/produc
   "dailyBudgetCents": 0,
   "monthlyBudgetCents": 0,
   "escalationPolicy": "Wanneer is menselijk handelen echt noodzakelijk?",
-  "sourceRules": "Welke eisen gelden voor bronnen en onzekerheid?",
   "privacyRules": "Welke persoonsgegevens mogen worden verwerkt?",
   "accessibilityRules": "Welke toegankelijkheidseisen zijn verplicht?",
   "qualityRules": "Wanneer is een productstap aantoonbaar goed?"

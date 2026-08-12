@@ -183,7 +183,7 @@ class ShadowIterationEngineTest(
         val researcherSteps = repository.steps("hkh-autopilot", iteration.id).filter { it.role == "RESEARCHER" }
         assertEquals(2, researcherSteps.size)
         assertEquals("FAILED", researcherSteps[0].status)
-        assertTrue(researcherSteps[0].errorMessage!!.contains("gevalideerde bron"))
+        assertTrue(researcherSteps[0].errorMessage!!.contains("twee bronnen"))
         assertEquals("COMPLETED", researcherSteps[1].status)
     }
 
@@ -316,10 +316,9 @@ class ShadowIterationEngineTest(
             val json = when (task.taskType.removePrefix("shadow-")) {
                 "researcher" -> if (scenario == Scenario.RESEARCH_RETRY_THEN_ACCEPT && task.runId.endsWith("-researcher-1")) """{
                     "summary":"Open erfgoedbronnen kunnen een controleerbare eerste zoekervaring ondersteunen.",
-                    "findings":[{"title":"Open collecties","finding":"Een bevinding die naar een niet-gevalideerde bron verwijst.","sourceUrls":["https://niet-in-sources.example/"]}],
+                    "findings":[{"title":"Open collecties","finding":"Noord-Hollands Archief biedt een publiek beschreven collectie met herleidbare objectpagina's.","sourceUrls":["https://noord-hollandsarchief.nl/"]}],
                     "sources":[
-                      {"url":"https://noord-hollandsarchief.nl/","consultedOn":"$today","rightsIndication":"Rechten verschillen per object en moeten op de objectpagina worden gecontroleerd.","rationale":"Regionale bron voor Noord-Hollandse archiefcollecties."},
-                      {"url":"https://www.rijksmuseum.nl/nl/rijksstudio","consultedOn":"$today","rightsIndication":"Beschikbaarheid en rechten staan per object vermeld.","rationale":"Voorbeeld van een doorzoekbare Nederlandse erfgoedcollectie."}
+                      {"url":"https://noord-hollandsarchief.nl/","consultedOn":"$today","rightsIndication":"Rechten verschillen per object en moeten op de objectpagina worden gecontroleerd.","rationale":"Regionale bron voor Noord-Hollandse archiefcollecties."}
                     ],
                     "currentState":{"purpose":"De applicatie helpt bewoners lokale geschiedenis herleidbaar te ontdekken.","gaps":["Geen brontransparantie bij zoekresultaten"]},
                     "improvementOpportunities":["Toon rechten- en broninformatie direct bij ieder resultaat"],

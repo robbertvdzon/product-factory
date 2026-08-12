@@ -89,7 +89,6 @@ data class ProductView(
     val dailyBudgetCents: Int,
     val monthlyBudgetCents: Int,
     val escalationPolicy: String,
-    val sourceRules: String,
     val privacyRules: String,
     val accessibilityRules: String,
     val qualityRules: String,
