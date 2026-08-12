@@ -10,8 +10,10 @@ De Flutter-webapp (`dashboard-frontend`) heeft één hoofdscherm: het productove
 elke 5 seconden en bestaat van boven naar beneden uit:
 
 1. **Metric-tegels** — totalen voor producten, interne storykandidaten, workspace-publicaties,
-   shadow-iteraties en Software Factory-stories. Deze tellers tonen altijd het *totaal*, ook als de lijst
-   eronder is ingekort.
+   shadow-iteraties en Software Factory-stories. Een succesvol geladen teller toont altijd het
+   *totaal*, ook als de lijst eronder is ingekort. De drie afzonderlijk geladen bronnen voor
+   storykandidaten, shadow-iteraties en Software Factory-stories tonen tijdens laden `Laden…` en bij
+   een fout `Niet beschikbaar`, zodat een ontbrekende bron niet als nul wordt gepresenteerd.
 2. **Producten** — per product status, ontwikkelmodus en knoppen voor pauzeren/hervatten,
    instellingen en 'Start productcyclus nu'. 'Start productcyclus nu' staat als losstaande,
    visueel dominante CTA (`StartCycleButton`, eigen rand/kleurenpaar met WCAG AA-contrast
@@ -26,8 +28,41 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    opent met focus binnen de dialoog, houdt de tab-focus binnen de dialoog (focus-trap) en sluit
    met Escape waarbij de focus terugkeert naar de Instellingen-knop. Volgorde van de productenlijst:
    zoals de backend hem levert (op slug).
-3. **Productcycli en onderzoekssessies** — per cyclus status, huidige rol, **starttijd** en
-   **doorlooptijd**, aantal kandidaten en of de cyclus doorgezet mag worden. Een iteratie met
+3. **Productcycli en onderzoekssessies** — iedere cyclus staat in een compacte, zelfstandig
+   uitklapbare kaart. De gesloten kaart toont product en cyclusnummer, status, huidige rol,
+   **starttijd**, **doorlooptijd**, toepasselijke kernreden en beslisbron. Daarnaast staan er twee
+   afzonderlijke aantallen: `Interne kandidaten` en `Software Factory-leveringen`. Deze aantallen
+   komen uit de records van de actuele, succesvol geladen dashboardverversing en zijn als `geladen
+   gegevens` gelabeld; de al bestaande backendcyclusaantallen voor kandidaten en leverbare
+   kandidaten blijven afzonderlijk zichtbaar.
+
+   De native button `Toon opbrengst` opent alleen de opbrengst in dezelfde kaart en verandert dan in
+   `Verberg opbrengst`. De toegankelijke naam bevat het cyclusnummer, de expanded-semantiek volgt de
+   toestand en muis, Enter en Spatie werken gelijk. De focus blijft bij openen en sluiten op deze
+   button, die een zichtbare focusrand heeft. In een geopende kaart staan precies de groepen
+   `Interne kandidaten` en `Software Factory-leveringen`. Per record tonen ze titel en tekstuele
+   kandidaat- of leveringsstatus; een lege groep meldt expliciet dat de geladen gegevens geen
+   resultaten bevatten. De opbrengst verdwijnt bij inklappen uit de widget- en semantics-tree. De
+   bestaande afzonderlijke beslisbronbutton blijft het cyclusdetail openen, zodat interactieve
+   bedieningen niet in elkaar zijn genest.
+
+   De frontend groepeert alle geladen cycli voordat de bestaande 5/+10-lijstbeperking wordt
+   toegepast. Een kandidaat koppelt alleen bij precies één exacte, hoofdlettergevoelige match op
+   `productSlug` + het integerpaar `iterationSequenceNumber`/`sequenceNumber`; een levering alleen
+   bij precies één exacte match op `productSlug` + het stringpaar `iterationId`/`id`. Ontbrekende,
+   lege, anders getypeerde, kruisproduct- of ambigue relaties worden niet geschat via titel,
+   kandidaat-id, lijstpositie, volgorde of waarschijnlijkheid. Ieder geladen record telt daardoor
+   precies eenmaal: bij maximaal één cyclus of als niet koppelbaar. Als de cycli en beide
+   opbrengstbronnen succesvol zijn geladen, verschijnt bij een positief aantal buiten alle kaarten
+   exact één melding `Niet aan een cyclus te koppelen in geladen gegevens: <aantal>`; bij nul
+   ontbreekt die melding.
+
+   Cycli, kandidaten en leveringen houden elk een eigen laad- en foutstatus. Een kaart toont per
+   opbrengstbron `laden…`, `niet beschikbaar` of een geladen aantal; het volledige globale aantal
+   niet-koppelbare records verschijnt pas als alle drie bronnen succesvol zijn geladen. Bij een
+   onvolledige bron staat daarvoor een laad- of foutmelding. De globale Software Factory-lijst toont
+   zijn eigen bronstatus; de epic-roadmap en storywachtrij melden dat ze onvolledig zijn totdat zowel
+   kandidaten als leveringen beschikbaar zijn. Een iteratie met
    `status` QUEUED of RUNNING (nog lopend) toont een neutrale voortgangsindicator
    (`IterationProgressIndicator`) in plaats van een badge; elke andere status zonder expliciet
    beslisrecord toont een vaste, afgeleide classificatiebadge — `onderzoek-onvoldoende`, `technische fout`,
@@ -44,7 +79,7 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    te activeren en klapt dan een inline scope-disclaimerpaneel open direct onder de badge, met de
    vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen pop-upvenster of dialoog,
    `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of Escape klapt het
-   paneel weer in en herstelt de focus op de badge. Iedere cyclusregel toont daarnaast één native
+   paneel weer in en herstelt de focus op de badge. Iedere cycluskaart toont daarnaast één native
    button met de beslisbron. Bij een expliciet handmatig-annuleringsrecord bevat de button de
    zichtbare en toegankelijke teksten `Beslisbron: Mens` en `Reden: Handmatig geannuleerd`.
    Dit record is gekoppeld via hetzelfde `iterationId` en heeft voorrang op de afleiding uit
@@ -183,6 +218,10 @@ elke subsectie van de storywachtrij en workspace-publicaties) tonen standaard **
 klaar, dan verschijnt eronder een knop **'Meer (nog N)'** die er telkens **10** bij toont; de knop
 verdwijnt zodra alles zichtbaar is. Elke sectie heeft een eigen, onafhankelijke teller, en die teller
 overleeft de auto-refresh: een uitgeklapte lijst blijft uitgeklapt en nieuwe items verschijnen bovenaan.
+Ook de open/dicht-toestand van iedere geladen cycluskaart blijft bij de normale auto-refresh behouden;
+meerdere kaarten kunnen onafhankelijk openstaan. Verdwijnt een cyclus uit de geladen gegevens, dan
+verdwijnt ook zijn kaarttoestand.
+
 Lijsten met een bruikbaar tijdstempel staan gesorteerd op nieuwste eerst; workspace-publicaties hebben geen
 tijdstempel en houden de volgorde van de backend.
 

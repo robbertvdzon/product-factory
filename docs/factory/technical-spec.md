@@ -72,7 +72,9 @@
 
 - `main.dart` — widgets en pagina's; `api.dart` — HTTP-client; `config.dart` — build-time config;
   `session.dart` — Google-login; `formatting.dart` — datum/tijd- en duurformattering;
-  `limited_list.dart` — de 5/+10-lijstbeperking; `classification.dart` — de bestaande pure
+  `limited_list.dart` — de 5/+10-lijstbeperking; `iteration_results.dart` — pure, verliesvrije
+  client-side koppeling van geladen kandidaten en leveringen aan cycli; `classification.dart` — de
+  bestaande pure
   mappings op `status`/`criticVerdict`/`errorMessage` plus
   `iterationDecisionPresentation`, dat eerst een aan het iteratie-id gekoppeld `decision`-record
   selecteert en alleen bij ontbreken daarvan terugvalt op de afleiding. De vaste
@@ -101,13 +103,33 @@
   `roadmap.dart` bevat het epic-contract voor de UI, de horizontale dependencygrafiek, kaartjes en
   de maak-/detaildialogen. De process-rank en score zijn daar alleen-lezen; klant-rank,
   dependencies, titel, beschrijving en status worden via de epic-routes opgeslagen.
+- `DashboardSource<T>` en `_OverviewResultsBuilder` in `main.dart` volgen de drie bestaande
+  leesverzoeken voor cycli, kandidaten en leveringen onafhankelijk als loading, loaded of failure.
+  De bijbehorende metrics en secties renderen daarom geen nul of compleet resultaat voor een bron
+  die nog laadt of is mislukt. Er zijn hiervoor geen nieuwe routes, requests of contractvelden.
+- `groupIterationResults` in `iteration_results.dart` indexeert alle geladen cycli vóór
+  `LimitedListSection` ze tot 5/+10 zichtbare kaarten beperkt. Kandidaten matchen alleen met exact
+  één cyclus via een niet-lege `String productSlug` en een `int iterationSequenceNumber` gelijk aan
+  `sequenceNumber`; leveringen alleen via dezelfde productslug en een niet-lege `String
+  iterationId` gelijk aan `id`. Ontbrekende of anders getypeerde waarden en sleutels met nul of
+  meerdere matches belanden eenmaal in de betreffende unlinked-lijst. Daardoor wordt ieder geladen
+  record aan maximaal één cyclus gekoppeld en nooit via een alternatieve heuristiek.
+- `IterationCycleCard` in `main.dart` bewaart zijn eigen expanded-state en `FocusNode`. Een stabiele
+  sibling-key bestaat uit productslug, iteratie-id, cyclusnummer en alleen waar nodig een
+  deterministische duplicaatpositie; daardoor blijft de open/dicht-toestand bij refresh behouden en
+  blijven onverwachte dubbele cycli zonder duplicate-key-fout renderbaar. De kaart toont per bron
+  loaded-resultaten, loading of failure en rendert het volledige unlinked-totaal alleen wanneer
+  cycli én beide opbrengstbronnen geladen zijn. De opbrengsttoggle en de bestaande detailbutton zijn
+  afzonderlijke native buttons.
 - Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
   `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
   `4m 12s`, `35s`). Backendtijdstempels zijn ISO-8601 in UTC; `parseInstant` is defensief en levert
   `null` bij ontbrekende of onleesbare waarden.
 - Paginering gebeurt client-side: alle lijstdata komt in één refresh binnen, de frontend toont er
-  standaard 5 van en laadt er per klik op 'Meer' 10 bij. De tellers staan in `_OverviewPageState`
-  (dus buiten de `FutureBuilder`) zodat de auto-refresh van 5 s de uitklapstand behoudt.
+  standaard 5 van en laat er per klik op 'Meer' 10 extra zien. De zichtbaarheidstellers staan in
+  `_OverviewPageState` (dus buiten de `FutureBuilder`) zodat de auto-refresh van 5 s de
+  lijstbeperking behoudt. De expanded-state van cycluskaarten staat in de stateful kaarten zelf en
+  blijft via hun stabiele keys behouden zolang de betreffende cycli geladen blijven.
 - Teksten in de UI zijn Nederlands; commentaar legt het *waarom* vast, niet het *wat*.
 - Formatteer nieuwe of gewijzigde code met `dart format`; laat ongerelateerde regels met rust, zodat de
   diff van een story leesbaar blijft (het bestand is historisch niet volledig dart-formatted).
