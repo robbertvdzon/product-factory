@@ -711,11 +711,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 criticVerdict: iteration['criticVerdict'] as String?,
                 errorMessage: iteration['errorMessage'] as String?,
               );
-              final decisionSource = classifyDecisionSource(
-                criticVerdict: iteration['criticVerdict'] as String?,
-                status: iteration['status'] as String?,
-                errorMessage: iteration['errorMessage'] as String?,
-              );
+              final decision = iterationDecisionPresentation(iteration);
               return Card(
                 child: ListTile(
                   leading: Icon(
@@ -737,7 +733,7 @@ class _OverviewPageState extends State<OverviewPage> {
                         key: ValueKey(
                           'iteration-decision-source-${iteration['id']}',
                         ),
-                        decisionSource: decisionSource,
+                        decision: decision,
                         onOpenDetails: () => _showIteration(iteration),
                       ),
                     ],
@@ -1160,6 +1156,7 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
               final dossier = result['dossier'] as String?;
               final summary = iteration['summary'] as String?;
               final timing = iterationTiming(iteration);
+              final decision = iterationDecisionPresentation(iteration);
               return ListView(
                 children: [
                   Wrap(
@@ -1190,6 +1187,15 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                           label: Text(
                             '${iteration['revisionRounds']} revisierondes',
                           ),
+                        ),
+                      Text(decision.sourceText),
+                      if (decision.reasonText != null)
+                        Text(decision.reasonText!),
+                      if (decision.mechanism != null)
+                        Text('Mechanisme: ${decision.mechanism}'),
+                      if (decision.decidedAt != null)
+                        Text(
+                          'Beslist op: ${formatDateTime(decision.decidedAt)}',
                         ),
                     ],
                   ),
@@ -1244,7 +1250,8 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                       'Hervat vanuit ${iteration['resumedFromIterationId']}',
                     ),
                   ],
-                  if (iteration['outcomeReason'] != null) ...[
+                  if (decision.derived &&
+                      iteration['outcomeReason'] != null) ...[
                     const SizedBox(height: 16),
                     Text(
                       'Uitkomstreden',
@@ -1519,12 +1526,12 @@ String _outcomeReasonLabel(String reason) => switch (reason) {
 /// terugbrengen naar precies de knop die de dialoog opende.
 class IterationDecisionSourceButton extends StatefulWidget {
   const IterationDecisionSourceButton({
-    required this.decisionSource,
+    required this.decision,
     required this.onOpenDetails,
     super.key,
   });
 
-  final String decisionSource;
+  final IterationDecisionPresentation decision;
   final Future<void> Function() onOpenDetails;
 
   @override
@@ -1553,11 +1560,29 @@ class _IterationDecisionSourceButtonState
   }
 
   @override
-  Widget build(BuildContext context) => OutlinedButton(
-    focusNode: _focusNode,
-    onPressed: _openDetails,
-    child: Text('Beslisbron: ${widget.decisionSource}'),
-  );
+  Widget build(BuildContext context) {
+    final reasonText = widget.decision.reasonText;
+    final accessibleName = [
+      widget.decision.sourceText,
+      if (reasonText != null) reasonText,
+    ].join('. ');
+    return OutlinedButton(
+      focusNode: _focusNode,
+      onPressed: _openDetails,
+      child: Semantics(
+        label: accessibleName,
+        excludeSemantics: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.decision.sourceText),
+            if (reasonText != null) Text(reasonText),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 String _prettyJson(String value) {

@@ -19,6 +19,9 @@ const String kTechnischeFout = 'technische fout';
 const String kBeslisbronEvaluatieAgent = 'Evaluatie-agent';
 const String kBeslisbronTechnischeFout = 'Technische fout';
 const String kBeslisbronOnbekend = 'Onbekend';
+const String kBeslisbronMens = 'Mens';
+const String kRedenHandmatigGeannuleerd = 'Handmatig geannuleerd';
+const String kMechanismeHandmatigeAnnulering = 'Handmatige annulering';
 
 /// Gesloten waardenverzameling voor de read-only beslisbron in het cyclusoverzicht.
 const List<String> kBeslisbronnen = [
@@ -26,6 +29,58 @@ const List<String> kBeslisbronnen = [
   kBeslisbronTechnischeFout,
   kBeslisbronOnbekend,
 ];
+
+class IterationDecisionPresentation {
+  const IterationDecisionPresentation({
+    required this.source,
+    required this.derived,
+    this.reason,
+    this.mechanism,
+    this.decidedAt,
+  });
+
+  final String source;
+  final bool derived;
+  final String? reason;
+  final String? mechanism;
+  final Object? decidedAt;
+
+  String get sourceText => 'Beslisbron: $source${derived ? ' (Afgeleid)' : ''}';
+  String? get reasonText => reason == null ? null : 'Reden: $reason';
+}
+
+/// Een aanwezig record heeft altijd voorrang op de conservatieve historische afleiding. Ook een
+/// toekomstig, nog onbekend codeveld blijft daardoor expliciete provenance en valt niet terug op
+/// bijvoorbeeld de foutmelding van dezelfde cyclus.
+IterationDecisionPresentation iterationDecisionPresentation(
+  Map<String, dynamic> iteration,
+) {
+  final rawDecision = iteration['decision'];
+  if (rawDecision is Map && rawDecision['iterationId'] == iteration['id']) {
+    final actorType = rawDecision['actorType'];
+    final reasonCode = rawDecision['reasonCode'];
+    final mechanism = rawDecision['mechanism'];
+    return IterationDecisionPresentation(
+      source: actorType == 'HUMAN' ? kBeslisbronMens : kBeslisbronOnbekend,
+      derived: false,
+      reason: reasonCode == 'MANUALLY_CANCELLED'
+          ? kRedenHandmatigGeannuleerd
+          : kBeslisbronOnbekend,
+      mechanism: mechanism == 'MANUAL_CANCELLATION'
+          ? kMechanismeHandmatigeAnnulering
+          : kBeslisbronOnbekend,
+      decidedAt: rawDecision['decidedAt'],
+    );
+  }
+  return IterationDecisionPresentation(
+    source: classifyDecisionSource(
+      criticVerdict: iteration['criticVerdict'] as String?,
+      status: iteration['status'] as String?,
+      errorMessage: iteration['errorMessage'] as String?,
+    ),
+    derived: true,
+  );
+}
 
 /// Alleen inhoudelijke revisies en technische uitval ná criticusacceptatie hebben voldoende
 /// herbruikbare artefacten om veilig bij de story-writer te worden hervat.

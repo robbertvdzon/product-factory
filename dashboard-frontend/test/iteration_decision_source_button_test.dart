@@ -13,6 +13,7 @@ Map<String, dynamic> _iteration({
   required int sequenceNumber,
   required String errorMessage,
   required DateTime startedAt,
+  Map<String, dynamic>? decision,
 }) => {
   'id': id,
   'productSlug': 'demo',
@@ -34,6 +35,7 @@ Map<String, dynamic> _iteration({
   'createdAt': startedAt.toIso8601String(),
   'startedAt': startedAt.toIso8601String(),
   'completedAt': startedAt.add(const Duration(minutes: 1)).toIso8601String(),
+  if (decision != null) 'decision': decision,
 };
 
 final _iterations = <Map<String, dynamic>>[
@@ -42,6 +44,13 @@ final _iterations = <Map<String, dynamic>>[
     sequenceNumber: 34,
     errorMessage: 'Synthetische foutreden uitsluitend voor cyclus 34',
     startedAt: DateTime.utc(2026, 8, 12, 11),
+    decision: {
+      'iterationId': 'iter-34',
+      'actorType': 'HUMAN',
+      'mechanism': 'MANUAL_CANCELLATION',
+      'reasonCode': 'MANUALLY_CANCELLED',
+      'decidedAt': DateTime.utc(2026, 8, 12, 11, 1).toIso8601String(),
+    },
   ),
   _iteration(
     id: 'iter-12',
@@ -114,8 +123,14 @@ void main() {
     (tester) async {
       final callLog = <Map<String, String>>[];
       await _withDashboard(tester, callLog, () async {
+        final semantics = tester.ensureSemantics();
         expect(find.byType(IterationDecisionSourceButton), findsNWidgets(2));
-        expect(find.text('Beslisbron: Technische fout'), findsNWidgets(2));
+        expect(find.text('Beslisbron: Mens'), findsOneWidget);
+        expect(find.text('Reden: Handmatig geannuleerd'), findsOneWidget);
+        expect(
+          find.text('Beslisbron: Technische fout (Afgeleid)'),
+          findsOneWidget,
+        );
 
         for (final iteration in _iterations) {
           final button = _decisionButton('${iteration['id']}');
@@ -143,6 +158,30 @@ void main() {
             findsNothing,
           );
         }
+        expect(
+          tester
+              .getSemantics(
+                find.descendant(
+                  of: _decisionButton('iter-34'),
+                  matching: find.byType(OutlinedButton),
+                ),
+              )
+              .getSemanticsData()
+              .label,
+          contains('Beslisbron: Mens. Reden: Handmatig geannuleerd'),
+        );
+        expect(
+          tester
+              .getSemantics(
+                find.descendant(
+                  of: _decisionButton('iter-12'),
+                  matching: find.byType(OutlinedButton),
+                ),
+              )
+              .getSemanticsData()
+              .label,
+          contains('Beslisbron: Technische fout (Afgeleid)'),
+        );
 
         for (final forbiddenText in [
           'Synthetische foutreden uitsluitend voor cyclus 12',
@@ -153,6 +192,36 @@ void main() {
         ]) {
           expect(find.text(forbiddenText), findsNothing);
         }
+        semantics.dispose();
+      });
+    },
+  );
+
+  testWidgets(
+    'expliciete annulering toont in detail dezelfde bron en reden plus mechanisme en tijd',
+    (tester) async {
+      final callLog = <Map<String, String>>[];
+      await _withDashboard(tester, callLog, () async {
+        await tester.tap(
+          find.descendant(
+            of: _decisionButton('iter-34'),
+            matching: find.byType(OutlinedButton),
+          ),
+        );
+        await _finishDialogTransition(tester);
+
+        expect(find.text('Productcyclus 34'), findsOneWidget);
+        expect(find.text('Beslisbron: Mens'), findsNWidgets(2));
+        expect(find.text('Reden: Handmatig geannuleerd'), findsNWidgets(2));
+        expect(find.text('Mechanisme: Handmatige annulering'), findsOneWidget);
+        expect(find.text('Beslist op: 12-08-2026 11:01'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.textContaining('Technische fout (Afgeleid)'),
+          ),
+          findsNothing,
+        );
       });
     },
   );

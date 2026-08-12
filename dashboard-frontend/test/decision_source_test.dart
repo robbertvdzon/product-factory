@@ -2,6 +2,78 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:product_factory_dashboard/classification.dart';
 
 void main() {
+  group('iterationDecisionPresentation', () {
+    test('expliciet record heeft voorrang op FAILED en errorMessage', () {
+      final result = iterationDecisionPresentation({
+        'id': 'iteration-1',
+        'status': 'FAILED',
+        'criticVerdict': null,
+        'errorMessage': 'Deze technische fallback mag niet winnen',
+        'decision': {
+          'iterationId': 'iteration-1',
+          'actorType': 'HUMAN',
+          'mechanism': 'MANUAL_CANCELLATION',
+          'reasonCode': 'MANUALLY_CANCELLED',
+          'decidedAt': '2026-08-12T11:01:00Z',
+        },
+      });
+
+      expect(result.sourceText, 'Beslisbron: Mens');
+      expect(result.reasonText, 'Reden: Handmatig geannuleerd');
+      expect(result.mechanism, 'Handmatige annulering');
+      expect(result.derived, isFalse);
+    });
+
+    test(
+      'record van een andere iterationId wordt niet aan deze cyclus gekoppeld',
+      () {
+        final result = iterationDecisionPresentation({
+          'id': 'iteration-2',
+          'status': 'FAILED',
+          'criticVerdict': null,
+          'errorMessage': 'Netwerkfout',
+          'decision': {
+            'iterationId': 'iteration-1',
+            'actorType': 'HUMAN',
+            'mechanism': 'MANUAL_CANCELLATION',
+            'reasonCode': 'MANUALLY_CANCELLED',
+            'decidedAt': '2026-08-12T11:01:00Z',
+          },
+        });
+
+        expect(result.sourceText, 'Beslisbron: Technische fout (Afgeleid)');
+        expect(result.reason, isNull);
+      },
+    );
+
+    test(
+      'historische fallback behoudt classificatie en markeert die afgeleid',
+      () {
+        final result = iterationDecisionPresentation({
+          'status': 'FAILED',
+          'criticVerdict': null,
+          'errorMessage': 'Netwerkfout',
+        });
+
+        expect(result.sourceText, 'Beslisbron: Technische fout (Afgeleid)');
+        expect(result.reason, isNull);
+        expect(result.derived, isTrue);
+      },
+    );
+
+    test('niet-classificeerbare historie blijft onbekend en afgeleid', () {
+      final result = iterationDecisionPresentation({
+        'status': 'TOEKOMSTIGE_STATUS',
+        'criticVerdict': 'ONBEKEND',
+        'errorMessage': null,
+      });
+
+      expect(result.sourceText, 'Beslisbron: Onbekend (Afgeleid)');
+      expect(result.source, isNot(kBeslisbronMens));
+      expect(result.source, isNot(kBeslisbronTechnischeFout));
+    });
+  });
+
   group('classifyDecisionSource', () {
     test('exact reeds geleverd resultaat blijft een evaluatiebesluit', () {
       expect(
