@@ -29,10 +29,16 @@ Map<String, dynamic> _iteration(int sequence) => {
 http.Response _json(Object body, {int status = 200}) =>
     http.Response(jsonEncode(body), status);
 
-MockClient _client({Completer<http.Response>? candidateResponse}) {
+MockClient _client({
+  Completer<http.Response>? candidateResponse,
+  bool duplicateIterations = false,
+}) {
   final iterations = [
     for (var sequence = 1; sequence <= 6; sequence++) _iteration(sequence),
   ];
+  if (duplicateIterations) {
+    iterations[4] = Map<String, dynamic>.of(iterations[5]);
+  }
   return MockClient((request) async {
     switch (request.url.path) {
       case '/api/shadow-iterations':
@@ -66,6 +72,16 @@ MockClient _client({Completer<http.Response>? candidateResponse}) {
             'status': 'DONE',
             'createdAt': '2026-08-12T10:00:00Z',
           },
+          if (duplicateIterations)
+            {
+              'id': 4,
+              'candidateId': 4,
+              'productSlug': 'demo',
+              'iterationId': 'iteration-6',
+              'title': 'Levering met ambigue cyclus-id',
+              'status': 'DONE',
+              'createdAt': '2026-08-12T11:00:00Z',
+            },
         ]);
       case '/api/ai-catalog':
         return _json(<String, dynamic>{});
@@ -86,6 +102,30 @@ Future<void> _pumpDashboard(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'volledig dubbele cycli renderen defensief met unieke kaartkeys',
+    (tester) async {
+      await http.runWithClient(() async {
+        await _pumpDashboard(tester);
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('demo · iteratie 6'), findsNWidgets(2));
+        expect(find.byType(IterationCycleCard), findsNWidgets(5));
+        expect(
+          find.text('Niet aan een cyclus te koppelen in geladen gegevens: 3'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining(
+            'Software Factory-leveringen: 0 · geladen gegevens',
+          ),
+          findsNWidgets(5),
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, () => _client(duplicateIterations: true));
+    },
+  );
+
   testWidgets(
     'globale melding telt niet-koppelbare records eenmaal en groepering gebruikt ook verborgen cycli',
     (tester) async {

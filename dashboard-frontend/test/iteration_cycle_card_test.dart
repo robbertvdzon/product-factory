@@ -3,6 +3,7 @@ import 'dart:ui' show Tristate;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:product_factory_dashboard/classification.dart';
 import 'package:product_factory_dashboard/main.dart';
 
 Map<String, dynamic> _iteration(String id, int sequence) => {
@@ -48,6 +49,7 @@ Widget _harness({
   bool candidatesLoading = false,
   bool deliveriesLoading = false,
   bool twoCards = false,
+  bool showErrorNotice = false,
   double textScale = 1,
 }) => MaterialApp(
   theme: ThemeData(useMaterial3: true),
@@ -83,6 +85,12 @@ Widget _harness({
                   deliveriesLoading: false,
                   onOpenDetails: () async {},
                 ),
+              if (showErrorNotice)
+                const SourceNotice(
+                  icon: Icons.error_outline,
+                  text: 'Opbrengstbron is niet beschikbaar.',
+                  error: true,
+                ),
             ],
           ),
         ),
@@ -93,6 +101,25 @@ Widget _harness({
 
 Finder _toggle(String id) =>
     find.byKey(ValueKey('iteration-results-toggle-$id'));
+
+Color _renderedTextColor(WidgetTester tester, Finder finder) {
+  final text = tester.widget<Text>(finder);
+  final inherited = DefaultTextStyle.of(tester.element(finder)).style;
+  return text.style?.color ??
+      text.textSpan?.style?.color ??
+      inherited.color ??
+      (throw StateError('Gerenderde tekst heeft geen kleur'));
+}
+
+BorderSide _renderedButtonSide(WidgetTester tester, Finder button) {
+  final materials = tester.widgetList<Material>(
+    find.descendant(of: button, matching: find.byType(Material)),
+  );
+  final material = materials.firstWhere(
+    (candidate) => candidate.shape is OutlinedBorder,
+  );
+  return (material.shape! as OutlinedBorder).side;
+}
 
 void main() {
   testWidgets(
@@ -289,45 +316,106 @@ void main() {
     },
   );
 
-  test('nieuwe kleuren halen WCAG AA tegen hun gerenderde achtergrond', () {
-    double luminance(Color color) {
-      double channel(int value) {
-        final normalized = value / 255;
-        return normalized <= 0.04045
-            ? normalized / 12.92
-            : ((normalized + 0.055) / 1.055) *
-                  ((normalized + 0.055) / 1.055) *
-                  ((normalized + 0.055) / 1.055);
+  testWidgets(
+    'gerenderde gesloten, geopende, fout- en focustoestanden halen WCAG AA',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 5000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(_harness());
+      final cardBackground = tester.widget<Card>(find.byType(Card)).color!;
+      final toggle = _toggle('iter-1');
+
+      for (final finder in [
+        find.text('product-met-een-lange-naam · iteratie 31'),
+        find.textContaining('Status: NEEDS_REVISION'),
+        find.textContaining('Interne kandidaten: 1 · geladen gegevens'),
+        find.text('Toon opbrengst'),
+      ]) {
+        expect(
+          contrastRatio(_renderedTextColor(tester, finder), cardBackground),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
+      expect(
+        contrastRatio(
+          _renderedButtonSide(tester, toggle).color,
+          cardBackground,
+        ),
+        greaterThanOrEqualTo(3),
+      );
+
+      await tester.tap(toggle);
+      await tester.pump();
+      final resultText = find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            (widget.textSpan?.toPlainText() ?? '').contains(
+              'Kandidaatstatus: ACCEPTED',
+            ),
+      );
+      for (final finder in [
+        find.text('Interne kandidaten'),
+        find.text('Resultaten uit de geladen gegevens: 1.').first,
+        resultText,
+        find.text('Verberg opbrengst'),
+      ]) {
+        expect(
+          contrastRatio(_renderedTextColor(tester, finder), cardBackground),
+          greaterThanOrEqualTo(4.5),
+        );
       }
 
-      final argb = color.toARGB32();
-      return 0.2126 * channel((argb >> 16) & 0xff) +
-          0.7152 * channel((argb >> 8) & 0xff) +
-          0.0722 * channel(argb & 0xff);
-    }
+      expect(
+        FocusManager.instance.primaryFocus?.debugLabel,
+        contains('results'),
+      );
+      final focusedSide = _renderedButtonSide(tester, toggle);
+      expect(focusedSide.width, 3);
+      expect(
+        contrastRatio(focusedSide.color, cardBackground),
+        greaterThanOrEqualTo(3),
+      );
 
-    double contrast(Color foreground, Color background) {
-      final first = luminance(foreground);
-      final second = luminance(background);
-      final lighter = first > second ? first : second;
-      final darker = first > second ? second : first;
-      return (lighter + 0.05) / (darker + 0.05);
-    }
-
-    for (final color in [
-      kCycleCardText,
-      kCycleCardSecondaryText,
-      kCycleToggleText,
-    ]) {
-      expect(contrast(color, kCycleCardBackground), greaterThanOrEqualTo(4.5));
-    }
-    expect(
-      contrast(kCycleErrorText, kCycleErrorBackground),
-      greaterThanOrEqualTo(4.5),
-    );
-    expect(
-      contrast(kCycleToggleFocus, kCycleCardBackground),
-      greaterThanOrEqualTo(3),
-    );
-  });
+      await tester.pumpWidget(
+        _harness(
+          firstCandidates: null,
+          firstDeliveries: null,
+          showErrorNotice: true,
+        ),
+      );
+      await tester.pump();
+      final notice = find.byType(SourceNotice);
+      final noticeContainer = tester.widget<Container>(
+        find.descendant(of: notice, matching: find.byType(Container)),
+      );
+      final noticeBackground =
+          (noticeContainer.decoration! as BoxDecoration).color!;
+      final noticeText = find.text('Opbrengstbron is niet beschikbaar.');
+      final noticeIcon = tester.widget<Icon>(
+        find.descendant(of: notice, matching: find.byType(Icon)),
+      );
+      expect(
+        contrastRatio(_renderedTextColor(tester, noticeText), noticeBackground),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrastRatio(noticeIcon.color!, noticeBackground),
+        greaterThanOrEqualTo(3),
+      );
+      expect(
+        contrastRatio(
+          _renderedTextColor(
+            tester,
+            find
+                .text('Resultaten uit geladen gegevens zijn niet beschikbaar.')
+                .first,
+          ),
+          cardBackground,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+    },
+  );
 }

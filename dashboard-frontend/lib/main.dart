@@ -766,12 +766,12 @@ class _OverviewPageState extends State<OverviewPage> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             if (iterationSource.loading)
-              const _SourceNotice(
+              const SourceNotice(
                 icon: Icons.hourglass_top,
                 text: 'Productcycli uit geladen gegevens worden geladen.',
               )
             else if (iterationSource.failed)
-              const _SourceNotice(
+              const SourceNotice(
                 icon: Icons.error_outline,
                 text: 'Productcycli uit geladen gegevens zijn niet beschikbaar.',
                 error: true,
@@ -785,7 +785,9 @@ class _OverviewPageState extends State<OverviewPage> {
               _limitedSection('iterations', iterations, (iteration) {
                 final linked = grouping!.resultsFor(iteration);
                 return IterationCycleCard(
-                  key: ValueKey('iteration-cycle-${iteration['id']}'),
+                  key: ValueKey(
+                    _iterationCardIdentity(iterations, iteration),
+                  ),
                   iteration: iteration,
                   candidates: candidateSource.loaded
                       ? linked.candidates
@@ -802,7 +804,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 candidateSource.loaded &&
                 deliverySource.loaded &&
                 grouping!.unlinkedCount > 0)
-              _SourceNotice(
+              SourceNotice(
                 key: const ValueKey('unlinked-iteration-results'),
                 icon: Icons.link_off,
                 text:
@@ -811,7 +813,7 @@ class _OverviewPageState extends State<OverviewPage> {
               )
             else if (iterationSource.loaded &&
                 (candidateSource.failed || deliverySource.failed))
-              const _SourceNotice(
+              const SourceNotice(
                 icon: Icons.info_outline,
                 text:
                     'Niet-koppelbare opbrengst is onvolledig doordat niet alle opbrengstbronnen beschikbaar zijn.',
@@ -819,7 +821,7 @@ class _OverviewPageState extends State<OverviewPage> {
               )
             else if (iterationSource.loaded &&
                 (candidateSource.loading || deliverySource.loading))
-              const _SourceNotice(
+              const SourceNotice(
                 icon: Icons.hourglass_top,
                 text:
                     'Niet-koppelbare opbrengst wordt berekend zodra alle opbrengstbronnen geladen zijn.',
@@ -830,12 +832,12 @@ class _OverviewPageState extends State<OverviewPage> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             if (deliverySource.loading)
-              const _SourceNotice(
+              const SourceNotice(
                 icon: Icons.hourglass_top,
                 text: 'Software Factory-leveringen worden geladen.',
               )
             else if (deliverySource.failed)
-              const _SourceNotice(
+              const SourceNotice(
                 icon: Icons.error_outline,
                 text: 'Software Factory-leveringen zijn niet beschikbaar.',
                 error: true,
@@ -885,7 +887,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 onChanged: () => setState(_reload),
               )
             else
-              const _SourceNotice(
+              const SourceNotice(
                 icon: Icons.info_outline,
                 text:
                     'Epic-roadmap is onvolledig totdat kandidaten en leveringen beschikbaar zijn.',
@@ -1037,7 +1039,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 onShowMore: _showMore,
               )
             else
-              const _SourceNotice(
+              const SourceNotice(
                 icon: Icons.info_outline,
                 text:
                     'Storywachtrij is onvolledig totdat kandidaten en leveringen beschikbaar zijn.',
@@ -1094,6 +1096,30 @@ String _sourceCount(DashboardSource<List<dynamic>> source, int count) {
   return '$count';
 }
 
+/// Bouwt een stabiele widgetidentiteit zonder te veronderstellen dat backend-id's
+/// uniek zijn. De duplicaatpositie is alleen onderscheidend wanneer alle drie de
+/// geladen cyclusvelden gelijk zijn; bij normale refreshes blijven de keys gelijk.
+(Object?, Object?, Object?, int) _iterationCardIdentity(
+  List<Map<String, dynamic>> iterations,
+  Map<String, dynamic> iteration,
+) {
+  var duplicateIndex = 0;
+  for (final other in iterations) {
+    if (identical(other, iteration)) break;
+    if (other['productSlug'] == iteration['productSlug'] &&
+        other['id'] == iteration['id'] &&
+        other['sequenceNumber'] == iteration['sequenceNumber']) {
+      duplicateIndex++;
+    }
+  }
+  return (
+    iteration['productSlug'],
+    iteration['id'],
+    iteration['sequenceNumber'],
+    duplicateIndex,
+  );
+}
+
 const Color kCycleCardBackground = Color(0xFFFFFFFF);
 const Color kCycleCardText = Color(0xFF202124);
 const Color kCycleCardSecondaryText = Color(0xFF4B4F52);
@@ -1102,8 +1128,8 @@ const Color kCycleToggleFocus = Color(0xFF005A9C);
 const Color kCycleErrorBackground = Color(0xFFFFF2F2);
 const Color kCycleErrorText = Color(0xFF781D24);
 
-class _SourceNotice extends StatelessWidget {
-  const _SourceNotice({
+class SourceNotice extends StatelessWidget {
+  const SourceNotice({
     required this.icon,
     required this.text,
     this.error = false,

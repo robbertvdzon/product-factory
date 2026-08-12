@@ -49,3 +49,27 @@ Review 2026-08-12:
   commandresultaten die aan dezelfde HEAD/worktree-tree zijn gebonden. De developercomment en dit
   worklog bevatten alleen handgeschreven groen proza; volgens de reviewer-regels is dat geen geldig
   volledig testbewijs.
+
+Reviewherstel 2026-08-12:
+- [x] Reviewbevindingen, factory-instructies en verificatieconfig opnieuw controleren.
+- [x] Unieke sibling-keys voor ook ambigue/dubbele cyclus-id's implementeren en testen.
+- [x] Contrast van daadwerkelijk gerenderde gesloten, geopende, fout- en focustoestanden testen.
+- [x] Gewijzigde bestanden formatteren en het volledige verplichte vangnet groen afronden.
+
+Aanpak:
+- De bestaande defensieve koppellogica blijft ongewijzigd; alleen de widgetidentiteit wordt losgemaakt
+  van de aanname dat een geladen cyclus-id uniek is.
+- De contrastregressie gaat kleuren uit de gerenderde widgetboom en echte focusdecoratie inspecteren,
+  zodat theming- of statewijzigingen niet door een constantenvergelijking heen kunnen glippen.
+
+Resultaat:
+- De kaart-key combineert product, id en cyclusnummer met een deterministische duplicaatpositie. Een
+  dashboardfixture met volledig dubbele cycli rendert beide kaarten zonder duplicate sibling keys en
+  laat de levering bij de ambigue id terecht niet gekoppeld.
+- De oude constantentest is vervangen door een widgettest die gesloten en geopende kaarttekst, knoprand,
+  daadwerkelijke focusrand, foutmelding en fouticoon uit de gerenderde widgetboom tegen hun gerenderde
+  achtergrond controleert op de toepasselijke WCAG AA-grens.
+- Definitief vangnet op de uiteindelijke worktree-tree: Maven `clean verify` gaf zes succesvolle modules,
+  0 failures en 0 errors; `flutter analyze` gaf `No issues found`; `flutter test` gaf 244 tests,
+  `All tests passed`. Revisiongebonden agentworker-bewijs wordt aansluitend door het factory-harnas
+  voor deze overgedragen tree aangemaakt en gevalideerd.
