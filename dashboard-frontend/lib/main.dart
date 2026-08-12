@@ -9,6 +9,7 @@ import 'formatting.dart';
 import 'google_button_stub.dart'
     if (dart.library.html) 'google_button_web.dart'
     as google_button;
+import 'iteration_results.dart';
 import 'limited_list.dart';
 import 'meeting_dialog.dart';
 import 'roadmap.dart';
@@ -188,6 +189,73 @@ class LoginPage extends StatelessWidget {
   );
 }
 
+class DashboardSource<T> {
+  const DashboardSource._({this.value, this.error, required this.loading});
+
+  factory DashboardSource.loading() => const DashboardSource._(loading: true);
+
+  factory DashboardSource.loaded(T value) =>
+      DashboardSource._(value: value, loading: false);
+
+  factory DashboardSource.failure(Object error) =>
+      DashboardSource._(error: error, loading: false);
+
+  final T? value;
+  final Object? error;
+  final bool loading;
+
+  bool get loaded => value != null;
+  bool get failed => error != null;
+}
+
+Future<DashboardSource<T>> _captureSource<T>(Future<T> future) async {
+  try {
+    return DashboardSource.loaded(await future);
+  } catch (error) {
+    return DashboardSource.failure(error);
+  }
+}
+
+class _OverviewResultsBuilder extends StatelessWidget {
+  const _OverviewResultsBuilder({
+    required this.iterationFuture,
+    required this.candidateFuture,
+    required this.deliveryFuture,
+    required this.builder,
+  });
+
+  final Future<DashboardSource<List<dynamic>>> iterationFuture;
+  final Future<DashboardSource<List<dynamic>>> candidateFuture;
+  final Future<DashboardSource<List<dynamic>>> deliveryFuture;
+  final Widget Function(
+    BuildContext context,
+    DashboardSource<List<dynamic>> iterations,
+    DashboardSource<List<dynamic>> candidates,
+    DashboardSource<List<dynamic>> deliveries,
+  )
+  builder;
+
+  @override
+  Widget build(BuildContext context) =>
+      FutureBuilder<DashboardSource<List<dynamic>>>(
+    future: iterationFuture,
+    builder: (context, iterationSnapshot) =>
+        FutureBuilder<DashboardSource<List<dynamic>>>(
+      future: candidateFuture,
+      builder: (context, candidateSnapshot) =>
+          FutureBuilder<DashboardSource<List<dynamic>>>(
+        future: deliveryFuture,
+        builder: (context, deliverySnapshot) => builder(
+          context,
+          iterationSnapshot.data ?? DashboardSource.loading(),
+          candidateSnapshot.data ?? DashboardSource.loading(),
+          deliverySnapshot.data ?? DashboardSource.loading(),
+        ),
+      ),
+    ),
+  );
+}
+
 class OverviewPage extends StatefulWidget {
   const OverviewPage({required this.session, super.key});
   final AuthenticatedSession? session;
@@ -197,6 +265,9 @@ class OverviewPage extends StatefulWidget {
 
 class _OverviewPageState extends State<OverviewPage> {
   late Future<List<dynamic>> data;
+  late Future<DashboardSource<List<dynamic>>> iterationData;
+  late Future<DashboardSource<List<dynamic>>> candidateData;
+  late Future<DashboardSource<List<dynamic>>> deliveryData;
   late final DashboardApi api;
   Timer? refreshTimer;
 
@@ -246,12 +317,12 @@ class _OverviewPageState extends State<OverviewPage> {
   // aan de aanroeper, en setState() gooit dan 'setState() callback argument returned a Future'
   // zodra _reload via setState(_reload) wordt doorgegeven (bv. in _changeStatus).
   void _reload() {
+    iterationData = _captureSource(api.shadowIterations());
+    candidateData = _captureSource(api.stories());
+    deliveryData = _captureSource(api.deliveries());
     data = Future.wait<dynamic>([
       api.products(),
-      api.stories(),
       api.publications(),
-      api.shadowIterations(),
-      api.deliveries(),
       api.humanActions(),
       api.aiCatalog(),
       api.meetings(),
@@ -467,36 +538,50 @@ class _OverviewPageState extends State<OverviewPage> {
         }
         final products = (snapshot.data![0] as List<dynamic>)
             .cast<Map<String, dynamic>>();
-        final stories = snapshot.data![1] as List<dynamic>;
         // Workspace-publicaties hebben geen tijdstempel in de contracts; daar geldt alleen de beperking.
-        final publications = (snapshot.data![2] as List<dynamic>)
+        final publications = (snapshot.data![1] as List<dynamic>)
             .cast<Map<String, dynamic>>();
-        final iterations = sortedByNewestFirst(
-          snapshot.data![3] as List<dynamic>,
-          ['startedAt', 'createdAt'],
-        );
-        final deliveries = snapshot.data![4] as List<dynamic>;
-        final sortedDeliveries = sortedByNewestFirst(deliveries, ['createdAt']);
         final humanActions = sortedByNewestFirst(
-          snapshot.data![5] as List<dynamic>,
+          snapshot.data![2] as List<dynamic>,
           ['createdAt'],
         );
-        final aiCatalog = snapshot.data![6] as Map<String, dynamic>;
+        final aiCatalog = snapshot.data![3] as Map<String, dynamic>;
         final meetings = sortedByNewestFirst(
-          snapshot.data![7] as List<dynamic>,
+          snapshot.data![4] as List<dynamic>,
           ['closedAt', 'createdAt'],
         );
-        final roadmapEpics = (snapshot.data![8] as List<dynamic>)
+        final roadmapEpics = (snapshot.data![5] as List<dynamic>)
             .cast<Map<String, dynamic>>();
         final settledQuestions = sortedByNewestFirst(
-          snapshot.data![9] as List<dynamic>,
+          snapshot.data![6] as List<dynamic>,
           ['createdAt'],
         );
         final roadmapSessions = sortedByNewestFirst(
-          snapshot.data![10] as List<dynamic>,
+          snapshot.data![7] as List<dynamic>,
           ['completedAt', 'createdAt'],
         );
-        return ListView(
+        return _OverviewResultsBuilder(
+          iterationFuture: iterationData,
+          candidateFuture: candidateData,
+          deliveryFuture: deliveryData,
+          builder: (context, iterationSource, candidateSource, deliverySource) {
+            final iterations = sortedByNewestFirst(
+              iterationSource.value ?? const <dynamic>[],
+              ['startedAt', 'createdAt'],
+            );
+            final stories = candidateSource.value ?? const <dynamic>[];
+            final deliveries = deliverySource.value ?? const <dynamic>[];
+            final sortedDeliveries = sortedByNewestFirst(deliveries, [
+              'createdAt',
+            ]);
+            final grouping = iterationSource.loaded
+                ? groupIterationResults(
+                    iterations: iterations,
+                    candidates: candidateSource.value ?? const <dynamic>[],
+                    deliveries: deliverySource.value ?? const <dynamic>[],
+                  )
+                : null;
+            return ListView(
           padding: const EdgeInsets.all(24),
           children: [
             Row(
@@ -532,7 +617,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
                 MetricCard(
                   label: 'Interne storykandidaten',
-                  value: '${stories.length}',
+                  value: _sourceCount(candidateSource, stories.length),
                   icon: Icons.lightbulb_outline,
                 ),
                 MetricCard(
@@ -542,12 +627,12 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
                 MetricCard(
                   label: 'Shadow-iteraties',
-                  value: '${iterations.length}',
+                  value: _sourceCount(iterationSource, iterations.length),
                   icon: Icons.science_outlined,
                 ),
                 MetricCard(
                   label: 'Software Factory-stories',
-                  value: '${deliveries.length}',
+                  value: _sourceCount(deliverySource, deliveries.length),
                   icon: Icons.precision_manufacturing_outlined,
                 ),
               ],
@@ -680,99 +765,100 @@ class _OverviewPageState extends State<OverviewPage> {
               'Productcycli en onderzoekssessies',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            if (iterations.isEmpty)
+            if (iterationSource.loading)
+              const _SourceNotice(
+                icon: Icons.hourglass_top,
+                text: 'Productcycli uit geladen gegevens worden geladen.',
+              )
+            else if (iterationSource.failed)
+              const _SourceNotice(
+                icon: Icons.error_outline,
+                text: 'Productcycli uit geladen gegevens zijn niet beschikbaar.',
+                error: true,
+              )
+            else if (iterations.isEmpty)
               const ListTile(
                 leading: Icon(Icons.hourglass_empty),
                 title: Text('Nog geen productcycli of onderzoekssessies'),
               ),
-            _limitedSection('iterations', iterations, (iteration) {
-              final status = '${iteration['status']}';
-              // Zelfde onderscheid als hierboven bij het detaildialoog (regel ~767): QUEUED/RUNNING
-              // is nog lopend en heeft dus geen afgeronde uitkomst om te classificeren.
-              final running = status == 'QUEUED' || status == 'RUNNING';
-              final role = iteration['currentRole'];
-              final pr = iteration['workspacePullRequestUrl'];
-              final timing = iterationTiming(iteration);
-              final classification = classifyIterationOutcome(
-                status: iteration['status'] as String?,
-                criticVerdict: iteration['criticVerdict'] as String?,
-                errorMessage: iteration['errorMessage'] as String?,
-              );
-              final decision = iterationDecisionPresentation(iteration);
-              return Card(
-                child: ListTile(
-                  leading: Icon(
-                    iteration['mode'] == 'autonomous'
-                        ? Icons.auto_awesome
-                        : Icons.science_outlined,
-                  ),
-                  title: Wrap(
-                    spacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        '${iteration['productSlug']} · iteratie ${iteration['sequenceNumber']}',
-                      ),
-                      if (running)
-                        const IterationProgressIndicator()
-                      else if (decision.derived)
-                        ClassificationBadge(classification: classification),
-                      IterationDecisionSourceButton(
-                        key: ValueKey(
-                          'iteration-decision-source-${iteration['id']}',
-                        ),
-                        decision: decision,
-                        onOpenDetails: () => _showIteration(iteration),
-                      ),
-                    ],
-                  ),
-                  subtitle: Text(
-                    [
-                      status,
-                      if (role != null) 'bezig: ${_roleLabel('$role')}',
-                      'gestart ${timing.startLabel}',
-                      if (timing.durationLabel != null) timing.durationLabel!,
-                      '${iteration['candidateCount']} kandidaten',
-                      '${iteration['acceptedCandidateCount'] ?? 0} leverbaar',
-                      if ((iteration['revisionRounds'] ?? 0) != 0)
-                        '${iteration['revisionRounds']} revisierondes',
-                      if (decision.derived &&
-                          iteration['outcomeReason'] != null)
-                        _outcomeReasonLabel('${iteration['outcomeReason']}'),
-                      if (iteration['criticVerdict'] != null)
-                        'criticus: ${iteration['criticVerdict']}',
-                      _deliveryLabel('${iteration['mode']}'),
-                    ].join(' · '),
-                  ),
-                  trailing: pr == null
-                      ? null
-                      : const Icon(Icons.call_merge_outlined),
-                ),
-              );
-            }),
+            if (iterationSource.loaded)
+              _limitedSection('iterations', iterations, (iteration) {
+                final linked = grouping!.resultsFor(iteration);
+                return IterationCycleCard(
+                  key: ValueKey('iteration-cycle-${iteration['id']}'),
+                  iteration: iteration,
+                  candidates: candidateSource.loaded
+                      ? linked.candidates
+                      : null,
+                  deliveries: deliverySource.loaded
+                      ? linked.deliveries
+                      : null,
+                  candidatesLoading: candidateSource.loading,
+                  deliveriesLoading: deliverySource.loading,
+                  onOpenDetails: () => _showIteration(iteration),
+                );
+              }),
+            if (iterationSource.loaded &&
+                candidateSource.loaded &&
+                deliverySource.loaded &&
+                grouping!.unlinkedCount > 0)
+              _SourceNotice(
+                key: const ValueKey('unlinked-iteration-results'),
+                icon: Icons.link_off,
+                text:
+                    'Niet aan een cyclus te koppelen in geladen gegevens: ${grouping.unlinkedCount}',
+                error: true,
+              )
+            else if (iterationSource.loaded &&
+                (candidateSource.failed || deliverySource.failed))
+              const _SourceNotice(
+                icon: Icons.info_outline,
+                text:
+                    'Niet-koppelbare opbrengst is onvolledig doordat niet alle opbrengstbronnen beschikbaar zijn.',
+                error: true,
+              )
+            else if (iterationSource.loaded &&
+                (candidateSource.loading || deliverySource.loading))
+              const _SourceNotice(
+                icon: Icons.hourglass_top,
+                text:
+                    'Niet-koppelbare opbrengst wordt berekend zodra alle opbrengstbronnen geladen zijn.',
+              ),
             const SizedBox(height: 24),
             Text(
               'Software Factory-stories',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            if (deliveries.isEmpty)
+            if (deliverySource.loading)
+              const _SourceNotice(
+                icon: Icons.hourglass_top,
+                text: 'Software Factory-leveringen worden geladen.',
+              )
+            else if (deliverySource.failed)
+              const _SourceNotice(
+                icon: Icons.error_outline,
+                text: 'Software Factory-leveringen zijn niet beschikbaar.',
+                error: true,
+              )
+            else if (deliveries.isEmpty)
               const ListTile(
                 leading: Icon(Icons.hourglass_empty),
                 title: Text(
                   'Nog geen stories naar de Software Factory gestuurd',
                 ),
               ),
-            _limitedSection('deliveries', sortedDeliveries, (delivery) {
-              return ListTile(
-                leading: const Icon(Icons.precision_manufacturing_outlined),
-                title: Text(
-                  '${delivery['externalStoryKey'] ?? 'wordt verstuurd'} · ${delivery['title']}',
-                ),
-                subtitle: Text(
-                  '${delivery['productSlug']} · ${delivery['status']} · ${delivery['remotePhase'] ?? 'nog geen fase'}',
-                ),
-              );
-            }),
+            if (deliverySource.loaded)
+              _limitedSection('deliveries', sortedDeliveries, (delivery) {
+                return ListTile(
+                  leading: const Icon(Icons.precision_manufacturing_outlined),
+                  title: Text(
+                    '${delivery['externalStoryKey'] ?? 'wordt verstuurd'} · ${delivery['title']}',
+                  ),
+                  subtitle: Text(
+                    '${delivery['productSlug']} · ${delivery['status']} · ${delivery['remotePhase'] ?? 'nog geen fase'}',
+                  ),
+                );
+              }),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -789,14 +875,21 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               ],
             ),
-            RoadmapBoard(
-              products: products,
-              epics: roadmapEpics,
-              stories: stories,
-              deliveries: deliveries,
-              api: api,
-              onChanged: () => setState(_reload),
-            ),
+            if (candidateSource.loaded && deliverySource.loaded)
+              RoadmapBoard(
+                products: products,
+                epics: roadmapEpics,
+                stories: stories,
+                deliveries: deliveries,
+                api: api,
+                onChanged: () => setState(_reload),
+              )
+            else
+              const _SourceNotice(
+                icon: Icons.info_outline,
+                text:
+                    'Epic-roadmap is onvolledig totdat kandidaten en leveringen beschikbaar zijn.',
+              ),
             if (settledQuestions.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
@@ -935,13 +1028,20 @@ class _OverviewPageState extends State<OverviewPage> {
               'Storywachtrij',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            ..._buildStoryQueueSections(
-              context,
-              sortedByNewestFirst(stories, ['createdAt']),
-              deliveries,
-              visibleCount: _visibleCount,
-              onShowMore: _showMore,
-            ),
+            if (candidateSource.loaded && deliverySource.loaded)
+              ..._buildStoryQueueSections(
+                context,
+                sortedByNewestFirst(stories, ['createdAt']),
+                deliveries,
+                visibleCount: _visibleCount,
+                onShowMore: _showMore,
+              )
+            else
+              const _SourceNotice(
+                icon: Icons.info_outline,
+                text:
+                    'Storywachtrij is onvolledig totdat kandidaten en leveringen beschikbaar zijn.',
+              ),
             const SizedBox(height: 24),
             Text('Workspace', style: Theme.of(context).textTheme.titleLarge),
             _limitedSection('publications', publications, (publication) {
@@ -979,11 +1079,398 @@ class _OverviewPageState extends State<OverviewPage> {
                 },
               );
             }),
-          ],
+              ],
+            );
+          },
         );
       },
     ),
   );
+}
+
+String _sourceCount(DashboardSource<List<dynamic>> source, int count) {
+  if (source.loading) return 'Laden…';
+  if (source.failed) return 'Niet beschikbaar';
+  return '$count';
+}
+
+const Color kCycleCardBackground = Color(0xFFFFFFFF);
+const Color kCycleCardText = Color(0xFF202124);
+const Color kCycleCardSecondaryText = Color(0xFF4B4F52);
+const Color kCycleToggleText = Color(0xFF174C3C);
+const Color kCycleToggleFocus = Color(0xFF005A9C);
+const Color kCycleErrorBackground = Color(0xFFFFF2F2);
+const Color kCycleErrorText = Color(0xFF781D24);
+
+class _SourceNotice extends StatelessWidget {
+  const _SourceNotice({
+    required this.icon,
+    required this.text,
+    this.error = false,
+    super.key,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.symmetric(vertical: 6),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: error ? kCycleErrorBackground : kCycleCardBackground,
+      border: Border.all(
+        color: error ? kCycleErrorText : kCycleCardSecondaryText,
+      ),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          color: error ? kCycleErrorText : kCycleCardSecondaryText,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: error ? kCycleErrorText : kCycleCardSecondaryText,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Compacte cycluskaart die uitsluitend haar gekoppelde opbrengst uitklapt. De
+/// detailbediening blijft een afzonderlijke native button en de kaart zelf is
+/// niet interactief, zodat bedieningen nooit in elkaar genest zijn.
+class IterationCycleCard extends StatefulWidget {
+  const IterationCycleCard({
+    required this.iteration,
+    required this.candidates,
+    required this.deliveries,
+    required this.candidatesLoading,
+    required this.deliveriesLoading,
+    required this.onOpenDetails,
+    super.key,
+  });
+
+  final Map<String, dynamic> iteration;
+  final List<Map<String, dynamic>>? candidates;
+  final List<Map<String, dynamic>>? deliveries;
+  final bool candidatesLoading;
+  final bool deliveriesLoading;
+  final Future<void> Function() onOpenDetails;
+
+  @override
+  State<IterationCycleCard> createState() => _IterationCycleCardState();
+}
+
+class _IterationCycleCardState extends State<IterationCycleCard> {
+  final FocusNode _toggleFocusNode = FocusNode(
+    debugLabel: 'iteration-results-toggle',
+  );
+  bool _expanded = false;
+
+  @override
+  void dispose() {
+    _toggleFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    _toggleFocusNode.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final iteration = widget.iteration;
+    final sequenceNumber = '${iteration['sequenceNumber']}';
+    final status = '${iteration['status']}';
+    final running = status == 'QUEUED' || status == 'RUNNING';
+    final role = iteration['currentRole'];
+    final timing = iterationTiming(iteration);
+    final classification = classifyIterationOutcome(
+      status: iteration['status'] as String?,
+      criticVerdict: iteration['criticVerdict'] as String?,
+      errorMessage: iteration['errorMessage'] as String?,
+    );
+    final decision = iterationDecisionPresentation(iteration);
+    final reason = decision.derived && iteration['outcomeReason'] != null
+        ? _outcomeReasonLabel('${iteration['outcomeReason']}')
+        : null;
+
+    String countLabel({
+      required String label,
+      required List<Map<String, dynamic>>? records,
+      required bool loading,
+    }) {
+      if (loading) return '$label: laden…';
+      if (records == null) return '$label: niet beschikbaar';
+      return '$label: ${records.length} · geladen gegevens';
+    }
+
+    return Card(
+      color: kCycleCardBackground,
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(color: kCycleCardText),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              isThreeLine: true,
+              leading: Icon(
+                iteration['mode'] == 'autonomous'
+                    ? Icons.auto_awesome
+                    : Icons.science_outlined,
+                color: kCycleCardSecondaryText,
+              ),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${iteration['productSlug']} · iteratie $sequenceNumber',
+                    style: const TextStyle(
+                      color: kCycleCardText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (running)
+                        const IterationProgressIndicator()
+                      else if (decision.derived)
+                        ClassificationBadge(classification: classification),
+                      IterationDecisionSourceButton(
+                        key: ValueKey(
+                          'iteration-decision-source-${iteration['id']}',
+                        ),
+                        decision: decision,
+                        onOpenDetails: widget.onOpenDetails,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      [
+                        'Status: $status',
+                        if (role != null) 'bezig: ${_roleLabel('$role')}',
+                        'gestart ${timing.startLabel}',
+                        if (timing.durationLabel != null)
+                          timing.durationLabel!,
+                      ].join(' · '),
+                      style: const TextStyle(color: kCycleCardSecondaryText),
+                    ),
+                    if (reason != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Kernreden: $reason',
+                        style: const TextStyle(color: kCycleCardText),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        countLabel(
+                          label: 'Interne kandidaten',
+                          records: widget.candidates,
+                          loading: widget.candidatesLoading,
+                        ),
+                        countLabel(
+                          label: 'Software Factory-leveringen',
+                          records: widget.deliveries,
+                          loading: widget.deliveriesLoading,
+                        ),
+                      ].join('\n'),
+                      style: const TextStyle(
+                        color: kCycleCardText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        'Backendcyclus: ${iteration['candidateCount']} kandidaten',
+                        '${iteration['acceptedCandidateCount'] ?? 0} leverbaar',
+                        if ((iteration['revisionRounds'] ?? 0) != 0)
+                          '${iteration['revisionRounds']} revisierondes',
+                        if (iteration['criticVerdict'] != null)
+                          'criticus: ${iteration['criticVerdict']}',
+                        _deliveryLabel('${iteration['mode']}'),
+                      ].join(' · '),
+                      style: const TextStyle(color: kCycleCardSecondaryText),
+                    ),
+                    if (iteration['workspacePullRequestUrl'] != null)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.call_merge_outlined,
+                              size: 18,
+                              color: kCycleCardSecondaryText,
+                            ),
+                            SizedBox(width: 4),
+                            Flexible(child: Text('Pull request beschikbaar')),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: MergeSemantics(
+                  child: Semantics(
+                    button: true,
+                    expanded: _expanded,
+                    label:
+                        '${_expanded ? 'Verberg' : 'Toon'} opbrengst voor cyclus $sequenceNumber',
+                    child: OutlinedButton.icon(
+                      key: ValueKey(
+                        'iteration-results-toggle-${iteration['id']}',
+                      ),
+                      focusNode: _toggleFocusNode,
+                      onPressed: _toggle,
+                      style: ButtonStyle(
+                        foregroundColor: const WidgetStatePropertyAll(
+                          kCycleToggleText,
+                        ),
+                        side: WidgetStateProperty.resolveWith((states) {
+                          if (states.contains(WidgetState.focused)) {
+                            return const BorderSide(
+                              color: kCycleToggleFocus,
+                              width: 3,
+                            );
+                          }
+                          return const BorderSide(color: kCycleToggleText);
+                        }),
+                      ),
+                      icon: Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                      ),
+                      label: Text(
+                        _expanded ? 'Verberg opbrengst' : 'Toon opbrengst',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (_expanded) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _LinkedResultsGroup(
+                      title: 'Interne kandidaten',
+                      records: widget.candidates,
+                      loading: widget.candidatesLoading,
+                      statusLabel: 'Kandidaatstatus',
+                    ),
+                    const SizedBox(height: 16),
+                    _LinkedResultsGroup(
+                      title: 'Software Factory-leveringen',
+                      records: widget.deliveries,
+                      loading: widget.deliveriesLoading,
+                      statusLabel: 'Leveringsstatus',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkedResultsGroup extends StatelessWidget {
+  const _LinkedResultsGroup({
+    required this.title,
+    required this.records,
+    required this.loading,
+    required this.statusLabel,
+  });
+
+  final String title;
+  final List<Map<String, dynamic>>? records;
+  final bool loading;
+  final String statusLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final sourceDescription = loading
+        ? 'Resultaten uit geladen gegevens worden geladen.'
+        : records == null
+        ? 'Resultaten uit geladen gegevens zijn niet beschikbaar.'
+        : records!.isEmpty
+        ? 'Geen resultaten in de geladen gegevens.'
+        : 'Resultaten uit de geladen gegevens: ${records!.length}.';
+    return Semantics(
+      container: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: kCycleCardText,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            sourceDescription,
+            style: const TextStyle(color: kCycleCardSecondaryText),
+          ),
+          if (records != null)
+            for (final record in records!)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text.rich(
+                  TextSpan(
+                    style: const TextStyle(color: kCycleCardText),
+                    children: [
+                      TextSpan(
+                        text: '${record['title'] ?? 'Zonder titel'}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      TextSpan(
+                        text:
+                            '\n$statusLabel: ${record['status'] ?? 'Onbekend'}',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
 }
 
 class IterationSessionDialog extends StatefulWidget {
