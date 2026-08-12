@@ -1455,7 +1455,10 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
           ),
         ),
         actions: [
-          if (status == 'NEEDS_REVISION')
+          if (canResumeIteration(
+            status: status,
+            outcomeReason: iteration?['outcomeReason'] as String?,
+          ))
             FilledButton.icon(
               onPressed: _resuming ? null : _resumeRevision,
               icon: _resuming
@@ -1465,7 +1468,11 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.restart_alt),
-              label: const Text('Hervat revisie'),
+              label: Text(
+                status == 'NEEDS_REVISION'
+                    ? 'Hervat revisie'
+                    : 'Herstel levering',
+              ),
             ),
           if (running)
             TextButton(
@@ -1498,6 +1505,11 @@ String _outcomeReasonLabel(String reason) => switch (reason) {
   'RESEARCH_GAP' => 'Noodzakelijke brononderbouwing ontbreekt',
   'POLICY_CONFLICT' => 'Er is nog een privacy-, rechten- of beleidsconflict',
   'OWNER_DECISION_REQUIRED' => 'Een echte beslissing van de eigenaar is nodig',
+  'DELIVERY_DEPENDENCY_UNRESOLVED' =>
+    'Technische levering mislukt: een story-afhankelijkheid werd niet herkend',
+  'NO_DELIVERABLE_CANDIDATE' =>
+    'Technische levering leverde geen bruikbare kandidaat op',
+  'TECHNICAL_FAILURE' => 'De cyclus is door een technische fout gestopt',
   'REJECT' => 'De gekozen richting is fundamenteel afgewezen',
   _ => reason,
 };

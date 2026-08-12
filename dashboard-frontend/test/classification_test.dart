@@ -2,6 +2,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:product_factory_dashboard/classification.dart';
 
 void main() {
+  group('canResumeIteration', () {
+    test('staat revisie en herstelbare leveringsfouten toe', () {
+      expect(
+        canResumeIteration(status: 'NEEDS_REVISION', outcomeReason: null),
+        isTrue,
+      );
+      expect(
+        canResumeIteration(
+          status: 'FAILED',
+          outcomeReason: 'DELIVERY_DEPENDENCY_UNRESOLVED',
+        ),
+        isTrue,
+      );
+      expect(
+        canResumeIteration(
+          status: 'FAILED',
+          outcomeReason: 'NO_DELIVERABLE_CANDIDATE',
+        ),
+        isTrue,
+      );
+    });
+
+    test('staat gewone technische fouten en echte afwijzingen niet toe', () {
+      expect(
+        canResumeIteration(
+          status: 'FAILED',
+          outcomeReason: 'TECHNICAL_FAILURE',
+        ),
+        isFalse,
+      );
+      expect(
+        canResumeIteration(status: 'REJECTED', outcomeReason: 'REJECT'),
+        isFalse,
+      );
+    });
+  });
+
   group('classifyIterationOutcome', () {
     test('ACCEPTED wordt richting-gekozen', () {
       expect(

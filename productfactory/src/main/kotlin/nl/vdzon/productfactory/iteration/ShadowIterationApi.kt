@@ -140,8 +140,11 @@ class ShadowIterationService(
     @Transactional
     fun resume(productSlug: String, id: String): ShadowIterationView {
         val source = require(productSlug, id)
-        if (source.status != "NEEDS_REVISION") {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Alleen een cyclus met NEEDS_REVISION kan worden hervat")
+        if (!isResumableIteration(source.status, source.outcomeReason)) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Alleen een revisie of herstelbare technische leveringsfout kan worden hervat",
+            )
         }
         val product = products.requireActive(productSlug)
         if (product.workspaceOwnership != "product-factory") {
@@ -161,6 +164,10 @@ class ShadowIterationService(
         return iteration
     }
 }
+
+internal fun isResumableIteration(status: String, outcomeReason: String?): Boolean =
+    status == "NEEDS_REVISION" ||
+        (status == "FAILED" && outcomeReason in setOf("DELIVERY_DEPENDENCY_UNRESOLVED", "NO_DELIVERABLE_CANDIDATE"))
 
 @Repository
 class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
@@ -352,9 +359,20 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
 
     fun existingCandidateContext(productSlug: String): String = jdbc.query(
         "select id, title, description, status from story_candidate where product_slug = ? order by id desc limit 20",
-        { row, _ -> "${row.getLong(1)} | ${row.getString(2)} | ${row.getString(3)} | ${row.getString(4)}" },
+        { row, _ ->
+            val status = row.getString("status")
+            val reference = if (status == "PUBLISHED") "story:${row.getLong("id")}" else "candidate:${row.getLong("id")} (niet als dependsOn gebruiken)"
+            "$reference | ${row.getString("title")} | ${row.getString("description")} | $status"
+        },
         productSlug,
     ).joinToString("\n").ifBlank { "Geen bestaande kandidaten." }
+
+    /** Alleen reeds gepubliceerde stories van hetzelfde product mogen een cross-batch afhankelijkheid vervullen. */
+    fun publishedCandidateIds(productSlug: String): Set<Long> = jdbc.queryForList(
+        "select id from story_candidate where product_slug = ? and status = 'PUBLISHED'",
+        Long::class.java,
+        productSlug,
+    ).toSet()
 
     fun previousIterationContext(productSlug: String, currentIterationId: String): String = jdbc.query(
         """select i.sequence_number, a.artifact_type, a.content_json
@@ -492,9 +510,10 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         }
     }
 
-    fun recordOutcome(iterationId: String, acceptedCount: Int, revisionRounds: Int, reason: String) {
+    fun recordOutcome(iterationId: String, generatedCount: Int, acceptedCount: Int, revisionRounds: Int, reason: String) {
         jdbc.update(
-            "update shadow_iteration set accepted_candidate_count = ?, revision_rounds = ?, outcome_reason = ? where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
+            "update shadow_iteration set generated_candidate_count = ?, accepted_candidate_count = ?, revision_rounds = ?, outcome_reason = ? where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
+            generatedCount,
             acceptedCount,
             revisionRounds,
             reason,
@@ -538,6 +557,20 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         }
     }
 
+    /** Een geaccepteerde richting die pas in de leveringslaag uitvalt is een technische fout, geen afwijzing. */
+    fun markDeliveryFailed(iterationId: String, criticVerdict: String, reason: String, error: String) {
+        val updated = jdbc.update(
+            "update shadow_iteration set status = 'FAILED', current_agent_role = null, critic_verdict = ?, error_message = ?, outcome_reason = ?, completed_at = current_timestamp where id = ? and status not in ($TERMINAL_STATUSES_SQL)",
+            criticVerdict,
+            error.take(MAX_ERROR_CHARS),
+            reason,
+            iterationId,
+        )
+        if (updated == 0) {
+            log.warn("Genegeerde schrijfpoging: iteratie {} staat al in een terminale staat, leveringsfout wordt niet overschreven", iterationId)
+        }
+    }
+
     /** Voor dummies geschreven samenvatting van de cyclus (onderzoek, productbesluit, resulterende stories). */
     fun saveSummary(iterationId: String, summary: String) {
         jdbc.update("update shadow_iteration set summary = ? where id = ?", summary, iterationId)
@@ -563,7 +596,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         /** Zelfde marge als AgentDispatchPort.BRIDGE_GRACE_SECONDS: geeft de poll-lus de tijd om zijn eigen timeout af te ronden voordat wij die stap als weeskind bestempelen. */
         private const val TIMEOUT_GRACE_SECONDS = 30L
         private const val VIEW_SELECT = """select i.*,
-            (select count(*) from story_candidate s where s.iteration_id = i.id) as candidate_count
+            greatest(i.generated_candidate_count, (select count(*) from story_candidate s where s.iteration_id = i.id)) as candidate_count
             from shadow_iteration i"""
 
         /** Terminale statussen: de conclusie (status/critic_verdict) van een iteratie mag hierna niet meer overschreven worden. */

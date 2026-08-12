@@ -235,15 +235,17 @@ class ShadowIterationEngine(
         val verdict = critic.path("overallVerdict").asText()
         val accepted = deliverableCandidates(candidates, critic)
         val effectiveVerdict = if (accepted.isNotEmpty()) "ACCEPT" else verdict
+        val unresolvedDependencies = candidates.flatMap(ReviewedCandidate::dependencyResolutions).filterNot(DependencyResolution::resolved)
         val outcomeReason = when {
             accepted.isNotEmpty() && accepted.size < candidates.size -> "PARTIAL_ACCEPT"
             accepted.isNotEmpty() -> "ACCEPT"
             candidates.isNotEmpty() && candidates.all { it.duplicateOfId != null } -> "ALREADY_DELIVERED"
+            verdict == "ACCEPT" && unresolvedDependencies.isNotEmpty() -> "DELIVERY_DEPENDENCY_UNRESOLVED"
             verdict == "REVISE" -> classifyRevisionReason(critic)
             verdict == "REJECT" -> "REJECT"
             else -> "NO_DELIVERABLE_CANDIDATE"
         }
-        repository.recordOutcome(iteration.id, accepted.size, contentRound - 1, outcomeReason)
+        repository.recordOutcome(iteration.id, candidates.size, accepted.size, contentRound - 1, outcomeReason)
         runCatching { generateSummary(iteration, product, research, productOwner, critic, accepted, effectiveVerdict) }
 
         if (accepted.isEmpty() && candidates.isNotEmpty() && candidates.all { it.duplicateOfId != null }) {
@@ -255,7 +257,12 @@ class ShadowIterationEngine(
             return
         }
         if (accepted.isEmpty()) {
-            repository.markReviewed(iteration.id, verdict, "REJECTED")
+            val error = if (unresolvedDependencies.isNotEmpty()) {
+                "Geaccepteerde storykandidaat kon niet worden geleverd doordat een afhankelijkheid niet werd herkend."
+            } else {
+                "De criticus accepteerde de cyclus, maar de leveringslaag vond geen leverbare kandidaat."
+            }
+            repository.markDeliveryFailed(iteration.id, verdict, outcomeReason, error)
             return
         }
 
@@ -625,6 +632,7 @@ class ShadowIterationEngine(
 
     private fun reviewedCandidates(productSlug: String, stories: JsonNode, critic: JsonNode, validThemeIds: Set<String>): List<ReviewedCandidate> {
         val reviews = critic.path("candidateReviews").associateBy { it.path("candidateIndex").asInt() }
+        val publishedBacklogIds = repository.publishedCandidateIds(productSlug)
         val draft = stories.path("candidates").mapIndexed { index, candidate ->
             val title = candidate.path("title").asText().trim()
             val description = candidate.path("description").asText().trim()
@@ -647,7 +655,7 @@ class ShadowIterationEngine(
         // vertaald via de positie binnen dezelfde batch (candidatesByPosition == draft, candidates[]-volgorde).
         val byKey = draft.associateBy(ReviewedCandidate::candidateKey)
         return draft.map { candidate ->
-            val resolutions = resolveDependencyReferences(byKey, draft, candidate.dependsOn)
+            val resolutions = resolveDependencyReferences(byKey, draft, candidate.dependsOn, publishedBacklogIds)
             candidate.copy(
                 resolvedDependsOn = resolutions.mapNotNull(DependencyResolution::resolvedCandidateKey),
                 dependencyResolutions = resolutions,
@@ -667,7 +675,7 @@ class ShadowIterationEngine(
                     mapOf(
                         "rawValue" to resolution.rawValue,
                         "resolvedCandidateKey" to resolution.resolvedCandidateKey,
-                        "resolvedBacklogId" to resolution.resolvedCandidateKey?.let(backlogIds::get),
+                        "resolvedBacklogId" to (resolution.resolvedBacklogId ?: resolution.resolvedCandidateKey?.let(backlogIds::get)),
                         "viaLegacyFallback" to resolution.viaLegacyFallback,
                         "resolved" to resolution.resolved,
                     )
@@ -869,6 +877,8 @@ class ShadowIterationEngine(
         dezelfde batch in dependsOn, gebruik dan exact diens candidateKey. Gebruik NOOIT een batch-relatief
         volgnummer zoals "Kandidaat 0" of "Kandidaat 1": dat volgnummer verandert zodra de batch- of
         reviewvolgorde wijzigt en de koppeling zou dan naar de verkeerde kandidaat kunnen wijzen.
+        Verwijst dependsOn naar een bestaande, reeds PUBLISHED story uit BESTAANDE KANDIDATEN, gebruik dan exact
+        de daar getoonde stabiele sleutel `story:<id>` (bijvoorbeeld `story:46`). Verzin geen story-ID.
 
         THEMEID: kies voor elke kandidaat, indien passend, het themaId van het roadmapthema hieronder waar deze
         kandidaat het meest aan bijdraagt en zet dat exacte themaId (niet de titel) in themeId. Past geen enkel
@@ -967,6 +977,8 @@ class ShadowIterationEngine(
         een volledig nieuwe kandidaat toevoegt, die dan een eigen unieke kebab-case-slug krijgt). Verwijst een
         kandidaat naar een andere kandidaat uit dezelfde batch in dependsOn, gebruik dan exact diens
         candidateKey en nooit een batch-relatief volgnummer zoals "Kandidaat 0".
+        Verwijst dependsOn naar een bestaande, reeds PUBLISHED story uit BESTAANDE KANDIDATEN, gebruik dan exact
+        de daar getoonde stabiele sleutel `story:<id>`. Verzin geen story-ID.
 
         THEMEID: behoud het themeId van iedere kandidaat die je herwerkt. Voeg je een volledig nieuwe kandidaat
         toe, kies dan (indien passend) het themaId van het roadmapthema hieronder waar die het meest aan

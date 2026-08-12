@@ -59,6 +59,11 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
     fun cancelShadowIteration(@PathVariable id: String, @RequestParam productSlug: String, @RequestBody(required = false) request: Map<String, String>?): Any =
         runtime.cancelShadowIteration(productSlug, id, request?.get("reason"))
 
+    @PostMapping("/shadow-iterations/{id}/resume")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun resumeShadowIteration(@PathVariable id: String, @RequestParam productSlug: String): Any =
+        runtime.resumeShadowIteration(productSlug, id)
+
     @GetMapping("/autonomy/deliveries")
     fun deliveries(): Any = runtime.products().flatMap { product -> runtime.deliveries(product["slug"].toString()) }
 
