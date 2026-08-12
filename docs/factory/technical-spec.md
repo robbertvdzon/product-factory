@@ -27,16 +27,28 @@
 
 - `main.dart` — widgets en pagina's; `api.dart` — HTTP-client; `config.dart` — build-time config;
   `session.dart` — Google-login; `formatting.dart` — datum/tijd- en duurformattering;
-  `limited_list.dart` — de 5/+10-lijstbeperking; `classification.dart` — de vaste
-  iteratie-uitkomstclassificatie (mapping van `status`/`criticVerdict`/`errorMessage` naar één van
-  vijf badge-waarden, inclusief de fallbackwaarde `niet-classificeerbaar` voor onbekende
-  statuswaarden), de bijbehorende AA-contrastkleuren en de `ClassificationBadge`-widget. Voor een
+  `limited_list.dart` — de 5/+10-lijstbeperking; `classification.dart` — twee pure, gesloten
+  mappings op de bestaande velden `status`/`criticVerdict`/`errorMessage`: de vaste
+  iteratie-uitkomstclassificatie naar één van vijf badge-waarden (inclusief de fallbackwaarde
+  `niet-classificeerbaar` voor onbekende statuswaarden) en `classifyDecisionSource` naar uitsluitend
+  `Evaluatie-agent`, `Technische fout` of `Onbekend`. De beslisbronmapping trimt invoer, vergelijkt
+  bekende waarden hoofdlettergevoelig, accepteert alleen de bewezen paren `ACCEPT`/`ACCEPTED`,
+  `REVISE`/`NEEDS_REVISION` en `REJECT`/`REJECTED` als `Evaluatie-agent`, en alleen `FAILED` zonder
+  verdict maar met foutmelding als `Technische fout`; alle overige combinaties zijn `Onbekend`.
+  Het bestand bevat daarnaast de AA-contrastkleuren en de `ClassificationBadge`-widget. Voor een
   iteratie met `status` QUEUED of RUNNING toont de iteratierij in plaats van de badge de
   `IterationProgressIndicator`-widget (`main.dart`), met `Semantics(liveRegion: true)` als
   Flutter-web-equivalent van `aria-live="polite"`; elke andere status toont ongewijzigd exact één
   `ClassificationBadge`. Dezelfde `ClassificationBadge` (met dezelfde `classifyIterationOutcome`-
   uitkomst) staat ook in `IterationSessionDialog` — de detaildialoog toont er geen losse `Chip` met
-  de ruwe statuswaarde meer naast.
+  de ruwe statuswaarde meer naast. Elke iteratierij bevat ook één
+  `IterationDecisionSourceButton` (`main.dart`): een native `OutlinedButton` die de bestaande
+  detaildialoog voor het gekoppelde iteratie-id opent. De `ListTile` zelf heeft geen `onTap` of
+  navigatie-chevron, zodat er geen geneste of dubbele detailbediening is. De button bewaart een
+  eigen `FocusNode`; na sluiten via de sluitactie of Escape keert de focus terug naar de opener.
+  De dialoogtitel gebruikt het user-facing `sequenceNumber`, met het iteratie-id als fallback als
+  dat nummer ontbreekt. Deze interactie gebruikt uitsluitend de bestaande GET-calls en wijzigt
+  geen API of contract.
 - Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
   `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
   `4m 12s`, `35s`). Backendtijdstempels zijn ISO-8601 in UTC; `parseInstant` is defensief en levert
