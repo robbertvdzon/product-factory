@@ -9,6 +9,9 @@
 - [x] Backend-, contract- en Fluttertests toevoegen of bijwerken.
 - [x] Gewijzigde code formatteren en gerichte tests draaien.
 - [x] Volledig vangnet uit `docs/factory/development.md` met succes afronden.
+- [x] Reviewbevinding herstellen: afgeleide technische uitkomst bij expliciete annulering onderdrukken.
+- [x] Regressietests voor overzicht, detail en historische fallback aanscherpen.
+- [x] Gerichte tests en het volledige verplichte vangnet opnieuw groen afronden.
 
 ## Notities
 
@@ -23,6 +26,13 @@ zichtbaar en toegankelijk als `Afgeleid`.
 
 Verificatie: `mvn -B --no-transfer-progress clean verify` (141 tests), `flutter analyze`
 (geen issues) en `flutter test` (227 tests) zijn afgerond met exitcode 0, 0 failures en 0 errors.
+
+Na de reviewbevinding toont een cyclus met expliciete handmatige-annuleringsprovenance geen uit
+`FAILED` afgeleide badge of technische uitkomstverklaring meer, zowel in het overzicht als in het
+detail. De aangescherpte widgettest bewijst per iteratie dat een historische cyclus zonder record
+zijn badge en technische fallback ongewijzigd behoudt. Het volledige vangnet is daarna opnieuw
+afgerond met dezelfde groene resultaten: 141 backendtests, geen Flutter-analyseproblemen en 227
+Fluttertests.
 
 ## Review
 

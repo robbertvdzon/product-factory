@@ -726,9 +726,10 @@ class _OverviewPageState extends State<OverviewPage> {
                       Text(
                         '${iteration['productSlug']} · iteratie ${iteration['sequenceNumber']}',
                       ),
-                      running
-                          ? const IterationProgressIndicator()
-                          : ClassificationBadge(classification: classification),
+                      if (running)
+                        const IterationProgressIndicator()
+                      else if (decision.derived)
+                        ClassificationBadge(classification: classification),
                       IterationDecisionSourceButton(
                         key: ValueKey(
                           'iteration-decision-source-${iteration['id']}',
@@ -748,7 +749,8 @@ class _OverviewPageState extends State<OverviewPage> {
                       '${iteration['acceptedCandidateCount'] ?? 0} leverbaar',
                       if ((iteration['revisionRounds'] ?? 0) != 0)
                         '${iteration['revisionRounds']} revisierondes',
-                      if (iteration['outcomeReason'] != null)
+                      if (decision.derived &&
+                          iteration['outcomeReason'] != null)
                         _outcomeReasonLabel('${iteration['outcomeReason']}'),
                       if (iteration['criticVerdict'] != null)
                         'criticus: ${iteration['criticVerdict']}',
@@ -1164,13 +1166,15 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      ClassificationBadge(
-                        classification: classifyIterationOutcome(
-                          status: iteration['status'] as String?,
-                          criticVerdict: iteration['criticVerdict'] as String?,
-                          errorMessage: iteration['errorMessage'] as String?,
+                      if (decision.derived)
+                        ClassificationBadge(
+                          classification: classifyIterationOutcome(
+                            status: iteration['status'] as String?,
+                            criticVerdict:
+                                iteration['criticVerdict'] as String?,
+                            errorMessage: iteration['errorMessage'] as String?,
+                          ),
                         ),
-                      ),
                       Chip(label: Text(_deliveryLabel('${iteration['mode']}'))),
                       if (currentRole != null)
                         Chip(label: Text('bezig: $currentRole')),

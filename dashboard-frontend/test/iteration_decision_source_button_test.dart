@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:product_factory_dashboard/classification.dart';
 import 'package:product_factory_dashboard/main.dart';
 
 Map<String, dynamic> _iteration({
@@ -28,6 +29,7 @@ Map<String, dynamic> _iteration({
   'workspacePullRequestUrl': null,
   'workspaceCommitSha': null,
   'errorMessage': errorMessage,
+  'outcomeReason': 'TECHNICAL_FAILURE',
   'summary': null,
   'prompt': 'Ruwe prompt voor cyclus $sequenceNumber',
   'logs': 'Ruwe logs voor cyclus $sequenceNumber',
@@ -112,6 +114,9 @@ Future<void> _withDashboard(
 Finder _decisionButton(String id) =>
     find.byKey(ValueKey('iteration-decision-source-$id'));
 
+Finder _iterationRow(String id) =>
+    find.ancestor(of: _decisionButton(id), matching: find.byType(ListTile));
+
 Future<void> _finishDialogTransition(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
@@ -129,6 +134,45 @@ void main() {
         expect(find.text('Reden: Handmatig geannuleerd'), findsOneWidget);
         expect(
           find.text('Beslisbron: Technische fout (Afgeleid)'),
+          findsOneWidget,
+        );
+        final explicitRow = _iterationRow('iter-34');
+        expect(
+          find.descendant(
+            of: explicitRow,
+            matching: find.byType(ClassificationBadge),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: explicitRow,
+            matching: find.textContaining(
+              'De cyclus is door een technische fout gestopt',
+            ),
+          ),
+          findsNothing,
+        );
+
+        final historicalRow = _iterationRow('iter-12');
+        expect(
+          tester
+              .widget<ClassificationBadge>(
+                find.descendant(
+                  of: historicalRow,
+                  matching: find.byType(ClassificationBadge),
+                ),
+              )
+              .classification,
+          kTechnischeFout,
+        );
+        expect(
+          find.descendant(
+            of: historicalRow,
+            matching: find.textContaining(
+              'De cyclus is door een technische fout gestopt',
+            ),
+          ),
           findsOneWidget,
         );
 
@@ -218,7 +262,16 @@ void main() {
         expect(
           find.descendant(
             of: find.byType(AlertDialog),
-            matching: find.textContaining('Technische fout (Afgeleid)'),
+            matching: find.byType(ClassificationBadge),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text(
+              'De cyclus is door een technische fout gestopt',
+            ),
           ),
           findsNothing,
         );
@@ -249,6 +302,26 @@ void main() {
         expect(
           find.text('Synthetische foutreden uitsluitend voor cyclus 34'),
           findsNothing,
+        );
+        expect(
+          tester
+              .widget<ClassificationBadge>(
+                find.descendant(
+                  of: find.byType(AlertDialog),
+                  matching: find.byType(ClassificationBadge),
+                ),
+              )
+              .classification,
+          kTechnischeFout,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text(
+              'De cyclus is door een technische fout gestopt',
+            ),
+          ),
+          findsOneWidget,
         );
 
         await tester.tap(find.text('Sluiten'));
