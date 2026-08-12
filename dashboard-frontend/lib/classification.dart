@@ -16,6 +16,49 @@ const String kRichtingVerworpen = 'richting-verworpen';
 const String kNietClassificeerbaar = 'niet-classificeerbaar';
 const String kTechnischeFout = 'technische fout';
 
+const String kBeslisbronEvaluatieAgent = 'Evaluatie-agent';
+const String kBeslisbronTechnischeFout = 'Technische fout';
+const String kBeslisbronOnbekend = 'Onbekend';
+
+/// Gesloten waardenverzameling voor de read-only beslisbron in het cyclusoverzicht.
+const List<String> kBeslisbronnen = [
+  kBeslisbronEvaluatieAgent,
+  kBeslisbronTechnischeFout,
+  kBeslisbronOnbekend,
+];
+
+/// Leidt uitsluitend uit bewezen combinaties van de bestaande cyclusvelden af wie of wat de
+/// uitkomst bepaalde. Witruimte rondom waarden is niet betekenisvol; lege waarden gelden als
+/// afwezig. Iedere onbekende, ambigue of tegenstrijdige combinatie valt veilig terug op
+/// [kBeslisbronOnbekend].
+String classifyDecisionSource({
+  required String? criticVerdict,
+  required String? status,
+  required String? errorMessage,
+}) {
+  String? presentValue(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  final verdict = presentValue(criticVerdict);
+  final finalStatus = presentValue(status);
+  final error = presentValue(errorMessage);
+
+  const provenEngineOutcomes = {
+    'ACCEPT': 'ACCEPTED',
+    'REVISE': 'NEEDS_REVISION',
+    'REJECT': 'REJECTED',
+  };
+  if (verdict != null && provenEngineOutcomes[verdict] == finalStatus) {
+    return kBeslisbronEvaluatieAgent;
+  }
+  if (finalStatus == 'FAILED' && verdict == null && error != null) {
+    return kBeslisbronTechnischeFout;
+  }
+  return kBeslisbronOnbekend;
+}
+
 /// De zes toegestane classificatiewaarden; een badge mag nooit iets anders tonen.
 /// [kGuardrailConflict] blijft hierin staan omdat `main.dart` deze onafhankelijk hergebruikt
 /// voor het "geblokkeerd"-label op storyqueue-kaarten (dependsOn-blokkade), ook al mapt geen

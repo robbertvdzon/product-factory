@@ -13,7 +13,7 @@ import 'package:product_factory_dashboard/main.dart';
 /// (product-156): eigen rij vóór en visueel gescheiden van de secundaire knoppenrij, AA-contrast,
 /// het statuslabel als tekst (niet uitsluitend kleur), tab-volgorde, functionele gelijkheid van de
 /// klik-actie en een kleinere kaarthoogte na de herindeling (gemeten tegen een `_LegacyProductCard`
-/// die de vóór-deze-wijziging-structuur reconstrueert).
+/// die de vóór-deze-wijziging-structuur met dezelfde secundaire acties reconstrueert).
 Map<String, dynamic> _product({String status = 'active'}) => {
   'slug': 'demo',
   'name': 'Demo product',
@@ -130,6 +130,11 @@ class _LegacyProductCard extends StatelessWidget {
                     onPressed: () {},
                     icon: const Icon(Icons.forum_outlined),
                     label: const Text('Start overleg'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('Start roadmap-sessie nu'),
                   ),
                 ],
               ),

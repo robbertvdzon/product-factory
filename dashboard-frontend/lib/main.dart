@@ -322,6 +322,7 @@ class _OverviewPageState extends State<OverviewPage> {
   Future<void> _showIteration(Map<String, dynamic> iteration) async {
     await showDialog<void>(
       context: context,
+      traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
       builder: (_) => IterationSessionDialog(
         api: api,
         productSlug: '${iteration['productSlug']}',
@@ -706,6 +707,11 @@ class _OverviewPageState extends State<OverviewPage> {
                 criticVerdict: iteration['criticVerdict'] as String?,
                 errorMessage: iteration['errorMessage'] as String?,
               );
+              final decisionSource = classifyDecisionSource(
+                criticVerdict: iteration['criticVerdict'] as String?,
+                status: iteration['status'] as String?,
+                errorMessage: iteration['errorMessage'] as String?,
+              );
               return Card(
                 child: ListTile(
                   leading: Icon(
@@ -723,6 +729,13 @@ class _OverviewPageState extends State<OverviewPage> {
                       running
                           ? const IterationProgressIndicator()
                           : ClassificationBadge(classification: classification),
+                      IterationDecisionSourceButton(
+                        key: ValueKey(
+                          'iteration-decision-source-${iteration['id']}',
+                        ),
+                        decisionSource: decisionSource,
+                        onOpenDetails: () => _showIteration(iteration),
+                      ),
                     ],
                   ),
                   subtitle: Text(
@@ -740,7 +753,6 @@ class _OverviewPageState extends State<OverviewPage> {
                   trailing: pr == null
                       ? const Icon(Icons.chevron_right)
                       : const Icon(Icons.call_merge_outlined),
-                  onTap: () => _showIteration(iteration),
                 ),
               );
             }),
@@ -1088,8 +1100,13 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
       final iteration = snapshot.data?['iteration'] as Map<String, dynamic>?;
       final status = iteration == null ? null : '${iteration['status']}';
       final running = status == 'QUEUED' || status == 'RUNNING';
+      final sequenceNumber = iteration?['sequenceNumber'];
       return AlertDialog(
-        title: Text('Productcyclus ${widget.iterationId}'),
+        title: Text(
+          sequenceNumber == null
+              ? 'Productcyclus ${widget.iterationId}'
+              : 'Productcyclus $sequenceNumber',
+        ),
         content: SizedBox(
           width: 900,
           height: 680,
@@ -1398,6 +1415,52 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
         ],
       );
     },
+  );
+}
+
+/// Native detailbutton voor één cyclus. De [FocusNode] leeft even lang als de rijwidget, zodat
+/// zowel de zichtbare sluitactie als Escape na het sluiten van de dialoog de focus betrouwbaar
+/// terugbrengen naar precies de knop die de dialoog opende.
+class IterationDecisionSourceButton extends StatefulWidget {
+  const IterationDecisionSourceButton({
+    required this.decisionSource,
+    required this.onOpenDetails,
+    super.key,
+  });
+
+  final String decisionSource;
+  final Future<void> Function() onOpenDetails;
+
+  @override
+  State<IterationDecisionSourceButton> createState() =>
+      _IterationDecisionSourceButtonState();
+}
+
+class _IterationDecisionSourceButtonState
+    extends State<IterationDecisionSourceButton> {
+  final FocusNode _focusNode = FocusNode(
+    debugLabel: 'iteration-decision-source',
+  );
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openDetails() async {
+    try {
+      await widget.onOpenDetails();
+    } finally {
+      if (mounted) _focusNode.requestFocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton(
+    focusNode: _focusNode,
+    onPressed: _openDetails,
+    child: Text('Beslisbron: ${widget.decisionSource}'),
   );
 }
 
