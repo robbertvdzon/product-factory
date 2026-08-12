@@ -49,3 +49,17 @@ Fluttertests.
 - [info] Gerichte reviewchecks: de twee beslisbron-widget/unitbestanden draaiden 51 tests groen;
   `ShadowIterationCancelTest` en `ShadowIterationDecisionMigrationTest` draaiden samen 6 tests groen.
   Het volledige vangnet is niet opnieuw gestart, conform de reviewer-instructie.
+
+## Herreview
+
+- [info] De eerdere bevinding is opgelost: bij expliciete handmatige-annuleringsprovenance worden
+  de afgeleide technische badge en `TECHNICAL_FAILURE`-verklaring nu zowel in overzicht als detail
+  onderdrukt; een historische cyclus zonder record behoudt de bestaande technische fallback met
+  de zichtbare en toegankelijke kwalificatie `Afgeleid`.
+- [info] De volledige storydiff vanaf `main` is opnieuw beoordeeld. De worktree was vóór deze
+  reviewnotitie schoon en de HEAD-tree kwam exact overeen met de geïndexeerde worktree-tree.
+- [info] Gerichte herreviewchecks: de twee Flutter-testbestanden draaiden 51 tests groen en de twee
+  backendtestklassen draaiden via de actuele reactorafhankelijkheden 6 tests groen, beide met 0
+  failures, 0 errors en 0 skips. Het volledige vangnet is conform de reviewer-instructie niet
+  opnieuw gestart; het factory-resultaat bij de actuele developerrevision vermeldt Maven 141 tests,
+  Flutter 227 tests en `flutter analyze` zonder issues.
