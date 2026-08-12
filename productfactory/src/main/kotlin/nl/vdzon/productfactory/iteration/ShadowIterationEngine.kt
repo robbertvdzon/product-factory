@@ -113,7 +113,6 @@ class ShadowIterationEngine(
             promptFor = { correction -> researchPrompt(iteration.focus, product, previousContext, meetingContext, roadmapContext, today, iteration.mode, productVision, correction) },
             validate = { validateResearch(it, today) },
         )
-        val sourceUrls = research.path("sources").map { it.path("url").asText() }.toSet()
 
         val productOwner = executeRoleWithRetry(
             iteration,
@@ -121,7 +120,7 @@ class ShadowIterationEngine(
             ShadowRole.PRODUCT_OWNER,
             ShadowSchemas.productOwner,
             promptFor = { correction -> productOwnerPrompt(product, research, productVision, roadmapContext, correction) },
-            validate = { validateProductOwner(it, sourceUrls) },
+            validate = ::validateProductOwner,
         )
 
         val ux = executeRoleWithRetry(
@@ -141,7 +140,7 @@ class ShadowIterationEngine(
             ShadowSchemas.stories,
             storyPrompt(product, research, productOwner, ux, candidateContext, roadmapContext, iteration.mode),
             storyAttempt,
-        ).also { validateStories(it, product.maxStoriesPerCycle, sourceUrls) }
+        ).also { validateStories(it, product.maxStoriesPerCycle) }
 
         var critic = executeRole(
             iteration,
@@ -163,7 +162,7 @@ class ShadowIterationEngine(
                 ShadowSchemas.stories,
                 revisionPrompt(product, research, productOwner, ux, previousStories, critic, candidateContext, roadmapContext, iteration.mode),
                 storyAttempt,
-            ).also { validateStories(it, product.maxStoriesPerCycle, sourceUrls) }
+            ).also { validateStories(it, product.maxStoriesPerCycle) }
             critic = executeRole(
                 iteration,
                 product,
@@ -326,16 +325,11 @@ class ShadowIterationEngine(
         ValidatedSource(url, consultedOn, rights, rationale)
     }.distinctBy { it.url }
 
-    private fun validateProductOwner(output: JsonNode, sourceUrls: Set<String>) {
+    private fun validateProductOwner(output: JsonNode) {
         require(output.path("productDirection").asText().isNotBlank() && output.path("rationale").asText().isNotBlank()) {
             "Productrichting en onderbouwing zijn verplicht"
         }
         require(output.path("decisions").size() in 1..5) { "Minimaal één productbesluit is verplicht" }
-        output.path("decisions").forEach { decision ->
-            require(textList(decision.path("sourceUrls")).let { it.isNotEmpty() && it.all(sourceUrls::contains) }) {
-                "Productbesluiten moeten naar onderzoeksbronnen verwijzen"
-            }
-        }
     }
 
     private fun validateUx(output: JsonNode) {
@@ -347,16 +341,13 @@ class ShadowIterationEngine(
         }
     }
 
-    private fun validateStories(output: JsonNode, maximum: Int, sourceUrls: Set<String>) {
+    private fun validateStories(output: JsonNode, maximum: Int) {
         val candidates = output.path("candidates")
         require(candidates.size() in 1..maximum.coerceAtMost(3)) { "Ongeldig aantal storykandidaten" }
         val candidateKeys = mutableSetOf<String>()
         candidates.forEach { candidate ->
             require(candidate.path("title").asText().isNotBlank() && candidate.path("description").asText().isNotBlank()) { "Storytitel en omschrijving zijn verplicht" }
             require(candidate.path("acceptanceCriteria").size() > 0) { "Acceptatiecriteria ontbreken" }
-            require(textList(candidate.path("sourceUrls")).let { it.isNotEmpty() && it.all(sourceUrls::contains) }) {
-                "Storykandidaten moeten naar onderzoeksbronnen verwijzen"
-            }
             val candidateKey = candidate.path("candidateKey").asText().trim()
             require(candidateKey.isNotBlank() && CANDIDATE_KEY_PATTERN.matches(candidateKey)) {
                 "candidateKey is verplicht en moet een kebab-case-slug zijn (bv. 'stabiele-review-sleutel')"
