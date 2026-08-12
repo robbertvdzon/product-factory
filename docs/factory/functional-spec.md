@@ -45,8 +45,21 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    te activeren en klapt dan een inline scope-disclaimerpaneel open direct onder de badge, met de
    vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen pop-upvenster of dialoog,
    `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of Escape klapt het
-   paneel weer in en herstelt de focus op de badge. Een klik op de rij buiten de badge opent nog
-   steeds de detaildialoog met voortgang, artifacts en het productdossier. Dit detaildialoog
+   paneel weer in en herstelt de focus op de badge. Iedere cyclusregel toont daarnaast één native
+   button met exact `Beslisbron: Evaluatie-agent`, `Beslisbron: Technische fout` of
+   `Beslisbron: Onbekend`. De waarde wordt read-only afgeleid uit
+   `criticVerdict`, `status` en `errorMessage`: `ACCEPT`/`ACCEPTED`,
+   `REVISE`/`NEEDS_REVISION` en `REJECT`/`REJECTED` leveren `Evaluatie-agent`; uitsluitend
+   `FAILED` met een ontbrekend verdict en een niet-lege foutmelding levert `Technische fout`;
+   iedere andere, ontbrekende, onbekende of tegenstrijdige combinatie levert `Onbekend`. Voor de
+   vergelijking wordt omringende witruimte verwijderd, maar de bekende waarden blijven
+   hoofdlettergevoelig. De button opent met klik, Enter of Spatie de bestaande detaildialoog van
+   precies die cyclus. De rijcontainer zelf is geen tweede detailbediening en toont daarom ook geen
+   navigatie-chevron; de afzonderlijke annuleeractie bij een lopende cyclus blijft ongewijzigd.
+   Sluiten met de zichtbare sluitactie of Escape herstelt de focus naar de beslisbronbutton die het
+   dialoog opende. Het cyclusoverzicht toont bij deze beslisbron geen ruwe foutmelding, prompt, log
+   of artefactinhoud en openen/sluiten veroorzaakt alleen de bestaande leesverzoeken. Deze
+   detaildialoog
    (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) toont dezelfde `ClassificationBadge`
    met dezelfde `classifyIterationOutcome`-uitkomst als de lijstkaart-rij (identieke badge-tekst en
    `kClassificationColors`-kleurenpaar) — geen losse `Chip` met de ruwe backend-statuswaarde (bv.
@@ -186,6 +199,12 @@ en hoe ze zich tot elkaar verhouden, als zelfstandige uitleg naast de badge-besc
   (`kBekendeStatuswaardenPerCategorie` in `classification.dart`), valt `classifyIterationOutcome`
   vanzelf terug op de badge `niet-classificeerbaar` — zonder dat iemand daar apart over hoeft te
   beslissen.
+- **De beslisbron is iets anders dan de conclusion-badge.** `classifyDecisionSource` gebruikt
+  dezelfde bestaande invoervelden, maar kent bewust slechts drie uitkomsten: `Evaluatie-agent`,
+  `Technische fout` en `Onbekend`. Alleen exact bewezen verdict-/eindstatusparen wijzen naar de
+  evaluatie-agent; het guardrailpad `ACCEPT` met `REJECTED`, lopende statussen en alle ambigue
+  combinaties blijven `Onbekend`. De beslisbron voegt geen status, actor of conclusion toe aan het
+  datamodel.
 - **Het eindoordeel van een iteratie wijzigt, na vaststelling, niet meer.** Dit geldt
   onvoorwaardelijk: `markAccepted`, `markReviewed` en `markFailed` in
   `productfactory/.../ShadowIterationApi.kt` weigeren sindsdien een tweede schrijfpoging op

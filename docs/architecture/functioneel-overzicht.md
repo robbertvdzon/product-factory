@@ -186,8 +186,24 @@ beneden:
   vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen `AlertDialog`/`showDialog`,
   geen focus-trap, `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of
   Escape klapt het paneel weer in en herstelt de focus op de badge; het paneel bevat geen link
-  naar een externe iteratielog-route. Aanklikken van de rij buiten de badge opent nog steeds een
-  detailscherm met de opdracht, alle vijf agentstappen (status, start-/eindtijd, foutmelding), het
+  naar een externe iteratielog-route.
+  Elke cyclusregel bevat daarnaast precies één beslisbronbutton met zichtbaar label
+  `Beslisbron: Evaluatie-agent`, `Beslisbron: Technische fout` of `Beslisbron: Onbekend`. De bron
+  wordt zonder nieuwe databron of statusmutatie conservatief afgeleid uit `criticVerdict`, `status`
+  en `errorMessage`: de bewezen paren `ACCEPT`/`ACCEPTED`, `REVISE`/`NEEDS_REVISION` en
+  `REJECT`/`REJECTED` wijzen naar de evaluatie-agent; alleen `FAILED` zonder verdict en met een
+  niet-lege foutmelding wijst naar een technische fout; alle overige combinaties zijn onbekend.
+  Ontbrekende, lege en alleen uit witruimte bestaande waarden gelden als afwezig. Omringende
+  witruimte wordt genegeerd, maar afwijkend hoofdlettergebruik en onbekende of tegenstrijdige
+  waarden vallen terug op `Onbekend`.
+  De native button opent met muis, Enter of Spatie het detailscherm van precies de gekozen cyclus.
+  De rij zelf is niet meer klikbaar en heeft geen navigatie-chevron; zo is er geen tweede of
+  geneste detailbediening naast de afzonderlijke annuleeractie. Na sluiten via de zichtbare
+  sluitactie of Escape keert de focus terug naar de gebruikte beslisbronbutton. De beslisbron toont
+  in het overzicht geen ruwe foutmelding, prompt, log of artefactinhoud, en het openen en sluiten
+  doet uitsluitend de bestaande leesverzoeken. De titel van het detailscherm toont het
+  user-facing cyclusnummer (met het interne iteratie-id als fallback) en het scherm bevat de
+  opdracht, alle vijf agentstappen (status, start-/eindtijd, foutmelding), het
   volledige gepubliceerde dossier en per rol (Onderzoeker, Product owner, UX-ontwerp, Story writer,
   Criticus) een leesbare samenvatting van de bekende tekstvelden (bv. `summary`, `findings`,
   `decisions`/`rationale`, `steps`, `candidates`, `issues`) — dit scherm ververst zichzelf elke 3
