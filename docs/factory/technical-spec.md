@@ -73,8 +73,9 @@
 - `main.dart` — widgets en pagina's; `api.dart` — HTTP-client; `config.dart` — build-time config;
   `session.dart` — Google-login; `formatting.dart` — datum/tijd- en duurformattering;
   `limited_list.dart` — de 5/+10-lijstbeperking; `iteration_results.dart` — pure, verliesvrije
-  client-side koppeling van geladen kandidaten en leveringen aan cycli; `classification.dart` — de
-  bestaande pure
+  client-side koppeling van geladen kandidaten en leveringen aan cycli; `iteration_evidence.dart` —
+  de pure selector en veilige presentatie-opbouw voor terminale `product-factory`-cycli;
+  `classification.dart` — de bestaande pure
   mappings op `status`/`criticVerdict`/`errorMessage` plus
   `iterationDecisionPresentation`, dat eerst een aan het iteratie-id gekoppeld `decision`-record
   selecteert en alleen bij ontbreken daarvan terugvalt op de afleiding. De vaste
@@ -133,6 +134,22 @@
   loaded-resultaten, loading of failure en rendert het volledige unlinked-totaal alleen wanneer
   cycli én beide opbrengstbronnen geladen zijn. De opbrengsttoggle en de bestaande detailbutton zijn
   afzonderlijke native buttons.
+- `shouldShowIterationEvidence` selecteert uitsluitend exact productslug `product-factory` met
+  status `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`, `NO_CHANGE` of `FAILED`. `_OverviewResultsBuilder`
+  geeft die cycli na de bestaande groepering door aan `IterationEvidenceRow`; alle overige cycli
+  blijven `IterationCycleCard` gebruiken. `iterationEvidencePresentation` hergebruikt
+  `parseInstant`/`formatDateTime`, `classifyIterationOutcome`, `outcomeReasonLabel` en
+  `iterationDecisionPresentation`. De datum valt per parseerpoging van `startedAt` terug op
+  `createdAt`. Alleen een volledig geldig, aan hetzelfde iteratie-id gekoppeld
+  handmatig-annuleringsrecord overschrijft uitkomst en reden; een aanwezig maar onbekend expliciet
+  record blijft `Onbekend` en activeert geen afleiding.
+- `IterationEvidenceRow` in `main.dart` rendert de vijf bewijswaarden en
+  `IterationEvidenceButton` binnen één expliciete semanticscontainer. De gekoppelde opbrengst is
+  uitsluitend `linked.deliveries.length` uit de bestaande exacte groepering; de onafhankelijke
+  leveringsbronstatus bepaalt `laden…`, `niet beschikbaar` of het geladen aantal. Een responsieve
+  `Wrap` gebruikt één, twee of drie kolommen. De native `OutlinedButton` heeft een eigen `FocusNode`,
+  opent de bestaande `_showIteration`-detailroute en herstelt focus na sluiten of Escape. Hiervoor
+  zijn geen API-, contract-, opslag-, telemetrie- of dependencywijzigingen toegevoegd.
 - Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
   `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
   `4m 12s`, `35s`). Backendtijdstempels zijn ISO-8601 in UTC; `parseInstant` is defensief en levert
@@ -149,7 +166,8 @@
 ## Bekende valkuilen
 
 - De conclusie van een `shadow_iteration` (kolommen `status`/`critic_verdict`) is write-once zodra
-  de iteratie een terminale staat bereikt (`ACCEPTED`/`NEEDS_REVISION`/`REJECTED`/`FAILED`):
+  de iteratie een terminale staat bereikt
+  (`ACCEPTED`/`NO_CHANGE`/`NEEDS_REVISION`/`REJECTED`/`FAILED`):
   `markAccepted`/`markReviewed`/`markFailed` in `ShadowIterationRepository`
   (`productfactory/.../iteration/ShadowIterationApi.kt`) hebben een `and status not in (...)`-guard
   in hun `WHERE`-clausule, zodat een tweede schrijfpoging 0 rijen raakt in plaats van de bestaande

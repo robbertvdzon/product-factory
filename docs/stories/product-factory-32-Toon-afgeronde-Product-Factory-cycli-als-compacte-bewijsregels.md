@@ -52,7 +52,7 @@ De afgeronde Product Factory-cycli worden nu als compacte bewijsregels getoond. 
 
 Actieve cycli en cycli van andere producten behouden hun bestaande kaartweergave. API’s, opslag, contracten, koppellogica, detailinhoud en de globale leveringsweergave zijn bewust niet gewijzigd.
 
-De volledige frontend-analyse en alle 291 frontendtests zijn geslaagd; ook de backendbuild met 142 tests was groen. Aanvullend zijn 34 gerichte tests en een browsercontrole op de preview uitgevoerd voor koppeling, bronstatussen, muis- en toetsenbordbediening, focusbegrenzing en een smalle viewport. De frontend-imagebuild is lokaal bewust niet uitgevoerd omdat die volgens het factory-vangnet uitsluitend in CI draait. Documentatie, merge en productie-uitrol volgen nog in hun eigen subtaken.
+De volledige frontend-analyse en alle 291 frontendtests zijn geslaagd; ook de backendbuild met 142 tests was groen. Aanvullend zijn 34 gerichte tests en een browsercontrole op de preview uitgevoerd voor koppeling, bronstatussen, muis- en toetsenbordbediening, focusbegrenzing en een smalle viewport. De frontend-imagebuild is lokaal bewust niet uitgevoerd omdat die volgens het factory-vangnet uitsluitend in CI draait. De functionele en technische dashboarddocumentatie is bijgewerkt; merge en productie-uitrol volgen nog in hun eigen subtaken.
 
 <!-- deploy-summary:start -->
 Afgeronde Product Factory-cycli zijn voortaan sneller te beoordelen doordat datum, uitkomst, reden, beslisbron en opbrengst compact bij elkaar staan. Lopende cycli en cycli van andere producten blijven eruitzien en werken zoals voorheen. Vanuit iedere bewijsregel kan het volledige detail worden geopend.

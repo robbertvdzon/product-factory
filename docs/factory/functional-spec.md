@@ -33,7 +33,7 @@ Het productoverzicht bestaat van boven naar beneden uit:
    opent met focus binnen de dialoog, houdt de tab-focus binnen de dialoog (focus-trap) en sluit
    met Escape waarbij de focus terugkeert naar de Instellingen-knop. Volgorde van de productenlijst:
    zoals de backend hem levert (op slug).
-3. **Productcycli en onderzoekssessies** — iedere cyclus staat in een compacte, zelfstandig
+3. **Productcycli en onderzoekssessies** — cycli staan standaard in een compacte, zelfstandig
    uitklapbare kaart. De gesloten kaart toont product en cyclusnummer, status, huidige rol,
    **starttijd**, **doorlooptijd**, toepasselijke kernreden en beslisbron. Daarnaast staan er twee
    afzonderlijke aantallen: `Interne kandidaten` en `Software Factory-leveringen`. Deze aantallen
@@ -41,9 +41,40 @@ Het productoverzicht bestaat van boven naar beneden uit:
    gegevens` gelabeld; de al bestaande backendcyclusaantallen voor kandidaten en leverbare
    kandidaten blijven afzonderlijk zichtbaar.
 
-   De native button `Toon opbrengst` opent alleen de opbrengst in dezelfde kaart en verandert dan in
-   `Verberg opbrengst`. De toegankelijke naam bevat het cyclusnummer, de expanded-semantiek volgt de
-   toestand en muis, Enter en Spatie werken gelijk. De focus blijft bij openen en sluiten op deze
+   Uitsluitend voor de exacte, hoofdlettergevoelige productslug `product-factory` vervangt een
+   niet-uitklapbare bewijsregel deze kaart zodra de status `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`,
+   `NO_CHANGE` of `FAILED` is. `QUEUED` en `RUNNING`, en alle cycli van andere producten, behouden
+   de reguliere kaart. Iedere bewijsregel vormt één semantisch gegroepeerde container en toont vijf
+   afzonderlijk gelabelde waarden:
+
+   - `Datum`: `startedAt`, met een ontbrekende of onleesbare waarde defensief terugvallend op
+     `createdAt`, in de lokale browsertijd; zonder bruikbare datum staat er `Onbekend`;
+   - `Cyclusuitkomst`: de bestaande gebruikersgerichte classificatie, of `Handmatig geannuleerd`
+     bij een volledig geldig, aan dezelfde FAILED-cyclus gekoppeld annuleringsrecord;
+   - `Reden`: uitsluitend de bestaande gelabelde operationele reden of de gecodeerde reden
+     `Handmatig geannuleerd`; ontbrekende en onbekende waarden worden `Onbekend`;
+   - `Beslisbron`: de bestaande expliciete provenance, of bij het ontbreken daarvan de bestaande
+     conservatieve afleiding met `(Afgeleid)`; een aanwezig maar onbekend expliciet record wordt
+     `Onbekend` en claimt geen mens of afgeleide beslisser;
+   - `Gekoppelde opbrengst`: alleen het aantal uniek en exact op productslug plus cyclus-id
+     gekoppelde Software Factory-leveringen. Kandidaten en ongeldige, kruisproduct- of ambigue
+     leveringskoppelingen tellen niet mee. Tijdens laden staat er `laden…`, bij bronfalen
+     `niet beschikbaar`, nooit een misleidende nul.
+
+   De bewijsregel toont geen tokens, prompts, ruwe foutmeldingen of foutpayloads, stacktraces,
+   persoonsgegevens, artefactinhoud of gegevens van andere producten. De native actie `Bekijk
+   bewijs` opent met muis, Enter of Spatie het bestaande detail van precies dezelfde cyclus; haar
+   toegankelijke naam bevat product en cyclus. De waarden en actie blijven bij smalle en brede
+   schermen en 200% tekstvergroting zonder horizontale pagina-scroll bruikbaar. Sluiten via de
+   zichtbare actie of Escape herstelt de focus naar dezelfde bewijsactie; semantiek, tekstcontrast,
+   bedieningscontrast en zichtbare focus voldoen aan WCAG 2.2 AA. Het detail zelf, de laad-, filter-
+   en koppellogica, de 5/+10-lijstbeperking, sorteervolgorde, auto-refresh en de globale Software
+   Factory-weergave blijven ongewijzigd.
+
+   In de reguliere kaart opent de native button `Toon opbrengst` alleen de opbrengst in dezelfde
+   kaart en verandert dan in `Verberg opbrengst`. De toegankelijke naam bevat het cyclusnummer, de
+   expanded-semantiek volgt de toestand en muis, Enter en Spatie werken gelijk. De focus blijft bij
+   openen en sluiten op deze
    button, die een zichtbare focusrand heeft. In een geopende kaart staan precies de groepen
    `Interne kandidaten` en `Software Factory-leveringen`. Per record tonen ze titel en tekstuele
    kandidaat- of leveringsstatus; een lege groep meldt expliciet dat de geladen gegevens geen
@@ -265,8 +296,9 @@ en hoe ze zich tot elkaar verhouden, als zelfstandige uitleg naast de badge-besc
 
 - **Status is altijd óf lopend, óf voltooid — nooit iets ertussenin.** Het bestaande `status`-veld
   (`ShadowIterationView.status`, `productfactory-contracts/.../Contracts.kt`) kent de ruwe waarden
-  QUEUED, RUNNING, ACCEPTED, NEEDS_REVISION, REJECTED en FAILED. QUEUED en RUNNING zijn **lopend**;
-  ACCEPTED, NEEDS_REVISION, REJECTED en FAILED zijn **voltooid**. Het eindoordeel (conclusion) is
+  QUEUED, RUNNING, ACCEPTED, NO_CHANGE, NEEDS_REVISION, REJECTED en FAILED. QUEUED en RUNNING zijn
+  **lopend**; ACCEPTED, NO_CHANGE, NEEDS_REVISION, REJECTED en FAILED zijn **voltooid**. Het
+  eindoordeel (conclusion) is
   pas relevant en geldig zodra de status voltooid is; zolang een iteratie nog loopt, bestaat er nog
   geen conclusion om te tonen.
 - **Er bestaat geen apart `conclusion`-veld in het datamodel.** De term "conclusion" verwijst naar
