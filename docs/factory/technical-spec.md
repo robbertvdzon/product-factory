@@ -106,7 +106,19 @@
 - `DashboardSource<T>` en `_OverviewResultsBuilder` in `main.dart` volgen de drie bestaande
   leesverzoeken voor cycli, kandidaten en leveringen onafhankelijk als loading, loaded of failure.
   De bijbehorende metrics en secties renderen daarom geen nul of compleet resultaat voor een bron
-  die nog laadt of is mislukt. Er zijn hiervoor geen nieuwe routes, requests of contractvelden.
+  die nog laadt of is mislukt. `_OverviewPageState.managementView` wisselt binnen dezelfde
+  `OverviewPage` tussen productoverzicht en Beheer. Beide weergaven hergebruiken dezelfde futures,
+  vijfsecondenrefresh en zichtbaarheidstellers; er zijn geen nieuwe routes, browser-URL's, requests of
+  contractvelden. Beheer rendert de leveringsbron zelfstandig en toont de storywachtrij pas als de
+  kandidaat- én leveringsbron geladen zijn. Zijn alleen kandidaten geladen, dan toont de wachtrij het
+  kandidaataantal met een expliciete onvolledigheidsmelding.
+- `DashboardNavigationLink` in `main.dart` verzorgt de interne links `Beheer` en `Terug naar
+  overzicht`. Eén expliciete `Semantics`-node levert link-, focus- en tapsemantiek; de onderliggende
+  `TextButton` levert pointer- en toetsenbordactivatie en een focusrand van drie pixels. Een eigen
+  `FocusNode` houdt Flutter-focus en webfocus gekoppeld, ook tijdens de automatische refresh.
+- `SoftwareFactoryDeliveryTile` laat leveringsrecords bij smalle schermen en tekstvergroting verticaal
+  meegroeien. Daardoor kunnen lange sleutel-, titel-, product-, status- en faseteksten teruglopen zonder
+  horizontale pagina-scroll.
 - `groupIterationResults` in `iteration_results.dart` indexeert alle geladen cycli vóór
   `LimitedListSection` ze tot 5/+10 zichtbare kaarten beperkt. Kandidaten matchen alleen met exact
   één cyclus via een niet-lege `String productSlug` en een `int iterationSequenceNumber` gelijk aan

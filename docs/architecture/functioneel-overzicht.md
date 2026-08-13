@@ -145,8 +145,10 @@ zelf of op een subtaak) tijdens het uitvoeren van een fase.
 
 ## 7. Wat je in het dashboard ziet
 
-Het (Google-beveiligde) Flutter-dashboard ververst zichzelf elke 5 seconden en toont, van boven naar
-beneden:
+Het (Google-beveiligde) Flutter-dashboard heeft een productoverzicht en een secundaire beheerweergave.
+Beide gebruiken dezelfde dashboardsessie en dezelfde elke 5 seconden ververste gegevens; Beheer heeft
+geen eigen URL of gegevensbron. Het productoverzicht bevat bovenaan de focusbare link `Beheer`, met
+linksemantiek en zichtbare toetsenbordfocus, en toont daarna van boven naar beneden:
 
 - **Metrics**: aantal producten, interne storykandidaten, workspace-publicaties, cycli en
   Software Factory-stories. Een succesvol geladen tegel toont altijd het *totaal*, ook wanneer de
@@ -206,9 +208,9 @@ beneden:
   De laadstatus van cycli, kandidaten en leveringen blijft afzonderlijk zichtbaar. Per kaart toont
   een nog ladende of mislukte opbrengstbron geen nul, maar `laden…` of `niet beschikbaar`; een
   volledig niet-koppelbaar totaal volgt pas wanneer alle bronnen beschikbaar zijn. De globale
-  Software Factory-lijst toont eveneens haar eigen laad- of foutmelding. De epic-roadmap en
-  storywachtrij melden dat ze onvolledig zijn totdat zowel kandidaten als leveringen beschikbaar
-  zijn.
+  Software Factory-lijst in Beheer toont eveneens haar eigen laad- of foutmelding. De epic-roadmap
+  en de storywachtrij in Beheer melden dat ze onvolledig zijn totdat zowel kandidaten als
+  leveringen beschikbaar zijn.
 
   Iteraties die nog lopen of in de wachtrij staan (`status` QUEUED/RUNNING)
   tonen een neutrale voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge;
@@ -356,9 +358,6 @@ beneden:
   andere status (o.a. `ACCEPTED`, `PENDING`, `QUEUED`, `RUNNING`) blijft het Reden-blok volledig
   verborgen; het bestaande 'Foutreden'-blok en de standaard ingeklapte criticus-roltegel met
   volledig artefact blijven ongewijzigd zichtbaar/functioneel.
-- **Software Factory-stories**: elke levering met storysleutel, titel, status (`DELIVERING`,
-  `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`, `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst
-  bekende Software Factory-fase.
 - **Epic-roadmap**: per product een horizontale grafiek met compacte epic-kaarten in de berekende
   uitvoervolgorde en pijlen voor afhankelijkheden. Elke kaart toont roadmap-rank,
   prioriteitsscore (0–100), klant-rank, process-rank en of de epic uitvoerbaar, geblokkeerd of
@@ -367,26 +366,51 @@ beneden:
   beschrijving, status, gekoppelde stories en opleverrapporten. Daar kan de klant titel,
   beschrijving, eigen rank en dependencies aanpassen; de process-rank blijft alleen-lezen.
   Circulaire dependencies worden atomair geweigerd. Een nieuwe epic krijgt een korte titel van
-  maximaal 80 tekens en wordt achteraan in beide ranglijsten toegevoegd.
+  maximaal 80 tekens en wordt achteraan in beide ranglijsten toegevoegd. Afgehandelde
+  onderzoeksvragen staan, wanneer aanwezig, direct onder de roadmap.
+- **Roadmap-sessies**: status en samenvatting per sessie, met een actie om het gekoppelde verslag te
+  bekijken wanneer dat beschikbaar is.
+- **Overleggen**: status, initiatiefnemer en uitkomst per overleg, met de bestaande detailactie en,
+  indien beschikbaar, een afzonderlijke notulenactie.
 - **Benodigde access tokens**: alleen zichtbaar zodra er iets openstaat; met een knop "Gereed
   melden" per item.
-- **Storykandidaten**: alle interne kandidaten (ook afgewezen of nog niet geleverde) met status.
-  Zit een kandidaat vast door een onopgeloste `dependsOn`-verwijzing (`blocked == true` met een
-  niet-lege `blockedReason`), dan toont de kaart direct — geen extra klik nodig — onder de titel een
-  label met icoon en de tekst "Geblokkeerd: <reden>", in hetzelfde WCAG AA-geverifieerde
-  kleurenpaar (`kGuardrailConflict`, `classification.dart`) als de classificatiebadges hierboven en
-  opvraagbaar via de semantics-tree van de kaart. Zonder blokkade of reden blijft de kaart
-  ongewijzigd; het label wordt uitsluitend uit de al opgehaalde `blocked`/`blockedReason`-velden
-  gerenderd, zonder extra netwerkverzoek (`_buildStoryQueueSections`,
-  `dashboard-frontend/lib/main.dart`).
 - **Workspace**: alle gepubliceerde artefacten (dossiers, evaluaties), aanklikbaar om de volledige
   inhoud te lezen.
 
-Alle lijsten hierboven (producten, productcycli, Software Factory-stories, access tokens, elke
-subsectie van de storykandidaten en workspace-publicaties) tonen standaard **5 items**. Staat er meer
-klaar, dan verschijnt eronder een knop **'Meer (nog N)'** die er telkens **10** bij toont; die knop
-verdwijnt zodra alles zichtbaar is. Elke sectie heeft een eigen, onafhankelijke teller die de
-auto-refresh overleeft: een uitgeklapte lijst blijft uitgeklapt en nieuwe items verschijnen bovenaan.
+De twee globale lijsten staan niet meer op het productoverzicht. De link `Beheer` opent binnen
+dezelfde dashboardpagina de beheerweergave. Daar staat `Terug naar overzicht` als eerste focusbare
+actie; ook deze link heeft linksemantiek, zichtbare toetsenbordfocus en blijft tijdens auto-refresh
+bruikbaar. Daarna toont Beheer, in deze volgorde:
+
+- **Software Factory-stories**: elke levering, nieuwste eerst, met storysleutel of fallbacktekst,
+  titel, product, status (`DELIVERING`, `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`,
+  `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst bekende Software Factory-fase. Laden, fout, leeg en
+  succes worden onafhankelijk van de kandidaatbron getoond.
+- **Storywachtrij**: alle interne kandidaten exact eenmaal in Fout, Bezig, In wachtrij of Klaar, met
+  de bestaande status, foutinformatie, leveringskoppeling en kandidaatdetailactie. Zit een kandidaat
+  vast door een onopgeloste `dependsOn`-verwijzing (`blocked == true` met een niet-lege
+  `blockedReason`), dan toont de kaart direct — geen extra klik nodig — onder de titel een label met
+  icoon en de tekst "Geblokkeerd: <reden>", in hetzelfde WCAG AA-geverifieerde kleurenpaar
+  (`kGuardrailConflict`, `classification.dart`) als de classificatiebadges hierboven en opvraagbaar
+  via de semantics-tree van de kaart. Zonder blokkade of reden blijft de kaart ongewijzigd; het label
+  wordt uitsluitend uit de al opgehaalde `blocked`/`blockedReason`-velden gerenderd, zonder extra
+  netwerkverzoek (`_buildStoryQueueSections`, `dashboard-frontend/lib/main.dart`). De kandidaatbron
+  houdt zijn eigen laad-, fout-, lege en successtatus. Als kandidaten geladen zijn terwijl leveringen
+  nog laden of niet beschikbaar zijn, toont de wachtrij het geladen kandidaataantal en meldt zij dat
+  de categorisering onvolledig is, in plaats van een compleet of leeg resultaat.
+
+Beheer hergebruikt de al geladen kandidaat- en leveringsgegevens en de bestaande kandidaatrelatie.
+Het wisselen van weergave koppelt, filtert, combineert of schrijft geen records en schrijft niets aan
+een cyclus toe. De Software Factory-metriek, cyclusopbrengsten en niet-koppelbare-opbrengstmelding
+blijven op het productoverzicht staan.
+
+Alle lijsten op beide weergaven (producten, productcycli, afgehandelde onderzoeksvragen,
+roadmap-sessies, overleggen, Software Factory-stories, access tokens, elke subsectie van de
+storywachtrij en workspace-publicaties) tonen standaard **5 items**. Staat er meer klaar, dan verschijnt
+eronder een knop **'Meer (nog N)'** die er telkens **10** bij toont; die knop verdwijnt zodra alles
+zichtbaar is. Elke sectie heeft een eigen, onafhankelijke teller die de auto-refresh en het wisselen
+tussen de weergaven overleeft: een uitgeklapte lijst blijft uitgeklapt en nieuwe items verschijnen
+bovenaan.
 Lijsten met een bruikbaar tijdstempel (cycli, leveringen, storykandidaten, access tokens) staan
 gesorteerd op nieuwste eerst; producten houden hun volgorde op slug en workspace-publicaties — die
 geen tijdstempel hebben — de volgorde van de backend. Het inkorten gebeurt volledig in de frontend op
