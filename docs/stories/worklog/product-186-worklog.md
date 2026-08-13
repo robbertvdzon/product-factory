@@ -112,3 +112,22 @@ Verificatie herstelronde (definitieve eindrun, alle exitcode 0):
 - `mvn -B --no-transfer-progress clean verify`: `BUILD SUCCESS`; 142 tests, 0 failures, 0 errors.
 - `flutter analyze`: `No issues found!`.
 - `flutter test`: 291 tests geslaagd, 0 failures, 0 errors.
+
+## Vervolgreview
+
+- [info] De datumbevinding is opgelost: `startedAt` en `createdAt` worden afzonderlijk defensief
+  geparseerd, waardoor zowel een ontbrekende als een onleesbare starttijd correct naar een geldige
+  aanmaaktijd terugvalt. Beide varianten hebben een gerichte regressietest.
+- [info] De provenancebevinding is opgelost: een gekoppeld expliciet maar onbekend beslisrecord
+  blijft `Onbekend`, zonder menselijke of afgeleide beslisser te claimen. Alleen bij een werkelijk
+  ontbrekend gekoppeld record wordt de bestaande conservatieve afleiding als `Afgeleid` getoond.
+- [info] De ontbrekende overzichtsdekking is opgelost: de widgettest verifieert nu expliciet
+  `QUEUED` en `RUNNING` voor `product-factory` en actieve en terminale cycli van een ander product;
+  alle vier behouden de bestaande kaartweergave.
+- [info] De herstelwijzigingen introduceren geen zichtbare regressie. Gerichte reviewrun:
+  `flutter test test/iteration_evidence_test.dart test/iteration_evidence_overview_test.dart` —
+  34 tests geslaagd, 0 failures en 0 errors. `git diff --check` is schoon.
+- [info] Het nieuwste factorybewijs is geldig en revisiongebonden: `testedTreeSha`
+  `824a4d480876db26013901d56725312db6bfaa70` is exact gelijk aan de huidige `HEAD^{tree}`;
+  `dashboard-flutter-analyze` en `dashboard-flutter-test` zijn groen. De Maven-gate is volgens de
+  geconfigureerde padselectie niet van toepassing op deze frontend-only story-diff.
