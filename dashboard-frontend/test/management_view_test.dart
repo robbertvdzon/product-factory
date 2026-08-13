@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:product_factory_dashboard/limited_list.dart';
 import 'package:product_factory_dashboard/main.dart';
 
 http.Response _json(Object body, {int status = 200}) =>
@@ -45,15 +46,52 @@ Map<String, dynamic> _delivery(
   'createdAt': '2026-08-${id.toString().padLeft(2, '0')}T11:00:00Z',
 };
 
+Map<String, dynamic> _product() => {
+  'slug': 'demo',
+  'name': 'Demo product voor regressie',
+  'status': 'active',
+  'mission': 'De bestaande productinstellingen blijven bereikbaar.',
+  'softwareFactoryProjectKey': 'DEMO',
+  'targetRepositoryName': 'factory/demo',
+  'workspaceOwnership': 'product-factory',
+  'developmentMode': 'autonomous',
+  'maxStoriesPerCycle': 3,
+  'wipLimit': 2,
+  'aiProvider': 'openai',
+  'aiModel': 'test-model',
+  'iterationTimes': ['03:00'],
+  'meetingRequestedTopics': <String>[],
+  'meetingRequestedAt': null,
+};
+
+Map<String, dynamic> _closedIteration() => {
+  'id': 'iteration-regression',
+  'productSlug': 'demo',
+  'sequenceNumber': 7,
+  'status': 'ACCEPTED',
+  'mode': 'autonomous',
+  'currentRole': null,
+  'candidateCount': 1,
+  'acceptedCandidateCount': 1,
+  'revisionRounds': 0,
+  'criticVerdict': 'ACCEPT',
+  'outcomeReason': 'ACCEPT',
+  'startedAt': '2026-08-12T10:00:00Z',
+  'completedAt': '2026-08-12T10:05:00Z',
+};
+
 MockClient _client({
   Future<http.Response> Function()? candidates,
   Future<http.Response> Function()? deliveries,
+  Future<http.Response?> Function(http.Request request)? override,
   List<String>? calls,
   List<dynamic> humanActions = const [],
   List<dynamic> settledQuestions = const [],
 }) {
   return MockClient((request) async {
     calls?.add(request.url.path);
+    final overridden = await override?.call(request);
+    if (overridden != null) return overridden;
     switch (request.url.path) {
       case '/api/story-candidates':
         return candidates?.call() ?? _json(<dynamic>[]);
@@ -232,6 +270,303 @@ void main() {
     },
   );
 
+  testWidgets(
+    'hoofdscherm behoudt metrieken, productactie en zelfstandig openende cycluskaart',
+    (tester) async {
+      final requests = <String>[];
+      final candidate = _candidate(1, title: 'Gekoppelde cyclusopbrengst')
+        ..['iterationSequenceNumber'] = 7;
+      final delivery = _delivery(1)..['iterationId'] = 'iteration-regression';
+      final client = _client(
+        candidates: () async => _json([candidate]),
+        deliveries: () async => _json([delivery]),
+        override: (request) async {
+          requests.add('${request.method} ${request.url.path}');
+          switch (request.url.path) {
+            case '/api/products':
+              return _json([_product()]);
+            case '/api/ai-catalog':
+              return _json({
+                'openai': ['test-model'],
+              });
+            case '/api/shadow-iterations':
+              return _json([_closedIteration()]);
+            case '/api/products/demo/cycles':
+              return _json(<String, dynamic>{}, status: 202);
+          }
+          return null;
+        },
+      );
+
+      await http.runWithClient(() async {
+        await _pumpDashboard(tester, client);
+
+        const metricValues = {
+          'Producten': '1',
+          'Interne storykandidaten': '1',
+          'Workspace-publicaties': '0',
+          'Shadow-iteraties': '1',
+          'Software Factory-stories': '1',
+        };
+        for (final entry in metricValues.entries) {
+          final card = find.ancestor(
+            of: find.text(entry.key),
+            matching: find.byType(MetricCard),
+          );
+          expect(card, findsOneWidget);
+          expect(
+            find.descendant(of: card, matching: find.text(entry.value)),
+            findsOneWidget,
+          );
+        }
+        expect(find.text('Demo product voor regressie'), findsOneWidget);
+
+        await tester.tap(find.byType(SettingsButton));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('De bestaande productinstellingen blijven bereikbaar.'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Annuleren'));
+        await tester.pumpAndSettle();
+
+        final cycleButton = find.byType(StartCycleButton);
+        expect(cycleButton, findsOneWidget);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.descendant(
+                  of: cycleButton,
+                  matching: find.byType(FilledButton),
+                ),
+              )
+              .onPressed,
+          isNotNull,
+        );
+        await tester.tap(cycleButton);
+        for (var pump = 0; pump < 4; pump++) {
+          await tester.pump();
+        }
+        expect(requests, contains('POST /api/products/demo/cycles'));
+
+        expect(find.textContaining('Status: ACCEPTED'), findsOneWidget);
+        expect(
+          find.text('Kernreden: Alle kandidaten zijn leverbaar'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Beslisbron: Evaluatie-agent (Afgeleid)'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
+          findsNothing,
+        );
+
+        await tester.tap(find.text('Toon opbrengst'));
+        await tester.pump();
+        expect(
+          find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Verberg opbrengst'));
+        await tester.pump();
+        expect(
+          find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
+          findsNothing,
+        );
+        expect(find.textContaining('Status: ACCEPTED'), findsOneWidget);
+        expect(
+          find.text('Kernreden: Alle kandidaten zijn leverbaar'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Beslisbron: Evaluatie-agent (Afgeleid)'),
+          findsOneWidget,
+        );
+        await _disposeDashboard(tester);
+      }, () => client);
+    },
+  );
+
+  testWidgets(
+    'hoofdscherm behoudt roadmap, vragen, sessies, overleggen, token- en workspace-acties',
+    (tester) async {
+      final requests = <String>[];
+      final client = _client(
+        override: (request) async {
+          requests.add('${request.method} ${request.url.path}');
+          switch (request.url.path) {
+            case '/api/products':
+              return _json([_product()]);
+            case '/api/ai-catalog':
+              return _json({
+                'openai': ['test-model'],
+              });
+            case '/api/workspace/publications':
+              return _json([
+                {
+                  'runId': 'publication-run',
+                  'productSlug': 'demo',
+                  'artifactPath': 'dossiers/behouden.md',
+                  'status': 'PUBLISHED',
+                },
+              ]);
+            case '/api/autonomy/human-actions':
+              return _json([
+                {
+                  'id': 9,
+                  'title': 'Tokenactie functioneel behouden',
+                  'category': 'TOKEN',
+                  'reason': 'Integratie wacht op configuratie',
+                  'status': 'OPEN',
+                  'createdAt': '2026-08-12T09:00:00Z',
+                },
+              ]);
+            case '/api/roadmap/epics':
+              return _json([
+                {
+                  'id': 'epic-1',
+                  'productSlug': 'demo',
+                  'title': 'Roadmap-epic functioneel behouden',
+                  'description': 'Details van de behouden epic',
+                  'status': 'OPEN',
+                  'customerRank': 1,
+                  'processRank': 1,
+                  'priorityScore': 100,
+                  'roadmapRank': 1,
+                  'dependencyIds': <String>[],
+                  'blockedByIds': <String>[],
+                },
+              ]);
+            case '/api/roadmap/settled-questions':
+              return _json([
+                {
+                  'productSlug': 'demo',
+                  'content': 'Behouden onderzoeksvraag met antwoord',
+                  'createdAt': '2026-08-12T08:00:00Z',
+                },
+              ]);
+            case '/api/roadmap/sessions':
+              return _json([
+                {
+                  'productSlug': 'demo',
+                  'sequenceNumber': 3,
+                  'status': 'COMPLETED',
+                  'summary': 'Behouden roadmapsessieresultaat',
+                  'workspaceRunId': 'roadmap-run',
+                  'completedAt': '2026-08-12T07:00:00Z',
+                },
+              ]);
+            case '/api/meetings':
+              return _json([
+                {
+                  'id': 'meeting-1',
+                  'productSlug': 'demo',
+                  'sequenceNumber': 4,
+                  'status': 'CLOSED',
+                  'initiator': 'owner',
+                  'outcomeSummary': 'Behouden overlegresultaat',
+                  'workspaceRunId': 'meeting-run',
+                  'closedAt': '2026-08-12T06:00:00Z',
+                },
+              ]);
+            case '/api/products/demo/meetings/meeting-1':
+              return _json({
+                'id': 'meeting-1',
+                'sequenceNumber': 4,
+                'status': 'CLOSED',
+                'initiator': 'owner',
+                'requestedTopics': <String>[],
+                'outcomeSummary': 'Behouden overlegresultaat',
+                'workspaceRunId': 'meeting-run',
+              });
+            case '/api/products/demo/meetings/meeting-1/messages':
+              return _json([
+                {
+                  'sender': 'owner',
+                  'content': 'Bewaard overlegbericht',
+                  'createdAt': '2026-08-12T06:00:00Z',
+                },
+              ]);
+            case '/api/products/demo/roadmap/epics/epic-1/verifications':
+              return _json(<dynamic>[]);
+            case '/api/autonomy/human-actions/9/complete':
+              return _json(<String, dynamic>{});
+          }
+          if (request.url.path.startsWith('/api/workspace/publications/') &&
+              request.url.path.endsWith('/artifact')) {
+            return http.Response('Inhoud van behouden publicatie', 200);
+          }
+          return null;
+        },
+      );
+
+      await http.runWithClient(() async {
+        await _pumpDashboard(tester, client);
+
+        expect(find.text('Roadmap-epic functioneel behouden'), findsOneWidget);
+        await tester.tap(find.text('Roadmap-epic functioneel behouden'));
+        await tester.pumpAndSettle();
+        expect(find.text('Epicdetails'), findsOneWidget);
+        expect(find.text('Details van de behouden epic'), findsOneWidget);
+        await tester.tap(find.text('Annuleren'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('demo · Behouden onderzoeksvraag met antwoord'),
+          findsOneWidget,
+        );
+        expect(find.text('demo · roadmap-sessie 3'), findsOneWidget);
+        expect(
+          find.textContaining('Behouden roadmapsessieresultaat'),
+          findsOneWidget,
+        );
+        await tester.tap(find.byTooltip('Verslag bekijken'));
+        await tester.pumpAndSettle();
+        expect(find.text('Inhoud van behouden publicatie'), findsOneWidget);
+        await tester.tap(find.text('Sluiten'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('demo · overleg 4'), findsOneWidget);
+        await tester.tap(find.text('demo · overleg 4'));
+        await tester.pumpAndSettle();
+        expect(find.text('Bewaard overlegbericht'), findsOneWidget);
+        await tester.tap(find.text('Sluiten'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Tokenactie functioneel behouden'), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Gereed melden'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byType(TextField),
+          'Configuratie is buiten het dashboard afgerond',
+        );
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.widgetWithText(FilledButton, 'Gereed melden'),
+          ),
+        );
+        for (var pump = 0; pump < 4; pump++) {
+          await tester.pump();
+        }
+        expect(
+          requests,
+          contains('POST /api/autonomy/human-actions/9/complete'),
+        );
+
+        expect(find.text('dossiers/behouden.md'), findsOneWidget);
+        await tester.tap(find.text('dossiers/behouden.md'));
+        await tester.pumpAndSettle();
+        expect(find.text('Inhoud van behouden publicatie'), findsOneWidget);
+        await tester.tap(find.text('Sluiten'));
+        await tester.pumpAndSettle();
+        await _disposeDashboard(tester);
+      }, () => client);
+    },
+  );
+
   testWidgets('kandidaatbron toont geladen lege toestand onafhankelijk', (
     tester,
   ) async {
@@ -365,46 +700,65 @@ void main() {
   );
 
   testWidgets(
-    'leveringslijst en wachtrijcategorie hebben onafhankelijke 5/+10-tellers die refresh overleven',
+    'leveringslijst en alle vier wachtrijcategorieën hebben onafhankelijke 5/+10-tellers',
     (tester) async {
       var candidateCalls = 0;
       var deliveryCalls = 0;
-      List<dynamic> candidatesFor(int total) => [
-        for (var id = 1; id <= total; id++) _candidate(id),
+      final candidates = <Map<String, dynamic>>[
+        for (var id = 1; id <= 16; id++)
+          _candidate(id, title: 'Foutkandidaat $id'),
+        for (var id = 101; id <= 116; id++)
+          _candidate(id, title: 'Bezigkandidaat $id'),
+        for (var id = 201; id <= 216; id++)
+          _candidate(id, title: 'Wachtrijkandidaat $id'),
+        for (var id = 301; id <= 316; id++)
+          _candidate(id, title: 'Klare kandidaat $id'),
       ];
-      List<dynamic> deliveriesFor(int total) => [
-        for (var id = 1; id <= total; id++) _delivery(id),
+      final deliveries = <Map<String, dynamic>>[
+        for (var id = 1; id <= 16; id++) _delivery(id, status: 'ERROR'),
+        for (var id = 101; id <= 116; id++) _delivery(id, status: 'RUNNING'),
+        for (var id = 301; id <= 316; id++) _delivery(id, status: 'DONE'),
       ];
       final client = _client(
         candidates: () async {
           candidateCalls++;
-          return _json(candidatesFor(candidateCalls == 1 ? 16 : 18));
+          return _json(candidates);
         },
         deliveries: () async {
           deliveryCalls++;
-          return _json(deliveriesFor(deliveryCalls == 1 ? 16 : 18));
+          return _json(deliveries);
         },
       );
       await _pumpDashboard(tester, client);
       await _openManagement(tester);
 
-      expect(find.byType(SoftwareFactoryDeliveryTile), findsNWidgets(5));
-      expect(find.text('Kandidaat 16'), findsOneWidget);
-      expect(find.text('Kandidaat 11'), findsNothing);
-      expect(find.text('Meer (nog 11)'), findsNWidgets(2));
+      expect(find.text('Fout (16)'), findsOneWidget);
+      expect(find.text('Bezig (16)'), findsOneWidget);
+      expect(find.text('In wachtrij (16)'), findsOneWidget);
+      expect(find.text('Klaar (16)'), findsOneWidget);
+      expect(find.byType(LimitedListSection), findsNWidgets(5));
 
-      await tester.tap(find.text('Meer (nog 11)').at(0));
-      await tester.pump();
-      expect(find.byType(SoftwareFactoryDeliveryTile), findsNWidgets(15));
-      expect(find.text('Kandidaat 11'), findsNothing);
-      expect(find.text('Meer (nog 1)'), findsOneWidget);
-      expect(find.text('Meer (nog 11)'), findsOneWidget);
+      List<int> visibleCounts() => find
+          .byType(LimitedListSection)
+          .evaluate()
+          .map((element) => (element.widget as LimitedListSection).visibleCount)
+          .toList();
 
-      await tester.tap(find.text('Meer (nog 11)'));
-      await tester.pump();
-      expect(find.text('Kandidaat 2'), findsOneWidget);
-      expect(find.text('Kandidaat 1'), findsNothing);
-      expect(find.text('Meer (nog 1)'), findsNWidgets(2));
+      // Volgorde: leveringen, Fout, Bezig, In wachtrij, Klaar. Na elke
+      // actie verandert uitsluitend de teller van de aangeklikte lijst.
+      expect(visibleCounts(), [5, 5, 5, 5, 5]);
+      final expected = List<int>.filled(5, 5);
+      for (final index in [1, 3, 0, 4, 2]) {
+        final section = find.byType(LimitedListSection).at(index);
+        await tester.tap(
+          find.descendant(of: section, matching: find.byType(TextButton)),
+        );
+        await tester.pump();
+        expected[index] = 15;
+        expect(visibleCounts(), expected);
+      }
+      expect(find.text('Meer (nog 1)'), findsNWidgets(4));
+      expect(find.text('Meer (nog 33)'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 5));
       for (var pump = 0; pump < 5; pump++) {
@@ -413,24 +767,58 @@ void main() {
 
       expect(candidateCalls, 2);
       expect(deliveryCalls, 2);
+      expect(visibleCounts(), [15, 15, 15, 15, 15]);
       expect(find.byType(SoftwareFactoryDeliveryTile), findsNWidgets(15));
-      expect(find.text('Kandidaat 18'), findsOneWidget);
-      expect(find.text('Kandidaat 4'), findsOneWidget);
-      expect(find.text('Kandidaat 3'), findsNothing);
-      expect(find.text('Meer (nog 3)'), findsNWidgets(2));
+      expect(find.text('Meer (nog 1)'), findsNWidgets(4));
+      expect(find.text('Meer (nog 33)'), findsOneWidget);
       await _disposeDashboard(tester);
     },
   );
 
   testWidgets(
-    'beheerlinks volgen visuele tabvolgorde, hebben linksemantiek en expliciete focusstijl',
+    'beheerlinks en vervolgacties volgen op beide weergaven de volledige visuele tabvolgorde',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      final client = _client();
+      final client = _client(
+        candidates: () async => _json([_candidate(1)]),
+        override: (request) async {
+          switch (request.url.path) {
+            case '/api/products':
+              return _json([_product()]);
+            case '/api/ai-catalog':
+              return _json({
+                'openai': ['test-model'],
+              });
+          }
+          return null;
+        },
+      );
       await _pumpDashboard(tester, client);
 
       Finder link = find.byType(DashboardNavigationLink);
       expect(tester.getSemantics(link).flagsCollection.isLink, isTrue);
+      final overviewOrder = <Finder>[
+        link,
+        find.widgetWithText(FilledButton, 'Product toevoegen'),
+        find.byTooltip('Vernieuwen'),
+        find.byType(StartCycleButton),
+        find.widgetWithText(OutlinedButton, 'Pauzeren'),
+        find.byType(SettingsButton),
+        find.widgetWithText(OutlinedButton, 'Start overleg'),
+        find.widgetWithText(OutlinedButton, 'Start roadmap-sessie nu'),
+      ];
+      for (final target in overviewOrder) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        expect(
+          _containsPrimaryFocus(tester, target),
+          isTrue,
+          reason: 'Onverwachte Tab-stop in de hoofdschermvolgorde.',
+        );
+      }
+
+      tester.binding.focusManager.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       expect(_containsPrimaryFocus(tester, link), isTrue);
@@ -447,6 +835,27 @@ void main() {
       link = find.byType(DashboardNavigationLink);
       expect(find.text('Terug naar overzicht'), findsOneWidget);
       expect(tester.getSemantics(link).flagsCollection.isLink, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(_containsPrimaryFocus(tester, link), isTrue);
+
+      final managementTextButton = tester.widget<TextButton>(
+        find.descendant(of: link, matching: find.byType(TextButton)),
+      );
+      expect(
+        managementTextButton.style?.side?.resolve({WidgetState.focused})?.width,
+        3,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      final candidateAction = find.ancestor(
+        of: find.text('Kandidaat 1'),
+        matching: find.byType(ListTile),
+      );
+      expect(_containsPrimaryFocus(tester, candidateAction), isTrue);
+
+      tester.binding.focusManager.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       expect(_containsPrimaryFocus(tester, link), isTrue);

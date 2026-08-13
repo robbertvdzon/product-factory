@@ -507,7 +507,9 @@ class _OverviewPageState extends State<OverviewPage> {
         ],
       ),
     );
-    controller.dispose();
+    // showDialog rondt zijn Future af zodra de route popt, terwijl de sluitanimatie de TextField
+    // nog één frame kan renderen. Stel disposal uit tot die widget uit de boom is.
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
     if (result == null || result.trim().isEmpty) return;
     await api.completeHumanAction(action['id'] as int, result.trim());
     if (mounted) setState(_reload);
