@@ -62,6 +62,11 @@ data class AgentWorkerStatus(
     val activeRuns: Int = 0,
 )
 
+data class WeeklyScheduleView(
+    val dayOfWeek: String,
+    val time: String,
+)
+
 data class ProductView(
     val id: String,
     val slug: String,
@@ -81,6 +86,7 @@ data class ProductView(
     val status: String,
     val developmentMode: String,
     val iterationTimes: List<String>,
+    val roadmapSchedule: List<WeeklyScheduleView>,
     val timezone: String,
     val maxStoriesPerCycle: Int,
     val wipLimit: Int,

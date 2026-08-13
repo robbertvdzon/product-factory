@@ -115,11 +115,16 @@ class ProductFactoryApiTest(
 
         mvc.put("/api/products/settings-test/settings") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"iterationTimes":["03:00","08:00","21:00"],"aiProvider":"claude","aiModel":"claude-sonnet-5","maxStoriesPerCycle":5}"""
+            content = """{"iterationTimes":["03:00","08:00","21:00"],"roadmapSchedule":[{"dayOfWeek":"MONDAY","time":"10:00"},{"dayOfWeek":"THURSDAY","time":"12:00"}],"aiProvider":"claude","aiModel":"claude-sonnet-5","maxStoriesPerCycle":5}"""
         }.andExpect {
             status { isOk() }
             jsonPath("$.iterationTimes.length()") { value(3) }
             jsonPath("$.iterationTimes[0]") { value("03:00") }
+            jsonPath("$.roadmapSchedule.length()") { value(2) }
+            jsonPath("$.roadmapSchedule[0].dayOfWeek") { value("MONDAY") }
+            jsonPath("$.roadmapSchedule[0].time") { value("10:00") }
+            jsonPath("$.roadmapSchedule[1].dayOfWeek") { value("THURSDAY") }
+            jsonPath("$.roadmapSchedule[1].time") { value("12:00") }
             jsonPath("$.aiProvider") { value("claude") }
             jsonPath("$.aiModel") { value("claude-sonnet-5") }
             jsonPath("$.maxStoriesPerCycle") { value(5) }
@@ -138,6 +143,16 @@ class ProductFactoryApiTest(
         mvc.put("/api/products/settings-test/settings") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"iterationTimes":["25:00"]}"""
+        }.andExpect { status { isBadRequest() } }
+
+        mvc.put("/api/products/settings-test/settings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"roadmapSchedule":[{"dayOfWeek":"FUNDAY","time":"10:00"}]}"""
+        }.andExpect { status { isBadRequest() } }
+
+        mvc.put("/api/products/settings-test/settings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"roadmapSchedule":[{"dayOfWeek":"MONDAY","time":"25:00"}]}"""
         }.andExpect { status { isBadRequest() } }
 
         // aiModel bleef ongewijzigd na de afgewezen updates.

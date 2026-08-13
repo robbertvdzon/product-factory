@@ -20,6 +20,9 @@ Map<String, dynamic> _product({String status = 'active'}) => {
   'aiProvider': 'openai',
   'aiModel': 'gpt-4o-mini',
   'iterationTimes': ['03:00', '15:00'],
+  'roadmapSchedule': [
+    {'dayOfWeek': 'MONDAY', 'time': '10:00'},
+  ],
   'meetingRequestedTopics': <String>[],
   'meetingRequestedAt': null,
 };
@@ -77,7 +80,7 @@ Future<void> _withDashboard(
 
 void main() {
   testWidgets(
-    'missie, project-key, repo, workspace, max-stories, wip, AI-model en cyclustijden staan '
+    'missie, project-key, repo, workspace, max-stories, wip, AI-model, cyclustijden en roadmapplanning staan '
     'niet meer standaard op de productkaart',
     (tester) async {
       final callLog = <Map<String, String>>[];
@@ -90,6 +93,7 @@ void main() {
         expect(find.textContaining('WIP: 2'), findsNothing);
         expect(find.textContaining('AI: openai · gpt-4o-mini'), findsNothing);
         expect(find.textContaining('Cyclustijden: 03:00, 15:00'), findsNothing);
+        expect(find.textContaining('Maandag 10:00'), findsNothing);
 
         // De kaart zelf (naam + status) blijft wel gewoon zichtbaar.
         expect(find.text('Demo product'), findsOneWidget);

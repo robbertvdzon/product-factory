@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import nl.vdzon.productfactory.contracts.ProductRecordView
 import nl.vdzon.productfactory.contracts.ProductView
+import nl.vdzon.productfactory.contracts.WeeklyScheduleView
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
@@ -32,6 +33,7 @@ data class ProductConfiguration(
     val status: String,
     val developmentMode: String,
     val iterationTimes: List<String>,
+    val roadmapSchedule: List<WeeklyScheduleView>,
     val timezone: String,
     val maxStoriesPerCycle: Int,
     val wipLimit: Int,
@@ -48,6 +50,7 @@ data class ProductConfiguration(
 data class UpdateProductSettingsRequest(
     val developmentMode: String? = null,
     val iterationTimes: List<String>? = null,
+    val roadmapSchedule: List<WeeklyScheduleView>? = null,
     val maxStoriesPerCycle: Int? = null,
     val wipLimit: Int? = null,
     val aiProvider: String? = null,
@@ -136,6 +139,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             jdbc.update("insert into product_allowed_write_path(product_slug, relative_path) values (?, ?)", product.slug, it)
         }
         replaceIterationTimes(product.slug, product.iterationTimes)
+        replaceRoadmapSchedule(product.slug, product.roadmapSchedule)
         return requireProduct(product.slug)
     }
 
@@ -149,6 +153,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         val aiProvider = (request.aiProvider ?: current.aiProvider).trim()
         val aiModel = (request.aiModel ?: current.aiModel).trim()
         val iterationTimes = request.iterationTimes ?: current.iterationTimes
+        val roadmapSchedule = request.roadmapSchedule ?: current.roadmapSchedule
         val targetRepositoryName = (request.targetRepositoryName ?: current.targetRepositoryName).trim()
         val acceptanceUrl = request.acceptanceUrl?.trim()?.ifBlank { null } ?: current.acceptanceUrl
 
@@ -158,6 +163,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         require(AiCatalog.isValid(aiProvider, aiModel)) { "Onbekende combinatie van AI-provider '$aiProvider' en model '$aiModel'" }
         require(iterationTimes.isNotEmpty()) { "Minimaal één cyclustijd is verplicht" }
         iterationTimes.forEach { require(it.matches(TIME_OF_DAY)) { "Ongeldige cyclustijd '$it', gebruik HH:mm" } }
+        validateRoadmapSchedule(roadmapSchedule)
         require(targetRepositoryName.matches(REPOSITORY)) { "Ongeldige repositorynaam" }
         validateUrl(acceptanceUrl)
 
@@ -168,6 +174,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             developmentMode, maxStoriesPerCycle, wipLimit, aiProvider, aiModel, targetRepositoryName, acceptanceUrl, normalized,
         )
         replaceIterationTimes(normalized, iterationTimes)
+        replaceRoadmapSchedule(normalized, roadmapSchedule)
         return requireProduct(normalized)
     }
 
@@ -198,6 +205,18 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         jdbc.update("delete from product_iteration_time where product_slug = ?", slug)
         times.distinct().forEach {
             jdbc.update("insert into product_iteration_time(product_slug, time_of_day) values (?, ?)", slug, java.sql.Time.valueOf("$it:00"))
+        }
+    }
+
+    private fun replaceRoadmapSchedule(slug: String, schedule: List<WeeklyScheduleView>) {
+        jdbc.update("delete from product_roadmap_schedule where product_slug = ?", slug)
+        schedule.distinct().forEach {
+            jdbc.update(
+                "insert into product_roadmap_schedule(product_slug, day_of_week, time_of_day) values (?, ?, ?)",
+                slug,
+                it.dayOfWeek,
+                java.sql.Time.valueOf("${it.time}:00"),
+            )
         }
     }
 
@@ -276,6 +295,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         require(candidate.timezone.isNotBlank()) { "Tijdzone is verplicht" }
         require(candidate.iterationTimes.isNotEmpty()) { "Minimaal één cyclustijd is verplicht" }
         candidate.iterationTimes.forEach { require(it.matches(TIME_OF_DAY)) { "Ongeldige cyclustijd '$it', gebruik HH:mm" } }
+        validateRoadmapSchedule(candidate.roadmapSchedule)
         require(AiCatalog.isValid(candidate.aiProvider, candidate.aiModel)) {
             "Onbekende combinatie van AI-provider '${candidate.aiProvider}' en model '${candidate.aiModel}'"
         }
@@ -315,6 +335,20 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             java.sql.Time::class.java,
             row.getString("slug"),
         ).map { it.toLocalTime().toString().take(5) },
+        roadmapSchedule = jdbc.query(
+            """select day_of_week, time_of_day from product_roadmap_schedule where product_slug = ?
+                order by case day_of_week
+                    when 'MONDAY' then 1 when 'TUESDAY' then 2 when 'WEDNESDAY' then 3
+                    when 'THURSDAY' then 4 when 'FRIDAY' then 5 when 'SATURDAY' then 6 else 7 end,
+                    time_of_day""".trimIndent(),
+            { scheduleRow, _ ->
+                WeeklyScheduleView(
+                    dayOfWeek = scheduleRow.getString("day_of_week"),
+                    time = scheduleRow.getTime("time_of_day").toLocalTime().toString().take(5),
+                )
+            },
+            row.getString("slug"),
+        ),
         timezone = row.getString("timezone"),
         maxStoriesPerCycle = row.getInt("max_stories_per_cycle"),
         wipLimit = row.getInt("wip_limit"),
@@ -370,12 +404,21 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         require(uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()) { "Ongeldige URL" }
     }
 
+    private fun validateRoadmapSchedule(schedule: List<WeeklyScheduleView>) {
+        schedule.forEach {
+            require(it.dayOfWeek in DAYS_OF_WEEK) { "Ongeldige roadmap-weekdag '${it.dayOfWeek}'" }
+            require(it.time.matches(TIME_OF_DAY)) { "Ongeldige roadmap-tijd '${it.time}', gebruik HH:mm" }
+        }
+        require(schedule.distinct().size == schedule.size) { "Dubbele roadmap-planning is niet toegestaan" }
+    }
+
     companion object {
         private val SLUG = Regex("[a-z0-9]+(?:-[a-z0-9]+)*")
         private val REPOSITORY = Regex("[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?")
         private val STATUSES = setOf("draft", "active", "paused", "archived")
         private val DEVELOPMENT_MODES = setOf("manual", "autonomous", "observe-only")
         private val OWNERSHIPS = setOf("owner", "product-factory")
+        private val DAYS_OF_WEEK = setOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY")
         private val TIME_OF_DAY = Regex("([01]\\d|2[0-3]):[0-5]\\d")
         private const val PRODUCT_SELECT = """select p.* from product_definition p"""
     }

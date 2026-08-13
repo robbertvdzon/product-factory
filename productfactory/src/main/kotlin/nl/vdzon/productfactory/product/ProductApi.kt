@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.product
 
 import nl.vdzon.productfactory.contracts.ProductRecordView
 import nl.vdzon.productfactory.contracts.ProductView
+import nl.vdzon.productfactory.contracts.WeeklyScheduleView
 import nl.vdzon.productfactory.product.api.AiCatalog
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.product.api.ProductConfiguration
@@ -33,6 +34,7 @@ data class CreateProductRequest(
     val status: String = "draft",
     val developmentMode: String = "manual",
     val iterationTimes: List<String> = listOf("03:00"),
+    val roadmapSchedule: List<WeeklyScheduleView> = emptyList(),
     val timezone: String = "Europe/Amsterdam",
     val maxStoriesPerCycle: Int = 3,
     val wipLimit: Int = 1,
@@ -62,6 +64,7 @@ data class CreateProductRequest(
         status = status,
         developmentMode = developmentMode,
         iterationTimes = iterationTimes,
+        roadmapSchedule = roadmapSchedule,
         timezone = timezone,
         maxStoriesPerCycle = maxStoriesPerCycle,
         wipLimit = wipLimit,

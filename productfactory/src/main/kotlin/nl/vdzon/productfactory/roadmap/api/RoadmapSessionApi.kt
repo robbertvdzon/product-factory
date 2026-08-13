@@ -23,7 +23,14 @@ class RoadmapSessionRepository(private val jdbc: JdbcTemplate, private val produ
         productSlug,
     ) ?: 0) > 0
 
-    /** Laatste keer dat een sessie voor dit product succesvol is afgerond, of `null` als dat nog nooit is gebeurd. */
+    /** Laatste aangemaakte sessie, ongeacht uitkomst; zo wordt één weekslot na een fout niet elk pollmoment herhaald. */
+    fun lastCreatedAt(productSlug: String): Instant? = jdbc.queryForObject(
+        "select max(created_at) from roadmap_session where product_slug = ?",
+        java.sql.Timestamp::class.java,
+        productSlug,
+    )?.toInstant()
+
+    /** Laatste succesvolle sessie; gebruikt om alleen productcycli sinds de vorige roadmapreview te selecteren. */
     fun lastCompletedAt(productSlug: String): Instant? = jdbc.queryForObject(
         "select max(completed_at) from roadmap_session where product_slug = ? and status = 'COMPLETED'",
         java.sql.Timestamp::class.java,

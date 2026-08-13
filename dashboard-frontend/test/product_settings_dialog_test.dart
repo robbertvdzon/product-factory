@@ -16,6 +16,10 @@ Map<String, dynamic> _product() => {
   'aiProvider': 'openai',
   'aiModel': 'gpt-4o-mini',
   'iterationTimes': ['03:00', '15:00'],
+  'roadmapSchedule': [
+    {'dayOfWeek': 'MONDAY', 'time': '10:00'},
+    {'dayOfWeek': 'THURSDAY', 'time': '12:00'},
+  ],
 };
 
 Map<String, dynamic> _aiCatalog() => {
@@ -131,7 +135,7 @@ void main() {
   );
 
   testWidgets(
-    'elk bewerkbaar veld (max stories, wip-limiet, doelrepository, AI-model, cyclustijden) '
+    'elk bewerkbaar veld (max stories, wip-limiet, doelrepository, AI-model, cyclustijden en roadmapplanning) '
     'wijzigt, slaat op en komt met de juiste sleutel in de opslag-payload terecht',
     (tester) async {
       Map<String, dynamic>? saved;
@@ -196,6 +200,39 @@ void main() {
       expect(saved!['aiProvider'], 'anthropic');
       expect(saved!['aiModel'], 'claude-3-5-sonnet');
       expect(saved!['iterationTimes'], ['15:00']);
+      expect(saved!['roadmapSchedule'], [
+        {'dayOfWeek': 'MONDAY', 'time': '10:00'},
+        {'dayOfWeek': 'THURSDAY', 'time': '12:00'},
+      ]);
+    },
+  );
+
+  testWidgets(
+    'roadmapmomenten kunnen afzonderlijk worden verwijderd en een lege planning blijft geldig',
+    (tester) async {
+      Map<String, dynamic>? saved;
+      await _openDialog(tester, onClosed: (settings) => saved = settings);
+
+      for (final label in ['Maandag 10:00', 'Donderdag 12:00']) {
+        final chip = find.ancestor(
+          of: find.text(label),
+          matching: find.byType(Chip),
+        );
+        await tester.ensureVisible(chip);
+        await tester.pump();
+        await tester.tap(
+          find.descendant(of: chip, matching: find.byIcon(Icons.cancel)),
+        );
+        await tester.pump();
+      }
+
+      final saveButton = find.widgetWithText(FilledButton, 'Opslaan');
+      await tester.ensureVisible(saveButton);
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+
+      expect(saved, isNotNull);
+      expect(saved!['roadmapSchedule'], isEmpty);
     },
   );
 

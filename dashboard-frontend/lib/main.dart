@@ -3401,6 +3401,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
   late String aiModel =
       (widget.aiCatalog[aiProvider] as List<dynamic>).first as String;
   List<String> iterationTimes = ['03:00'];
+  List<Map<String, String>> roadmapSchedule = [];
 
   @override
   void dispose() {
@@ -3434,6 +3435,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
       'aiModel': aiModel,
       'maxStoriesPerCycle': stories,
       'iterationTimes': iterationTimes,
+      'roadmapSchedule': roadmapSchedule,
     });
   }
 
@@ -3511,6 +3513,11 @@ class _AddProductDialogState extends State<AddProductDialog> {
             IterationTimesField(
               times: iterationTimes,
               onChanged: (value) => setState(() => iterationTimes = value),
+            ),
+            const SizedBox(height: 16),
+            WeeklyRoadmapScheduleField(
+              schedule: roadmapSchedule,
+              onChanged: (value) => setState(() => roadmapSchedule = value),
             ),
           ],
         ),
@@ -3634,6 +3641,14 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
   late List<String> iterationTimes = List<String>.from(
     (widget.product['iterationTimes'] as List<dynamic>?) ?? const ['03:00'],
   );
+  late List<Map<String, String>> roadmapSchedule =
+      ((widget.product['roadmapSchedule'] as List<dynamic>?) ?? const [])
+          .map(
+            (entry) => Map<String, String>.from(
+              Map<String, dynamic>.from(entry as Map),
+            ),
+          )
+          .toList();
 
   @override
   void dispose() {
@@ -3654,6 +3669,7 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
       'aiProvider': aiProvider,
       'aiModel': aiModel,
       'iterationTimes': iterationTimes,
+      'roadmapSchedule': roadmapSchedule,
       'targetRepositoryName': targetRepositoryName.text.trim(),
     });
   }
@@ -3756,6 +3772,11 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
             IterationTimesField(
               times: iterationTimes,
               onChanged: (value) => setState(() => iterationTimes = value),
+            ),
+            const SizedBox(height: 16),
+            WeeklyRoadmapScheduleField(
+              schedule: roadmapSchedule,
+              onChanged: (value) => setState(() => roadmapSchedule = value),
             ),
           ],
         ),
@@ -3885,6 +3906,115 @@ class IterationTimesField extends StatelessWidget {
             avatar: const Icon(Icons.add, size: 18),
             label: const Text('Tijd toevoegen'),
             onPressed: () => _addTime(context),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+/// Optionele weekplanning voor automatische roadmap-sessies. Anders dan productcycli zijn dit
+/// combinaties van weekdag en tijd; een lege lijst betekent bewust alleen handmatig starten.
+class WeeklyRoadmapScheduleField extends StatefulWidget {
+  const WeeklyRoadmapScheduleField({
+    required this.schedule,
+    required this.onChanged,
+    super.key,
+  });
+
+  final List<Map<String, String>> schedule;
+  final ValueChanged<List<Map<String, String>>> onChanged;
+
+  @override
+  State<WeeklyRoadmapScheduleField> createState() =>
+      _WeeklyRoadmapScheduleFieldState();
+}
+
+class _WeeklyRoadmapScheduleFieldState
+    extends State<WeeklyRoadmapScheduleField> {
+  String selectedDay = 'MONDAY';
+
+  static const days = <String, String>{
+    'MONDAY': 'Maandag',
+    'TUESDAY': 'Dinsdag',
+    'WEDNESDAY': 'Woensdag',
+    'THURSDAY': 'Donderdag',
+    'FRIDAY': 'Vrijdag',
+    'SATURDAY': 'Zaterdag',
+    'SUNDAY': 'Zondag',
+  };
+
+  Future<void> _addMoment(BuildContext context) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 10, minute: 0),
+    );
+    if (picked == null) return;
+    final time =
+        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+    final moment = {'dayOfWeek': selectedDay, 'time': time};
+    if (widget.schedule.any(
+      (entry) => entry['dayOfWeek'] == selectedDay && entry['time'] == time,
+    )) {
+      return;
+    }
+    final updated = [...widget.schedule, moment]
+      ..sort((a, b) {
+        final dayCompare = days.keys
+            .toList()
+            .indexOf(a['dayOfWeek']!)
+            .compareTo(days.keys.toList().indexOf(b['dayOfWeek']!));
+        return dayCompare != 0 ? dayCompare : a['time']!.compareTo(b['time']!);
+      });
+    widget.onChanged(updated);
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Roadmapplanning', style: Theme.of(context).textTheme.titleSmall),
+      const SizedBox(height: 4),
+      const Text(
+        'Automatische roadmap-sessies per week. Zonder momenten start je ze alleen handmatig.',
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          for (final moment in widget.schedule)
+            Chip(
+              label: Text(
+                '${days[moment['dayOfWeek']] ?? moment['dayOfWeek']} ${moment['time']}',
+              ),
+              onDeleted: () => widget.onChanged(
+                widget.schedule.where((entry) => entry != moment).toList(),
+              ),
+            ),
+          SizedBox(
+            width: 210,
+            child: DropdownButtonFormField<String>(
+              key: const Key('roadmap-weekday'),
+              initialValue: selectedDay,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Weekdag'),
+              items: days.entries
+                  .map(
+                    (entry) => DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => selectedDay = value!),
+            ),
+          ),
+          ActionChip(
+            avatar: const Icon(Icons.add, size: 18),
+            label: const Text('Moment toevoegen'),
+            onPressed: () => _addMoment(context),
           ),
         ],
       ),

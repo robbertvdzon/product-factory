@@ -34,4 +34,3 @@ product-factory:
   roadmap:
     enabled: ${PF_ROADMAP_ENABLED:false}
     poll-delay: ${PF_ROADMAP_POLL_DELAY:PT1H}
-    session-interval: ${PF_ROADMAP_SESSION_INTERVAL:P7D}
