@@ -32,3 +32,24 @@ simuleert is groen, maar reproduceert het gedrag van de gebouwde Flutter-webapp 
 
 Besluit: afwijzen wegens schending van het acceptancecriterium dat `Terug naar overzicht` met het
 toetsenbord activeerbaar is. Het volledige vangnet na deze run kan deze gedragsfout niet groen maken.
+
+## Hertest na developerherstel
+
+- Preview en API-health geven HTTP 200. De deployments in namespace `product-factory-pr-67` gebruiken
+  image `sha-b0b40133d6f6932a9342f0e3391d339464e045a2`, gelijk aan de geteste HEAD.
+- In headless Chromium is Flutter-semantiek geactiveerd. Chromium rapporteert `Beheer` en `Terug naar
+  overzicht` als focusbare links; beide zijn de eerste Tab-stop in hun weergave.
+- Twee echte Tab+Enter-rondreizen zijn geslaagd. In de eerste bleef `Terug naar overzicht` 6,5 seconden
+  en daarmee over de automatische refresh gefocust, waarna Enter het hoofdscherm opende. De tweede
+  rondreis zonder wachttijd en heen/terug met de muis zijn eveneens geslaagd.
+- Op 320 logische pixels breed zijn de teruglink, beide beheersecties en de kandidaatkaart bereikbaar.
+  `documentElement.scrollWidth` bleef 320, een horizontale scrollpoging hield `scrollX` op 0 en er was
+  geen zichtbare overlap of overflow.
+- Gerichte bestaande widgettests uitgevoerd voor volledige tabvolgorde/focus, Beheer op 320 pixels met
+  200% tekst en lange records/Meer-acties, en laad-/foutmeldingen op 320 pixels met 200% tekst: 3 tests
+  geslaagd, 0 failures en 0 errors.
+- Screenshots van overzicht, Beheer, gefocuste teruglink na refresh en de 320px-weergave staan in
+  `/work/screenshots`.
+
+Hertestbesluit: de eerder gemelde toetsenbordbug is op de actuele revision opgelost. Het volledige
+revisiongebonden vangnet wordt conform de tester-instructie na deze run door de factory-harness uitgevoerd.
