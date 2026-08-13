@@ -53,3 +53,29 @@ Verificatie (definitieve eindrun, alle exitcode 0):
 - `mvn -B --no-transfer-progress clean verify`: `BUILD SUCCESS`; 142 tests, 0 failures, 0 errors.
 - `flutter analyze`: `No issues found!`.
 - `flutter test`: 289 tests geslaagd, 0 failures, 0 errors.
+
+## Review (product-186)
+
+- [bug] `iterationEvidencePresentation` formatteert `startedAt ?? createdAt` rechtstreeks. Daardoor
+  levert een aanwezige maar onleesbare `startedAt` met een geldige `createdAt` nu `Onbekend` op,
+  terwijl de bestaande `iterationTiming`-presentatie in dat geval juist naar de geldige
+  `createdAt` terugvalt. Dit wijkt af van de geëiste bestaande datumweergave. Voeg naast de reparatie
+  een regressietest toe voor zowel ontbrekende als onleesbare `startedAt` met geldige `createdAt`.
+- [bug] Bij ieder gekoppeld expliciet `decision`-record dat niet exact de handmatige-annuleringscodes
+  bevat, negeert `iterationEvidencePresentation` de expliciete provenance en roept het rechtstreeks
+  `classifyDecisionSource` aan. Een toekomstig/onbekend expliciet record op een ACCEPTED-cyclus kan
+  zo onterecht `Evaluatie-agent (Afgeleid)` tonen, terwijl de bestaande presentatielogica het record
+  als expliciet herkent en conservatief `Onbekend` hoort te tonen. Leid alleen af wanneer een
+  gekoppeld expliciet record werkelijk ontbreekt; claim bij een aanwezig maar niet geldig herkend
+  record geen mens en geen afgeleide bron.
+- [blocker] De expliciet vereiste widgettestmatrix voor ongewijzigde kaarten is niet compleet.
+  `iteration_evidence_overview_test.dart` bewijst alleen een RUNNING `product-factory`-cyclus en een
+  terminale cyclus van een ander product. QUEUED voor `product-factory` en een actieve cyclus van een
+  ander product worden alleen indirect/pure-logisch of in oudere componentharnassen geraakt, niet in
+  de overzichtsroute die deze story wijzigt. Voeg overzicht-widgetfixtures/asserties toe voor alle
+  vier vereiste combinaties: QUEUED en RUNNING van `product-factory`, plus actief en terminaal van
+  een ander product.
+- [info] Het factorybewijs is revisiongebonden en groen voor de geraakte runnable gates:
+  `testedTreeSha` is gelijk aan de huidige `HEAD^{tree}`; frontend analyze en tests zijn geslaagd.
+  De Maven-gate is volgens de geconfigureerde `pathPrefixes` niet van toepassing op deze
+  frontend-only diff.
