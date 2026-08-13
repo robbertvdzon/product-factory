@@ -100,17 +100,26 @@ class DeliveryVerificationEngine(
 
     /** Zelfde Playwright-screenshotpatroon als ShadowIterationEngine.environmentInstruction, module-eigen om geen afhankelijkheid op `iteration` te introduceren. */
     private fun environmentInstruction(product: ProductView): String {
+        val live = product.liveUrl?.trim()?.ifBlank { null }
         val acceptance = product.acceptanceUrl?.trim()?.ifBlank { null }
         val admin = product.adminUrl?.trim()?.ifBlank { null }
-        if (acceptance == null && admin == null) {
-            return "Er is geen acceptatie- of beheer-URL voor dit product geconfigureerd: zet verdict op INCONCLUSIVE en leg dat uit in report."
+        if (live == null && acceptance == null && admin == null) {
+            return "Er is geen productie-, acceptatie- of beheer-URL voor dit product geconfigureerd: zet verdict op INCONCLUSIVE en leg dat uit in report."
         }
         val places = listOfNotNull(
-            acceptance?.let { "de draaiende applicatie op $it" },
-            admin?.let { "het beheergedeelte op $it" },
-        ).joinToString(" en ")
+            live?.let { "- PUBLIEKE PRODUCTIEAPP: $it — dit is de grondwaarheid voor wat echt live staat; uitsluitend lezen, navigeren en niet-mutatieve zoekacties uitvoeren." },
+            acceptance?.let { "- ACCEPTATIEOMGEVING: $it — gebruik deze voor uitgebreidere veilige interactie met representatieve nepdata." },
+            admin?.let { "- BEHEEROMGEVING (secundair): $it — alleen bekijken als die zonder authenticatie toegankelijk is; probeer nooit in te loggen en sla deze over zodra een login nodig is." },
+        ).joinToString("\n")
         return """
-        OMGEVING: bekijk $places. Je webtool (WebFetch/websearch) wordt hier geblokkeerd door
+        OMGEVINGEN: bekijk de relevante publieke productflow op alle hieronder beschikbare publieke omgevingen:
+        $places
+
+        De productieapp blijft strikt read-only: verstuur geen formulieren of opdrachten die gegevens wijzigen.
+        Een niet-toegankelijke beheeromgeving is op zichzelf geen reden voor INCONCLUSIVE; beoordeel de publieke
+        productflow. Noem in report concreet welke URL's, schermen en doorklikstappen je werkelijk hebt bekeken.
+
+        Je webtool (WebFetch/websearch) wordt hier geblokkeerd door
         bot-bescherming (HTTP 403) — gebruik in plaats daarvan je Bash-tool om een echte headless
         Chromium-browser te besturen via Playwright (al globaal geïnstalleerd; voer zo nodig eerst
         `npx playwright install chromium` uit). Deze applicatie rendert op canvas (Flutter Web/CanvasKit):
@@ -121,8 +130,8 @@ class DeliveryVerificationEngine(
         Gebruik hetzelfde screenshot-en-bekijken-patroon voor eventuele doorkliknavigatie. Playwright
         staat alleen globaal geïnstalleerd, dus start het script met
         `NODE_PATH="$(npm root -g)" node jouw-script.cjs`, anders vindt Node het package niet. Dit is een
-        standing acceptatieomgeving zonder login en met representatieve nepdata, geen productie. Dat is
-        een bewuste ontwerpkeuze, geen beveiligingslek.
+        acceptatieomgeving met representatieve nepdata. De publieke productieapp heeft geen login nodig;
+        de beheeromgeving kan die wel vereisen en moet dan worden overgeslagen.
         """.trimIndent()
     }
 

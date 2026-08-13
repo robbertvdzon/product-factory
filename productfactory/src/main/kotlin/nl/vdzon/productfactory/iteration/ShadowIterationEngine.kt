@@ -112,7 +112,7 @@ class ShadowIterationEngine(
             ShadowRole.RESEARCHER,
             ShadowSchemas.research,
             promptFor = { correction -> researchPrompt(iteration.focus, product, previousContext, meetingContext, roadmapContext, today, iteration.mode, productVision, correction) },
-            validate = { validateResearch(it, today) },
+            validate = { validateResearch(it, today, product = product) },
         )
 
         val productOwner = resume?.productOwner?.let(mapper::readTree) ?: executeRoleWithRetry(
@@ -419,7 +419,12 @@ class ShadowIterationEngine(
         }
     }
 
-    private fun validateResearch(output: JsonNode, today: LocalDate, requireToday: Boolean = true) {
+    private fun validateResearch(
+        output: JsonNode,
+        today: LocalDate,
+        requireToday: Boolean = true,
+        product: ProductView? = null,
+    ) {
         require(output.path("summary").asText().isNotBlank()) { "Onderzoekssamenvatting ontbreekt" }
         val sources = validatedSources(output, today, requireToday)
         require(sources.size >= 2) { "Minimaal twee bronnen zijn verplicht" }
@@ -429,7 +434,29 @@ class ShadowIterationEngine(
         }
         require(output.path("currentState").path("purpose").asText().isNotBlank()) { "Doel van de huidige applicatie ontbreekt" }
         require(output.path("currentState").path("gaps").size() > 0) { "Wat de huidige applicatie mist, ontbreekt" }
+        product?.let { validateBrowserEvidence(output, it) }
         require(output.path("improvementOpportunities").size() > 0) { "Verbetermogelijkheden ontbreken" }
+    }
+
+    private fun validateBrowserEvidence(output: JsonNode, product: ProductView) {
+        val evidence = output.path("browserEvidence").associateBy { it.path("environment").asText() }
+        val publicTargets = listOfNotNull(
+            product.liveUrl?.trim()?.ifBlank { null }?.let { "PRODUCTION" to it },
+            product.acceptanceUrl?.trim()?.ifBlank { null }?.let { "ACCEPTANCE" to it },
+        )
+        publicTargets.forEach { (environment, url) ->
+            val item = evidence[environment] ?: error("Browserbewijs voor $environment ontbreekt")
+            require(item.path("url").asText() == url) { "Browserbewijs voor $environment verwijst niet naar de geconfigureerde URL" }
+            require(item.path("status").asText() == "NAVIGATED") { "Browsernavigatie op $environment is niet geslaagd" }
+            require(item.path("actions").size() > 0) { "Browserbewijs voor $environment bevat geen navigatiestappen" }
+        }
+        product.adminUrl?.trim()?.ifBlank { null }?.let { url ->
+            val item = evidence["ADMIN"] ?: error("Browserbewijs voor ADMIN ontbreekt")
+            require(item.path("url").asText() == url) { "Browserbewijs voor ADMIN verwijst niet naar de geconfigureerde URL" }
+            require(item.path("status").asText() in setOf("NAVIGATED", "SKIPPED_AUTH")) {
+                "Beheeromgeving is niet bekeken of aantoonbaar vanwege authenticatie overgeslagen"
+            }
+        }
     }
 
     private fun validatedSources(output: JsonNode, today: LocalDate, requireToday: Boolean = true): List<ValidatedSource> = output.path("sources").map { source ->
@@ -732,16 +759,24 @@ class ShadowIterationEngine(
         )
     }
 
-    private fun environmentInstruction(product: ProductView): String {
+    internal fun environmentInstruction(product: ProductView): String {
+        val live = product.liveUrl?.trim()?.ifBlank { null }
         val acceptance = product.acceptanceUrl?.trim()?.ifBlank { null }
         val admin = product.adminUrl?.trim()?.ifBlank { null }
-        if (acceptance == null && admin == null) return ""
+        if (live == null && acceptance == null && admin == null) return ""
         val places = listOfNotNull(
-            acceptance?.let { "de draaiende applicatie op $it" },
-            admin?.let { "het beheergedeelte op $it" },
-        ).joinToString(" en ")
+            live?.let { "- PUBLIEKE PRODUCTIEAPP: $it — uitsluitend lezen, navigeren en niet-mutatieve zoekacties uitvoeren." },
+            acceptance?.let { "- ACCEPTATIEOMGEVING: $it — gebruik deze voor uitgebreidere veilige interactie met representatieve nepdata." },
+            admin?.let { "- BEHEEROMGEVING (secundair): $it — alleen bekijken als die zonder authenticatie toegankelijk is; probeer nooit in te loggen en sla deze over zodra een login nodig is." },
+        ).joinToString("\n")
         return """
-        ACCEPTATIEOMGEVING: bekijk ook $places. Je webtool (WebFetch/websearch) wordt hier geblokkeerd door
+        DRAAIENDE OMGEVINGEN: bekijk de relevante publieke productflow op alle hieronder beschikbare
+        publieke omgevingen voordat je conclusies over de huidige staat trekt:
+        $places
+
+        De productieapp blijft strikt read-only: verstuur geen formulieren of opdrachten die gegevens wijzigen.
+        Een ingelogde beheeromgeving is secundair en mag worden overgeslagen. Je webtool
+        (WebFetch/websearch) wordt hier geblokkeerd door
         bot-bescherming (HTTP 403) — gebruik in plaats daarvan je Bash-tool om een echte headless
         Chromium-browser te besturen via Playwright (al globaal geïnstalleerd; voer zo nodig eerst
         `npx playwright install chromium` uit). Deze applicatie rendert op canvas (Flutter Web/CanvasKit):
@@ -752,14 +787,18 @@ class ShadowIterationEngine(
         precies zoals de tester dat ook doet. Gebruik hetzelfde screenshot-en-bekijken-patroon voor
         eventuele doorkliknavigatie binnen de omgeving. Playwright staat alleen globaal
         geïnstalleerd, dus start het script met `NODE_PATH="$(npm root -g)" node jouw-script.cjs`, anders
-        vindt Node het package niet. Dit is een standing acceptatieomgeving zonder login
-        en met representatieve nepdata, geen productie. Dat is een bewuste ontwerpkeuze, geen
+        vindt Node het package niet. De acceptatieomgeving gebruikt representatieve nepdata. Dat is een
+        bewuste ontwerpkeuze, geen
         beveiligingslek: de omgeving gebruikt dummy-data en alle externe koppelingen zijn gemockt,
         inclusief AI. Zie AI-gedreven onderdelen die je hier tegenkomt daarom als gescripte mockresponses,
         niet als representatief voor het echte AI-gedrag in productie. Loop actief door wat je ziet,
         inclusief het beheergedeelte als dat er is, en beoordeel expliciet de bruikbaarheid en
         duidelijkheid van de huidige applicatie als onderdeel van je onderzoek, niet alleen als optionele
-        achtergrond.
+        achtergrond. Vul browserEvidence voor iedere hierboven genoemde omgeving in. Gebruik status
+        NAVIGATED uitsluitend als de browser werkelijk startte, je een screenshot hebt bekeken en je
+        minstens één relevante navigatie- of doorklikstap hebt uitgevoerd; een HTTP-check is niet genoeg.
+        Gebruik SKIPPED_AUTH voor een beheerlogin en FAILED met de concrete technische fout als navigatie
+        niet lukte.
         """.trimIndent()
     }
 
@@ -1067,7 +1106,7 @@ class ShadowIterationEngine(
         // internal (niet private): OrphanedIterationReconciler hergebruikt dezelfde waarden om te bepalen
         // wanneer een RUNNING-stap zijn eigen timeout onmogelijk nog kan halen.
         internal const val ROLE_TIMEOUT_SECONDS = 900L
-        // RESEARCHER bekijkt de acceptatieomgeving nu via een echte (headless) browser in plaats van WebFetch
+        // RESEARCHER bekijkt productie en acceptatie via een echte (headless) browser in plaats van WebFetch
         // (zie AgentTaskExecutor.requiresBrowserAccess): browsernavigatie, paginalaadtijd en scriptuitvoering maken
         // die stap merkbaar trager dan de overige, puur tekst-/toolgedreven rollen, die ruim binnen 900s blijven.
         internal const val RESEARCHER_TIMEOUT_SECONDS = 3600L

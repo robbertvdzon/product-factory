@@ -61,10 +61,11 @@ class AgentContractTest {
             ),
         )
         assertTrue(command.last().contains("Onderzoek openbare archieven"))
-        assertTrue(command.last().contains("Wijzig geen bestanden"))
+        assertTrue(command.last().contains("Wijzig geen bronbestanden"))
+        assertTrue(command.last().contains("Maak geen bestanden"))
     }
 
-    @Test fun `codex command grants the researcher role a writable sandbox with network access`() {
+    @Test fun `codex command grants the researcher unrestricted browser process access`() {
         val workspace = Files.createTempDirectory("pf-agent-workspace-researcher")
         val settings = AgentWorkerSettings(
             url = "wss://factory.example/agent-worker",
@@ -81,11 +82,13 @@ class AgentContractTest {
             workspace.resolve("last-message"),
         )
 
-        assertTrue(command.containsAll(listOf("--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")))
+        assertTrue(command.containsAll(listOf("--sandbox", "danger-full-access")))
+        assertFalse(command.contains("workspace-write"))
         assertFalse(command.contains("read-only"))
+        assertTrue(command.last().contains("tijdelijke Playwright-scripts en screenshots"))
     }
 
-    @Test fun `codex command grants the delivery verifier browser and network access`() {
+    @Test fun `codex command grants the delivery verifier unrestricted browser process access`() {
         val workspace = Files.createTempDirectory("pf-agent-workspace-verifier")
         val executor = CodexAgentTaskExecutor(
             AgentWorkerSettings(
@@ -99,7 +102,8 @@ class AgentContractTest {
             workspace.resolve("last-message"),
         )
 
-        assertTrue(command.containsAll(listOf("--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")))
+        assertTrue(command.containsAll(listOf("--sandbox", "danger-full-access")))
+        assertFalse(command.contains("workspace-write"))
         assertFalse(command.contains("read-only"))
     }
 
@@ -149,7 +153,8 @@ class AgentContractTest {
             ),
         )
         assertTrue(command.last().contains("Onderzoek openbare archieven"))
-        assertTrue(command.last().contains("Wijzig geen bestanden"))
+        assertTrue(command.last().contains("Wijzig geen bronbestanden"))
+        assertTrue(command.last().contains("Maak geen bestanden"))
     }
 
     @Test fun `claude command grants the researcher role Bash and Read for a headless browser and screenshots`() {

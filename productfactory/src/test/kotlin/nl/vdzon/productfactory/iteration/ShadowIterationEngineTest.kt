@@ -4,6 +4,7 @@ import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.contracts.AgentResult
 import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.WorkspacePublicationView
+import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.roadmap.api.RoadmapCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
@@ -33,6 +34,7 @@ class ShadowIterationEngineTest(
     @Autowired private val workspace: FakeWorkspacePublicationPort,
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val roadmap: RoadmapCatalog,
+    @Autowired private val products: ProductCatalog,
 ) {
     // De fakes zijn Spring-singletons die alle testmethoden in deze klasse delen; zonder reset
     // lekt de workspace-artefactenlijst (en het scenario) van de ene test naar de volgende.
@@ -42,6 +44,16 @@ class ShadowIterationEngineTest(
         bridge.scenario = Scenario.ACCEPT
         bridge.themeIdToEmit = null
         bridge.publishedDependencyId = null
+    }
+
+    @Test
+    fun `researcher receives production acceptance and login-safe admin browser instructions`() {
+        val prompt = engine.environmentInstruction(products.requireProduct("hkh-autopilot"))
+        assertTrue(prompt.contains("PUBLIEKE PRODUCTIEAPP: https://hkh-autopilot.vdzonsoftware.nl"))
+        assertTrue(prompt.contains("ACCEPTATIEOMGEVING: https://hkh-autopilot-acceptance.vdzonsoftware.nl"))
+        assertTrue(prompt.contains("BEHEEROMGEVING (secundair): https://hkh-autopilot-admin-acceptance.vdzonsoftware.nl/"))
+        assertTrue(prompt.contains("probeer nooit in te loggen"))
+        assertTrue(prompt.contains("browserEvidence"))
     }
 
     @Test
@@ -426,6 +438,11 @@ class ShadowIterationEngineTest(
                       {"url":"https://noord-hollandsarchief.nl/","consultedOn":"$today","rightsIndication":"Rechten verschillen per object en moeten op de objectpagina worden gecontroleerd.","rationale":"Regionale bron voor Noord-Hollandse archiefcollecties."}
                     ],
                     "currentState":{"purpose":"De applicatie helpt bewoners lokale geschiedenis herleidbaar te ontdekken.","gaps":["Geen brontransparantie bij zoekresultaten"]},
+                    "browserEvidence":[
+                      {"environment":"PRODUCTION","url":"https://hkh-autopilot.vdzonsoftware.nl","status":"NAVIGATED","actions":["Homepage geopend","Publieke zoekroute geopend"],"observations":"De publieke productflow was via Chromium zichtbaar en navigeerbaar."},
+                      {"environment":"ACCEPTANCE","url":"https://hkh-autopilot-acceptance.vdzonsoftware.nl","status":"NAVIGATED","actions":["Homepage geopend","Historische zoekroute geopend"],"observations":"De acceptatieflow was via Chromium zichtbaar en navigeerbaar."},
+                      {"environment":"ADMIN","url":"https://hkh-autopilot-admin-acceptance.vdzonsoftware.nl/","status":"SKIPPED_AUTH","actions":[],"observations":"De beheeromgeving vroeg om authenticatie en is daarom overgeslagen."}
+                    ],
                     "improvementOpportunities":["Toon rechten- en broninformatie direct bij ieder resultaat"],
                     "inspiration":[]
                 }""" else """{
@@ -436,6 +453,11 @@ class ShadowIterationEngineTest(
                       {"url":"https://www.rijksmuseum.nl/nl/rijksstudio","consultedOn":"$today","rightsIndication":"Beschikbaarheid en rechten staan per object vermeld.","rationale":"Voorbeeld van een doorzoekbare Nederlandse erfgoedcollectie."}
                     ],
                     "currentState":{"purpose":"De applicatie helpt bewoners lokale geschiedenis herleidbaar te ontdekken.","gaps":["Geen brontransparantie bij zoekresultaten"]},
+                    "browserEvidence":[
+                      {"environment":"PRODUCTION","url":"https://hkh-autopilot.vdzonsoftware.nl","status":"NAVIGATED","actions":["Homepage geopend","Publieke zoekroute geopend"],"observations":"De publieke productflow was via Chromium zichtbaar en navigeerbaar."},
+                      {"environment":"ACCEPTANCE","url":"https://hkh-autopilot-acceptance.vdzonsoftware.nl","status":"NAVIGATED","actions":["Homepage geopend","Historische zoekroute geopend"],"observations":"De acceptatieflow was via Chromium zichtbaar en navigeerbaar."},
+                      {"environment":"ADMIN","url":"https://hkh-autopilot-admin-acceptance.vdzonsoftware.nl/","status":"SKIPPED_AUTH","actions":[],"observations":"De beheeromgeving vroeg om authenticatie en is daarom overgeslagen."}
+                    ],
                     "improvementOpportunities":["Toon rechten- en broninformatie direct bij ieder resultaat"],
                     "inspiration":[{"name":"Rijksstudio","url":"https://www.rijksmuseum.nl/nl/rijksstudio","relevance":"Toont hoe broninformatie naast beeldmateriaal gepresenteerd kan worden."}]
                 }"""

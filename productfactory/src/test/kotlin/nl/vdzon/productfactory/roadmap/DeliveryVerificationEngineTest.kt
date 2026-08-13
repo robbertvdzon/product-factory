@@ -31,6 +31,7 @@ class DeliveryVerificationEngineTest(
     @Autowired private val roadmap: RoadmapCatalog,
     @Autowired private val products: ProductCatalog,
     @Autowired private val jdbc: JdbcTemplate,
+    @Autowired private val agent: CapturingDeliveryVerificationAgent,
 ) {
     private val slug = "delivery-verification-test"
 
@@ -42,11 +43,15 @@ class DeliveryVerificationEngineTest(
                     slug = slug,
                     name = "Opleverchecker-testproduct",
                     mission = "Test de opleverchecker",
+                    liveUrl = "https://example.test",
+                    acceptanceUrl = "https://acceptance.example.test",
+                    adminUrl = "https://admin.example.test",
                     status = "active",
                     developmentMode = "autonomous",
                 ).configuration(),
             )
         }
+        agent.tasks.clear()
         jdbc.update("delete from delivery_verification where product_slug = ?", slug)
         jdbc.update("delete from story_delivery where product_slug = ?", slug)
         jdbc.update("delete from story_candidate where product_slug = ?", slug)
@@ -67,6 +72,11 @@ class DeliveryVerificationEngineTest(
         assertEquals(1, results.size)
         assertEquals("SATISFIES", results.single().verdict)
         assertEquals(candidateId, results.single().candidateId)
+        val prompt = agent.tasks.single().prompt
+        assertTrue(prompt.contains("PUBLIEKE PRODUCTIEAPP: https://example.test"))
+        assertTrue(prompt.contains("ACCEPTATIEOMGEVING: https://acceptance.example.test"))
+        assertTrue(prompt.contains("BEHEEROMGEVING (secundair): https://admin.example.test"))
+        assertTrue(prompt.contains("probeer nooit in te loggen"))
 
         val stored = reports.forTheme(slug, theme.id)
         assertEquals(1, stored.size)
@@ -155,12 +165,19 @@ class DeliveryVerificationEngineTest(
     class Fakes {
         @Bean
         @Primary
-        fun fakeAgentDispatch(): AgentDispatchPort = AgentDispatchPort { task ->
+        fun fakeAgentDispatch() = CapturingDeliveryVerificationAgent()
+    }
+
+    class CapturingDeliveryVerificationAgent : AgentDispatchPort {
+        val tasks = mutableListOf<nl.vdzon.productfactory.contracts.AgentTask>()
+
+        override fun execute(task: nl.vdzon.productfactory.contracts.AgentTask): AgentResult {
+            tasks += task
             val summary = when (task.taskType) {
                 "delivery-verification" -> """{"verdict":"SATISFIES","report":"Bronvermelding is zichtbaar bij elk resultaat, precies zoals bedoeld."}"""
                 else -> """{"summary":"onbekend"}"""
             }
-            AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)
+            return AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)
         }
     }
 }

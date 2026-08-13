@@ -7,10 +7,11 @@ internal object ShadowSchemas {
         "findings":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"object","additionalProperties":false,"required":["title","finding","sourceUrls"],"properties":{"title":{"type":"string","minLength":3,"maxLength":200},"finding":{"type":"string","minLength":20,"maxLength":3000},"sourceUrls":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string"}}}}},
         "sources":{"type":"array","minItems":2,"maxItems":12,"items":{"type":"object","additionalProperties":false,"required":["url","consultedOn","rightsIndication","rationale"],"properties":{"url":{"type":"string"},"consultedOn":{"type":"string"},"rightsIndication":{"type":"string","minLength":3,"maxLength":500},"rationale":{"type":"string","minLength":10,"maxLength":1000}}}},
         "currentState":{"type":"object","additionalProperties":false,"required":["purpose","gaps"],"properties":{"purpose":{"type":"string","minLength":20,"maxLength":1500},"gaps":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","minLength":5,"maxLength":1000}}}},
+        "browserEvidence":{"type":"array","maxItems":6,"items":{"type":"object","additionalProperties":false,"required":["environment","url","status","actions","observations"],"properties":{"environment":{"type":"string","enum":["PRODUCTION","ACCEPTANCE","ADMIN"]},"url":{"type":"string"},"status":{"type":"string","enum":["NAVIGATED","SKIPPED_AUTH","FAILED"]},"actions":{"type":"array","maxItems":12,"items":{"type":"string","minLength":3,"maxLength":500}},"observations":{"type":"string","minLength":10,"maxLength":2000}}}},
         "improvementOpportunities":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","minLength":10,"maxLength":1000}},
         "inspiration":{"type":"array","maxItems":8,"items":{"type":"object","additionalProperties":false,"required":["name","url","relevance"],"properties":{"name":{"type":"string","minLength":2,"maxLength":200},"url":{"type":"string"},"relevance":{"type":"string","minLength":10,"maxLength":1000}}}}
         """.trimIndent(),
-        listOf("summary", "findings", "sources", "currentState", "improvementOpportunities", "inspiration"),
+        listOf("summary", "findings", "sources", "currentState", "browserEvidence", "improvementOpportunities", "inspiration"),
     )
 
     val productOwner = schema(
