@@ -77,6 +77,8 @@ class DeliveryVerificationEngineTest(
         assertTrue(prompt.contains("ACCEPTATIEOMGEVING: https://acceptance.example.test"))
         assertTrue(prompt.contains("BEHEEROMGEVING (secundair): https://admin.example.test"))
         assertTrue(prompt.contains("probeer nooit in te loggen"))
+        assertTrue(prompt.contains("productie-, acceptatie- of beheeromgeving achter een login is op zichzelf geen reden voor INCONCLUSIVE"))
+        assertTrue(prompt.contains("geen enkele relevante publieke productomgeving"))
 
         val stored = reports.forTheme(slug, theme.id)
         assertEquals(1, stored.size)

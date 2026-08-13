@@ -438,17 +438,27 @@ class ShadowIterationEngine(
         require(output.path("improvementOpportunities").size() > 0) { "Verbetermogelijkheden ontbreken" }
     }
 
-    private fun validateBrowserEvidence(output: JsonNode, product: ProductView) {
+    internal fun validateBrowserEvidence(output: JsonNode, product: ProductView) {
         val evidence = output.path("browserEvidence").associateBy { it.path("environment").asText() }
         val publicTargets = listOfNotNull(
             product.liveUrl?.trim()?.ifBlank { null }?.let { "PRODUCTION" to it },
             product.acceptanceUrl?.trim()?.ifBlank { null }?.let { "ACCEPTANCE" to it },
         )
+        var navigatedPublicEnvironment = false
         publicTargets.forEach { (environment, url) ->
             val item = evidence[environment] ?: error("Browserbewijs voor $environment ontbreekt")
             require(item.path("url").asText() == url) { "Browserbewijs voor $environment verwijst niet naar de geconfigureerde URL" }
-            require(item.path("status").asText() == "NAVIGATED") { "Browsernavigatie op $environment is niet geslaagd" }
+            val status = item.path("status").asText()
+            require(status in setOf("NAVIGATED", "SKIPPED_AUTH")) {
+                "Browsernavigatie op $environment is niet geslaagd en ook niet aantoonbaar vanwege authenticatie overgeslagen"
+            }
             require(item.path("actions").size() > 0) { "Browserbewijs voor $environment bevat geen navigatiestappen" }
+            navigatedPublicEnvironment = navigatedPublicEnvironment || status == "NAVIGATED"
+        }
+        if (publicTargets.isNotEmpty()) {
+            require(navigatedPublicEnvironment) {
+                "Geen enkele publieke productomgeving kon werkelijk met de browser worden bekeken"
+            }
         }
         product.adminUrl?.trim()?.ifBlank { null }?.let { url ->
             val item = evidence["ADMIN"] ?: error("Browserbewijs voor ADMIN ontbreekt")
@@ -765,8 +775,8 @@ class ShadowIterationEngine(
         val admin = product.adminUrl?.trim()?.ifBlank { null }
         if (live == null && acceptance == null && admin == null) return ""
         val places = listOfNotNull(
-            live?.let { "- PUBLIEKE PRODUCTIEAPP: $it — uitsluitend lezen, navigeren en niet-mutatieve zoekacties uitvoeren." },
-            acceptance?.let { "- ACCEPTATIEOMGEVING: $it — gebruik deze voor uitgebreidere veilige interactie met representatieve nepdata." },
+            live?.let { "- PUBLIEKE PRODUCTIEAPP: $it — uitsluitend lezen, navigeren en niet-mutatieve zoekacties uitvoeren; stop zonder inloggen als authenticatie nodig is." },
+            acceptance?.let { "- ACCEPTATIEOMGEVING: $it — gebruik deze voor uitgebreidere veilige interactie met representatieve nepdata; stop zonder inloggen als authenticatie nodig is." },
             admin?.let { "- BEHEEROMGEVING (secundair): $it — alleen bekijken als die zonder authenticatie toegankelijk is; probeer nooit in te loggen en sla deze over zodra een login nodig is." },
         ).joinToString("\n")
         return """
@@ -775,7 +785,9 @@ class ShadowIterationEngine(
         $places
 
         De productieapp blijft strikt read-only: verstuur geen formulieren of opdrachten die gegevens wijzigen.
-        Een ingelogde beheeromgeving is secundair en mag worden overgeslagen. Je webtool
+        Een productie-, acceptatie- of beheeromgeving achter een login mag worden overgeslagen: probeer nooit
+        in te loggen. Minstens één publiek toegankelijke productomgeving moet je wel werkelijk bekijken en daarin
+        navigeren; gebruik daarvoor normaal de acceptatieomgeving wanneer productie authenticatie vereist. Je webtool
         (WebFetch/websearch) wordt hier geblokkeerd door
         bot-bescherming (HTTP 403) — gebruik in plaats daarvan je Bash-tool om een echte headless
         Chromium-browser te besturen via Playwright (al globaal geïnstalleerd; voer zo nodig eerst
@@ -797,8 +809,10 @@ class ShadowIterationEngine(
         achtergrond. Vul browserEvidence voor iedere hierboven genoemde omgeving in. Gebruik status
         NAVIGATED uitsluitend als de browser werkelijk startte, je een screenshot hebt bekeken en je
         minstens één relevante navigatie- of doorklikstap hebt uitgevoerd; een HTTP-check is niet genoeg.
-        Gebruik SKIPPED_AUTH voor een beheerlogin en FAILED met de concrete technische fout als navigatie
-        niet lukte.
+        Gebruik SKIPPED_AUTH uitsluitend wanneer productie, acceptatie of beheer daadwerkelijk een login vraagt,
+        en FAILED met de concrete technische fout als navigatie om een andere reden niet lukte. Een
+        SKIPPED_AUTH-omgeving is geen mislukte browserrun zolang je minstens één andere publieke omgeving wel met
+        status NAVIGATED hebt onderzocht.
         """.trimIndent()
     }
 

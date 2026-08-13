@@ -107,8 +107,8 @@ class DeliveryVerificationEngine(
             return "Er is geen productie-, acceptatie- of beheer-URL voor dit product geconfigureerd: zet verdict op INCONCLUSIVE en leg dat uit in report."
         }
         val places = listOfNotNull(
-            live?.let { "- PUBLIEKE PRODUCTIEAPP: $it — dit is de grondwaarheid voor wat echt live staat; uitsluitend lezen, navigeren en niet-mutatieve zoekacties uitvoeren." },
-            acceptance?.let { "- ACCEPTATIEOMGEVING: $it — gebruik deze voor uitgebreidere veilige interactie met representatieve nepdata." },
+            live?.let { "- PUBLIEKE PRODUCTIEAPP: $it — uitsluitend lezen, navigeren en niet-mutatieve zoekacties uitvoeren; stop zonder inloggen als authenticatie nodig is." },
+            acceptance?.let { "- ACCEPTATIEOMGEVING: $it — gebruik deze voor uitgebreidere veilige interactie met representatieve nepdata; stop zonder inloggen als authenticatie nodig is." },
             admin?.let { "- BEHEEROMGEVING (secundair): $it — alleen bekijken als die zonder authenticatie toegankelijk is; probeer nooit in te loggen en sla deze over zodra een login nodig is." },
         ).joinToString("\n")
         return """
@@ -116,8 +116,11 @@ class DeliveryVerificationEngine(
         $places
 
         De productieapp blijft strikt read-only: verstuur geen formulieren of opdrachten die gegevens wijzigen.
-        Een niet-toegankelijke beheeromgeving is op zichzelf geen reden voor INCONCLUSIVE; beoordeel de publieke
-        productflow. Noem in report concreet welke URL's, schermen en doorklikstappen je werkelijk hebt bekeken.
+        Een productie-, acceptatie- of beheeromgeving achter een login is op zichzelf geen reden voor INCONCLUSIVE:
+        probeer nooit in te loggen, meld de login in report en beoordeel de productflow op een andere publiek
+        toegankelijke omgeving. Zet pas INCONCLUSIVE als geen enkele relevante publieke productomgeving zonder
+        authenticatie werkelijk bekeken en genavigeerd kon worden. Noem in report concreet welke URL's, schermen en
+        doorklikstappen je werkelijk hebt bekeken en welke omgeving vanwege authenticatie is overgeslagen.
 
         Je webtool (WebFetch/websearch) wordt hier geblokkeerd door
         bot-bescherming (HTTP 403) — gebruik in plaats daarvan je Bash-tool om een echte headless
@@ -129,9 +132,9 @@ class DeliveryVerificationEngine(
         schermafbeelding opslaat; bekijk die vervolgens met je Read-tool zoals je een screenshot zou lezen.
         Gebruik hetzelfde screenshot-en-bekijken-patroon voor eventuele doorkliknavigatie. Playwright
         staat alleen globaal geïnstalleerd, dus start het script met
-        `NODE_PATH="$(npm root -g)" node jouw-script.cjs`, anders vindt Node het package niet. Dit is een
-        acceptatieomgeving met representatieve nepdata. De publieke productieapp heeft geen login nodig;
-        de beheeromgeving kan die wel vereisen en moet dan worden overgeslagen.
+        `NODE_PATH="$(npm root -g)" node jouw-script.cjs`, anders vindt Node het package niet. De
+        acceptatieomgeving gebruikt representatieve nepdata. Productie of beheer kan een login vereisen en moet
+        dan zonder inlogpoging worden overgeslagen.
         """.trimIndent()
     }
 

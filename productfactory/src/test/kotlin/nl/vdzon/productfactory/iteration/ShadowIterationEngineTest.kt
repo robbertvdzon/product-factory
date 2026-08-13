@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.iteration
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.contracts.AgentResult
 import nl.vdzon.productfactory.contracts.AgentTask
@@ -35,6 +36,7 @@ class ShadowIterationEngineTest(
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val roadmap: RoadmapCatalog,
     @Autowired private val products: ProductCatalog,
+    @Autowired private val mapper: ObjectMapper,
 ) {
     // De fakes zijn Spring-singletons die alle testmethoden in deze klasse delen; zonder reset
     // lekt de workspace-artefactenlijst (en het scenario) van de ene test naar de volgende.
@@ -54,6 +56,41 @@ class ShadowIterationEngineTest(
         assertTrue(prompt.contains("BEHEEROMGEVING (secundair): https://hkh-autopilot-admin-acceptance.vdzonsoftware.nl/"))
         assertTrue(prompt.contains("probeer nooit in te loggen"))
         assertTrue(prompt.contains("browserEvidence"))
+        assertTrue(prompt.contains("SKIPPED_AUTH"))
+    }
+
+    @Test
+    fun `authenticated production is accepted when acceptance was really navigated`() {
+        val productFactory = products.requireProduct("hkh-autopilot").copy(
+            slug = "product-factory",
+            liveUrl = "https://product-factory.vdzonsoftware.nl",
+            acceptanceUrl = "https://product-factory-acceptance.vdzonsoftware.nl",
+            adminUrl = null,
+        )
+        val output = mapper.readTree(
+            """
+            {
+              "browserEvidence": [
+                {
+                  "environment": "PRODUCTION",
+                  "url": "https://product-factory.vdzonsoftware.nl",
+                  "status": "SKIPPED_AUTH",
+                  "actions": ["Loginpagina met Chromium geopend en zonder inlogpoging gestopt"],
+                  "observations": "De productieomgeving vereist authenticatie en is daarom veilig overgeslagen."
+                },
+                {
+                  "environment": "ACCEPTANCE",
+                  "url": "https://product-factory-acceptance.vdzonsoftware.nl",
+                  "status": "NAVIGATED",
+                  "actions": ["Dashboard geopend", "Productdetail geopend"],
+                  "observations": "De publieke productflow is op acceptatie met Chromium bekeken en genavigeerd."
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        engine.validateBrowserEvidence(output, productFactory)
     }
 
     @Test
