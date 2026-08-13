@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show SemanticsAction, SemanticsActionEvent;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -797,6 +798,20 @@ void main() {
 
       Finder link = find.byType(DashboardNavigationLink);
       expect(tester.getSemantics(link).flagsCollection.isLink, isTrue);
+      expect(
+        tester
+            .getSemantics(link)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.focus),
+        isTrue,
+      );
+      expect(
+        tester
+            .getSemantics(link)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
       final overviewOrder = <Finder>[
         link,
         find.widgetWithText(FilledButton, 'Product toevoegen'),
@@ -835,7 +850,22 @@ void main() {
       link = find.byType(DashboardNavigationLink);
       expect(find.text('Terug naar overzicht'), findsOneWidget);
       expect(tester.getSemantics(link).flagsCollection.isLink, isTrue);
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      final backLinkSemantics = tester.getSemantics(link);
+      expect(
+        backLinkSemantics.getSemanticsData().hasAction(SemanticsAction.focus),
+        isTrue,
+      );
+      expect(
+        backLinkSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      tester.binding.performSemanticsAction(
+        SemanticsActionEvent(
+          type: SemanticsAction.focus,
+          nodeId: backLinkSemantics.id,
+          viewId: tester.view.viewId,
+        ),
+      );
       await tester.pump();
       expect(_containsPrimaryFocus(tester, link), isTrue);
 
@@ -854,10 +884,19 @@ void main() {
       );
       expect(_containsPrimaryFocus(tester, candidateAction), isTrue);
 
-      tester.binding.focusManager.primaryFocus?.unfocus();
+      tester.binding.performSemanticsAction(
+        SemanticsActionEvent(
+          type: SemanticsAction.focus,
+          nodeId: tester.getSemantics(link).id,
+          viewId: tester.view.viewId,
+        ),
+      );
       await tester.pump();
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.pump();
+      expect(_containsPrimaryFocus(tester, link), isTrue);
+      await tester.pump(const Duration(seconds: 5));
+      for (var pump = 0; pump < 5; pump++) {
+        await tester.pump();
+      }
       expect(_containsPrimaryFocus(tester, link), isTrue);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       for (var pump = 0; pump < 3; pump++) {

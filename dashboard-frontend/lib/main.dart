@@ -1143,7 +1143,7 @@ class _OverviewPageState extends State<OverviewPage> {
 
 /// Interne dashboardnavigatie met expliciete linksemantiek en een zichtbare
 /// focusrand, zonder een nieuwe route of browser-URL te introduceren.
-class DashboardNavigationLink extends StatelessWidget {
+class DashboardNavigationLink extends StatefulWidget {
   const DashboardNavigationLink({
     required this.label,
     required this.onPressed,
@@ -1154,27 +1154,50 @@ class DashboardNavigationLink extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => MergeSemantics(
-    child: Semantics(
-      link: true,
-      child: TextButton(
-        onPressed: onPressed,
-        style: ButtonStyle(
-          textStyle: const WidgetStatePropertyAll(
-            TextStyle(decoration: TextDecoration.underline),
-          ),
-          side: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.focused)) {
-              return BorderSide(
-                color: Theme.of(context).colorScheme.primary,
-                width: 3,
-              );
-            }
-            return BorderSide.none;
-          }),
+  State<DashboardNavigationLink> createState() =>
+      _DashboardNavigationLinkState();
+}
+
+class _DashboardNavigationLinkState extends State<DashboardNavigationLink> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    // Houd webfocus en Flutter-focus op dezelfde node. MergeSemantics rond een
+    // interactieve knop kan ze bij een DOM-focusactie kort uit elkaar laten lopen.
+    container: true,
+    excludeSemantics: true,
+    label: widget.label,
+    link: true,
+    focusable: true,
+    focused: _focusNode.hasFocus,
+    onFocus: _focusNode.requestFocus,
+    onTap: widget.onPressed,
+    child: TextButton(
+      focusNode: _focusNode,
+      onFocusChange: (_) => setState(() {}),
+      onPressed: widget.onPressed,
+      style: ButtonStyle(
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(decoration: TextDecoration.underline),
         ),
-        child: Text(label),
+        side: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.focused)) {
+            return BorderSide(
+              color: Theme.of(context).colorScheme.primary,
+              width: 3,
+            );
+          }
+          return BorderSide.none;
+        }),
       ),
+      child: Text(widget.label),
     ),
   );
 }

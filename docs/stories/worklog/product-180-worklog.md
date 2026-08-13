@@ -17,8 +17,26 @@ Stappenplan:
 - [x] De volledige visuele tabvolgorde op overzicht en Beheer bewijzen.
 - [x] Gerichte tests en het volledige vangnet opnieuw tot het einde uitvoeren.
 - [x] Zelfreview en eindresultaten van de herstelrun vastleggen.
+- [x] Testerafwijzing voor Enter op `Terug naar overzicht` in de webpreview reproduceren en analyseren.
+- [x] Webkeyboardnavigatie herstellen en gerichte regressiedekking toevoegen.
+- [x] Gerichte tests en het volledige vangnet opnieuw tot het einde uitvoeren.
+- [x] Zelfreview en eindresultaten van de webkeyboard-herstelrun vastleggen.
 
 Gedaan / rationale:
+- Webkeyboard-herstelrun gestart na testerfeedback: de echte Chromium-preview activeert `Beheer` wel
+  met Enter, maar `Terug naar overzicht` niet. De productie-linkimplementatie en bestaande
+  widgettest worden daarom gericht onderzocht en aangevuld met een regressie die het webgedrag zo
+  dicht mogelijk benadert.
+- `DashboardNavigationLink` gebruikt nu één expliciete link-semanticsnode met eigen `onTap`,
+  `onFocus` en `FocusNode`. De onderliggende `TextButton` blijft pointer-, keyboard- en
+  focusrandgedrag leveren, maar zijn semantics worden uitgesloten. Zo blijven DOM-focus en
+  Flutter-focus gekoppeld en kan Enter niet meer op een inmiddels andere Flutter-focusactie landen.
+- De keyboardtest voert voortaan een echte `SemanticsAction.focus` op beide links uit, bewijst de
+  aanwezige focus- en tapacties en laat de teruglink gefocust een automatische vijfsecondenrefresh
+  doorlopen voordat Enter wordt verzonden.
+- Een lokale release-webbuild is met Chromium en geactiveerde Flutter-semantiek doorgelopen. Echte
+  Tab- en Enter-events navigeerden heen en terug; de teruglink behield focus over de automatische
+  refresh. De tijdelijke browserharness en testoutput zijn daarna verwijderd.
 - Herstelrun na reviewerfeedback gestart. De productie-implementatie en volledige story-diff worden
   opnieuw beoordeeld; de drie gemelde hiaten in `management_view_test.dart` zijn als afzonderlijke
   werkstappen opgenomen zodat de regressiebewijzen concreet en controleerbaar worden aangevuld.
@@ -75,3 +93,16 @@ Herstelrun na reviewerfeedback:
 - Zelfreview bevestigt dat de reviewhiaten nu met gedrag en records worden bewezen, de productiehunk
   beperkt is tot veilige controller-lifecycle-opruiming en geen backend-, contract-, route-,
   authenticatie-, telemetrie- of opslagwijziging is toegevoegd.
+
+Webkeyboard-herstelrun na testerafwijzing:
+- Gerichte tests: `management_view_test.dart` samen met `story_queue_blocked_label_test.dart` levert
+  20 geslaagde tests; de afzonderlijke focus/refresh/Enter-regressie is daarna opnieuw groen.
+- Release-webbuild: `flutter build web --release --pwa-strategy=none` met lokale niet-authenticated
+  configuratie is geslaagd. Headless Chromium heeft op die build met gemockte bestaande API-routes
+  beide navigatierichtingen via Tab+Enter uitgevoerd, inclusief zes seconden wachten op refresh.
+- Volledig vangnet op de uiteindelijke wijziging: Maven `BUILD SUCCESS` met 142 tests,
+  `flutter analyze` met `No issues found!` en `flutter test` met 257 geslaagde tests; overal
+  exitcode 0, 0 failures en 0 errors.
+- Zelfreview: de diff blijft beperkt tot de dashboardlink, regressietest en dit worklog;
+  `.factory/verification.yaml`, API-contracten, routes, opslag, authenticatie en backend zijn niet
+  gewijzigd. Er staan geen tijdelijke browsertestbestanden of achtergrondprocessen meer open.
