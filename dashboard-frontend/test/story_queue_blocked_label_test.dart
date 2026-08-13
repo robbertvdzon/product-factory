@@ -54,6 +54,9 @@ Future<void> _pumpDashboard(
     await tester.pumpWidget(const ProductFactoryDashboard());
     await tester.pump();
     await tester.pump();
+    await tester.tap(find.text('Beheer'));
+    await tester.pump();
+    await tester.pump();
   }, () => mockClient);
 }
 
@@ -169,8 +172,8 @@ void main() {
         ),
       ], callLog);
 
-      // OverviewPage haalt precies één keer elk van de 7 bestaande endpoints op; het label
-      // hergebruikt uitsluitend de al opgehaalde 'blocked'/'blockedReason'-velden.
+      // Navigeren naar Beheer hergebruikt de bestaande dashboardbronnen; het label
+      // veroorzaakt dus geen extra call en leest alleen 'blocked'/'blockedReason'.
       expect(callLog.where((path) => path == '/api/products').length, 1);
       expect(
         callLog.where((path) => path == '/api/story-candidates').length,
