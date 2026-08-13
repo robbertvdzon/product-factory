@@ -174,7 +174,7 @@ linksemantiek en zichtbare toetsenbordfocus, en toont daarna van boven naar bene
   bewerkbaar en opslaanbaar veld. Het scherm opent met focus binnen de dialoog, houdt de tab-focus
   binnen de dialoog (focus-trap) en sluit met Escape, waarbij de focus terugkeert naar de
   Instellingen-knop.
-- **Productcycli en onderzoekssessies**: elke cyclus staat in een compacte, zelfstandig
+- **Productcycli en onderzoekssessies**: cycli staan standaard in een compacte, zelfstandig
   uitklapbare kaart met status, huidige rol (als hij nog loopt), starttijd, doorlooptijd, aantal
   kandidaten, aantal leverbare kandidaten, revisierondes en, wanneer van toepassing, uitkomstreden
   en criticusoordeel. De gesloten kaart toont daarnaast afzonderlijke aantallen voor interne
@@ -187,10 +187,32 @@ linksemantiek en zichtbare toetsenbordfocus, en toont daarna van boven naar bene
   auto-refresh. Een nog niet gestarte cyclus toont geen doorlooptijd. Datum en tijd staan in de
   lokale tijdzone van de browser als `dd-MM-yyyy HH:mm`, nooit als ruwe ISO-string.
 
-  De button `Toon opbrengst` opent uitsluitend binnen dezelfde kaart twee groepen: `Interne
-  kandidaten` en `Software Factory-leveringen`. Iedere gekoppelde titel staat daar samen met zijn
-  tekstuele kandidaat- of leveringsstatus; een lege groep blijft expliciet herkenbaar als een leeg
-  resultaat van de geladen gegevens. De button verandert bij openen in `Verberg opbrengst`, werkt
+  Daarop bestaat één bewust smalle presentatie-uitzondering. Een cyclus met exact productslug
+  `product-factory` en status `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`, `NO_CHANGE` of `FAILED`
+  verschijnt als compacte, niet-uitklapbare bewijsregel. Actieve cycli (`QUEUED`/`RUNNING`) en alle
+  cycli van andere producten behouden de kaart. Eén semantisch gegroepeerde bewijsregel toont
+  afzonderlijk `Datum`, `Cyclusuitkomst`, `Reden`, `Beslisbron` en `Gekoppelde opbrengst`. Datum
+  gebruikt de eerste parseerbare waarde van `startedAt` en `createdAt`; uitkomst, reden en
+  provenance hergebruiken de bestaande veilige presentatiemappings. Een bewezen handmatige
+  annulering gaat voor een technische afleiding. Ontbrekende of onbekende presentatiegegevens
+  worden `Onbekend`; een onbekend expliciet beslisrecord claimt geen mens en valt niet terug op een
+  afgeleide bron.
+
+  `Gekoppelde opbrengst` telt alleen uniek en exact op productslug plus cyclus-id gekoppelde
+  Software Factory-leveringen, niet de interne kandidaten. Ongeldige, kruisproduct- en ambigue
+  koppelingen tellen niet mee; een leveringsbron die nog laadt of faalt verschijnt als `laden…` of
+  `niet beschikbaar`, niet als nul. De regel toont geen ruwe foutgegevens, prompts, tokens,
+  persoonsgegevens of artefactinhoud. De native actie `Bekijk bewijs` opent met muis of toetsenbord
+  het bestaande detail van die cyclus, bevat product- en cycluscontext voor hulptechnologie en
+  ontvangt na sluiten of Escape opnieuw focus. De regel blijft zonder horizontale pagina-scroll
+  bruikbaar op smalle en brede schermen en bij 200% tekstvergroting. Detailinhoud, koppeling,
+  bronstatussen, sortering, lijstbeperking en auto-refresh veranderen niet.
+
+  In de reguliere kaart opent de button `Toon opbrengst` uitsluitend binnen dezelfde kaart twee
+  groepen: `Interne kandidaten` en `Software Factory-leveringen`. Iedere gekoppelde titel staat
+  daar samen met zijn tekstuele kandidaat- of leveringsstatus; een lege groep blijft expliciet
+  herkenbaar als een leeg resultaat van de geladen gegevens. De button verandert bij openen in
+  `Verberg opbrengst`, werkt
   met muis, Enter en Spatie, bevat het cyclusnummer in zijn toegankelijke naam en houdt focus bij
   openen en sluiten. De bestaande beslisbronbutton blijft los daarvan het detailscherm openen.
   Meerdere kaarten kunnen onafhankelijk openstaan en behouden hun toestand tijdens de normale
