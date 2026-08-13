@@ -4,10 +4,15 @@ De Product Factory laat producten autonoom doorontwikkelen: per product draaien 
 (shadow iterations) waarin agents onderzoek doen, storykandidaten schrijven en die — als het product op
 autonoom staat — als stories naar de Software Factory sturen.
 
-## De overzichtspagina
+## De dashboardweergaven
 
-De Flutter-webapp (`dashboard-frontend`) heeft één hoofdscherm: het productoverzicht. Het ververst zichzelf
-elke 5 seconden en bestaat van boven naar beneden uit:
+De Flutter-webapp (`dashboard-frontend`) heeft één hoofdscherm, het productoverzicht, en daarbinnen
+een secundaire beheerweergave. Beide gebruiken dezelfde beveiligde dashboardsessie en dezelfde elke
+5 seconden ververste gegevens; Beheer heeft geen eigen URL, gegevensbron of netwerkverzoek. Op het
+productoverzicht staat de als link vormgegeven navigatieactie `Beheer`. Deze is met muis of toetsenbord
+te activeren, heeft linksemantiek en een zichtbare focusrand.
+
+Het productoverzicht bestaat van boven naar beneden uit:
 
 1. **Metric-tegels** — totalen voor producten, interne storykandidaten, workspace-publicaties,
    shadow-iteraties en Software Factory-stories. Een succesvol geladen teller toont altijd het
@@ -60,9 +65,9 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    Cycli, kandidaten en leveringen houden elk een eigen laad- en foutstatus. Een kaart toont per
    opbrengstbron `laden…`, `niet beschikbaar` of een geladen aantal; het volledige globale aantal
    niet-koppelbare records verschijnt pas als alle drie bronnen succesvol zijn geladen. Bij een
-   onvolledige bron staat daarvoor een laad- of foutmelding. De globale Software Factory-lijst toont
-   zijn eigen bronstatus; de epic-roadmap en storywachtrij melden dat ze onvolledig zijn totdat zowel
-   kandidaten als leveringen beschikbaar zijn. Een iteratie met
+   onvolledige bron staat daarvoor een laad- of foutmelding. De globale Software Factory-lijst in
+   Beheer toont zijn eigen bronstatus; de epic-roadmap en de storywachtrij in Beheer melden dat ze
+   onvolledig zijn totdat zowel kandidaten als leveringen beschikbaar zijn. Een iteratie met
    `status` QUEUED of RUNNING (nog lopend) toont een neutrale voortgangsindicator
    (`IterationProgressIndicator`) in plaats van een badge; elke andere status zonder expliciet
    beslisrecord toont een vaste, afgeleide classificatiebadge — `onderzoek-onvoldoende`, `technische fout`,
@@ -189,17 +194,43 @@ elke 5 seconden en bestaat van boven naar beneden uit:
    (o.a. `ACCEPTED`, `PENDING`, `QUEUED`, `RUNNING`) blijft het Reden-blok volledig verborgen; het
    bestaande 'Foutreden'-blok en de standaard ingeklapte criticus-roltegel met volledig artefact
    blijven ongewijzigd.
-4. **Software Factory-stories** — de leveringen met externe storykey, status en fase.
-5. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
-6. **Storywachtrij** — storykandidaten verdeeld over Fout / Bezig / In wachtrij / Klaar. Is een
+4. **Epic-roadmap** — de berekende epicvolgorde per product, met de bestaande detail- en
+   beheeracties. Eventuele afgehandelde onderzoeksvragen staan direct onder de roadmap.
+5. **Roadmap-sessies** — de sessiestatus, samenvatting en, indien aanwezig, een actie om het verslag
+   te bekijken.
+6. **Overleggen** — de overlegstatus en uitkomst, met de bestaande detail- en notulenacties.
+7. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
+8. **Workspace** — gepubliceerde artifacts, klikbaar om de inhoud te tonen.
+
+### De beheerweergave
+
+Beheer begint met de als link vormgegeven navigatieactie `Terug naar overzicht`, gevolgd door de titel
+`Beheer`. De link is de eerste focusbare actie, heeft linksemantiek en een zichtbare focusrand, werkt met
+muis en toetsenbord en brengt de gebruiker terug naar het bestaande productoverzicht. De focus blijft
+over de automatische verversing behouden. De weergave bevat in deze volgorde:
+
+1. **Software Factory-stories** — alle leveringen, nieuwste eerst, met externe storykey of de bestaande
+   fallbacktekst, titel, product, leveringsstatus en laatst bekende Software Factory-fase. De sectie
+   toont de laad-, fout-, lege of successtatus van de leveringsbron onafhankelijk van de kandidaatbron.
+2. **Storywachtrij** — alle storykandidaten exact eenmaal verdeeld over Fout / Bezig / In wachtrij /
+   Klaar. De bestaande kandidaatdetailactie, kandidaat- en leveringsstatussen, foutinformatie en
+   leveringskoppeling blijven behouden. Is een
    kandidaat geblokkeerd door een onopgeloste `dependsOn`-verwijzing (`blocked == true` met een
    niet-lege `blockedReason`), dan toont de kaart direct — zonder extra klik — onder de titel een
    label met icoon en de tekst "Geblokkeerd: <reden>", in het bestaande WCAG AA-contrasterende
    kleurenpaar `kGuardrailConflict` (`classification.dart`) en opvraagbaar via de semantics-tree
    van de kaart. Ontbreekt de blokkade of de reden, dan blijft de kaart ongewijzigd; er wordt geen
    extra data opgehaald voor dit label (`_buildStoryQueueSections`,
-   `dashboard-frontend/lib/main.dart`).
-7. **Workspace** — gepubliceerde artifacts, klikbaar om de inhoud te tonen.
+   `dashboard-frontend/lib/main.dart`). De wachtrij volgt de eigen laad-, fout-, lege of successtatus
+   van de kandidaatbron. Zolang kandidaten wel zijn geladen maar leveringen nog laden of zijn mislukt,
+   meldt zij expliciet het geladen kandidaataantal en dat de categorisering onvolledig is; zij toont dan
+   geen compleet of leeg resultaat. Alleen de bestaande kandidaatrelatie koppelt een levering aan een
+   wachtrijrecord.
+
+De globale leveringslijst en storywachtrij worden in Beheer alleen anders gepresenteerd: records worden
+niet samengevoegd, gefilterd, herschreven of voor deze weergave aan een cyclus toegeschreven. Op het
+hoofdscherm blijven de metriek `Software Factory-stories`, de opbrengstgroepen in cycluskaarten en de
+melding over niet-koppelbare opbrengst aanwezig.
 
 ### Start- en doorlooptijd van een productcyclus
 
@@ -213,11 +244,13 @@ elke 5 seconden en bestaat van boven naar beneden uit:
 
 ### Lijstbeperking met de 'Meer'-knop
 
-Alle lijsten op de overzichtspagina (producten, productcycli, Software Factory-stories, access tokens,
-elke subsectie van de storywachtrij en workspace-publicaties) tonen standaard **5 items**. Staat er meer
-klaar, dan verschijnt eronder een knop **'Meer (nog N)'** die er telkens **10** bij toont; de knop
-verdwijnt zodra alles zichtbaar is. Elke sectie heeft een eigen, onafhankelijke teller, en die teller
-overleeft de auto-refresh: een uitgeklapte lijst blijft uitgeklapt en nieuwe items verschijnen bovenaan.
+De lijsten op het productoverzicht (producten, productcycli, afgehandelde onderzoeksvragen,
+roadmap-sessies, overleggen, access tokens en workspace-publicaties) en in Beheer (Software
+Factory-stories en elke subsectie van de storywachtrij) tonen standaard **5 items**.
+Staat er meer klaar, dan verschijnt eronder een knop **'Meer (nog N)'** die er telkens **10** bij toont;
+de knop verdwijnt zodra alles zichtbaar is. Elke sectie heeft een eigen, onafhankelijke teller, en die
+teller overleeft de auto-refresh en het wisselen tussen overzicht en Beheer: een uitgeklapte lijst blijft
+uitgeklapt en nieuwe items verschijnen bovenaan.
 Ook de open/dicht-toestand van iedere geladen cycluskaart blijft bij de normale auto-refresh behouden;
 meerdere kaarten kunnen onafhankelijk openstaan. Verdwijnt een cyclus uit de geladen gegevens, dan
 verdwijnt ook zijn kaarttoestand.

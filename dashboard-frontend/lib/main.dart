@@ -270,6 +270,7 @@ class _OverviewPageState extends State<OverviewPage> {
   late Future<DashboardSource<List<dynamic>>> deliveryData;
   late final DashboardApi api;
   Timer? refreshTimer;
+  bool managementView = false;
 
   /// Hoeveel items er per sectie zichtbaar zijn. Deze tellers staan bewust in de state en niet in de
   /// FutureBuilder, zodat de auto-refresh (elke 5 s) een uitgeklapte lijst uitgeklapt laat.
@@ -506,11 +507,102 @@ class _OverviewPageState extends State<OverviewPage> {
         ],
       ),
     );
-    controller.dispose();
+    // showDialog rondt zijn Future af zodra de route popt, terwijl de sluitanimatie de TextField
+    // nog één frame kan renderen. Stel disposal uit tot die widget uit de boom is.
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
     if (result == null || result.trim().isEmpty) return;
     await api.completeHumanAction(action['id'] as int, result.trim());
     if (mounted) setState(_reload);
   }
+
+  Widget _managementBody() => _OverviewResultsBuilder(
+    iterationFuture: iterationData,
+    candidateFuture: candidateData,
+    deliveryFuture: deliveryData,
+    builder: (context, _, candidateSource, deliverySource) {
+      final stories = sortedByNewestFirst(
+        candidateSource.value ?? const <dynamic>[],
+        ['createdAt'],
+      );
+      final deliveries = deliverySource.value ?? const <dynamic>[];
+      final sortedDeliveries = sortedByNewestFirst(deliveries, ['createdAt']);
+
+      return ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: DashboardNavigationLink(
+              label: 'Terug naar overzicht',
+              onPressed: () => setState(() => managementView = false),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text('Beheer', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 24),
+          Text(
+            'Software Factory-stories',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          if (deliverySource.loading)
+            const SourceNotice(
+              icon: Icons.hourglass_top,
+              text: 'Software Factory-leveringen worden geladen.',
+            )
+          else if (deliverySource.failed)
+            const SourceNotice(
+              icon: Icons.error_outline,
+              text: 'Software Factory-leveringen zijn niet beschikbaar.',
+              error: true,
+            )
+          else if (deliveries.isEmpty)
+            const ListTile(
+              leading: Icon(Icons.hourglass_empty),
+              title: Text('Nog geen stories naar de Software Factory gestuurd'),
+            ),
+          if (deliverySource.loaded)
+            _limitedSection('deliveries', sortedDeliveries, (delivery) {
+              return SoftwareFactoryDeliveryTile(delivery: delivery);
+            }),
+          const SizedBox(height: 24),
+          Text('Storywachtrij', style: Theme.of(context).textTheme.titleLarge),
+          if (candidateSource.loading)
+            const SourceNotice(
+              icon: Icons.hourglass_top,
+              text: 'Storykandidaten voor de storywachtrij worden geladen.',
+            )
+          else if (candidateSource.failed)
+            const SourceNotice(
+              icon: Icons.error_outline,
+              text:
+                  'Storykandidaten voor de storywachtrij zijn niet beschikbaar.',
+              error: true,
+            )
+          else if (deliverySource.loading)
+            SourceNotice(
+              icon: Icons.hourglass_top,
+              text:
+                  '${stories.length} storykandidaten geladen. Storywachtrij is onvolledig zolang Software Factory-leveringen worden geladen.',
+            )
+          else if (deliverySource.failed)
+            SourceNotice(
+              icon: Icons.error_outline,
+              text:
+                  '${stories.length} storykandidaten geladen. Storywachtrij is onvolledig omdat Software Factory-leveringen niet beschikbaar zijn.',
+              error: true,
+            )
+          else
+            ..._buildStoryQueueSections(
+              context,
+              stories,
+              deliveries,
+              visibleCount: _visibleCount,
+              onShowMore: _showMore,
+            ),
+        ],
+      );
+    },
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -524,7 +616,9 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
       ],
     ),
-    body: FutureBuilder<List<dynamic>>(
+    body: managementView
+        ? _managementBody()
+        : FutureBuilder<List<dynamic>>(
       future: data,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done &&
@@ -571,9 +665,6 @@ class _OverviewPageState extends State<OverviewPage> {
             );
             final stories = candidateSource.value ?? const <dynamic>[];
             final deliveries = deliverySource.value ?? const <dynamic>[];
-            final sortedDeliveries = sortedByNewestFirst(deliveries, [
-              'createdAt',
-            ]);
             final grouping = iterationSource.loaded
                 ? groupIterationResults(
                     iterations: iterations,
@@ -584,24 +675,38 @@ class _OverviewPageState extends State<OverviewPage> {
             return ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    'Productoverzicht',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                Text(
+                  'Productoverzicht',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      DashboardNavigationLink(
+                        label: 'Beheer',
+                        onPressed: () =>
+                            setState(() => managementView = true),
+                      ),
+                      FilledButton.icon(
+                        onPressed: () => _addProduct(aiCatalog),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Product toevoegen'),
+                      ),
+                      IconButton(
+                        onPressed: () => setState(_reload),
+                        tooltip: 'Vernieuwen',
+                        icon: const Icon(Icons.refresh),
+                      ),
+                    ],
                   ),
-                ),
-                FilledButton.icon(
-                  onPressed: () => _addProduct(aiCatalog),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Product toevoegen'),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () => setState(_reload),
-                  tooltip: 'Vernieuwen',
-                  icon: const Icon(Icons.refresh),
                 ),
               ],
             ),
@@ -827,41 +932,6 @@ class _OverviewPageState extends State<OverviewPage> {
                     'Niet-koppelbare opbrengst wordt berekend zodra alle opbrengstbronnen geladen zijn.',
               ),
             const SizedBox(height: 24),
-            Text(
-              'Software Factory-stories',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            if (deliverySource.loading)
-              const SourceNotice(
-                icon: Icons.hourglass_top,
-                text: 'Software Factory-leveringen worden geladen.',
-              )
-            else if (deliverySource.failed)
-              const SourceNotice(
-                icon: Icons.error_outline,
-                text: 'Software Factory-leveringen zijn niet beschikbaar.',
-                error: true,
-              )
-            else if (deliveries.isEmpty)
-              const ListTile(
-                leading: Icon(Icons.hourglass_empty),
-                title: Text(
-                  'Nog geen stories naar de Software Factory gestuurd',
-                ),
-              ),
-            if (deliverySource.loaded)
-              _limitedSection('deliveries', sortedDeliveries, (delivery) {
-                return ListTile(
-                  leading: const Icon(Icons.precision_manufacturing_outlined),
-                  title: Text(
-                    '${delivery['externalStoryKey'] ?? 'wordt verstuurd'} · ${delivery['title']}',
-                  ),
-                  subtitle: Text(
-                    '${delivery['productSlug']} · ${delivery['status']} · ${delivery['remotePhase'] ?? 'nog geen fase'}',
-                  ),
-                );
-              }),
-            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
@@ -1026,25 +1096,6 @@ class _OverviewPageState extends State<OverviewPage> {
               }),
             ],
             const SizedBox(height: 24),
-            Text(
-              'Storywachtrij',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            if (candidateSource.loaded && deliverySource.loaded)
-              ..._buildStoryQueueSections(
-                context,
-                sortedByNewestFirst(stories, ['createdAt']),
-                deliveries,
-                visibleCount: _visibleCount,
-                onShowMore: _showMore,
-              )
-            else
-              const SourceNotice(
-                icon: Icons.info_outline,
-                text:
-                    'Storywachtrij is onvolledig totdat kandidaten en leveringen beschikbaar zijn.',
-              ),
-            const SizedBox(height: 24),
             Text('Workspace', style: Theme.of(context).textTheme.titleLarge),
             _limitedSection('publications', publications, (publication) {
               final runId = '${publication['runId']}';
@@ -1086,6 +1137,108 @@ class _OverviewPageState extends State<OverviewPage> {
           },
         );
       },
+    ),
+  );
+}
+
+/// Interne dashboardnavigatie met expliciete linksemantiek en een zichtbare
+/// focusrand, zonder een nieuwe route of browser-URL te introduceren.
+class DashboardNavigationLink extends StatefulWidget {
+  const DashboardNavigationLink({
+    required this.label,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  State<DashboardNavigationLink> createState() =>
+      _DashboardNavigationLinkState();
+}
+
+class _DashboardNavigationLinkState extends State<DashboardNavigationLink> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    // Houd webfocus en Flutter-focus op dezelfde node. MergeSemantics rond een
+    // interactieve knop kan ze bij een DOM-focusactie kort uit elkaar laten lopen.
+    container: true,
+    excludeSemantics: true,
+    label: widget.label,
+    link: true,
+    focusable: true,
+    focused: _focusNode.hasFocus,
+    onFocus: _focusNode.requestFocus,
+    onTap: widget.onPressed,
+    child: TextButton(
+      focusNode: _focusNode,
+      onFocusChange: (_) => setState(() {}),
+      onPressed: widget.onPressed,
+      style: ButtonStyle(
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(decoration: TextDecoration.underline),
+        ),
+        side: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.focused)) {
+            return BorderSide(
+              color: Theme.of(context).colorScheme.primary,
+              width: 3,
+            );
+          }
+          return BorderSide.none;
+        }),
+      ),
+      child: Text(widget.label),
+    ),
+  );
+}
+
+/// Verliesvrije, niet-interactieve leveringsrij die ook bij lange teksten en
+/// sterke tekstvergroting verticaal kan meegroeien.
+class SoftwareFactoryDeliveryTile extends StatelessWidget {
+  const SoftwareFactoryDeliveryTile({required this.delivery, super.key});
+
+  final Map<String, dynamic> delivery;
+
+  @override
+  Widget build(BuildContext context) => MergeSemantics(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(Icons.precision_manufacturing_outlined),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${delivery['externalStoryKey'] ?? 'wordt verstuurd'} · ${delivery['title']}',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${delivery['productSlug']} · ${delivery['status']} · ${delivery['remotePhase'] ?? 'nog geen fase'}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
