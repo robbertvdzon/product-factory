@@ -145,12 +145,18 @@ class AutonomousDeliveryIntegrationTest(
         val notYetDeployed = repository.list("hkh-autopilot").single { it.id == delivery.id }
         assertFalse(notYetDeployed.confirmedDeployed)
         assertEquals(null, notYetDeployed.deployedAt)
+        assertTrue(repository.toReconcile("hkh-autopilot").any { it.id == delivery.id })
+        assertFalse(repository.active("hkh-autopilot").any { it.id == delivery.id })
+        val completedBeforeDeploy = notYetDeployed.completedAt
+        assertNotNull(completedBeforeDeploy)
 
         val deployedAt = java.time.Instant.now()
         repository.updateRemote(delivery.id, "DONE", "deploy-approved", confirmedDeployed = true, deployedAt = deployedAt)
         val deployed = repository.list("hkh-autopilot").single { it.id == delivery.id }
         assertTrue(deployed.confirmedDeployed)
         assertNotNull(deployed.deployedAt)
+        assertEquals(completedBeforeDeploy, deployed.completedAt)
+        assertFalse(repository.toReconcile("hkh-autopilot").any { it.id == delivery.id })
     }
 
     @TestConfiguration

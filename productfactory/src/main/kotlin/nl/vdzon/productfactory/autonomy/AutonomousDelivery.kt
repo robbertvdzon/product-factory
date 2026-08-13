@@ -213,7 +213,8 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
         val complete = status == "DONE"
         jdbc.update(
             """update story_delivery set status = ?, remote_phase = ?, error_message = null,
-                last_reconciled_at = current_timestamp, completed_at = case when ? then current_timestamp else completed_at end,
+                last_reconciled_at = current_timestamp,
+                completed_at = case when ? then coalesce(completed_at, current_timestamp) else completed_at end,
                 confirmed_deployed = ?, deployed_at = coalesce(?, deployed_at)
                 where id = ?""".trimIndent(),
             status, phase, complete, confirmedDeployed, deployedAt?.let(::databaseTimestamp), id,
@@ -222,7 +223,10 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
 
     fun active(productSlug: String): List<StoryDeliveryView> = list(productSlug).filter { it.status in ACTIVE_STATUSES }
     fun toReconcile(productSlug: String): List<StoryDeliveryView> = list(productSlug).filter {
-        it.externalStoryKey != null && (it.status in ACTIVE_STATUSES || it.status == "ERROR")
+        val awaitingRolloutConfirmation = it.status == "DONE" && !it.confirmedDeployed
+        it.externalStoryKey != null && (
+            it.status in ACTIVE_STATUSES || it.status == "ERROR" || awaitingRolloutConfirmation
+        )
     }
     fun errors(productSlug: String): Int = jdbc.queryForObject(
         "select count(*) from story_delivery where product_slug = ? and status = 'ERROR'", Int::class.java, productSlug,
