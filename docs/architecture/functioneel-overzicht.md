@@ -149,8 +149,10 @@ Het (Google-beveiligde) Flutter-dashboard ververst zichzelf elke 5 seconden en t
 beneden:
 
 - **Metrics**: aantal producten, interne storykandidaten, workspace-publicaties, cycli en
-  Software Factory-stories. Deze tegels tonen altijd het *totaal*, ook wanneer de lijst eronder is
-  ingekort.
+  Software Factory-stories. Een succesvol geladen tegel toont altijd het *totaal*, ook wanneer de
+  lijst eronder is ingekort. Kandidaten, cycli en Software Factory-stories laden afzonderlijk; hun
+  tegel toont tijdens laden `Laden…` en bij een fout `Niet beschikbaar` in plaats van een
+  misleidende nul.
 - **Producten**: per product status (`draft`/`active`/gepauzeerd), ontwikkelmodus
   (`manual`/`autonomous`/`observe-only`), met knoppen om een cyclus of shadow-iteratie te starten,
   het product te pauzeren/hervatten, of de instellingen te openen. "Start productcyclus nu" (de
@@ -170,14 +172,44 @@ beneden:
   bewerkbaar en opslaanbaar veld. Het scherm opent met focus binnen de dialoog, houdt de tab-focus
   binnen de dialoog (focus-trap) en sluit met Escape, waarbij de focus terugkeert naar de
   Instellingen-knop.
-- **Productcycli en onderzoekssessies**: elke cyclus met status, huidige rol (als hij nog loopt),
-  starttijd, doorlooptijd, aantal kandidaten, aantal leverbare kandidaten, revisierondes en,
-  wanneer van toepassing, uitkomstreden en criticusoordeel. De starttijd komt uit `startedAt`,
+- **Productcycli en onderzoekssessies**: elke cyclus staat in een compacte, zelfstandig
+  uitklapbare kaart met status, huidige rol (als hij nog loopt), starttijd, doorlooptijd, aantal
+  kandidaten, aantal leverbare kandidaten, revisierondes en, wanneer van toepassing, uitkomstreden
+  en criticusoordeel. De gesloten kaart toont daarnaast afzonderlijke aantallen voor interne
+  kandidaten en Software Factory-leveringen uit de actuele geladen dashboardgegevens. Deze nieuwe
+  aantallen zijn als geladen gegevens herkenbaar en staan los van de bestaande backendcycluswaarden.
+  De starttijd komt uit `startedAt`,
   of uit `createdAt` zolang de cyclus nog niet gestart is. De doorlooptijd is het verschil tussen
   start en afronding, compact weergegeven als bijvoorbeeld `2u 13m`, `4m 12s` of `35s`; loopt de
   cyclus nog, dan staat er `loopt nog: <tijd sinds start>` en loopt die waarde mee met de
   auto-refresh. Een nog niet gestarte cyclus toont geen doorlooptijd. Datum en tijd staan in de
   lokale tijdzone van de browser als `dd-MM-yyyy HH:mm`, nooit als ruwe ISO-string.
+
+  De button `Toon opbrengst` opent uitsluitend binnen dezelfde kaart twee groepen: `Interne
+  kandidaten` en `Software Factory-leveringen`. Iedere gekoppelde titel staat daar samen met zijn
+  tekstuele kandidaat- of leveringsstatus; een lege groep blijft expliciet herkenbaar als een leeg
+  resultaat van de geladen gegevens. De button verandert bij openen in `Verberg opbrengst`, werkt
+  met muis, Enter en Spatie, bevat het cyclusnummer in zijn toegankelijke naam en houdt focus bij
+  openen en sluiten. De bestaande beslisbronbutton blijft los daarvan het detailscherm openen.
+  Meerdere kaarten kunnen onafhankelijk openstaan en behouden hun toestand tijdens de normale
+  auto-refresh zolang de betreffende cyclus geladen blijft.
+
+  Koppeling gebeurt uitsluitend op een exacte combinatie van product en cyclusnummer voor een
+  kandidaat, of product en cyclus-id voor een levering. De frontend gebruikt hiervoor alle geladen
+  cycli, ook degene die nog achter de 5/+10-lijstbeperking staan. Ontbrekende, ongeldige,
+  kruisproduct- en dubbelzinnige relaties worden niet op basis van titel, positie of
+  waarschijnlijkheid gegokt en tellen ieder precies eenmaal als niet koppelbaar. Zodra cycli,
+  kandidaten én leveringen succesvol zijn geladen, staat bij een positief aantal één melding buiten
+  de kaarten: `Niet aan een cyclus te koppelen in geladen gegevens: <aantal>`; bij nul staat er geen
+  melding.
+
+  De laadstatus van cycli, kandidaten en leveringen blijft afzonderlijk zichtbaar. Per kaart toont
+  een nog ladende of mislukte opbrengstbron geen nul, maar `laden…` of `niet beschikbaar`; een
+  volledig niet-koppelbaar totaal volgt pas wanneer alle bronnen beschikbaar zijn. De globale
+  Software Factory-lijst toont eveneens haar eigen laad- of foutmelding. De epic-roadmap en
+  storywachtrij melden dat ze onvolledig zijn totdat zowel kandidaten als leveringen beschikbaar
+  zijn.
+
   Iteraties die nog lopen of in de wachtrij staan (`status` QUEUED/RUNNING)
   tonen een neutrale voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge;
   elke andere status zonder expliciet beslisrecord toont een vaste, afgeleide
