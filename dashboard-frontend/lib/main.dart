@@ -9,6 +9,7 @@ import 'formatting.dart';
 import 'google_button_stub.dart'
     if (dart.library.html) 'google_button_web.dart'
     as google_button;
+import 'iteration_evidence.dart';
 import 'iteration_results.dart';
 import 'limited_list.dart';
 import 'meeting_dialog.dart';
@@ -889,6 +890,19 @@ class _OverviewPageState extends State<OverviewPage> {
             if (iterationSource.loaded)
               _limitedSection('iterations', iterations, (iteration) {
                 final linked = grouping!.resultsFor(iteration);
+                if (shouldShowIterationEvidence(iteration)) {
+                  return IterationEvidenceRow(
+                    key: ValueKey(
+                      _iterationCardIdentity(iterations, iteration),
+                    ),
+                    iteration: iteration,
+                    deliveries: deliverySource.loaded
+                        ? linked.deliveries
+                        : null,
+                    deliveriesLoading: deliverySource.loading,
+                    onOpenDetails: () => _showIteration(iteration),
+                  );
+                }
                 return IterationCycleCard(
                   key: ValueKey(
                     _iterationCardIdentity(iterations, iteration),
@@ -1325,6 +1339,215 @@ class SourceNotice extends StatelessWidget {
   );
 }
 
+/// Niet-uitklapbare bewijsregel voor afgeronde Product Factory-cycli. De vijf
+/// gelabelde waarden en de detailactie delen één expliciete semanticsgroep.
+class IterationEvidenceRow extends StatelessWidget {
+  const IterationEvidenceRow({
+    required this.iteration,
+    required this.deliveries,
+    required this.deliveriesLoading,
+    required this.onOpenDetails,
+    super.key,
+  });
+
+  final Map<String, dynamic> iteration;
+  final List<Map<String, dynamic>>? deliveries;
+  final bool deliveriesLoading;
+  final Future<void> Function() onOpenDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final presentation = iterationEvidencePresentation(iteration);
+    final productSlug = iteration['productSlug'] is String
+        ? iteration['productSlug'] as String
+        : kEvidenceUnknown;
+    final cycleReference = iteration['sequenceNumber'] ?? iteration['id'];
+    final cycleLabel = cycleReference == null
+        ? kEvidenceUnknown
+        : '$cycleReference';
+    late final String linkedYield;
+    if (deliveriesLoading) {
+      linkedYield = 'laden…';
+    } else if (deliveries == null) {
+      linkedYield = 'niet beschikbaar';
+    } else {
+      linkedYield = '${deliveries!.length}';
+    }
+
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: 'Bewijs voor product $productSlug, cyclus $cycleLabel',
+      child: Card(
+        color: kCycleCardBackground,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final columnCount = constraints.maxWidth >= 900
+                  ? 3
+                  : constraints.maxWidth >= 560
+                  ? 2
+                  : 1;
+              final fieldWidth =
+                  (constraints.maxWidth - (columnCount - 1) * 16) /
+                  columnCount;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '$productSlug · iteratie $cycleLabel',
+                    style: const TextStyle(
+                      color: kCycleCardText,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 10,
+                    children: [
+                      SizedBox(
+                        width: fieldWidth,
+                        child: _EvidenceValue(
+                          label: 'Datum',
+                          value: presentation.date,
+                        ),
+                      ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: _EvidenceValue(
+                          label: 'Cyclusuitkomst',
+                          value: presentation.outcome,
+                        ),
+                      ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: _EvidenceValue(
+                          label: 'Reden',
+                          value: presentation.reason,
+                        ),
+                      ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: _EvidenceValue(
+                          label: 'Beslisbron',
+                          value: presentation.decisionSource,
+                        ),
+                      ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: _EvidenceValue(
+                          label: 'Gekoppelde opbrengst',
+                          value: linkedYield,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IterationEvidenceButton(
+                      key: ValueKey('iteration-evidence-${iteration['id']}'),
+                      productSlug: productSlug,
+                      cycleLabel: cycleLabel,
+                      onOpenDetails: onOpenDetails,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EvidenceValue extends StatelessWidget {
+  const _EvidenceValue({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: '$label: $value',
+    excludeSemantics: true,
+    child: Text.rich(
+      TextSpan(
+        style: const TextStyle(color: kCycleCardText),
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          TextSpan(text: value),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Native bewijsactie met een eigen focusnode, zodat sluiten via de zichtbare
+/// actie én Escape naar exact dezelfde bewijsregel terugkeert.
+class IterationEvidenceButton extends StatefulWidget {
+  const IterationEvidenceButton({
+    required this.productSlug,
+    required this.cycleLabel,
+    required this.onOpenDetails,
+    super.key,
+  });
+
+  final String productSlug;
+  final String cycleLabel;
+  final Future<void> Function() onOpenDetails;
+
+  @override
+  State<IterationEvidenceButton> createState() =>
+      _IterationEvidenceButtonState();
+}
+
+class _IterationEvidenceButtonState extends State<IterationEvidenceButton> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'iteration-evidence');
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openDetails() async {
+    try {
+      await widget.onOpenDetails();
+    } finally {
+      if (mounted) _focusNode.requestFocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton(
+    focusNode: _focusNode,
+    onPressed: _openDetails,
+    style: ButtonStyle(
+      foregroundColor: const WidgetStatePropertyAll(kCycleToggleText),
+      side: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) {
+          return const BorderSide(color: kCycleToggleFocus, width: 3);
+        }
+        return const BorderSide(color: kCycleToggleText);
+      }),
+    ),
+    child: Semantics(
+      label:
+          'Bekijk bewijs voor product ${widget.productSlug}, cyclus ${widget.cycleLabel}',
+      excludeSemantics: true,
+      child: const Text('Bekijk bewijs'),
+    ),
+  );
+}
+
 /// Compacte cycluskaart die uitsluitend haar gekoppelde opbrengst uitklapt. De
 /// detailbediening blijft een afzonderlijke native button en de kaart zelf is
 /// niet interactief, zodat bedieningen nooit in elkaar genest zijn.
@@ -1382,7 +1605,7 @@ class _IterationCycleCardState extends State<IterationCycleCard> {
     );
     final decision = iterationDecisionPresentation(iteration);
     final reason = decision.derived && iteration['outcomeReason'] != null
-        ? _outcomeReasonLabel('${iteration['outcomeReason']}')
+        ? outcomeReasonLabel('${iteration['outcomeReason']}')
         : null;
 
     String countLabel({
@@ -1895,7 +2118,7 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                     ),
                     const SizedBox(height: 4),
                     SelectableText(
-                      _outcomeReasonLabel('${iteration['outcomeReason']}'),
+                      outcomeReasonLabel('${iteration['outcomeReason']}'),
                     ),
                   ],
                   if (status == 'FAILED') ...[
@@ -2137,25 +2360,6 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
     },
   );
 }
-
-String _outcomeReasonLabel(String reason) => switch (reason) {
-  'ACCEPT' => 'Alle kandidaten zijn leverbaar',
-  'PARTIAL_ACCEPT' =>
-    'Minstens één kandidaat is leverbaar; andere vragen nog werk',
-  'ALREADY_DELIVERED' => 'Het resultaat was al eerder geleverd',
-  'CANDIDATE_REVISE' =>
-    'Een kandidaat heeft nog een lokale inhoudelijke reparatie nodig',
-  'RESEARCH_GAP' => 'Noodzakelijke brononderbouwing ontbreekt',
-  'POLICY_CONFLICT' => 'Er is nog een privacy-, rechten- of beleidsconflict',
-  'OWNER_DECISION_REQUIRED' => 'Een echte beslissing van de eigenaar is nodig',
-  'DELIVERY_DEPENDENCY_UNRESOLVED' =>
-    'Technische levering mislukt: een story-afhankelijkheid werd niet herkend',
-  'NO_DELIVERABLE_CANDIDATE' =>
-    'Technische levering leverde geen bruikbare kandidaat op',
-  'TECHNICAL_FAILURE' => 'De cyclus is door een technische fout gestopt',
-  'REJECT' => 'De gekozen richting is fundamenteel afgewezen',
-  _ => reason,
-};
 
 /// Native detailbutton voor één cyclus. De [FocusNode] leeft even lang als de rijwidget, zodat
 /// zowel de zichtbare sluitactie als Escape na het sluiten van de dialoog de focus betrouwbaar
