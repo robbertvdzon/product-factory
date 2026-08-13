@@ -72,11 +72,15 @@ fun interface AgentTaskExecutor {
 }
 
 /**
- * De RESEARCHER-rol moet de acceptatieomgeving kunnen bekijken via een echte (headless) browser, omdat
- * Cloudflare's bot-bescherming daar WebFetch/websearch met HTTP 403 blokkeert. Alleen deze rol krijgt
- * daarom Bash/schrijftoegang; alle andere rollen blijven read-only.
+ * Rollen die een acceptatieomgeving daadwerkelijk moeten bedienen hebben een echte (headless) browser
+ * nodig, omdat Cloudflare's bot-bescherming WebFetch/websearch met HTTP 403 blokkeert. Zij krijgen
+ * daarom Bash/schrijftoegang voor tijdelijke Playwright-bestanden plus netwerktoegang; alle andere
+ * rollen blijven read-only.
  */
-internal fun isResearcherTask(task: AgentTask): Boolean = task.taskType == "shadow-researcher"
+internal fun requiresBrowserAccess(task: AgentTask): Boolean = task.taskType in setOf(
+    "shadow-researcher",
+    "delivery-verification",
+)
 
 /** Gedeelde veiligheidsinstructie voor iedere providerimplementatie: dezelfde grenzen, ongeacht de gekozen AI. */
 internal fun agentPrompt(task: AgentTask): String = """
@@ -105,8 +109,8 @@ class RoutingAgentTaskExecutor(
 /**
  * Voert een taak uit via de `claude`-CLI (Claude Code) met een abonnementslogin. Gebruikt `--json-schema` voor
  * gestructureerde output in plaats van Codex' `--output-schema`-bestand, en `--tools`/`--setting-sources` om de
- * agent read-only te houden in plaats van Codex' `--sandbox read-only` ([isResearcherTask] geeft de RESEARCHER-rol
- * daarnaast Bash, zodat die de acceptatieomgeving via een headless browser kan bekijken).
+ * agent read-only te houden in plaats van Codex' `--sandbox read-only` ([requiresBrowserAccess] geeft
+ * browserrollen daarnaast Bash, zodat die de acceptatieomgeving via een headless browser kunnen bekijken).
  */
 class ClaudeAgentTaskExecutor(
     private val settings: AgentWorkerSettings,
@@ -138,7 +142,7 @@ class ClaudeAgentTaskExecutor(
         add("--setting-sources")
         add("")
         add("--tools")
-        add(if (isResearcherTask(task)) "WebSearch,WebFetch,Bash,Read" else "WebSearch,WebFetch")
+        add(if (requiresBrowserAccess(task)) "WebSearch,WebFetch,Bash,Read" else "WebSearch,WebFetch")
         add("--permission-mode")
         add("bypassPermissions")
         task.model?.takeIf { it.isNotBlank() }?.let { model ->
@@ -281,7 +285,7 @@ class CodexAgentTaskExecutor(
         add("-c")
         add("shell_environment_policy.inherit=none")
         add("--json")
-        if (isResearcherTask(task)) {
+        if (requiresBrowserAccess(task)) {
             add("--sandbox")
             add("workspace-write")
             add("-c")

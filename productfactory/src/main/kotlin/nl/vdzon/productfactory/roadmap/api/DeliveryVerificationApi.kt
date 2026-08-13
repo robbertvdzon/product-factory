@@ -3,6 +3,7 @@ package nl.vdzon.productfactory.roadmap.api
 import nl.vdzon.productfactory.contracts.DeliveryVerificationView
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
 
 internal data class PendingDeliveryVerification(
@@ -28,7 +29,11 @@ class DeliveryVerificationRepository(private val jdbc: JdbcTemplate) {
             join story_delivery d on d.candidate_id = c.id
             join roadmap_theme t on t.id = c.theme_id
             where c.product_slug = ? and c.theme_id is not null and d.confirmed_deployed = true and t.status <> 'DONE'
-              and not exists (select 1 from delivery_verification v where v.candidate_id = c.id)
+              and not exists (
+                  select 1 from delivery_verification v
+                  where v.candidate_id = c.id
+                    and (v.verdict in ('SATISFIES', 'DOES_NOT_SATISFY') or v.attempt_count >= 2)
+              )
             order by d.deployed_at asc
             limit ?""".trimIndent(),
         { row, _ ->
@@ -41,12 +46,25 @@ class DeliveryVerificationRepository(private val jdbc: JdbcTemplate) {
         limit,
     )
 
+    @Transactional
     fun save(id: String, productSlug: String, themeId: String, candidateId: Long, verdict: String, report: String) {
-        jdbc.update(
-            """insert into delivery_verification(id, product_slug, theme_id, candidate_id, status, verdict, report, completed_at)
-                values (?, ?, ?, ?, 'COMPLETED', ?, ?, current_timestamp)""".trimIndent(),
-            id, productSlug, themeId, candidateId, verdict, report,
+        // Een eerdere INCONCLUSIVE kan door een tijdelijk onbereikbare browseromgeving zijn ontstaan.
+        // Vervang die bij één volgende poging; conclusieve beoordelingen en twee mislukte pogingen
+        // blijven via pending() uitgesloten, zodat oude kandidaten de verificatiewachtrij niet blokkeren.
+        val updated = jdbc.update(
+            """update delivery_verification
+                set id = ?, status = 'COMPLETED', verdict = ?, report = ?, completed_at = current_timestamp,
+                    attempt_count = attempt_count + 1
+                where candidate_id = ? and verdict = 'INCONCLUSIVE'""".trimIndent(),
+            id, verdict, report, candidateId,
         )
+        if (updated == 0) {
+            jdbc.update(
+                """insert into delivery_verification(id, product_slug, theme_id, candidate_id, status, verdict, report, completed_at)
+                    values (?, ?, ?, ?, 'COMPLETED', ?, ?, current_timestamp)""".trimIndent(),
+                id, productSlug, themeId, candidateId, verdict, report,
+            )
+        }
     }
 
     fun recentReports(productSlug: String, limit: Int = 15): List<DeliveryVerificationView> = jdbc.query(

@@ -85,6 +85,24 @@ class AgentContractTest {
         assertFalse(command.contains("read-only"))
     }
 
+    @Test fun `codex command grants the delivery verifier browser and network access`() {
+        val workspace = Files.createTempDirectory("pf-agent-workspace-verifier")
+        val executor = CodexAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                workspace, "/opt/homebrew/bin/codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+
+        val command = executor.command(
+            AgentTask("run-2c", "hkh-autopilot", "delivery-verification", "Controleer de oplevering"),
+            workspace.resolve("last-message"),
+        )
+
+        assertTrue(command.containsAll(listOf("--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")))
+        assertFalse(command.contains("read-only"))
+    }
+
     @Test fun `codex command passes a structured output schema`() {
         val workspace = Files.createTempDirectory("pf-agent-schema")
         val executor = CodexAgentTaskExecutor(
@@ -152,6 +170,22 @@ class AgentContractTest {
         assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch,Bash,Read")))
     }
 
+    @Test fun `claude command grants the delivery verifier Bash and Read for a headless browser and screenshots`() {
+        val workspace = Files.createTempDirectory("pf-claude-workspace-verifier")
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                workspace, "codex", "gpt-5.6-terra", "/opt/homebrew/bin/claude",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+
+        val command = executor.command(
+            AgentTask("run-3c", "hkh-autopilot", "delivery-verification", "Controleer de oplevering"),
+        )
+
+        assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch,Bash,Read")))
+    }
+
     @Test fun `claude command keeps non researcher roles read only`() {
         val executor = ClaudeAgentTaskExecutor(
             AgentWorkerSettings(
@@ -160,7 +194,7 @@ class AgentContractTest {
             ),
         ) { _, _, _ -> error("niet uitvoeren") }
 
-        val command = executor.command(AgentTask("run-3c", "hkh-autopilot", "shadow-critic", "Beoordeel"))
+        val command = executor.command(AgentTask("run-3d", "hkh-autopilot", "shadow-critic", "Beoordeel"))
 
         assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch")))
         assertFalse(command.contains("WebSearch,WebFetch,Bash,Read"))

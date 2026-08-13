@@ -20,8 +20,8 @@ import kotlin.test.assertTrue
 
 /**
  * Dekt de opleverchecker (zie DeliveryVerificationEngine): een bevestigd opgeleverde, aan een thema
- * gekoppelde kandidaat wordt precies één keer geverifieerd, en het rapport is daarna terug te vinden
- * via [DeliveryVerificationRepository.forTheme].
+ * gekoppelde kandidaat wordt geverifieerd, een conclusief rapport wordt niet herhaald en een tijdelijk
+ * INCONCLUSIVE-rapport kan opnieuw worden geprobeerd.
  */
 @SpringBootTest
 @Import(DeliveryVerificationEngineTest.Fakes::class)
@@ -87,6 +87,41 @@ class DeliveryVerificationEngineTest(
         val results = engine.verifyPending(product, "test-session-3")
 
         assertEquals(0, results.size)
+    }
+
+    @Test
+    fun `an inconclusive verification is replaced by a later conclusive retry`() {
+        val theme = roadmap.createTheme(slug, "Opnieuw controleren", "Test opnieuw na een tijdelijke browserfout.", "HIGH")
+        val candidateId = insertConfirmedDeployedCandidate(theme.id)
+        reports.save(
+            "inconclusive-run",
+            slug,
+            theme.id,
+            candidateId,
+            "INCONCLUSIVE",
+            "De browseromgeving was tijdelijk niet bereikbaar.",
+        )
+
+        val results = engine.verifyPending(products.requireProduct(slug), "retry-session")
+
+        assertEquals(1, results.size)
+        assertEquals("SATISFIES", results.single().verdict)
+        val stored = reports.forTheme(slug, theme.id)
+        assertEquals(1, stored.size)
+        assertEquals("SATISFIES", stored.single().verdict)
+    }
+
+    @Test
+    fun `an inconclusive verification is retried at most once`() {
+        val theme = roadmap.createTheme(slug, "Begrensd opnieuw controleren", "Blokkeer de wachtrij niet blijvend.", "HIGH")
+        val candidateId = insertConfirmedDeployedCandidate(theme.id)
+        reports.save("inconclusive-run-1", slug, theme.id, candidateId, "INCONCLUSIVE", "Eerste poging onzeker.")
+        reports.save("inconclusive-run-2", slug, theme.id, candidateId, "INCONCLUSIVE", "Tweede poging onzeker.")
+
+        val results = engine.verifyPending(products.requireProduct(slug), "third-session")
+
+        assertEquals(0, results.size)
+        assertEquals("INCONCLUSIVE", reports.forTheme(slug, theme.id).single().verdict)
     }
 
     private fun insertConfirmedDeployedCandidate(themeId: String) = insertCandidate(themeId, confirmedDeployed = true)

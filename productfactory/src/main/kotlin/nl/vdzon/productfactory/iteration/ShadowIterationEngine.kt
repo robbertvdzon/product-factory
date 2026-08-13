@@ -1068,7 +1068,7 @@ class ShadowIterationEngine(
         // wanneer een RUNNING-stap zijn eigen timeout onmogelijk nog kan halen.
         internal const val ROLE_TIMEOUT_SECONDS = 900L
         // RESEARCHER bekijkt de acceptatieomgeving nu via een echte (headless) browser in plaats van WebFetch
-        // (zie AgentTaskExecutor.isResearcherTask): browsernavigatie, paginalaadtijd en scriptuitvoering maken
+        // (zie AgentTaskExecutor.requiresBrowserAccess): browsernavigatie, paginalaadtijd en scriptuitvoering maken
         // die stap merkbaar trager dan de overige, puur tekst-/toolgedreven rollen, die ruim binnen 900s blijven.
         internal const val RESEARCHER_TIMEOUT_SECONDS = 3600L
         private const val MAX_STORY_ATTEMPTS = 3
