@@ -80,17 +80,12 @@ IterationEvidencePresentation iterationEvidencePresentation(
   final status = iteration['status'];
   final criticVerdict = iteration['criticVerdict'];
   final errorMessage = iteration['errorMessage'];
-  final derivedDecisionSource = classifyDecisionSource(
-    criticVerdict: criticVerdict is String ? criticVerdict : null,
-    status: status is String ? status : null,
-    errorMessage: errorMessage is String ? errorMessage : null,
-  );
+  final evidenceDate =
+      parseInstant(iteration['startedAt']) ??
+      parseInstant(iteration['createdAt']);
 
   return IterationEvidencePresentation(
-    date: formatDateTime(
-      iteration['startedAt'] ?? iteration['createdAt'],
-      fallback: kEvidenceUnknown,
-    ),
+    date: formatDateTime(evidenceDate, fallback: kEvidenceUnknown),
     outcome: manualCancellation
         ? kRedenHandmatigGeannuleerd
         : classifyIterationOutcome(
@@ -105,6 +100,8 @@ IterationEvidencePresentation iterationEvidencePresentation(
         : kEvidenceUnknown,
     decisionSource: manualCancellation
         ? decision.source
-        : '$derivedDecisionSource (Afgeleid)',
+        : decision.derived
+        ? '${decision.source} (Afgeleid)'
+        : kEvidenceUnknown,
   );
 }

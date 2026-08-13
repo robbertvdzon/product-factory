@@ -202,26 +202,47 @@ void main() {
       expect(result.reason, isNot(contains('TOKEN')));
     });
 
-    test('ongeldig expliciet record claimt nooit een menselijke beslisser', () {
-      final result = iterationEvidencePresentation(
-        _iteration(
-          status: 'FAILED',
-          criticVerdict: null,
-          outcomeReason: 'TECHNICAL_FAILURE',
-          errorMessage: null,
-          decision: {
-            'iterationId': 'iteration-42',
-            'actorType': 'HUMAN',
-            'mechanism': 'ONBEKEND_MECHANISME',
-            'reasonCode': 'ONBEKENDE_REDEN',
-          },
-        ),
-      );
+    test('ontbrekende startedAt valt terug op geldige createdAt', () {
+      final iteration = _iteration()
+        ..addAll({'startedAt': null, 'createdAt': '2026-08-12T10:00:00Z'});
 
-      expect(result.outcome, 'technische fout');
-      expect(result.decisionSource, 'Onbekend (Afgeleid)');
-      expect(result.decisionSource, isNot(contains('Mens')));
+      expect(iterationEvidencePresentation(iteration).date, '12-08-2026 10:00');
     });
+
+    test('onleesbare startedAt valt terug op geldige createdAt', () {
+      final iteration = _iteration()
+        ..addAll({
+          'startedAt': 'geen datum',
+          'createdAt': '2026-08-12T10:00:00Z',
+        });
+
+      expect(iterationEvidencePresentation(iteration).date, '12-08-2026 10:00');
+    });
+
+    test(
+      'onbekend expliciet record claimt geen mens of afgeleide beslisser',
+      () {
+        final result = iterationEvidencePresentation(
+          _iteration(
+            status: 'ACCEPTED',
+            criticVerdict: 'ACCEPT',
+            outcomeReason: 'ACCEPT',
+            errorMessage: null,
+            decision: {
+              'iterationId': 'iteration-42',
+              'actorType': 'HUMAN',
+              'mechanism': 'ONBEKEND_MECHANISME',
+              'reasonCode': 'ONBEKENDE_REDEN',
+            },
+          ),
+        );
+
+        expect(result.outcome, 'richting-gekozen');
+        expect(result.decisionSource, 'Onbekend');
+        expect(result.decisionSource, isNot(contains('Mens')));
+        expect(result.decisionSource, isNot(contains('Afgeleid')));
+      },
+    );
   });
 
   final widgetFixtures =

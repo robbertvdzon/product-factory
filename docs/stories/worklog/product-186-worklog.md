@@ -79,3 +79,36 @@ Verificatie (definitieve eindrun, alle exitcode 0):
   `testedTreeSha` is gelijk aan de huidige `HEAD^{tree}`; frontend analyze en tests zijn geslaagd.
   De Maven-gate is volgens de geconfigureerde `pathPrefixes` niet van toepassing op deze
   frontend-only diff.
+
+## Herstelronde na review
+
+Stappenplan:
+- [x] Datumfallback herstellen en afdekken voor ontbrekende én onleesbare `startedAt`.
+- [x] Onbekende expliciete provenance conservatief presenteren en regressietesten.
+- [x] De overzicht-widgettestmatrix aanvullen voor QUEUED/RUNNING en andere producten.
+- [x] Gewijzigde Dart-bestanden gericht formatteren en gerichte tests uitvoeren.
+- [x] Het volledige vangnet uitvoeren en de zelfreview actualiseren.
+
+Gedaan / rationale:
+- De reviewbevindingen zijn bij de start van deze herstelrun overgenomen. De reparatie blijft beperkt
+  tot de bestaande bewijs-presentatielogica en de ontbrekende overzichtsdekking.
+- De datum kiest nu de eerste daadwerkelijk parseerbare waarde uit `startedAt` en `createdAt`. Tests
+  bewijzen zowel de ontbrekende als de onleesbare `startedAt`-variant met een geldige fallback.
+- Een gekoppeld maar niet als geldige handmatige annulering herkend beslisrecord blijft expliciet
+  `Onbekend`; alleen wanneer het record ontbreekt wordt de bestaande conservatieve bron als
+  `(Afgeleid)` getoond. Zo claimt een onbekend toekomstig record geen menselijke beslisser.
+- De dashboard-overzichttest bevat nu terminal en actief voor een ander product én QUEUED en RUNNING
+  voor `product-factory`; alle vier blijven een `IterationCycleCard` op het bestaande codepad.
+
+Zelfreview herstelronde:
+- Scope en regressie: uitsluitend de bewijswaarde-opbouw en testfixtures zijn gewijzigd. De selector,
+  kaartweergave, detaildialoog, bronstatussen, koppeling, API en opslag zijn ongemoeid gebleven.
+- Privacy en provenance: onbekende expliciete codes worden niet weergegeven en veroorzaken geen
+  menselijke of afgeleide claim; reden- en foutpayloads blijven buiten de bewijsregel.
+- Toegankelijkheid: de bestaande semantische groep, labels, native bewijsactie, focusbegrenzing en
+  focusherstel zijn niet gewijzigd en blijven door de volledige widgettests afgedekt.
+
+Verificatie herstelronde (definitieve eindrun, alle exitcode 0):
+- `mvn -B --no-transfer-progress clean verify`: `BUILD SUCCESS`; 142 tests, 0 failures, 0 errors.
+- `flutter analyze`: `No issues found!`.
+- `flutter test`: 291 tests geslaagd, 0 failures, 0 errors.

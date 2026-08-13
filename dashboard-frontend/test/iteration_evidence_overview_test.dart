@@ -46,6 +46,12 @@ final _terminal = _iteration(
 final _iterations = <Map<String, dynamic>>[
   _terminal,
   _iteration(
+    id: 'pf-queued',
+    productSlug: 'product-factory',
+    sequence: 38,
+    status: 'QUEUED',
+  ),
+  _iteration(
     id: 'pf-running',
     productSlug: 'product-factory',
     sequence: 40,
@@ -58,6 +64,12 @@ final _iterations = <Map<String, dynamic>>[
     status: 'REJECTED',
     verdict: 'REJECT',
     outcomeReason: 'REJECT',
+  ),
+  _iteration(
+    id: 'other-running',
+    productSlug: 'ander-product',
+    sequence: 37,
+    status: 'RUNNING',
   ),
 ];
 
@@ -155,7 +167,7 @@ void main() {
         await _pumpDashboard(tester);
 
         expect(find.byType(IterationEvidenceRow), findsOneWidget);
-        expect(find.byType(IterationCycleCard), findsNWidgets(2));
+        expect(find.byType(IterationCycleCard), findsNWidgets(4));
         expect(
           find.descendant(
             of: find.byType(IterationEvidenceRow),
@@ -183,6 +195,18 @@ void main() {
           ),
           findsOneWidget,
         );
+        final queuedCard = find.ancestor(
+          of: find.text('product-factory · iteratie 38'),
+          matching: find.byType(IterationCycleCard),
+        );
+        expect(queuedCard, findsOneWidget);
+        expect(
+          find.descendant(
+            of: queuedCard,
+            matching: find.byType(IterationProgressIndicator),
+          ),
+          findsOneWidget,
+        );
         final otherCard = find.ancestor(
           of: find.text('ander-product · iteratie 39'),
           matching: find.byType(IterationCycleCard),
@@ -192,6 +216,18 @@ void main() {
           find.descendant(
             of: otherCard,
             matching: find.byType(ClassificationBadge),
+          ),
+          findsOneWidget,
+        );
+        final otherActiveCard = find.ancestor(
+          of: find.text('ander-product · iteratie 37'),
+          matching: find.byType(IterationCycleCard),
+        );
+        expect(otherActiveCard, findsOneWidget);
+        expect(
+          find.descendant(
+            of: otherActiveCard,
+            matching: find.byType(IterationProgressIndicator),
           ),
           findsOneWidget,
         );
