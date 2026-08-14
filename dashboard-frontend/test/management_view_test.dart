@@ -87,6 +87,7 @@ MockClient _client({
   Future<http.Response> Function()? deliveries,
   Future<http.Response?> Function(http.Request request)? override,
   List<String>? calls,
+  List<dynamic> products = const [],
   List<dynamic> humanActions = const [],
   List<dynamic> settledQuestions = const [],
 }) {
@@ -95,6 +96,8 @@ MockClient _client({
     final overridden = await override?.call(request);
     if (overridden != null) return overridden;
     switch (request.url.path) {
+      case '/api/products':
+        return _json(products);
       case '/api/story-candidates':
         return candidates?.call() ?? _json(<dynamic>[]);
       case '/api/autonomy/deliveries':
@@ -631,6 +634,64 @@ void main() {
     await tester.pump();
     await _disposeDashboard(tester);
   });
+
+  testWidgets(
+    'productspecifieke leveringen blijven laden totdat kandidaten geladen zijn',
+    (tester) async {
+      final pendingCandidates = Completer<http.Response>();
+      final client = _client(
+        products: [_product()],
+        candidates: () => pendingCandidates.future,
+        deliveries: () async => _json([_delivery(1)]),
+      );
+      await _pumpDashboard(tester, client);
+      await _openManagement(tester);
+
+      expect(
+        find.text(
+          'Software Factory-leveringen voor deze productscope worden bepaald zodra storykandidaten zijn geladen.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('PRODUCT-1'), findsNothing);
+      expect(
+        find.text('Nog geen stories naar de Software Factory gestuurd'),
+        findsNothing,
+      );
+
+      pendingCandidates.complete(_json([_candidate(1)]));
+      await tester.pump();
+      await tester.pump();
+      expect(find.textContaining('PRODUCT-1'), findsWidgets);
+      await _disposeDashboard(tester);
+    },
+  );
+
+  testWidgets(
+    'productspecifieke leveringen tonen kandidaatfout niet als lege lijst',
+    (tester) async {
+      final client = _client(
+        products: [_product()],
+        candidates: () async => _json({'error': 'stuk'}, status: 500),
+        deliveries: () async => _json([_delivery(1)]),
+      );
+      await _pumpDashboard(tester, client);
+      await _openManagement(tester);
+
+      expect(
+        find.text(
+          'Software Factory-leveringen voor deze productscope zijn niet beschikbaar omdat storykandidaten niet beschikbaar zijn.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('PRODUCT-1'), findsNothing);
+      expect(
+        find.text('Nog geen stories naar de Software Factory gestuurd'),
+        findsNothing,
+      );
+      await _disposeDashboard(tester);
+    },
+  );
 
   testWidgets('leveringsbron toont geladen lege toestand onafhankelijk', (
     tester,

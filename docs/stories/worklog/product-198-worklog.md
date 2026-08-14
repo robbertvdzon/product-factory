@@ -9,6 +9,11 @@
 - [x] Gewijzigde Dart-code formatteren en gerichte controles draaien.
 - [x] Het volledige factory-vangnet succesvol afronden.
 - [x] De uiteindelijke diff zelf reviewen.
+- [x] Afgeleide laad- en foutstatussen voor hoofdscherm en Beheer herstellen.
+- [x] Live-statusmeldingen per weergave isoleren.
+- [x] Regressietests voor beide reviewbevindingen toevoegen en gericht draaien.
+- [x] Het volledige factory-vangnet na de reviewfixes opnieuw succesvol afronden.
+- [x] De reviewfix-diff zelf controleren.
 
 ## Uitvoering
 
@@ -50,3 +55,28 @@ toetsenbord/focus, live-status, viewports en Beheer.
 Revisiongebonden factorybewijs gecontroleerd: de gemeten tree
 `722e27da265ac9aa8512d7e1c3d7bf239b6fc3bd` is gelijk aan `HEAD^{tree}`. De twee toepasselijke
 Flutter-commando's zijn groen; Maven is volgens de path-prefixconfig terecht overgeslagen.
+
+## Reviewfix-run
+
+De twee reviewbevindingen worden gereproduceerd en met gerichte regressietests hersteld. De
+bronstatus blijft daarbij expliciet totdat alle bronnen voor een afleiding geladen zijn, en
+hoofdscherm- en Beheer-meldingen krijgen ieder hun eigen presentatiestatus.
+
+De hoofdschermmetrics combineren nu de status van alle bronnen die voor hun canonieke afleiding
+nodig zijn. Een productspecifieke Beheer-leveringslijst verschijnt pas nadat zowel leveringen als
+kandidaten geladen zijn; laden en fouten krijgen een expliciete melding en worden niet meer als een
+lege lijst gepresenteerd. `Alle producten` behoudt de onafhankelijke globale leveringslijst.
+
+De live-status voor het hoofdscherm en die voor Beheer zijn gescheiden. Bij een productwijziging in
+Beheer wordt een eventueel verouderde hoofdschermmelding gewist; `Alle producten` kan daardoor niet
+meer naar het hoofdscherm lekken.
+
+Gerichte verificatie: de drie betrokken testbestanden zijn samen groen met 29 tests. Volledig
+vangnet na de fixes:
+
+- `mvn -B --no-transfer-progress clean verify`: `BUILD SUCCESS`, 0 failures, 0 errors.
+- `flutter analyze`: geen issues.
+- `flutter test`: 314 tests, alle tests geslaagd.
+- `git diff --check`: geen whitespacefouten.
+- Geen conflictmarkeringen aangetroffen; `.factory/verification.yaml` en
+  `dashboard-frontend/pubspec.lock` zijn ongewijzigd.

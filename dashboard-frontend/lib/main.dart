@@ -283,7 +283,8 @@ class _OverviewPageState extends State<OverviewPage> {
   bool productPreferenceLoaded = false;
   String? activeProductSlug;
   String? managementProductSlug;
-  String? productScopeAnnouncement;
+  String? overviewProductScopeAnnouncement;
+  String? managementProductScopeAnnouncement;
   List<Map<String, dynamic>> availableProducts = const [];
 
   /// Hoeveel items er per sectie zichtbaar zijn. Deze tellers staan bewust in de state en niet in de
@@ -383,7 +384,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }) async {
     setState(() {
       activeProductSlug = slug;
-      productScopeAnnouncement = announcement;
+      overviewProductScopeAnnouncement = announcement;
     });
     await productScopePreferences.save(slug);
   }
@@ -601,6 +602,8 @@ class _OverviewPageState extends State<OverviewPage> {
       final scopeLabel = selectedSlug == null
           ? 'Alle producten'
           : _productDisplayName(selectedProduct!);
+      final scopedDeliveriesLoaded = deliverySource.loaded &&
+          (selectedSlug == null || candidateSource.loaded);
 
       return ListView(
         padding: const EdgeInsets.all(24),
@@ -624,9 +627,12 @@ class _OverviewPageState extends State<OverviewPage> {
               if (slug == null) {
                 setState(() {
                   managementProductSlug = null;
-                  productScopeAnnouncement =
-                      'Beheerscope Alle producten. ${allStories.length} '
-                      'storykandidaten en ${allDeliveries.length} leveringen.';
+                  managementProductScopeAnnouncement =
+                      'Beheerscope Alle producten. '
+                      '${_sourceCount(candidateSource, allStories.length)} '
+                      'storykandidaten en '
+                      '${_sourceCount(deliverySource, allDeliveries.length)} '
+                      'leveringen.';
                 });
                 return;
               }
@@ -645,41 +651,59 @@ class _OverviewPageState extends State<OverviewPage> {
               setState(() {
                 managementProductSlug = slug;
                 activeProductSlug = slug;
-                productScopeAnnouncement =
+                overviewProductScopeAnnouncement = null;
+                managementProductScopeAnnouncement =
                     'Gekozen product ${_productDisplayName(product)}. '
-                    '${nextStories.length} storykandidaten en '
-                    '${nextDeliveries.length} leveringen.';
+                    '${_sourceCount(candidateSource, nextStories.length)} '
+                    'storykandidaten en '
+                    '${_derivedSourceCount(
+                      [candidateSource, deliverySource],
+                      nextDeliveries.length,
+                    )} leveringen.';
               });
               await productScopePreferences.save(slug);
             },
           ),
-          if (productScopeAnnouncement != null)
+          if (managementProductScopeAnnouncement != null)
             ProductScopeStatus(
               key: const ValueKey('management-product-scope-status'),
-              message: productScopeAnnouncement!,
+              message: managementProductScopeAnnouncement!,
             ),
           const SizedBox(height: 24),
           Text(
             'Software Factory-stories — $scopeLabel',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          if (deliverySource.loading)
-            const SourceNotice(
-              icon: Icons.hourglass_top,
-              text: 'Software Factory-leveringen worden geladen.',
-            )
-          else if (deliverySource.failed)
+          if (deliverySource.failed)
             const SourceNotice(
               icon: Icons.error_outline,
               text: 'Software Factory-leveringen zijn niet beschikbaar.',
               error: true,
             )
-          else if (scopedDeliveries.isEmpty)
+          else if (selectedSlug != null && candidateSource.failed)
+            const SourceNotice(
+              icon: Icons.error_outline,
+              text:
+                  'Software Factory-leveringen voor deze productscope zijn niet beschikbaar omdat storykandidaten niet beschikbaar zijn.',
+              error: true,
+            )
+          else if (deliverySource.loading)
+            const SourceNotice(
+              icon: Icons.hourglass_top,
+              text: 'Software Factory-leveringen worden geladen.',
+            )
+          else if (selectedSlug != null && candidateSource.loading)
+            const SourceNotice(
+              icon: Icons.hourglass_top,
+              text:
+                  'Software Factory-leveringen voor deze productscope worden bepaald zodra storykandidaten zijn geladen.',
+            )
+          else if (scopedDeliveriesLoaded && scopedDeliveries.isEmpty)
             const ListTile(
               leading: Icon(Icons.hourglass_empty),
               title: Text('Nog geen stories naar de Software Factory gestuurd'),
             ),
-          if (deliverySource.loaded)
+          if (scopedDeliveriesLoaded)
             _limitedSection('deliveries', sortedDeliveries, (delivery) {
               return SoftwareFactoryDeliveryTile(delivery: delivery);
             }),
@@ -853,6 +877,7 @@ class _OverviewPageState extends State<OverviewPage> {
                         label: 'Beheer',
                         onPressed: () => setState(() {
                           managementProductSlug = activeProductSlug;
+                          managementProductScopeAnnouncement = null;
                           managementView = true;
                         }),
                       ),
@@ -883,7 +908,10 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
                 MetricCard(
                   label: 'Interne storykandidaten',
-                  value: _sourceCount(candidateSource, linkedStories.length),
+                  value: _derivedSourceCount(
+                    [candidateSource, iterationSource],
+                    linkedStories.length,
+                  ),
                   icon: Icons.lightbulb_outline,
                 ),
                 MetricCard(
@@ -901,8 +929,8 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
                 MetricCard(
                   label: 'Software Factory-stories',
-                  value: _sourceCount(
-                    deliverySource,
+                  value: _derivedSourceCount(
+                    [candidateSource, deliverySource],
                     scopedDeliveries.length,
                   ),
                   icon: Icons.precision_manufacturing_outlined,
@@ -940,8 +968,12 @@ class _OverviewPageState extends State<OverviewPage> {
                     slug,
                     announcement:
                         'Gekozen product ${_productDisplayName(product)}. '
-                        '${nextIterations.length} eerdere cycli en '
-                        '${nextStories.length} gekoppelde stories.',
+                        '${_sourceCount(iterationSource, nextIterations.length)} '
+                        'eerdere cycli en '
+                        '${_derivedSourceCount(
+                          [candidateSource, iterationSource],
+                          nextStories.length,
+                        )} gekoppelde stories.',
                   );
                 },
               ),
@@ -951,10 +983,10 @@ class _OverviewPageState extends State<OverviewPage> {
                 key: const ValueKey('active-product-name'),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
-              if (productScopeAnnouncement != null)
+              if (overviewProductScopeAnnouncement != null)
                 ProductScopeStatus(
                   key: const ValueKey('product-scope-status'),
-                  message: productScopeAnnouncement!,
+                  message: overviewProductScopeAnnouncement!,
                 ),
               const SizedBox(height: 24),
               Text(
@@ -1474,8 +1506,15 @@ class SoftwareFactoryDeliveryTile extends StatelessWidget {
 }
 
 String _sourceCount(DashboardSource<List<dynamic>> source, int count) {
-  if (source.loading) return 'Laden…';
-  if (source.failed) return 'Niet beschikbaar';
+  return _derivedSourceCount([source], count);
+}
+
+String _derivedSourceCount(
+  Iterable<DashboardSource<List<dynamic>>> sources,
+  int count,
+) {
+  if (sources.any((source) => source.failed)) return 'Niet beschikbaar';
+  if (sources.any((source) => source.loading)) return 'Laden…';
   return '$count';
 }
 

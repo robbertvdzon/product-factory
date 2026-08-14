@@ -31,7 +31,9 @@ http.Response _json(Object body, {int status = 200}) =>
     http.Response(jsonEncode(body), status);
 
 MockClient _client({
+  Completer<http.Response>? iterationResponse,
   Completer<http.Response>? candidateResponse,
+  Completer<http.Response>? deliveryResponse,
   bool duplicateIterations = false,
 }) {
   final iterations = [
@@ -47,6 +49,7 @@ MockClient _client({
           {'slug': 'demo', 'name': 'Demo'},
         ]);
       case '/api/shadow-iterations':
+        if (iterationResponse != null) return iterationResponse.future;
         return _json(iterations);
       case '/api/story-candidates':
         if (candidateResponse != null) return candidateResponse.future;
@@ -67,6 +70,7 @@ MockClient _client({
           },
         ]);
       case '/api/autonomy/deliveries':
+        if (deliveryResponse != null) return deliveryResponse.future;
         return _json([
           {
             'id': 3,
@@ -104,6 +108,18 @@ Future<void> _pumpDashboard(WidgetTester tester) async {
   for (var pump = 0; pump < 5; pump++) {
     await tester.pump();
   }
+}
+
+String _metricValue(WidgetTester tester, String label) {
+  final card = find.ancestor(
+    of: find.text(label),
+    matching: find.byType(MetricCard),
+  );
+  return tester
+      .widgetList<Text>(find.descendant(of: card, matching: find.byType(Text)))
+      .map((text) => text.data)
+      .whereType<String>()
+      .firstWhere((text) => text != label);
 }
 
 void main() {
@@ -216,6 +232,8 @@ void main() {
           find.textContaining('Interne kandidaten: laden…'),
           findsNWidgets(5),
         );
+        expect(_metricValue(tester, 'Interne storykandidaten'), 'Laden…');
+        expect(_metricValue(tester, 'Software Factory-stories'), 'Laden…');
         expect(
           find.textContaining(
             'Software Factory-leveringen: 0 · geladen gegevens',
@@ -239,6 +257,14 @@ void main() {
           find.textContaining('Interne kandidaten: niet beschikbaar'),
           findsNWidgets(5),
         );
+        expect(
+          _metricValue(tester, 'Interne storykandidaten'),
+          'Niet beschikbaar',
+        );
+        expect(
+          _metricValue(tester, 'Software Factory-stories'),
+          'Niet beschikbaar',
+        );
         expect(find.textContaining('Interne kandidaten: 0'), findsNothing);
         expect(
           find.text('Gekoppelde stories zijn niet beschikbaar.'),
@@ -252,6 +278,60 @@ void main() {
         );
         await tester.pumpWidget(const SizedBox.shrink());
       }, () => _client(candidateResponse: candidateResponse));
+    },
+  );
+
+  testWidgets(
+    'geladen kandidaten wachten voor hun scopetelling op de cyclusbron',
+    (tester) async {
+      final iterationResponse = Completer<http.Response>();
+      await http.runWithClient(() async {
+        await _pumpDashboard(tester);
+
+        expect(_metricValue(tester, 'Interne storykandidaten'), 'Laden…');
+        expect(
+          find.text('Nog geen eenduidig gekoppelde stories'),
+          findsNothing,
+        );
+
+        iterationResponse.complete(
+          _json({'error': 'synthetisch'}, status: 500),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          _metricValue(tester, 'Interne storykandidaten'),
+          'Niet beschikbaar',
+        );
+        expect(
+          find.text('Gekoppelde stories zijn niet beschikbaar.'),
+          findsOneWidget,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, () => _client(iterationResponse: iterationResponse));
+    },
+  );
+
+  testWidgets(
+    'geladen kandidaten wachten voor hun leveringstelling op de leveringsbron',
+    (tester) async {
+      final deliveryResponse = Completer<http.Response>();
+      await http.runWithClient(() async {
+        await _pumpDashboard(tester);
+
+        expect(_metricValue(tester, 'Software Factory-stories'), 'Laden…');
+
+        deliveryResponse.complete(_json({'error': 'synthetisch'}, status: 500));
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          _metricValue(tester, 'Software Factory-stories'),
+          'Niet beschikbaar',
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, () => _client(deliveryResponse: deliveryResponse));
     },
   );
 }

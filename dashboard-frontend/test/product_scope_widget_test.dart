@@ -400,6 +400,26 @@ void main() {
       final preferences = await SharedPreferences.getInstance();
       expect(preferences.getString(activeProductSlugPreferenceKey), 'Alpha');
 
+      await tester.tap(find.text('Terug naar overzicht'));
+      for (var pump = 0; pump < 3; pump++) {
+        await tester.pump();
+      }
+      expect(
+        find.byKey(const ValueKey('management-product-scope-status')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('product-scope-status')), findsNothing);
+      expect(find.textContaining('Beheerscope Alle producten.'), findsNothing);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('active-product-name')))
+            .data,
+        'Alpha product',
+      );
+
+      await tester.tap(find.text('Beheer'));
+      await tester.pump();
+      await tester.pump();
       await _chooseScope(tester, 'Beta product');
       expect(preferences.getString(activeProductSlugPreferenceKey), 'Beta');
       expect(
