@@ -6,10 +6,12 @@ FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
 ARG API_BASE_URL
 ARG GOOGLE_CLIENT_ID
 ARG AUTH_REQUIRED=true
+ARG ACCEPTANCE_DATASET=false
 WORKDIR /app
 COPY . .
 RUN flutter pub get && flutter build web --release --pwa-strategy=none \
-    --dart-define=API_BASE_URL=${API_BASE_URL} --dart-define=GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID} --dart-define=AUTH_REQUIRED=${AUTH_REQUIRED}
+    --dart-define=API_BASE_URL=${API_BASE_URL} --dart-define=GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID} --dart-define=AUTH_REQUIRED=${AUTH_REQUIRED} \
+    --dart-define=ACCEPTANCE_DATASET=${ACCEPTANCE_DATASET}
 
 # Flutter gebruikt standaard een vaste main.dart.js-naam. Geef iedere inhoud een eigen URL,
 # zodat browsers nooit een oude app-bundle onder dezelfde naam kunnen blijven serveren.

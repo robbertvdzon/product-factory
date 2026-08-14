@@ -27,7 +27,7 @@ class PreviewDataSeeder(
 ) {
     @Transactional
     fun ensure(): PreviewSeedResult {
-        val prNumber = preview.requireSeedingAllowed()
+        val prNumber = preview.requirePreviewSeedingAllowed()
 
         val applied = mutableListOf<String>()
         val alreadyPresent = mutableListOf<String>()
@@ -162,8 +162,16 @@ class PreviewDataSeeder(
 
 @Component
 @ConditionalOnProperty(name = ["PF_PREVIEW_ENABLED"], havingValue = "true")
-class PreviewDataStartup(private val seeder: PreviewDataSeeder) : ApplicationRunner {
+class PreviewDataStartup(
+    private val preview: PreviewRuntimeConfig,
+    private val previewSeeder: PreviewDataSeeder,
+    private val acceptanceSeeder: AcceptanceDataSeeder,
+) : ApplicationRunner {
     override fun run(args: ApplicationArguments) {
-        seeder.ensure()
+        when (preview.dataset) {
+            SyntheticDataset.PR_PREVIEW -> previewSeeder.ensure()
+            SyntheticDataset.ACCEPTANCE -> acceptanceSeeder.ensure()
+            SyntheticDataset.NONE -> error("PF_PREVIEW_ENABLED is actief zonder synthetische dataset")
+        }
     }
 }

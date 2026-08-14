@@ -8,4 +8,8 @@ abstract final class AppConfig {
     'AUTH_REQUIRED',
     defaultValue: false,
   );
+  static const acceptanceDataset = bool.fromEnvironment(
+    'ACCEPTANCE_DATASET',
+    defaultValue: false,
+  );
 }

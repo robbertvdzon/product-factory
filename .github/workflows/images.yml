@@ -135,6 +135,7 @@ jobs:
             API_BASE_URL=https://product-factory-api-acceptance.vdzonsoftware.nl
             GOOGLE_CLIENT_ID=
             AUTH_REQUIRED=false
+            ACCEPTANCE_DATASET=true
           cache-from: type=gha,scope=product-factory-dashboard-frontend
           cache-to: type=gha,mode=max,scope=product-factory-dashboard-frontend
   # GitOps promotion: ArgoCD only redeploys when the manifest actually changes. Our images use a

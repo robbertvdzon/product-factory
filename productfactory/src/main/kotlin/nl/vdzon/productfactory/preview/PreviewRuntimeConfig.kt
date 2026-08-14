@@ -19,6 +19,11 @@ class PreviewRuntimeConfig(
     @param:Value("\${PF_PREVIEW_PR_NUMBER:}") previewPrNumber: String,
 ) {
     val prNumber: Int? = previewPrNumber.toIntOrNull()?.takeIf { it > 0 }
+    val dataset: SyntheticDataset = when {
+        enabled && marker == REQUIRED_MARKER -> SyntheticDataset.PR_PREVIEW
+        enabled && marker == ACCEPTANCE_MARKER -> SyntheticDataset.ACCEPTANCE
+        else -> SyntheticDataset.NONE
+    }
 
     init {
         if (enabled) {
@@ -44,6 +49,19 @@ class PreviewRuntimeConfig(
         return prNumber ?: ACCEPTANCE_SEED_ID
     }
 
+    fun requirePreviewSeedingAllowed(): Int {
+        require(dataset == SyntheticDataset.PR_PREVIEW) {
+            "PR-previewdata mag alleen met de geverifieerde PR-previewmarker worden aangemaakt"
+        }
+        return requireNotNull(prNumber)
+    }
+
+    fun requireAcceptanceSeedingAllowed() {
+        require(dataset == SyntheticDataset.ACCEPTANCE) {
+            "Synthetische acceptatiedata mag alleen met de geverifieerde acceptatiemarkering worden aangemaakt"
+        }
+    }
+
     companion object {
         const val REQUIRED_MARKER = "product-factory-pr-preview"
         const val ACCEPTANCE_MARKER = "product-factory-acceptance"
@@ -53,3 +71,5 @@ class PreviewRuntimeConfig(
             Regex("^jdbc:postgresql://postgres(?::5432)?/productfactory(?:\\?.*)?$")
     }
 }
+
+enum class SyntheticDataset { NONE, PR_PREVIEW, ACCEPTANCE }
