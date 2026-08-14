@@ -30,3 +30,23 @@ toetsenbord/focus, live-status, viewports en Beheer.
 - `git diff --check`: geen whitespacefouten.
 - Geen conflictmarkeringen aangetroffen; `.factory/verification.yaml` en
   `dashboard-frontend/pubspec.lock` zijn ongewijzigd.
+
+## Review
+
+- [bug] Productafhankelijke afleidingen verliezen de laad-/foutstatus van hun tweede bron. De
+  hoofdschermmetrics tonen daardoor `0` zodra respectievelijk kandidaten of leveringen al geladen
+  zijn terwijl cycli of kandidaten nog laden/mislukt zijn. In een afzonderlijke Beheer-scope wordt
+  een geladen leveringsbron bij een ladende/mislukte kandidaatbron bovendien als een lege, complete
+  leveringslijst weergegeven. Toon voor deze afgeleide tellingen en lijsten pas een compleet
+  resultaat wanneer alle noodzakelijke bronnen geladen zijn en voeg regressietests voor beide
+  bronvolgordes en fouten toe (`dashboard-frontend/lib/main.dart:578-590, 666-685, 884-907`).
+- [bug] `productScopeAnnouncement` wordt voor hoofdscherm en Beheer gedeeld en bij navigatie niet
+  gewist of per view bijgehouden. Reproductie: open Beheer, kies `Alle producten` en ga terug naar
+  het overzicht. Onder de naam van het actieve product blijft dan de zichtbare/live tekst
+  `Beheerscope Alle producten ...` staan, hoewel die keuze volgens de story niet op het hoofdscherm
+  bestaat. Houd de meldingen per view gescheiden of reset ze bij navigatie en dek de heen-en-terugflow
+  af (`dashboard-frontend/lib/main.dart:612, 627-629, 656-660, 854-857, 954-958`).
+
+Revisiongebonden factorybewijs gecontroleerd: de gemeten tree
+`722e27da265ac9aa8512d7e1c3d7bf239b6fc3bd` is gelijk aan `HEAD^{tree}`. De twee toepasselijke
+Flutter-commando's zijn groen; Maven is volgens de path-prefixconfig terecht overgeslagen.
