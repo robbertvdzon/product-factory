@@ -109,6 +109,7 @@
   `limited_list.dart` — de 5/+10-lijstbeperking; `iteration_results.dart` — pure, verliesvrije
   client-side koppeling van geladen kandidaten en leveringen aan cycli; `iteration_evidence.dart` —
   de pure selector en veilige presentatie-opbouw voor terminale `product-factory`-cycli;
+  `product_scope.dart` — canonieke productselectie, scopefilters en browservoorkeur;
   `classification.dart` — de bestaande pure
   mappings op `status`/`criticVerdict`/`errorMessage` plus
   `iterationDecisionPresentation`, dat eerst een aan het iteratie-id gekoppeld `decision`-record
@@ -144,9 +145,30 @@
   die nog laadt of is mislukt. `_OverviewPageState.managementView` wisselt binnen dezelfde
   `OverviewPage` tussen productoverzicht en Beheer. Beide weergaven hergebruiken dezelfde futures,
   vijfsecondenrefresh en zichtbaarheidstellers; er zijn geen nieuwe routes, browser-URL's, requests of
-  contractvelden. Beheer rendert de leveringsbron zelfstandig en toont de storywachtrij pas als de
-  kandidaat- én leveringsbron geladen zijn. Zijn alleen kandidaten geladen, dan toont de wachtrij het
-  kandidaataantal met een expliciete onvolledigheidsmelding.
+  contractvelden. In een afzonderlijke Beheer-scope wordt de leveringslijst pas afgeleid als zowel
+  kandidaten als leveringen geladen zijn; `Alle producten` rendert de globale leveringsbron
+  zelfstandig. De storywachtrij verschijnt pas compleet als kandidaat- én leveringsbron geladen
+  zijn. Zijn alleen kandidaten geladen, dan toont zij het kandidaataantal met een expliciete
+  onvolledigheidsmelding.
+- `product_scope.dart` accepteert alleen productrecords met een niet-lege `String slug` en vergelijkt
+  canonieke slugs exact en hoofdlettergevoelig, zonder trimmen of fallbackvelden. `selectProductScope`
+  herstelt een voorkeur alleen bij exact één match en valt anders terug op het eerste geldige product
+  in de ontvangen API-volgorde. `ProductScopePreferences` leest, schrijft en verwijdert uitsluitend
+  de slug onder `product-factory.dashboard.active-product-slug` via `shared_preferences`; een
+  opslagfout blokkeert de lokale presentatiewissel niet.
+- `iterationsInProductScope` filtert cycli rechtstreeks via `Iteration.productSlug`.
+  `linkedStoriesInProductScope` vereist daarnaast een integer `iterationSequenceNumber` dat exact
+  één integer `sequenceNumber` binnen de productcycli aanwijst. `candidatesInManagementScope`
+  filtert rechtstreeks via `StoryCandidate.productSlug`; `deliveriesInManagementScope` vereist
+  exact één kandidaat met hetzelfde integer `candidateId` en bepaalt de scope uitsluitend via de
+  slug van die kandidaat. Ontbrekende, anders getypeerde, lege, kruisproduct- en ambigue relaties
+  vallen buiten een afzonderlijke scope en blijven alleen in de globale Beheer-keuze zichtbaar.
+- `ProductScopePicker` in `main.dart` gebruikt één `DropdownButtonFormField` met expliciete
+  Semantics-naam en actuele waarde, een focusrand van drie pixels en een eigen `FocusNode` dat na
+  wisselen focus herstelt. Alleen de Beheer-variant voegt `Alle producten` toe.
+  `ProductScopeStatus` is een zichtbare `Semantics(liveRegion: true)`-melding; hoofdscherm en Beheer
+  bewaren afzonderlijke meldingstoestand zodat de tijdelijke Beheer-scope niet naar het overzicht
+  lekt. Een scopewissel gebruikt de reeds geladen objecten en start zelf geen HTTP-request.
 - `DashboardNavigationLink` in `main.dart` verzorgt de interne links `Beheer` en `Terug naar
   overzicht`. Eén expliciete `Semantics`-node levert link-, focus- en tapsemantiek; de onderliggende
   `TextButton` levert pointer- en toetsenbordactivatie en een focusrand van drie pixels. Een eigen
@@ -154,20 +176,19 @@
 - `SoftwareFactoryDeliveryTile` laat leveringsrecords bij smalle schermen en tekstvergroting verticaal
   meegroeien. Daardoor kunnen lange sleutel-, titel-, product-, status- en faseteksten teruglopen zonder
   horizontale pagina-scroll.
-- `groupIterationResults` in `iteration_results.dart` indexeert alle geladen cycli vóór
-  `LimitedListSection` ze tot 5/+10 zichtbare kaarten beperkt. Kandidaten matchen alleen met exact
-  één cyclus via een niet-lege `String productSlug` en een `int iterationSequenceNumber` gelijk aan
-  `sequenceNumber`; leveringen alleen via dezelfde productslug en een niet-lege `String
-  iterationId` gelijk aan `id`. Ontbrekende of anders getypeerde waarden en sleutels met nul of
-  meerdere matches belanden eenmaal in de betreffende unlinked-lijst. Daardoor wordt ieder geladen
-  record aan maximaal één cyclus gekoppeld en nooit via een alternatieve heuristiek.
+- `groupIterationResults` in `iteration_results.dart` indexeert alle geladen cycli binnen de actieve
+  productscope vóór `LimitedListSection` ze tot 5/+10 zichtbare kaarten beperkt. Kandidaten matchen
+  alleen met exact één cyclus via een niet-lege `String productSlug` en een `int
+  iterationSequenceNumber` gelijk aan `sequenceNumber`; leveringen alleen via dezelfde productslug
+  en een niet-lege `String iterationId` gelijk aan `id`. Ontbrekende of anders getypeerde waarden en
+  sleutels met nul of meerdere matches belanden eenmaal in de interne unlinked-lijst en worden niet
+  aan een scope-item toegeschreven.
 - `IterationCycleCard` in `main.dart` bewaart zijn eigen expanded-state en `FocusNode`. Een stabiele
   sibling-key bestaat uit productslug, iteratie-id, cyclusnummer en alleen waar nodig een
   deterministische duplicaatpositie; daardoor blijft de open/dicht-toestand bij refresh behouden en
   blijven onverwachte dubbele cycli zonder duplicate-key-fout renderbaar. De kaart toont per bron
-  loaded-resultaten, loading of failure en rendert het volledige unlinked-totaal alleen wanneer
-  cycli én beide opbrengstbronnen geladen zijn. De opbrengsttoggle en de bestaande detailbutton zijn
-  afzonderlijke native buttons.
+  loaded-resultaten, loading of failure; niet koppelbare records blijven buiten de actieve scope.
+  De opbrengsttoggle en de bestaande detailbutton zijn afzonderlijke native buttons.
 - `shouldShowIterationEvidence` selecteert uitsluitend exact productslug `product-factory` met
   status `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`, `NO_CHANGE` of `FAILED`. `_OverviewResultsBuilder`
   geeft die cycli na de bestaande groepering door aan `IterationEvidenceRow`; alle overige cycli

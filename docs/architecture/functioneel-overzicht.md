@@ -10,11 +10,11 @@ en wat je daarvan in het dashboard terugziet. Voor de vertrouwensgrenzen rond sh
 
 Een cyclus (in de code een "shadow-iteratie", ook voor autonome producten) start op twee manieren:
 
-- **Handmatig** vanuit het dashboard: de knop "Shadow-iteratie" (modus `shadow`, blijft altijd
-  intern) of "Start productcyclus nu" (modus `autonomous`, alleen zichtbaar bij een actief,
-  autonoom product met workspace-eigenaarschap `product-factory`). Rechtstreeks op de runtime kan
-  hetzelfde via `POST /api/products/{slug}/shadow-iterations` respectievelijk
-  `POST /api/products/{slug}/autonomous-cycles`.
+- **Handmatig** vanuit het dashboard: onder `Cyclus starten` start de knop "Start productcyclus nu"
+  een cyclus voor het actieve product via `POST /api/products/{slug}/cycles`. De knop is alleen
+  beschikbaar bij een actief product met workspace-eigenaarschap `product-factory`; de runtime
+  leidt de modus af uit de productinstelling (`autonomous` blijft autonoom, iedere andere
+  ontwikkelmodus wordt `shadow`).
 - **Automatisch**, uitsluitend in `autonomous`-modus: de `AutonomousCoordinator` controleert elke
   minuut (`product-factory.autonomy.poll-delay`, standaard elke minuut) of het product aan de
   planning toe is (`iterationSchedule`, standaard `0 3 * * *`, dus rond 03:00). Een nieuwe
@@ -156,31 +156,28 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   `expliciet`, `afgeleid` en `onbekend` beslisgedrag. Dit is scenariodekking en geen dynamische
   telling van alle acceptatiegegevens. De melding ontbreekt in productie en PR-previews en blijft
   zonder kleur, bij 320 CSS-pixels en 200% tekstvergroting begrijpelijk.
-- **Metrics**: aantal producten, interne storykandidaten, workspace-publicaties, cycli en
-  Software Factory-stories. Een succesvol geladen tegel toont altijd het *totaal*, ook wanneer de
-  lijst eronder is ingekort. Kandidaten, cycli en Software Factory-stories laden afzonderlijk; hun
-  tegel toont tijdens laden `Laden…` en bij een fout `Niet beschikbaar` in plaats van een
-  misleidende nul.
-- **Producten**: per product status (`draft`/`active`/gepauzeerd), ontwikkelmodus
-  (`manual`/`autonomous`/`observe-only`), met knoppen om een cyclus of shadow-iteratie te starten,
-  het product te pauzeren/hervatten, of de instellingen te openen. "Start productcyclus nu" (de
-  cyclus-CTA, alleen zichtbaar bij een actief, autonoom product met workspace-eigenaarschap
-  `product-factory`) staat als losstaande, visueel dominante knop (`StartCycleButton`) op een
-  eigen rij, boven en met extra ruimte gescheiden van de secundaire knoppenrij
-  (Pauzeren/Hervatten, Instellingen, Start overleg); onderscheidend door een eigen rand en
-  kleurenpaar met WCAG AA-contrast (≥4.5:1) en een zichtbare focusring, niet uitsluitend door
-  kleur. Gedrag, enabling-conditie, icoon en tekst van de knop zijn ongewijzigd. Gepauzeerd
-  betekent: geen nieuwe agents, stories of automatische antwoorden meer, maar extern lopend werk
-  wordt niet afgebroken.
-  Missie, Software Factory-projectkoppeling, doelrepository, workspace, `maxStoriesPerCycle`,
-  `wipLimit`, AI-provider/model en cyclustijden staan niet meer los op de kaart, maar in het
-  Instellingen-scherm (`ProductSettingsDialog`) achter de Instellingen-knop: missie, project en
-  workspace als alleen-lezen tekst met een toelichting dat ze aan de Software Factory-integratie
-  gekoppeld en dus niet bewerkbaar zijn, de overige velden — inclusief de doelrepository — als
-  bewerkbaar en opslaanbaar veld. Het scherm opent met focus binnen de dialoog, houdt de tab-focus
-  binnen de dialoog (focus-trap) en sluit met Escape, waarbij de focus terugkeert naar de
-  Instellingen-knop.
-- **Productcycli en onderzoekssessies**: cycli staan standaard in een compacte, zelfstandig
+- **Metrics**: het globale aantal geldige producten en workspace-publicaties, plus de aantallen
+  interne storykandidaten, cycli en Software Factory-stories binnen het actieve product. Een
+  succesvol geladen tegel toont het volledige scope-aantal, ook wanneer de lijst eronder is
+  ingekort. Een afgeleide telling toont `Laden…` of `Niet beschikbaar` zolang een benodigde bron
+  laadt of is mislukt, nooit een misleidende nul.
+- **Actief product**: de volledige productkaarten zijn vervangen door een compacte productkeuze en
+  de blijvend zichtbare naam van exact één actief product. Alleen een niet-lege `Product.slug` is
+  canoniek; vergelijking is exact en hoofdlettergevoelig, zonder trimmen, normaliseren of fallback
+  naar naam, id of positie. Een exact unieke browservoorkeur wordt hersteld. Anders wordt het eerste
+  geldige product in de ontvangen API-volgorde actief en wordt een aanwezige ongeldige voorkeur
+  verwijderd. Bij geen geldige producten verschijnt een lege toestand zonder productacties.
+  Wisselen bewaart alleen de gekozen slug, filtert de al geladen bronrecords en veroorzaakt geen
+  request. De keuze is met het toetsenbord bedienbaar, heeft een toegankelijke naam, actuele waarde
+  en zichtbare focus; de focus blijft na wisselen staan en een zichtbare live-status meldt de nieuwe
+  scope en tellingen. Op brede en smalle schermen is de zichtbare, semantische en tabvolgorde daarna
+  steeds `Cyclus starten`, `Eerdere cycli` en `Gekoppelde stories`.
+- **Cyclus starten**: de bestaande visueel dominante `StartCycleButton` voor het actieve product.
+  Gedrag, foutafhandeling en beschikbaarheid blijven gelijk: de knop is alleen actief bij status
+  `active` en workspace-eigenaarschap `product-factory`.
+- **Eerdere cycli**: uitsluitend cycli waarvan `Iteration.productSlug` exact gelijk is aan de
+  actieve `Product.slug`. De bestaande sortering en 5/+10-lijstbeperking blijven behouden. Cycli
+  staan standaard in een compacte, zelfstandig
   uitklapbare kaart met status, huidige rol (als hij nog loopt), starttijd, doorlooptijd, aantal
   kandidaten, aantal leverbare kandidaten, revisierondes en, wanneer van toepassing, uitkomstreden
   en criticusoordeel. De gesloten kaart toont daarnaast afzonderlijke aantallen voor interne
@@ -211,8 +208,9 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   persoonsgegevens of artefactinhoud. De native actie `Bekijk bewijs` opent met muis of toetsenbord
   het bestaande detail van die cyclus, bevat product- en cycluscontext voor hulptechnologie en
   ontvangt na sluiten of Escape opnieuw focus. De regel blijft zonder horizontale pagina-scroll
-  bruikbaar op smalle en brede schermen en bij 200% tekstvergroting. Detailinhoud, koppeling,
-  bronstatussen, sortering, lijstbeperking en auto-refresh veranderen niet.
+  bruikbaar op smalle en brede schermen en bij 200% tekstvergroting. Detailinhoud, bronstatussen,
+  sortering, lijstbeperking en auto-refresh blijven behouden; de bewijsregel verschijnt alleen bij
+  de eerdere cycli van het actieve product.
 
   De standing acceptatiecatalogus gebruikt precies deze bestaande paden: één `RUNNING`-fixture
   blijft een actieve kaart; de terminale fixtures tonen respectievelijk een expliciete menselijke
@@ -234,19 +232,15 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
 
   Koppeling gebeurt uitsluitend op een exacte combinatie van product en cyclusnummer voor een
   kandidaat, of product en cyclus-id voor een levering. De frontend gebruikt hiervoor alle geladen
-  cycli, ook degene die nog achter de 5/+10-lijstbeperking staan. Ontbrekende, ongeldige,
-  kruisproduct- en dubbelzinnige relaties worden niet op basis van titel, positie of
-  waarschijnlijkheid gegokt en tellen ieder precies eenmaal als niet koppelbaar. Zodra cycli,
-  kandidaten én leveringen succesvol zijn geladen, staat bij een positief aantal één melding buiten
-  de kaarten: `Niet aan een cyclus te koppelen in geladen gegevens: <aantal>`; bij nul staat er geen
-  melding.
+  cycli binnen de actieve scope, ook degene die nog achter de 5/+10-lijstbeperking staan.
+  Ontbrekende, ongeldige, kruisproduct- en dubbelzinnige relaties worden niet op basis van titel,
+  positie of waarschijnlijkheid gegokt en verschijnen niet in de actieve productscope.
 
   De laadstatus van cycli, kandidaten en leveringen blijft afzonderlijk zichtbaar. Per kaart toont
-  een nog ladende of mislukte opbrengstbron geen nul, maar `laden…` of `niet beschikbaar`; een
-  volledig niet-koppelbaar totaal volgt pas wanneer alle bronnen beschikbaar zijn. De globale
-  Software Factory-lijst in Beheer toont eveneens haar eigen laad- of foutmelding. De epic-roadmap
-  en de storywachtrij in Beheer melden dat ze onvolledig zijn totdat zowel kandidaten als
-  leveringen beschikbaar zijn.
+  een nog ladende of mislukte opbrengstbron geen nul, maar `laden…` of `niet beschikbaar`. Een
+  productspecifieke Software Factory-lijst in Beheer wacht ook op kandidaten, omdat die de
+  leveringsscope bepalen; `Alle producten` houdt de onafhankelijke globale leveringsbronstatus. De
+  storywachtrij meldt dat zij onvolledig is totdat zowel kandidaten als leveringen beschikbaar zijn.
 
   Iteraties die nog lopen of in de wachtrij staan (`status` QUEUED/RUNNING)
   tonen een neutrale voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge;
@@ -394,6 +388,17 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   andere status (o.a. `ACCEPTED`, `PENDING`, `QUEUED`, `RUNNING`) blijft het Reden-blok volledig
   verborgen; het bestaande 'Foutreden'-blok en de standaard ingeklapte criticus-roltegel met
   volledig artefact blijven ongewijzigd zichtbaar/functioneel.
+- **Gekoppelde stories**: uitsluitend kandidaten met exact dezelfde niet-lege
+  `StoryCandidate.productSlug` als het actieve product én een integer `iterationSequenceNumber` dat
+  precies één `sequenceNumber` van een geladen cyclus in die scope aanwijst. Ontbrekende,
+  anders getypeerde, kruisproduct- en ambigue relaties worden uitgesloten. Iedere actie opent het
+  bestaande detail van precies de gekozen kandidaat. De lijst gebruikt de 5/+10-beperking en toont
+  tijdens onvolledig laden geen definitieve nul.
+- **Product beheren**: pauzeren/hervatten, instellingen, overleg en roadmap-sessie gelden voor het
+  actieve product. Missie, Software Factory-projectkoppeling en workspace zijn in het
+  Instellingen-scherm alleen-lezen; doelrepository, `maxStoriesPerCycle`, `wipLimit`,
+  AI-provider/model en cyclustijden zijn daar bewerkbaar. De dialoog houdt toetsenbordfocus binnen
+  het scherm en herstelt bij sluiten de focus naar de Instellingen-knop.
 - **Epic-roadmap**: per product een horizontale grafiek met compacte epic-kaarten in de berekende
   uitvoervolgorde en pijlen voor afhankelijkheden. Elke kaart toont roadmap-rank,
   prioriteitsscore (0–100), klant-rank, process-rank en of de epic uitvoerbaar, geblokkeerd of
@@ -413,16 +418,26 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
 - **Workspace**: alle gepubliceerde artefacten (dossiers, evaluaties), aanklikbaar om de volledige
   inhoud te lezen.
 
-De twee globale lijsten staan niet meer op het productoverzicht. De link `Beheer` opent binnen
-dezelfde dashboardpagina de beheerweergave. Daar staat `Terug naar overzicht` als eerste focusbare
-actie; ook deze link heeft linksemantiek, zichtbare toetsenbordfocus en blijft tijdens auto-refresh
-bruikbaar. Daarna toont Beheer, in deze volgorde:
+De twee globale lijsten staan niet op het productoverzicht. De link `Beheer` opent binnen dezelfde
+dashboardpagina de beheerweergave met het actieve product als scope. Daar staat `Terug naar
+overzicht` als eerste focusbare actie; ook deze link heeft linksemantiek, zichtbare toetsenbordfocus
+en blijft tijdens auto-refresh bruikbaar. De keuze `Beheerscope` biedt ieder geldig product én,
+alleen in Beheer, `Alle producten`. Iedere lijstkop toont de gekozen productnaam of `Alle producten`.
+Een productkeuze wordt ook het actieve product op het hoofdscherm en wordt lokaal bewaard;
+`Alle producten` is tijdelijk en overschrijft die voorkeur niet. Een zichtbare live-status meldt
+scope en tellingen zonder de focus te verplaatsen. Daarna toont Beheer, in deze volgorde:
 
-- **Software Factory-stories**: elke levering, nieuwste eerst, met storysleutel of fallbacktekst,
-  titel, product, status (`DELIVERING`, `DELIVERED`, `RUNNING`, `WAITING_FOR_ANSWER`,
-  `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst bekende Software Factory-fase. Laden, fout, leeg en
-  succes worden onafhankelijk van de kandidaatbron getoond.
-- **Storywachtrij**: alle interne kandidaten exact eenmaal in Fout, Bezig, In wachtrij of Klaar, met
+- **Software Factory-stories**: leveringen binnen de gekozen scope, nieuwste eerst, met storysleutel
+  of fallbacktekst, titel, product, status (`DELIVERING`, `DELIVERED`, `RUNNING`,
+  `WAITING_FOR_ANSWER`, `WAITING_HUMAN`, `DONE`, `ERROR`) en de laatst bekende Software
+  Factory-fase. Een afzonderlijke productscope leidt de levering uitsluitend via exact één kandidaat
+  met hetzelfde integer `candidateId` en diens exacte `StoryCandidate.productSlug` af; de eventuele
+  productslug op de levering is geen fallback. Daarom zijn dan kandidaat- én leveringsbron nodig.
+  `Alle producten` behoudt de globale lijst en onafhankelijke leveringsbronstatus, inclusief records
+  zonder eenduidige productrelatie.
+- **Storywachtrij**: bij een afzonderlijk product alleen kandidaten met exact dezelfde
+  `StoryCandidate.productSlug`; bij `Alle producten` alle interne kandidaten. Ze staan exact eenmaal
+  in Fout, Bezig, In wachtrij of Klaar, met
   de bestaande status, foutinformatie, leveringskoppeling en kandidaatdetailactie. Zit een kandidaat
   vast door een onopgeloste `dependsOn`-verwijzing (`blocked == true` met een niet-lege
   `blockedReason`), dan toont de kaart direct — geen extra klik nodig — onder de titel een label met
@@ -436,11 +451,10 @@ bruikbaar. Daarna toont Beheer, in deze volgorde:
   de categorisering onvolledig is, in plaats van een compleet of leeg resultaat.
 
 Beheer hergebruikt de al geladen kandidaat- en leveringsgegevens en de bestaande kandidaatrelatie.
-Het wisselen van weergave koppelt, filtert, combineert of schrijft geen records en schrijft niets aan
-een cyclus toe. De Software Factory-metriek, cyclusopbrengsten en niet-koppelbare-opbrengstmelding
-blijven op het productoverzicht staan.
+Een scopewissel filtert alleen lokaal, doet geen request en herschrijft geen bronrecord. Alleen
+`Alle producten` mag records zonder eenduidig bepaalbare productrelatie tonen.
 
-Alle lijsten op beide weergaven (producten, productcycli, afgehandelde onderzoeksvragen,
+Alle lijsten op beide weergaven (eerdere cycli, gekoppelde stories, afgehandelde onderzoeksvragen,
 roadmap-sessies, overleggen, Software Factory-stories, access tokens, elke subsectie van de
 storywachtrij en workspace-publicaties) tonen standaard **5 items**. Staat er meer klaar, dan verschijnt
 eronder een knop **'Meer (nog N)'** die er telkens **10** bij toont; die knop verdwijnt zodra alles
@@ -448,9 +462,10 @@ zichtbaar is. Elke sectie heeft een eigen, onafhankelijke teller die de auto-ref
 tussen de weergaven overleeft: een uitgeklapte lijst blijft uitgeklapt en nieuwe items verschijnen
 bovenaan.
 Lijsten met een bruikbaar tijdstempel (cycli, leveringen, storykandidaten, access tokens) staan
-gesorteerd op nieuwste eerst; producten houden hun volgorde op slug en workspace-publicaties — die
-geen tijdstempel hebben — de volgorde van de backend. Het inkorten gebeurt volledig in de frontend op
-de al opgehaalde data; de backend-endpoints kennen geen paginering.
+gesorteerd op nieuwste eerst; de productkeuze houdt de ontvangen API-volgorde en
+workspace-publicaties — die geen tijdstempel hebben — de volgorde van de backend. Het inkorten
+gebeurt volledig in de frontend op de al opgehaalde data; de backend-endpoints kennen geen
+paginering.
 
 ## 8. Samenvatting van de belangrijkste regel
 

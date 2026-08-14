@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _product({String status = 'active'}) => {
   'slug': 'demo',
@@ -79,6 +80,8 @@ Future<void> _withDashboard(
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
     'missie, project-key, repo, workspace, max-stories, wip, AI-model, cyclustijden en roadmapplanning staan '
     'niet meer standaard op de productkaart',
@@ -95,8 +98,11 @@ void main() {
         expect(find.textContaining('Cyclustijden: 03:00, 15:00'), findsNothing);
         expect(find.textContaining('Maandag 10:00'), findsNothing);
 
-        // De kaart zelf (naam + status) blijft wel gewoon zichtbaar.
-        expect(find.text('Demo product'), findsOneWidget);
+        // De compacte keuze en actieve scope houden de productnaam zichtbaar.
+        expect(
+          find.byKey(const ValueKey('active-product-name')),
+          findsOneWidget,
+        );
       });
     },
   );

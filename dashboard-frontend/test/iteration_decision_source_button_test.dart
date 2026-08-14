@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/classification.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _iteration({
   required String id,
@@ -83,6 +84,13 @@ MockClient _buildMockClient(List<Map<String, String>> callLog) {
       return http.Response(jsonEncode(<dynamic>[]), 200);
     }
     switch (request.url.path) {
+      case '/api/products':
+        return http.Response(
+          jsonEncode([
+            {'slug': 'demo', 'name': 'Demo'},
+          ]),
+          200,
+        );
       case '/api/shadow-iterations':
         return http.Response(jsonEncode(_iterations), 200);
       case '/api/ai-catalog':
@@ -123,6 +131,8 @@ Future<void> _finishDialogTransition(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
     'iedere cyclusregel toont één native beslisbronbutton zonder interactieve rij of ruwe inhoud',
     (tester) async {

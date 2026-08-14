@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:product_factory_dashboard/classification.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _iteration({
   required String id,
@@ -80,6 +80,11 @@ MockClient _client(List<String> calls, {bool ambiguous = false}) =>
     MockClient((request) async {
       calls.add(request.url.path);
       switch (request.url.path) {
+        case '/api/products':
+          return _json([
+            {'slug': 'product-factory', 'name': 'Product Factory'},
+            {'slug': 'ander-product', 'name': 'Ander product'},
+          ]);
         case '/api/shadow-iterations':
           return _json(
             ambiguous
@@ -159,6 +164,8 @@ Future<void> _pumpDashboard(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
     'overzicht vervangt alleen terminal product-factory en telt exact gekoppelde leveringen',
     (tester) async {
@@ -167,7 +174,7 @@ void main() {
         await _pumpDashboard(tester);
 
         expect(find.byType(IterationEvidenceRow), findsOneWidget);
-        expect(find.byType(IterationCycleCard), findsNWidgets(4));
+        expect(find.byType(IterationCycleCard), findsNWidgets(2));
         expect(
           find.descendant(
             of: find.byType(IterationEvidenceRow),
@@ -207,30 +214,7 @@ void main() {
           ),
           findsOneWidget,
         );
-        final otherCard = find.ancestor(
-          of: find.text('ander-product · iteratie 39'),
-          matching: find.byType(IterationCycleCard),
-        );
-        expect(otherCard, findsOneWidget);
-        expect(
-          find.descendant(
-            of: otherCard,
-            matching: find.byType(ClassificationBadge),
-          ),
-          findsOneWidget,
-        );
-        final otherActiveCard = find.ancestor(
-          of: find.text('ander-product · iteratie 37'),
-          matching: find.byType(IterationCycleCard),
-        );
-        expect(otherActiveCard, findsOneWidget);
-        expect(
-          find.descendant(
-            of: otherActiveCard,
-            matching: find.byType(IterationProgressIndicator),
-          ),
-          findsOneWidget,
-        );
+        expect(find.textContaining('ander-product · iteratie'), findsNothing);
 
         await tester.tap(find.text('Bekijk bewijs'));
         await tester.pump();
