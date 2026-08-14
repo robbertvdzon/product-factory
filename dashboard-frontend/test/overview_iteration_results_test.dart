@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _iteration(int sequence) => {
   'id': 'iteration-$sequence',
@@ -41,6 +42,10 @@ MockClient _client({
   }
   return MockClient((request) async {
     switch (request.url.path) {
+      case '/api/products':
+        return _json([
+          {'slug': 'demo', 'name': 'Demo'},
+        ]);
       case '/api/shadow-iterations':
         return _json(iterations);
       case '/api/story-candidates':
@@ -102,6 +107,8 @@ Future<void> _pumpDashboard(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
     'volledig dubbele cycli renderen defensief met unieke kaartkeys',
     (tester) async {
@@ -112,8 +119,8 @@ void main() {
         expect(find.text('demo · iteratie 6'), findsNWidgets(2));
         expect(find.byType(IterationCycleCard), findsNWidgets(5));
         expect(
-          find.text('Niet aan een cyclus te koppelen in geladen gegevens: 3'),
-          findsOneWidget,
+          find.byKey(const ValueKey('unlinked-iteration-results')),
+          findsNothing,
         );
         expect(
           find.textContaining(
@@ -127,14 +134,14 @@ void main() {
   );
 
   testWidgets(
-    'globale melding telt niet-koppelbare records eenmaal en groepering gebruikt ook verborgen cycli',
+    'scope sluit niet-koppelbare records uit en groepering gebruikt ook verborgen cycli',
     (tester) async {
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
 
         expect(
-          find.text('Niet aan een cyclus te koppelen in geladen gegevens: 2'),
-          findsOneWidget,
+          find.byKey(const ValueKey('unlinked-iteration-results')),
+          findsNothing,
         );
         final hiddenCycleTitle = find.descendant(
           of: find.byType(IterationCycleCard),
@@ -234,9 +241,7 @@ void main() {
         );
         expect(find.textContaining('Interne kandidaten: 0'), findsNothing);
         expect(
-          find.text(
-            'Niet-koppelbare opbrengst is onvolledig doordat niet alle opbrengstbronnen beschikbaar zijn.',
-          ),
+          find.text('Gekoppelde stories zijn niet beschikbaar.'),
           findsOneWidget,
         );
         expect(

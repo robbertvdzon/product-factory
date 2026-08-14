@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/config.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 http.Response _json(Object body) => http.Response(jsonEncode(body), 200);
 
@@ -34,6 +35,8 @@ Future<void> _pumpOverview(
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   test(
     'productie- en previewbuild hebben de acceptatiemarkering standaard uit',
     () {

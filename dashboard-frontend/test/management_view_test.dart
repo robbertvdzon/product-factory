@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/limited_list.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 http.Response _json(Object body, {int status = 200}) =>
     http.Response(jsonEncode(body), status);
@@ -155,6 +156,8 @@ bool _containsPrimaryFocus(WidgetTester tester, Finder finder) {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
     'verplaatst beide globale lijsten verliesvrij naar Beheer zonder nieuwe requests',
     (tester) async {
@@ -222,9 +225,11 @@ void main() {
       await _openManagement(tester);
 
       final deliveryHeadingY = tester
-          .getTopLeft(find.text('Software Factory-stories'))
+          .getTopLeft(find.text('Software Factory-stories — Alle producten'))
           .dy;
-      final queueHeadingY = tester.getTopLeft(find.text('Storywachtrij')).dy;
+      final queueHeadingY = tester
+          .getTopLeft(find.text('Storywachtrij — Alle producten'))
+          .dy;
       expect(deliveryHeadingY, lessThan(queueHeadingY));
       expect(find.byType(SoftwareFactoryDeliveryTile), findsNWidgets(4));
       expect(
@@ -320,7 +325,10 @@ void main() {
             findsOneWidget,
           );
         }
-        expect(find.text('Demo product voor regressie'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('active-product-name')),
+          findsOneWidget,
+        );
 
         await tester.tap(find.byType(SettingsButton));
         await tester.pumpAndSettle();
@@ -361,20 +369,20 @@ void main() {
         );
         expect(
           find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
-          findsNothing,
+          findsOneWidget,
         );
 
         await tester.tap(find.text('Toon opbrengst'));
         await tester.pump();
         expect(
           find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
-          findsOneWidget,
+          findsNWidgets(2),
         );
         await tester.tap(find.text('Verberg opbrengst'));
         await tester.pump();
         expect(
           find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
-          findsNothing,
+          findsOneWidget,
         );
         expect(find.textContaining('Status: ACCEPTED'), findsOneWidget);
         expect(
@@ -816,6 +824,7 @@ void main() {
         link,
         find.widgetWithText(FilledButton, 'Product toevoegen'),
         find.byTooltip('Vernieuwen'),
+        find.byType(ProductScopePicker),
         find.byType(StartCycleButton),
         find.widgetWithText(OutlinedButton, 'Pauzeren'),
         find.byType(SettingsButton),
@@ -875,6 +884,12 @@ void main() {
       expect(
         managementTextButton.style?.side?.resolve({WidgetState.focused})?.width,
         3,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        _containsPrimaryFocus(tester, find.byType(ProductScopePicker)),
+        isTrue,
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();

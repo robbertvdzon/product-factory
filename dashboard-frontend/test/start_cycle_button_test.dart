@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/classification.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Dekt de herpositionering van de CTA 'Start productcyclus nu' op de Producten-kaart
 /// (product-156): eigen rij vóór en visueel gescheiden van de secundaire knoppenrij, AA-contrast,
@@ -70,83 +71,9 @@ Future<void> _withDashboard(
   }, () => mockClient);
 }
 
-/// Reconstructie van de productkaart-knoppenrij zoals die vóór deze story was: alle vier de
-/// knoppen (inclusief 'Start productcyclus nu') samen in één `Wrap`, zonder eigen CTA-rij. Dient
-/// als vaste referentie om de kaarthoogte vóór/na deze wijziging te kunnen vergelijken, zonder
-/// afhankelijk te zijn van git-geschiedenis.
-class _LegacyProductCard extends StatelessWidget {
-  const _LegacyProductCard({required this.width});
-  final double width;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: width,
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.inventory_2_outlined),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Demo product',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                const Chip(label: Text('active')),
-                const SizedBox(width: 8),
-                const Chip(label: Text('autonomous')),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Active: geplande productcycli en leveringen mogen draaien.',
-            ),
-            const Text(
-              'Autonomous: de Product Factory mag geaccepteerde stories '
-              'zelfstandig naar de Software Factory sturen.',
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Wrap(
-                spacing: 8,
-                children: [
-                  FilledButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.auto_awesome),
-                    label: const Text('Start productcyclus nu'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.pause),
-                    label: const Text('Pauzeren'),
-                  ),
-                  SettingsButton(onPressed: () async {}),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.forum_outlined),
-                    label: const Text('Start overleg'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('Start roadmap-sessie nu'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
     "'Start productcyclus nu' staat als eigen StartCycleButton-widget op een losstaande rij, "
     'vóór en boven de secundaire knoppenrij, met een stijl die door rand/grootte verschilt',
@@ -203,12 +130,16 @@ void main() {
   );
 
   testWidgets(
-    "de status (autonomous/manual) blijft als leesbare tekst naast de productnaam zichtbaar",
+    'de actieve productnaam blijft zichtbaar naast de compacte productkeuze',
     (tester) async {
       final callLog = <Map<String, String>>[];
       await _withDashboard(tester, _product(), callLog, 900, () async {
-        expect(find.text('active'), findsOneWidget);
-        expect(find.text('autonomous'), findsOneWidget);
+        expect(find.text('Demo product'), findsWidgets);
+        expect(find.byType(ProductScopePicker), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('active-product-name')),
+          findsOneWidget,
+        );
       });
     },
   );
@@ -319,50 +250,18 @@ void main() {
   );
 
   testWidgets(
-    'de kaarthoogte na deze wijziging is kleiner dan de kaarthoogte vóór de wijziging, gemeten op '
-    'dezelfde testviewportbreedte',
+    'de volledige productkaart is vervangen door een compacte productscope',
     (tester) async {
-      const viewportWidth = 488.0;
       final callLog = <Map<String, String>>[];
-
-      late double newCardHeight;
-      late double newCardWidth;
-      await _withDashboard(
-        tester,
-        _product(),
-        callLog,
-        viewportWidth,
-        () async {
-          final card = find.ancestor(
-            of: find.text('Demo product'),
-            matching: find.byType(Card),
-          );
-          final size = tester.getSize(card);
-          newCardHeight = size.height;
-          newCardWidth = size.width;
-        },
-      );
-
-      // De legacy-kaart wordt op exact dezelfde breedte gerenderd als de daadwerkelijke kaart
-      // hierboven (viewportbreedte minus de vaste ListView- en Card-padding uit main.dart).
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xff325d4d),
-            ),
-          ),
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: _LegacyProductCard(width: newCardWidth),
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      final legacyCardHeight = tester.getSize(find.byType(Card)).height;
-
-      expect(newCardHeight, lessThan(legacyCardHeight));
+      await _withDashboard(tester, _product(), callLog, 488, () async {
+        final activeName = find.byKey(const ValueKey('active-product-name'));
+        expect(activeName, findsOneWidget);
+        expect(
+          find.ancestor(of: activeName, matching: find.byType(Card)),
+          findsNothing,
+        );
+        expect(find.byType(ProductScopePicker), findsOneWidget);
+      });
     },
   );
 }

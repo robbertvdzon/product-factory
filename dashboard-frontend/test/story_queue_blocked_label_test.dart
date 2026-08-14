@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/classification.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Bouwt een [MockClient] die alle door `OverviewPage` gebruikte `/api/...`-endpoints beantwoordt
 /// (conform de projectconventie dat widgettests géén echte HTTP-calls doen) en elk opgevraagde pad
@@ -14,6 +15,13 @@ MockClient _buildMockClient(List<dynamic> stories, List<String> callLog) {
   return MockClient((request) async {
     callLog.add(request.url.path);
     switch (request.url.path) {
+      case '/api/products':
+        return http.Response(
+          jsonEncode([
+            {'slug': 'demo', 'name': 'Demo'},
+          ]),
+          200,
+        );
       case '/api/story-candidates':
         return http.Response(jsonEncode(stories), 200);
       case '/api/ai-catalog':
@@ -61,6 +69,8 @@ Future<void> _pumpDashboard(
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
     'toont het blokkeerlabel als de kandidaat blocked is met een reden',
     (tester) async {
