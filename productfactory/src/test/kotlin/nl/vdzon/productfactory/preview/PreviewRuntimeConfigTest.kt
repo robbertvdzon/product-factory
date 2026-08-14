@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.preview
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertEquals
 
 private const val VALID_DB_URL = "jdbc:postgresql://postgres:5432/productfactory"
 
@@ -29,6 +30,9 @@ class PreviewRuntimeConfigTest {
     fun `enabled configuration with everything correct is valid`() {
         val config = PreviewRuntimeConfig(enabled = true, marker = PreviewRuntimeConfig.REQUIRED_MARKER, databaseUrl = VALID_DB_URL, previewPrNumber = "42")
         assert(config.prNumber == 42)
+        assertEquals(SyntheticDataset.PR_PREVIEW, config.dataset)
+        assertEquals(42, config.requirePreviewSeedingAllowed())
+        assertFailsWith<IllegalArgumentException> { config.requireAcceptanceSeedingAllowed() }
     }
 
     @Test
@@ -65,6 +69,9 @@ class PreviewRuntimeConfigTest {
         val config = PreviewRuntimeConfig(enabled = true, marker = PreviewRuntimeConfig.ACCEPTANCE_MARKER, databaseUrl = VALID_DB_URL, previewPrNumber = "")
         assert(config.prNumber == null)
         assert(config.requireSeedingAllowed() == 0)
+        assertEquals(SyntheticDataset.ACCEPTANCE, config.dataset)
+        config.requireAcceptanceSeedingAllowed()
+        assertFailsWith<IllegalArgumentException> { config.requirePreviewSeedingAllowed() }
     }
 
     @Test

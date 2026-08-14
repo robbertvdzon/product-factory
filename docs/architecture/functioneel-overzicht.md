@@ -147,9 +147,15 @@ zelf of op een subtaak) tijdens het uitvoeren van een fase.
 
 Het (Google-beveiligde) Flutter-dashboard heeft een productoverzicht en een secundaire beheerweergave.
 Beide gebruiken dezelfde dashboardsessie en dezelfde elke 5 seconden ververste gegevens; Beheer heeft
-geen eigen URL of gegevensbron. Het productoverzicht bevat bovenaan de focusbare link `Beheer`, met
-linksemantiek en zichtbare toetsenbordfocus, en toont daarna van boven naar beneden:
+geen eigen URL of gegevensbron. Het productoverzicht bevat de focusbare link `Beheer`, met
+linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
 
+- **Synthetische acceptatiedata**: uitsluitend in de standing acceptatievariant staat direct onder
+  `Productoverzicht`, vóór navigatieacties, metrics en overige inhoud, een zichtbare en semantisch
+  gegroepeerde melding. Zij beschrijft de vaste catalogus als `1 actief`, `3 terminaal` en met
+  `expliciet`, `afgeleid` en `onbekend` beslisgedrag. Dit is scenariodekking en geen dynamische
+  telling van alle acceptatiegegevens. De melding ontbreekt in productie en PR-previews en blijft
+  zonder kleur, bij 320 CSS-pixels en 200% tekstvergroting begrijpelijk.
 - **Metrics**: aantal producten, interne storykandidaten, workspace-publicaties, cycli en
   Software Factory-stories. Een succesvol geladen tegel toont altijd het *totaal*, ook wanneer de
   lijst eronder is ingekort. Kandidaten, cycli en Software Factory-stories laden afzonderlijk; hun
@@ -207,6 +213,14 @@ linksemantiek en zichtbare toetsenbordfocus, en toont daarna van boven naar bene
   ontvangt na sluiten of Escape opnieuw focus. De regel blijft zonder horizontale pagina-scroll
   bruikbaar op smalle en brede schermen en bij 200% tekstvergroting. Detailinhoud, koppeling,
   bronstatussen, sortering, lijstbeperking en auto-refresh veranderen niet.
+
+  De standing acceptatiecatalogus gebruikt precies deze bestaande paden: één `RUNNING`-fixture
+  blijft een actieve kaart; de terminale fixtures tonen respectievelijk een expliciete menselijke
+  handmatige annulering, `Evaluatie-agent (Afgeleid)` en `Onbekend (Afgeleid)`. Aan de
+  `ACCEPTED`-fixture zijn exact twee voltooide synthetische leveringen gekoppeld; de onbekende
+  `REJECTED`-fixture heeft geen kandidaten of leveringen. Daardoor tonen hun bewijsregels via de
+  gewone koppellogica respectievelijk twee en nul gekoppelde opbrengsten, en verschijnen de twee
+  leveringen met hun vaste sleutel, titel, status en fase in Beheer.
 
   In de reguliere kaart opent de button `Toon opbrengst` uitsluitend binnen dezelfde kaart twee
   groepen: `Interne kandidaten` en `Software Factory-leveringen`. Iedere gekoppelde titel staat

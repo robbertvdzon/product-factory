@@ -24,3 +24,13 @@ origin en callbackconfiguratie toe aan dezelfde Google OAuth-client als de ander
 
 De twee publieke Cloudflare-routes staan in `deploy/README.md`. De interne runtime-route is alleen
 voor operationele health/deploycontrole en hoort niet als gebruikersendpoint te worden gedeeld.
+
+## Standing acceptatie
+
+Naast productie bestaat de geïsoleerde overlay `deploy/overlays/acceptance` in namespace
+`product-factory-acceptance`. Deze combineert de geverifieerde marker
+`product-factory-acceptance`, een in-namespace database en uitgeschakelde autonomie/externe
+publicatie met een afzonderlijke frontendimage (`ACCEPTANCE_DATASET=true`). Alleen daar worden de
+vaste `product-factory`-acceptatiefixtures en de zichtbare synthetische-datamelding geactiveerd;
+productie en PR-previews blijven daarvan vrij. De routes, exacte activatievoorwaarden,
+datasetscheiding en botsingsprocedure staan in [deploy/README.md](../../deploy/README.md#standing-acceptatieomgeving).

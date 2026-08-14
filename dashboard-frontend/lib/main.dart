@@ -258,8 +258,13 @@ class _OverviewResultsBuilder extends StatelessWidget {
 }
 
 class OverviewPage extends StatefulWidget {
-  const OverviewPage({required this.session, super.key});
+  const OverviewPage({
+    required this.session,
+    this.acceptanceDataset = AppConfig.acceptanceDataset,
+    super.key,
+  });
   final AuthenticatedSession? session;
+  final bool acceptanceDataset;
   @override
   State<OverviewPage> createState() => _OverviewPageState();
 }
@@ -683,6 +688,10 @@ class _OverviewPageState extends State<OverviewPage> {
                   'Productoverzicht',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
+                if (widget.acceptanceDataset) ...[
+                  const SizedBox(height: 16),
+                  const AcceptanceDatasetNotice(),
+                ],
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerRight,
@@ -1151,6 +1160,46 @@ class _OverviewPageState extends State<OverviewPage> {
           },
         );
       },
+    ),
+  );
+}
+
+/// Statische omgevingsmelding: aantallen beschrijven de vaste fixturecatalogus
+/// en worden daarom niet afgeleid uit mogelijk aanvullende acceptatiegegevens.
+class AcceptanceDatasetNotice extends StatelessWidget {
+  const AcceptanceDatasetNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7F1ED),
+        border: Border.all(color: const Color(0xFF325D4D), width: 2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              'Synthetische acceptatiedata',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: const Color(0xFF173D31),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Vaste scenariodekking: 1 actief en 3 terminaal, met expliciet, afgeleid en onbekend beslisgedrag.',
+            style: TextStyle(color: Color(0xFF173D31)),
+          ),
+        ],
+      ),
     ),
   );
 }

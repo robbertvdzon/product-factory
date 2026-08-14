@@ -14,6 +14,14 @@ te activeren, heeft linksemantiek en een zichtbare focusrand.
 
 Het productoverzicht bestaat van boven naar beneden uit:
 
+Uitsluitend in de standing acceptatievariant staat direct onder de kop `Productoverzicht` en vóór
+de navigatieacties, metrics en overige overzichtsinhoud de melding `Synthetische acceptatiedata`.
+De zichtbare én toegankelijke tekst beschrijft de vaste catalogus als `1 actief` en `3 terminaal`,
+met `expliciet`, `afgeleid` en `onbekend` beslisgedrag. Dit zijn statische aantallen voor de
+synthetische scenariodekking, geen dynamische totalen van alle gegevens in de acceptatiedatabase.
+De melding groeit bij 320 CSS-pixels en 200% tekstvergroting verticaal mee en blijft zonder kleur
+begrijpelijk. Productie en PR-previews tonen deze melding niet.
+
 1. **Metric-tegels** — totalen voor producten, interne storykandidaten, workspace-publicaties,
    shadow-iteraties en Software Factory-stories. Een succesvol geladen teller toont altijd het
    *totaal*, ook als de lijst eronder is ingekort. De drie afzonderlijk geladen bronnen voor
@@ -40,6 +48,14 @@ Het productoverzicht bestaat van boven naar beneden uit:
    komen uit de records van de actuele, succesvol geladen dashboardverversing en zijn als `geladen
    gegevens` gelabeld; de al bestaande backendcyclusaantallen voor kandidaten en leverbare
    kandidaten blijven afzonderlijk zichtbaar.
+
+   De vaste acceptatiecatalogus vult de bestaande presentatieregels zonder fixturespecifieke
+   classificatie: de ene `RUNNING`-cyclus blijft een actieve kaart; de drie terminale cycli tonen
+   respectievelijk `Mens` met `Handmatig geannuleerd`, `Evaluatie-agent (Afgeleid)` en `Onbekend
+   (Afgeleid)`. De geaccepteerde cyclus heeft twee exact gekoppelde Software Factory-leveringen en
+   toont dus `Gekoppelde opbrengst: 2`; de afgewezen onbekende cyclus heeft geen kandidaat of
+   levering en toont `Gekoppelde opbrengst: 0`. De twee voltooide synthetische leveringen blijven
+   via de bestaande beheerweergave zichtbaar.
 
    Uitsluitend voor de exacte, hoofdlettergevoelige productslug `product-factory` vervangt een
    niet-uitklapbare bewijsregel deze kaart zodra de status `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`,

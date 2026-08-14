@@ -23,3 +23,27 @@ Testers gebruiken de frontend-URL hierboven om de preview in de browser te bekij
 De preview-database is een wegwerpbare in-namespace Postgres (`deploy/overlays/preview`)
 met een vaste, niet-gevoelige connectiestring — geen echt secret om op te halen, vandaar de
 simpele recipe hierboven in plaats van een `oc get secret`-aanroep.
+
+## Standing acceptatieomgeving
+
+De afzonderlijke overlay `deploy/overlays/acceptance` draait in namespace
+`product-factory-acceptance` en gebruikt vaste hostnamen:
+
+- Frontend: `https://product-factory-acceptance.vdzonsoftware.nl`
+- Dashboard-backend/API: `https://product-factory-api-acceptance.vdzonsoftware.nl`
+- Runtime: `https://product-factory-runtime-acceptance.vdzonsoftware.nl`
+
+De runtime laadt de versieerbare synthetische `product-factory`-catalogus alleen wanneer
+`PF_PREVIEW_ENABLED=true`, `PF_PREVIEW_MARKER=product-factory-acceptance`, geen
+`PF_PREVIEW_PR_NUMBER` is gezet en `PF_DB_URL` naar de in-namespace database wijst. De
+PR-previewmarker blijft de bestaande `hkh-autopilot`-dataset selecteren; productie heeft de
+synthetische modus en marker uitgeschakeld. Autonome uitvoering en externe workspacepublicatie
+staan in de acceptance-overlay uit.
+
+De acceptance-frontend is een afzonderlijke imagevariant met compile-time
+`ACCEPTANCE_DATASET=true`, een acceptance-API-base-URL en uitgeschakelde login. CI tagt deze als
+`sha-<commit>-acceptance` en pint alleen de acceptance-overlay op die variant. Productie en
+PR-previews gebruiken de veilige Dockerfile-default `ACCEPTANCE_DATASET=false` en tonen de melding
+dus niet. Herstarten mag de vaste fixtures niet wijzigen of dupliceren; een afwijkende botsing op
+een gereserveerde fixture-identiteit laat startup transactioneel falen in plaats van data te
+overschrijven.
