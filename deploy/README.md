@@ -39,6 +39,29 @@ Cloudflare publiceert `product-factory.vdzonsoftware.nl` naar
 `product-factory-api.vdzonsoftware.nl` naar
 `http://dashboard-backend.product-factory.svc.cluster.local:8081`.
 
+## Standing acceptatieomgeving
+
+`deploy/overlays/acceptance` is een blijvende, van productie en PR-previews gescheiden omgeving in
+namespace `product-factory-acceptance`. De gebruikers- en API-routes zijn respectievelijk
+`https://product-factory-acceptance.vdzonsoftware.nl` en
+`https://product-factory-api-acceptance.vdzonsoftware.nl`.
+
+De acceptance-overlay selecteert de vaste synthetische dataset met `PF_PREVIEW_ENABLED=true` en
+marker `product-factory-acceptance`; `PF_PREVIEW_PR_NUMBER` blijft daar leeg. De runtime accepteert
+deze combinatie alleen met de in-namespace PostgreSQL-URL en laadt dan seedversie
+`acceptance-product-factory-cycles-v1`. Laat de previewmarker en de acceptance-marker nooit tussen
+overlays uitwisselen: de previewmarker selecteert de afzonderlijke bestaande `hkh-autopilot`-seed,
+terwijl productie geen synthetische seed activeert.
+
+De overlay houdt autonomie en externe workspacepublicatie uitgeschakeld. De twee synthetische
+leveringen zijn al voltooid, bevestigd en geëvalueerd en worden daarom niet naar externe systemen
+gestuurd. De frontend gebruikt bovendien de aparte, door CI gepinde image
+`sha-<commit>-acceptance`; alleen die build bevat `ACCEPTANCE_DATASET=true` en toont de melding
+`Synthetische acceptatiedata`. Een restart is veilig en idempotent. Faalt startup met een melding
+over een afwijkende gereserveerde acceptatiefixture, herstel dan niet door rijen te overschrijven:
+onderzoek eerst de botsende id/seedversie; de transactie heeft geen gedeeltelijke catalogus
+achtergelaten.
+
 ## Database verbinden
 
 Er zijn twee volledig gescheiden PostgreSQL-databases: een lokale, lege ontwikkeldatabase via

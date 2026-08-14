@@ -24,6 +24,40 @@
 - `dashboard-backend` — Spring Boot API + Google-authenticatie; ontsluit de runtime voor het dashboard.
 - `dashboard-frontend` — de Flutter-webapp met het productoverzicht.
 
+## Synthetische omgevingsdatasets
+
+- `PreviewRuntimeConfig` selecteert fail-closed exact één `SyntheticDataset`: `PR_PREVIEW` bij
+  marker `product-factory-pr-preview` plus een positief PR-nummer, `ACCEPTANCE` bij marker
+  `product-factory-acceptance` zonder PR-nummer, en anders `NONE`. Een ingeschakelde synthetische
+  modus accepteert uitsluitend de in-namespace PostgreSQL-URL. `PreviewDataStartup` routeert op
+  deze selectie; daardoor kan een acceptance-start nooit de PR-previewseed laden en omgekeerd.
+- De bestaande PR-previewcatalogus voor `hkh-autopilot` blijft ongewijzigd. Alleen `ACCEPTANCE`
+  laadt `AcceptanceFixtureCatalog` versie `acceptance-product-factory-cycles-v1` voor exact slug
+  `product-factory`: vier cycli met vaste ids, nummers 9201–9204 en UTC-tijden, één expliciet
+  beslisrecord, twee kandidaten en twee voltooide leveringen. De scenario's zijn één `RUNNING`,
+  één handmatig geannuleerde `FAILED`, één `ACCEPTED` met `criticVerdict=ACCEPT` en twee gekoppelde
+  opbrengsten, en één `REJECTED` met `criticVerdict=ACCEPT` zonder gekoppelde opbrengst.
+- `AcceptanceFixtureValidator` vergelijkt vóór opslag recursief de gesloten veldenset, recordaantallen
+  en iedere exacte waarde met de versieerbare catalogus; er is geen invoerpad voor vrije
+  fixturewaarden. Daardoor worden een andere productslug, extra velden en gewijzigde waarden met
+  persoonsgegevens, contactgegevens, prompts, tokens, stacktraces, productie-identiteiten of echte
+  `hkh-autopilot`-verwijzingen geweigerd. Na een insert wordt dezelfde vergelijking op de opgeslagen
+  data uitgevoerd. Een exact reeds aanwezige catalogus is een no-op. Iedere botsing op een
+  gereserveerde id, cyclussleutel, fingerprint, idempotency key of seedversie faalt concreet binnen
+  dezelfde transactie; bestaande data wordt niet overschreven en gedeeltelijke fixturedata wordt
+  teruggedraaid.
+- Op een lege acceptatiedatabase maakt de seeder alleen de noodzakelijke, gepauzeerde
+  `product-factory`-productcontext aan. Een al bestaand product en alle niet-gereserveerde cycli of
+  records blijven ongemoeid. De kandidaten staan al op `PUBLISHED`; de leveringen op `DONE`, fase
+  `developed`, bevestigd deployed en geëvalueerd. Daardoor starten ze geen agentrun, reconciliatie,
+  workspacepublicatie of Software Factory-levering. De implementatie gebruikt uitsluitend de
+  bestaande tabellen en API-contracten: er is geen migratie, endpoint of contractveld toegevoegd.
+- De frontend krijgt de omgevingsmarkering uitsluitend compile-time via Dart-define
+  `ACCEPTANCE_DATASET`. De Dockerfile-default is `false`; alleen de apart getagde acceptance-image
+  zet deze op `true`. `OverviewPage` voegt dan de statische `AcceptanceDatasetNotice` direct onder
+  `Productoverzicht` toe. De bestaande sortering, classificatie, koppeling, beheerweergave,
+  verversing en detailbediening blijven hetzelfde.
+
 ## Beslisprovenance, opslag en API-contract
 
 - Flyway-migratie `V20__shadow_iteration_decision.sql` voegt de tabel
