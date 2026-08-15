@@ -108,7 +108,8 @@
   `session.dart` — Google-login; `formatting.dart` — datum/tijd- en duurformattering;
   `limited_list.dart` — de 5/+10-lijstbeperking; `iteration_results.dart` — pure, verliesvrije
   client-side koppeling van geladen kandidaten en leveringen aan cycli; `iteration_evidence.dart` —
-  de pure selector en veilige presentatie-opbouw voor terminale `product-factory`-cycli;
+  de pure, productslug-onafhankelijke selector en veilige presentatie-opbouw voor terminale,
+  actieve en onbekende cycli van ieder product;
   `product_scope.dart` — canonieke productselectie, scopefilters en browservoorkeur;
   `start_availability.dart` — het pure, gedeelde presentatiemodel voor de handmatige
   startbeschikbaarheid;
@@ -122,20 +123,13 @@
   bekende waarden hoofdlettergevoelig, accepteert alleen de bewezen paren `ACCEPT`/`ACCEPTED`,
   `REVISE`/`NEEDS_REVISION` en `REJECT`/`REJECTED` als `Evaluatie-agent`, en alleen `FAILED` zonder
   verdict maar met foutmelding als `Technische fout`; alle overige combinaties zijn `Onbekend`.
-  Het bestand bevat daarnaast de AA-contrastkleuren en de `ClassificationBadge`-widget. Voor een
-  iteratie met `status` QUEUED of RUNNING toont de iteratierij in plaats van de badge de
-  `IterationProgressIndicator`-widget (`main.dart`), met `Semantics(liveRegion: true)` als
-  Flutter-web-equivalent van `aria-live="polite"`; elke andere status toont een
-  `ClassificationBadge`, behalve wanneer expliciete provenance aanwezig is. Dan krijgen bron en
-  reden voorrang en worden de afgeleide badge en `outcomeReason` zowel in lijst als detail
-  onderdrukt. `IterationSessionDialog` toont bij expliciete handmatige annulering daarnaast het
+  Alleen de twee bewezen bronnen krijgen in `iterationDecisionPresentation` de vlag `(Afgeleid)`;
+  `Onbekend` krijgt die bewijsclaim nooit. Het bestand bevat daarnaast de AA-contrastkleuren en de
+  `ClassificationBadge`-widget voor terminale detailpresentatie. `IterationSessionDialog` toont bij
+  expliciete handmatige annulering daarnaast het
   mechanisme en `decidedAt` via de bestaande lokale datum-/tijdformatter. Zonder expliciet record
-  toont lijst en detail de conservatief afgeleide bron zichtbaar en toegankelijk met `(Afgeleid)`.
-  Elke iteratierij bevat ook één
-  `IterationDecisionSourceButton` (`main.dart`): een native `OutlinedButton` die de bestaande
-  detaildialoog voor het gekoppelde iteratie-id opent. De `ListTile` zelf heeft geen `onTap` of
-  navigatie-chevron, zodat er geen geneste of dubbele detailbediening is. De button bewaart een
-  eigen `FocusNode`; na sluiten via de sluitactie of Escape keert de focus terug naar de opener.
+  toont het detail een bewezen conservatief afgeleide bron zichtbaar en toegankelijk met
+  `(Afgeleid)`, of anders uitsluitend `Onbekend`.
   De dialoogtitel gebruikt het user-facing `sequenceNumber`, met het iteratie-id als fallback als
   dat nummer ontbreekt. Openen en sluiten gebruikt uitsluitend de bestaande GET-calls.
   `roadmap.dart` bevat het epic-contract voor de UI, de horizontale dependencygrafiek, kaartjes en
@@ -201,16 +195,13 @@
   en een niet-lege `String iterationId` gelijk aan `id`. Ontbrekende of anders getypeerde waarden en
   sleutels met nul of meerdere matches belanden eenmaal in de interne unlinked-lijst en worden niet
   aan een scope-item toegeschreven.
-- `IterationCycleCard` in `main.dart` bewaart zijn eigen expanded-state en `FocusNode`. Een stabiele
+- `iterationHistoryKind` in `iteration_evidence.dart` selecteert productslug-onafhankelijk een
+  terminale bewijsregel voor `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`, `NO_CHANGE` en `FAILED`, een
+  actieve voortgangskaart voor `QUEUED` en `RUNNING`, en anders een veilige onbekende-statuskaart.
+  De productslug bepaalt alleen productscope, sleutel en toegankelijke identificatie. Een stabiele
   sibling-key bestaat uit productslug, iteratie-id, cyclusnummer en alleen waar nodig een
-  deterministische duplicaatpositie; daardoor blijft de open/dicht-toestand bij refresh behouden en
-  blijven onverwachte dubbele cycli zonder duplicate-key-fout renderbaar. De kaart toont per bron
-  loaded-resultaten, loading of failure; niet koppelbare records blijven buiten de actieve scope.
-  De opbrengsttoggle en de bestaande detailbutton zijn afzonderlijke native buttons.
-- `shouldShowIterationEvidence` selecteert uitsluitend exact productslug `product-factory` met
-  status `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`, `NO_CHANGE` of `FAILED`. `_OverviewResultsBuilder`
-  geeft die cycli na de bestaande groepering door aan `IterationEvidenceRow`; alle overige cycli
-  blijven `IterationCycleCard` gebruiken. `iterationEvidencePresentation` hergebruikt
+  deterministische duplicaatpositie, zodat onverwachte dubbele cycli defensief blijven renderen.
+- `iterationEvidencePresentation` hergebruikt
   `parseInstant`/`formatDateTime`, `classifyIterationOutcome`, `outcomeReasonLabel` en
   `iterationDecisionPresentation`. De datum valt per parseerpoging van `startedAt` terug op
   `createdAt`. Alleen een volledig geldig, aan hetzelfde iteratie-id gekoppeld
@@ -221,7 +212,14 @@
   uitsluitend `linked.deliveries.length` uit de bestaande exacte groepering; de onafhankelijke
   leveringsbronstatus bepaalt `laden…`, `niet beschikbaar` of het geladen aantal. Een responsieve
   `Wrap` gebruikt één, twee of drie kolommen. De native `OutlinedButton` heeft een eigen `FocusNode`,
-  opent de bestaande `_showIteration`-detailroute en herstelt focus na sluiten of Escape. Hiervoor
+  opent de bestaande `_showIteration`-detailroute en herstelt focus na sluiten of Escape. De
+  toegankelijke actienaam bevat product, cyclus, datum en uitkomst.
+- `IterationProgressCard` rendert actieve cycli uitsluitend met de gesloten veilige statusmapping,
+  een bekende `currentRole`, rechtstreeks uit status bepaalde voortgang en één neutrale
+  `IterationProgressButton`. Voor onbekende status blijven alleen `Status: Onbekend` en die actie
+  over. Beide varianten zijn niet uitklapbaar, vormen een eigen semanticscontainer en renderen geen
+  terminale of vrije metadata. De bovenliggende geschiedenis is één benoemde semanticsgroep.
+  Hiervoor
   zijn geen API-, contract-, opslag-, telemetrie- of dependencywijzigingen toegevoegd.
 - Geen extra dependencies voor formattering: datum/tijd wordt met eigen helpers naar het vaste formaat
   `dd-MM-yyyy HH:mm` in de lokale tijdzone gebracht, duur naar maximaal twee eenheden (`2u 13m`,
@@ -230,8 +228,8 @@
 - Paginering gebeurt client-side: alle lijstdata komt in één refresh binnen, de frontend toont er
   standaard 5 van en laat er per klik op 'Meer' 10 extra zien. De zichtbaarheidstellers staan in
   `_OverviewPageState` (dus buiten de `FutureBuilder`) zodat de auto-refresh van 5 s de
-  lijstbeperking behoudt. De expanded-state van cycluskaarten staat in de stateful kaarten zelf en
-  blijft via hun stabiele keys behouden zolang de betreffende cycli geladen blijven.
+  lijstbeperking behoudt. Cyclusregels en voortgangskaarten zijn niet uitklapbaar; hun stabiele keys
+  behouden uitsluitend de juiste widgetidentiteit en openerfocus tijdens een auto-refresh.
 - Teksten in de UI zijn Nederlands; commentaar legt het *waarom* vast, niet het *wat*.
 - Formatteer nieuwe of gewijzigde code met `dart format`; laat ongerelateerde regels met rust, zodat de
   diff van een story leesbaar blijft (het bestand is historisch niet volledig dart-formatted).

@@ -467,7 +467,6 @@ class _OverviewPageState extends State<OverviewPage> {
         iterationId: '${iteration['id']}',
       ),
     );
-    if (mounted) setState(_reload);
   }
 
   Future<void> _openMeeting(String productSlug, String meetingId) async {
@@ -1026,40 +1025,37 @@ class _OverviewPageState extends State<OverviewPage> {
                   title: Text('Nog geen cycli voor dit product'),
                 ),
               if (iterationSource.loaded)
-                _limitedSection(
-                  'iterations-${activeProduct['slug']}',
-                  scopedIterations,
-                  (iteration) {
-                    final linked = grouping!.resultsFor(iteration);
-                    if (shouldShowIterationEvidence(iteration)) {
-                      return IterationEvidenceRow(
-                        key: ValueKey(
-                          _iterationCardIdentity(scopedIterations, iteration),
-                        ),
+                Semantics(
+                  container: true,
+                  explicitChildNodes: true,
+                  label:
+                      'Cyclusgeschiedenis voor product ${activeProduct['slug']}',
+                  child: _limitedSection(
+                    'iterations-${activeProduct['slug']}',
+                    scopedIterations,
+                    (iteration) {
+                      final linked = grouping!.resultsFor(iteration);
+                      final cardKey = ValueKey(
+                        _iterationCardIdentity(scopedIterations, iteration),
+                      );
+                      if (shouldShowIterationEvidence(iteration)) {
+                        return IterationEvidenceRow(
+                          key: cardKey,
+                          iteration: iteration,
+                          deliveries: deliverySource.loaded
+                              ? linked.deliveries
+                              : null,
+                          deliveriesLoading: deliverySource.loading,
+                          onOpenDetails: () => _showIteration(iteration),
+                        );
+                      }
+                      return IterationProgressCard(
+                        key: cardKey,
                         iteration: iteration,
-                        deliveries: deliverySource.loaded
-                            ? linked.deliveries
-                            : null,
-                        deliveriesLoading: deliverySource.loading,
                         onOpenDetails: () => _showIteration(iteration),
                       );
-                    }
-                    return IterationCycleCard(
-                      key: ValueKey(
-                        _iterationCardIdentity(scopedIterations, iteration),
-                      ),
-                      iteration: iteration,
-                      candidates: candidateSource.loaded
-                          ? linked.candidates
-                          : null,
-                      deliveries: deliverySource.loaded
-                          ? linked.deliveries
-                          : null,
-                      candidatesLoading: candidateSource.loading,
-                      deliveriesLoading: deliverySource.loading,
-                      onOpenDetails: () => _showIteration(iteration),
-                    );
-                  },
+                    },
+                  ),
                 ),
               const SizedBox(height: 24),
               Text(
@@ -1732,7 +1728,7 @@ class SourceNotice extends StatelessWidget {
   );
 }
 
-/// Niet-uitklapbare bewijsregel voor afgeronde Product Factory-cycli. De vijf
+/// Niet-uitklapbare bewijsregel voor afgeronde productcycli. De vijf
 /// gelabelde waarden en de detailactie delen één expliciete semanticsgroep.
 class IterationEvidenceRow extends StatelessWidget {
   const IterationEvidenceRow({
@@ -1844,6 +1840,8 @@ class IterationEvidenceRow extends StatelessWidget {
                       key: ValueKey('iteration-evidence-${iteration['id']}'),
                       productSlug: productSlug,
                       cycleLabel: cycleLabel,
+                      date: presentation.date,
+                      outcome: presentation.outcome,
                       onOpenDetails: onOpenDetails,
                     ),
                   ),
@@ -1889,12 +1887,16 @@ class IterationEvidenceButton extends StatefulWidget {
   const IterationEvidenceButton({
     required this.productSlug,
     required this.cycleLabel,
+    required this.date,
+    required this.outcome,
     required this.onOpenDetails,
     super.key,
   });
 
   final String productSlug;
   final String cycleLabel;
+  final String date;
+  final String outcome;
   final Future<void> Function() onOpenDetails;
 
   @override
@@ -1934,9 +1936,146 @@ class _IterationEvidenceButtonState extends State<IterationEvidenceButton> {
     ),
     child: Semantics(
       label:
-          'Bekijk bewijs voor product ${widget.productSlug}, cyclus ${widget.cycleLabel}',
+          'Bekijk cyclusdetail voor product ${widget.productSlug}, '
+          'cyclus ${widget.cycleLabel}, cyclusdatum ${widget.date}, '
+          'uitkomst ${widget.outcome}',
       excludeSemantics: true,
-      child: const Text('Bekijk bewijs'),
+      child: const Text('Bekijk cyclusdetail'),
+    ),
+  );
+}
+
+/// Niet-uitklapbare voortgangskaart voor actieve en onbekende statussen. De
+/// gesloten mappings voorkomen dat terminale metadata of vrije backendtekst in
+/// het compacte overzicht of de semantics-tree terechtkomt.
+class IterationProgressCard extends StatelessWidget {
+  const IterationProgressCard({
+    required this.iteration,
+    required this.onOpenDetails,
+    super.key,
+  });
+
+  final Map<String, dynamic> iteration;
+  final Future<void> Function() onOpenDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final presentation = iterationProgressPresentation(iteration);
+    final productSlug = iteration['productSlug'] is String
+        ? iteration['productSlug'] as String
+        : kEvidenceUnknown;
+    final cycleReference = iteration['sequenceNumber'] ?? iteration['id'];
+    final cycleLabel = cycleReference == null
+        ? kEvidenceUnknown
+        : '$cycleReference';
+    final active =
+        iterationHistoryKind(iteration) == IterationHistoryKind.active;
+
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      liveRegion: active,
+      label: 'Voortgang voor product $productSlug, cyclus $cycleLabel',
+      child: Card(
+        color: kCycleCardBackground,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '$productSlug · iteratie $cycleLabel',
+                style: const TextStyle(
+                  color: kCycleCardText,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _EvidenceValue(label: 'Status', value: presentation.status),
+              if (presentation.currentStep != null) ...[
+                const SizedBox(height: 10),
+                _EvidenceValue(
+                  label: 'Huidige stap',
+                  value: presentation.currentStep!,
+                ),
+              ],
+              if (presentation.progress != null) ...[
+                const SizedBox(height: 10),
+                _EvidenceValue(
+                  label: 'Voortgang',
+                  value: presentation.progress!,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IterationProgressButton(
+                  key: ValueKey('iteration-progress-${iteration['id']}'),
+                  productSlug: productSlug,
+                  cycleLabel: cycleLabel,
+                  onOpenDetails: onOpenDetails,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class IterationProgressButton extends StatefulWidget {
+  const IterationProgressButton({
+    required this.productSlug,
+    required this.cycleLabel,
+    required this.onOpenDetails,
+    super.key,
+  });
+
+  final String productSlug;
+  final String cycleLabel;
+  final Future<void> Function() onOpenDetails;
+
+  @override
+  State<IterationProgressButton> createState() =>
+      _IterationProgressButtonState();
+}
+
+class _IterationProgressButtonState extends State<IterationProgressButton> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'iteration-progress');
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openDetails() async {
+    try {
+      await widget.onOpenDetails();
+    } finally {
+      if (mounted) _focusNode.requestFocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton(
+    focusNode: _focusNode,
+    onPressed: _openDetails,
+    style: ButtonStyle(
+      foregroundColor: const WidgetStatePropertyAll(kCycleToggleText),
+      side: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) {
+          return const BorderSide(color: kCycleToggleFocus, width: 3);
+        }
+        return const BorderSide(color: kCycleToggleText);
+      }),
+    ),
+    child: Semantics(
+      label:
+          'Bekijk cyclusdetail voor product ${widget.productSlug}, cyclus ${widget.cycleLabel}',
+      excludeSemantics: true,
+      child: const Text('Bekijk cyclusdetail'),
     ),
   );
 }

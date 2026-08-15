@@ -194,95 +194,67 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   blokkademelding en detailactie afwezig. Een zichtbare of langlopende `RUNNING`-cyclus en alle
   overige gegevens beïnvloeden de uitkomst niet; de vijfsecondenrefresh blijft ongewijzigd.
 - **Eerdere cycli**: uitsluitend cycli waarvan `Iteration.productSlug` exact gelijk is aan de
-  actieve `Product.slug`. De bestaande sortering en 5/+10-lijstbeperking blijven behouden. Cycli
-  staan standaard in een compacte, zelfstandig
-  uitklapbare kaart met status, huidige rol (als hij nog loopt), starttijd, doorlooptijd, aantal
-  kandidaten, aantal leverbare kandidaten, revisierondes en, wanneer van toepassing, uitkomstreden
-  en criticusoordeel. De gesloten kaart toont daarnaast afzonderlijke aantallen voor interne
-  kandidaten en Software Factory-leveringen uit de actuele geladen dashboardgegevens. Deze nieuwe
-  aantallen zijn als geladen gegevens herkenbaar en staan los van de bestaande backendcycluswaarden.
-  De starttijd komt uit `startedAt`,
-  of uit `createdAt` zolang de cyclus nog niet gestart is. De doorlooptijd is het verschil tussen
-  start en afronding, compact weergegeven als bijvoorbeeld `2u 13m`, `4m 12s` of `35s`; loopt de
-  cyclus nog, dan staat er `loopt nog: <tijd sinds start>` en loopt die waarde mee met de
-  auto-refresh. Een nog niet gestarte cyclus toont geen doorlooptijd. Datum en tijd staan in de
-  lokale tijdzone van de browser als `dd-MM-yyyy HH:mm`, nooit als ruwe ISO-string.
+  actieve `Product.slug`. De productslug bepaalt alleen scope en identificatie; de status bepaalt
+  voor ieder product hetzelfde niet-uitklapbare presentatiemodel. De bestaande sortering,
+  5/+10-lijstbeperking en auto-refresh blijven behouden. De geschiedenis vormt één benoemde
+  semanticsgroep en iedere zichtbare cyclus vormt daarin een afzonderlijke semanticscontainer.
 
-  Daarop bestaat één bewust smalle presentatie-uitzondering. Een cyclus met exact productslug
-  `product-factory` en status `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`, `NO_CHANGE` of `FAILED`
-  verschijnt als compacte, niet-uitklapbare bewijsregel. Actieve cycli (`QUEUED`/`RUNNING`) en alle
-  cycli van andere producten behouden de kaart. Eén semantisch gegroepeerde bewijsregel toont
-  afzonderlijk `Datum`, `Cyclusuitkomst`, `Reden`, `Beslisbron` en `Gekoppelde opbrengst`. Datum
-  gebruikt de eerste parseerbare waarde van `startedAt` en `createdAt`; uitkomst, reden en
-  provenance hergebruiken de bestaande veilige presentatiemappings. Een bewezen handmatige
-  annulering gaat voor een technische afleiding. Ontbrekende of onbekende presentatiegegevens
-  worden `Onbekend`; een onbekend expliciet beslisrecord claimt geen mens en valt niet terug op een
-  afgeleide bron.
+  `ACCEPTED`, `NEEDS_REVISION`, `REJECTED`, `NO_CHANGE` en `FAILED` verschijnen als terminale
+  bewijsregel. Iedere regel toont zichtbaar en semantisch in dezelfde betekenisvolle volgorde
+  `Datum`, `Cyclusuitkomst`, `Reden`, `Beslisbron`, `Gekoppelde opbrengst` en precies één
+  alleen-lezen detailactie. Datum gebruikt de eerste parseerbare waarde van `startedAt` en
+  `createdAt` en wordt in de lokale browsertijd als `dd-MM-yyyy HH:mm` getoond. De uitkomst en reden
+  komen uit de bestaande veilige classificatie- en redenmapping; ontbrekende of onbekende waarden
+  worden niet uit vrije tekst geschat.
+
+  Een herkend expliciet beslisrecord heeft voorrang. Een geldig, aan dezelfde FAILED-cyclus
+  gekoppeld handmatig-annuleringsrecord toont `Mens` en `Handmatig geannuleerd`. Zonder record
+  krijgen alleen de bewezen paren `ACCEPT`/`ACCEPTED`, `REVISE`/`NEEDS_REVISION` en
+  `REJECT`/`REJECTED` de bron `Evaluatie-agent (Afgeleid)`; `FAILED` zonder verdict en met aanwezige
+  foutinformatie krijgt `Technische fout (Afgeleid)`. Ontbrekende, onbekende, tegenstrijdige of
+  niet reconstrueerbare provenance toont uitsluitend `Onbekend`, zonder `(Afgeleid)`. Een aanwezig
+  maar onbekend of aan een andere cyclus gekoppeld expliciet record activeert evenmin afleiding.
+  Ruwe fouttekst wordt nooit als reden of beslisbron in het overzicht getoond.
 
   `Gekoppelde opbrengst` telt alleen uniek en exact op productslug plus cyclus-id gekoppelde
   Software Factory-leveringen, niet de interne kandidaten. Ongeldige, kruisproduct- en ambigue
-  koppelingen tellen niet mee; een leveringsbron die nog laadt of faalt verschijnt als `laden…` of
-  `niet beschikbaar`, niet als nul. De regel toont geen ruwe foutgegevens, prompts, tokens,
-  persoonsgegevens of artefactinhoud. De native actie `Bekijk bewijs` opent met muis of toetsenbord
-  het bestaande detail van die cyclus, bevat product- en cycluscontext voor hulptechnologie en
-  ontvangt na sluiten of Escape opnieuw focus. De regel blijft zonder horizontale pagina-scroll
-  bruikbaar op smalle en brede schermen en bij 200% tekstvergroting. Detailinhoud, bronstatussen,
-  sortering, lijstbeperking en auto-refresh blijven behouden; de bewijsregel verschijnt alleen bij
-  de eerdere cycli van het actieve product.
+  koppelingen tellen niet mee. Tijdens laden staat er `laden…`, bij bronfalen `niet beschikbaar` en
+  alleen bij succesvol geladen gegevens een aantal. De native actie `Bekijk cyclusdetail` opent met
+  muis, Enter of Spatie het bestaande detail van precies dezelfde cyclus. Haar toegankelijke naam
+  bevat product, cyclus, datum en gebruikersgerichte uitkomst. Sluiten of Escape herstelt de focus
+  naar dezelfde actie. De regel blijft zonder horizontale pagina-scroll bruikbaar op smalle en
+  brede schermen en bij 200% tekstvergroting en toont geen ruwe foutgegevens, prompts, tokens,
+  persoonsgegevens of artefactinhoud.
 
-  De standing acceptatiecatalogus gebruikt precies deze bestaande paden: één `RUNNING`-fixture
-  blijft een actieve kaart; de terminale fixtures tonen respectievelijk een expliciete menselijke
-  handmatige annulering, `Evaluatie-agent (Afgeleid)` en `Onbekend (Afgeleid)`. Aan de
-  `ACCEPTED`-fixture zijn exact twee voltooide synthetische leveringen gekoppeld; de onbekende
-  `REJECTED`-fixture heeft geen kandidaten of leveringen. Daardoor tonen hun bewijsregels via de
-  gewone koppellogica respectievelijk twee en nul gekoppelde opbrengsten, en verschijnen de twee
-  leveringen met hun vaste sleutel, titel, status en fase in Beheer.
+  `QUEUED` en `RUNNING` verschijnen als veilige voortgangskaart met alleen de gesloten statusmapping,
+  een bekende `currentRole` als huidige stap, voortgang die rechtstreeks uit de actieve status volgt
+  en de neutrale detailactie `Bekijk cyclusdetail`. Ontbrekende of onbekende rollen worden
+  weggelaten. Een ontbrekende of onbekende status toont alleen `Status: Onbekend` en dezelfde actie.
+  Deze kaarten tonen geen cyclusuitkomst, reden, beslissing, beslisbron, classificatiebadge,
+  afleidingsclaim, terminale opbrengst of ruwe fouttekst. Ook zij zijn niet uitklapbaar.
 
-  In de reguliere kaart opent de button `Toon opbrengst` uitsluitend binnen dezelfde kaart twee
-  groepen: `Interne kandidaten` en `Software Factory-leveringen`. Iedere gekoppelde titel staat
-  daar samen met zijn tekstuele kandidaat- of leveringsstatus; een lege groep blijft expliciet
-  herkenbaar als een leeg resultaat van de geladen gegevens. De button verandert bij openen in
-  `Verberg opbrengst`, werkt
-  met muis, Enter en Spatie, bevat het cyclusnummer in zijn toegankelijke naam en houdt focus bij
-  openen en sluiten. De bestaande beslisbronbutton blijft los daarvan het detailscherm openen.
-  Meerdere kaarten kunnen onafhankelijk openstaan en behouden hun toestand tijdens de normale
-  auto-refresh zolang de betreffende cyclus geladen blijft.
+  De frontend groepeert alle geladen cycli binnen de actieve scope voordat de lijstbeperking wordt
+  toegepast. Kandidaten koppelen alleen bij precies één exacte combinatie van productslug en het
+  integerpaar `iterationSequenceNumber`/`sequenceNumber`; leveringen alleen bij precies één exacte
+  combinatie van productslug en het stringpaar `iterationId`/`id`. Ontbrekende, ongeldige,
+  kruisproduct- en ambigue relaties worden niet op basis van titel, positie of waarschijnlijkheid
+  gegokt en verschijnen niet in de actieve productscope.
 
-  Koppeling gebeurt uitsluitend op een exacte combinatie van product en cyclusnummer voor een
-  kandidaat, of product en cyclus-id voor een levering. De frontend gebruikt hiervoor alle geladen
-  cycli binnen de actieve scope, ook degene die nog achter de 5/+10-lijstbeperking staan.
-  Ontbrekende, ongeldige, kruisproduct- en dubbelzinnige relaties worden niet op basis van titel,
-  positie of waarschijnlijkheid gegokt en verschijnen niet in de actieve productscope.
-
-  De laadstatus van cycli, kandidaten en leveringen blijft afzonderlijk zichtbaar. Per kaart toont
-  een nog ladende of mislukte opbrengstbron geen nul, maar `laden…` of `niet beschikbaar`. Een
+  De laadstatus van cycli, kandidaten en leveringen blijft afzonderlijk zichtbaar. Een
   productspecifieke Software Factory-lijst in Beheer wacht ook op kandidaten, omdat die de
   leveringsscope bepalen; `Alle producten` houdt de onafhankelijke globale leveringsbronstatus. De
   storywachtrij meldt dat zij onvolledig is totdat zowel kandidaten als leveringen beschikbaar zijn.
+  Het compacte cyclusoverzicht gebruikt geen kandidaatbron. Renderen, scopewisselen en het openen of
+  sluiten van detail voegen geen overzichtsrequest of muterende call toe; alleen het bestaande
+  detailpad voert bij activering zijn bestaande leesverzoeken uit.
 
-  Iteraties die nog lopen of in de wachtrij staan (`status` QUEUED/RUNNING)
-  tonen een neutrale voortgangsindicator (`IterationProgressIndicator`) in plaats van een badge;
-  elke andere status zonder expliciet beslisrecord toont een vaste, afgeleide
-  classificatiebadge — `onderzoek-onvoldoende`, `technische fout`, `richting-gekozen`,
-  `richting-verworpen` of `niet-classificeerbaar` —
-  afgeleid uit de velden `status`, `criticVerdict` en `errorMessage`. Elke onvoorziene of
-  ontbrekende statuswaarde (inclusief een tijdens uitvoering afgebroken iteratie, waarvoor geen
-  apart CANCELLED-statusveld bestaat) mapt naar `niet-classificeerbaar`. De badge toont de
-  classificatie zowel als zichtbare tekst als via een Semantics-label, dus niet uitsluitend via
-  kleur, en elk van de vijf kleurenparen haalt WCAG 2.1 AA-contrast (≥ 4.5:1). De
-  voortgangsindicator gebruikt `Semantics(liveRegion: true)` (het Flutter-web-equivalent van
-  `aria-live="polite"`). De classificatiebadge zelf is met muis én toetsenbord (Tab, Enter/Spatie)
-  activeerbaar en klapt dan direct onder de badge een inline scope-disclaimerpaneel open met de
-  vaste tekst "Dit toont wat de uitkomst was, niet waarom." — geen `AlertDialog`/`showDialog`,
-  geen focus-trap, `Semantics(expanded: ...)` volgt de open/dicht-status. Nogmaals activeren of
-  Escape klapt het paneel weer in en herstelt de focus op de badge; het paneel bevat geen link
-  naar een externe iteratielog-route.
-  Elke cyclusregel bevat daarnaast precies één beslisbronbutton. Bij een gekoppeld expliciet
-  handmatig-annuleringsrecord toont die zichtbaar én toegankelijk `Beslisbron: Mens` en
-  `Reden: Handmatig geannuleerd`. Het record heeft voorrang op de velden waaruit historische
-  provenance wordt afgeleid; daarom blijven de afgeleide classificatiebadge en uitkomstreden voor
-  die cyclus verborgen. De bestaande foutmelding mag in het detail blijven staan, maar wordt niet
-  als beslisbron of vervangende verklaring gebruikt.
+  De standing acceptatiecatalogus gebruikt dezelfde generieke paden: de `RUNNING`-fixture is een
+  actieve kaart; de terminale fixtures tonen respectievelijk een expliciete menselijke handmatige
+  annulering, `Evaluatie-agent (Afgeleid)` en uitsluitend `Onbekend`. Aan de `ACCEPTED`-fixture zijn
+  exact twee voltooide synthetische leveringen gekoppeld; de onbekende `REJECTED`-fixture heeft geen
+  kandidaat of levering. Daardoor tonen de regels respectievelijk twee en nul gekoppelde opbrengsten
+  en verschijnen de twee leveringen ook in Beheer.
+
   De bestaande annuleeractie accepteert nog steeds een optionele vrije reden, maar bewaart die
   uitsluitend als bestaande foutmelding. Alleen als de overgang van QUEUED/RUNNING naar FAILED
   slaagt, wordt in dezelfde transactie maximaal één privacy-minimaal beslisrecord opgeslagen met
@@ -291,25 +263,11 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   `completedAt`; een conflict of rollback laat geen los record of halve statusovergang achter.
   Historische cycli krijgen geen backfill. Het record bevat geen naam, e-mailadres, account-id,
   aangeleverde reden of andere vrije tekst.
-  Zonder gekoppeld record toont de button `Beslisbron: Evaluatie-agent (Afgeleid)`,
-  `Beslisbron: Technische fout (Afgeleid)` of `Beslisbron: Onbekend (Afgeleid)`. De bron wordt
-  conservatief afgeleid uit `criticVerdict`, `status` en `errorMessage`: de bewezen paren
-  `ACCEPT`/`ACCEPTED`, `REVISE`/`NEEDS_REVISION` en `REJECT`/`REJECTED` wijzen naar de
-  evaluatie-agent; alleen `FAILED` zonder verdict en met een
-  niet-lege foutmelding wijst naar een technische fout; alle overige combinaties zijn onbekend.
-  Ontbrekende, lege en alleen uit witruimte bestaande waarden gelden als afwezig. Omringende
-  witruimte wordt genegeerd, maar afwijkend hoofdlettergebruik en onbekende of tegenstrijdige
-  waarden vallen terug op `Onbekend`. Ook deze onbekende fallback blijft zichtbaar en toegankelijk
-  als `Afgeleid` herkenbaar.
-  De native button opent met muis, Enter of Spatie het detailscherm van precies de gekozen cyclus.
-  De rij zelf is niet meer klikbaar en heeft geen navigatie-chevron; zo is er geen tweede of
-  geneste detailbediening naast de afzonderlijke annuleeractie. Na sluiten via de zichtbare
-  sluitactie of Escape keert de focus terug naar de gebruikte beslisbronbutton. De beslisbron toont
-  in het overzicht geen ruwe foutmelding, prompt, log of artefactinhoud, en het openen en sluiten
-  doet uitsluitend de bestaande leesverzoeken. Voor een expliciet handmatig-annuleringsrecord
+  Voor een expliciet handmatig-annuleringsrecord
   toont het detailscherm dezelfde bron en reden, aangevuld met `Mechanisme: Handmatige annulering`
   en het lokale beslissingstijdstip uit `decidedAt`; de afgeleide badge en uitkomstreden blijven
-  ook daar verborgen. Voor cycli zonder record toont het detail de bron met `(Afgeleid)`.
+  ook daar verborgen. Voor cycli zonder record toont het detail alleen een bewezen bron met
+  `(Afgeleid)`; onbekende provenance blijft ook daar uitsluitend `Onbekend`.
   De titel van het detailscherm toont het user-facing cyclusnummer (met het interne iteratie-id als
   fallback) en het scherm bevat de opdracht, alle vijf agentstappen (status, start-/eindtijd,
   foutmelding), het
@@ -346,14 +304,14 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   (`readableFields` leeg), dan toont het dialoog uitsluitend de bestaande ruwe JSON direct
   zichtbaar, zonder toggle en zonder te crashen.
   Retry-pogingen (`artifactType` met `-2`/`-3`-suffix) gebruiken dezelfde leesbare weergave als de
-  eerste poging. Voor een cyclus zonder expliciet beslisrecord toont dit detailscherm
-  (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) bovenaan dezelfde
-  `ClassificationBadge` (zelfde
-  `classifyIterationOutcome`-uitkomst, zelfde badge-tekst en `kClassificationColors`-kleurenpaar) als
-  de lijstkaart-rij, in plaats van de ruwe backend-statuswaarde (bv. 'NEEDS_REVISION') als losse
+  eerste poging. Voor een terminale cyclus zonder expliciet beslisrecord toont dit detailscherm
+  (`IterationSessionDialog`, `dashboard-frontend/lib/main.dart`) bovenaan een
+  `ClassificationBadge` met dezelfde `classifyIterationOutcome`-uitkomst, badge-tekst en
+  `kClassificationColors`-kleurenpaar als de uitkomstmapping van de terminale bewijsregel, in plaats
+  van de ruwe backend-statuswaarde (bv. 'NEEDS_REVISION') als losse
   `Chip`; de badge is er het eerste focusbare element, vóór Voortgang/agentresultaten/
-  workspace-publicaties, en met toetsenbord (Tab, Enter/Spatie) op dezelfde manier bedienbaar als op
-  de lijstkaart. Voor een expliciete handmatige annulering ontbreekt deze afgeleide badge zoals
+  workspace-publicaties, en met toetsenbord (Tab, Enter/Spatie) bedienbaar. Voor een expliciete
+  handmatige annulering ontbreekt deze afgeleide badge zoals
   hierboven beschreven. De weergave van de workspace-publicatie/PR-referentie
   (`workspacePullRequestUrl`/`workspaceCommitSha`) in dit detailscherm is door de badge-/
   indicator-toevoeging ongewijzigd gebleven. Heeft de iteratie zelf `status == 'FAILED'`, dan toont

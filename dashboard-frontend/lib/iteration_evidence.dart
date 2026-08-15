@@ -5,7 +5,7 @@ import 'formatting.dart';
 
 const String kEvidenceUnknown = 'Onbekend';
 
-const Set<String> kProductFactoryEvidenceStatuses = {
+const Set<String> kTerminalIterationStatuses = {
   'ACCEPTED',
   'NEEDS_REVISION',
   'REJECTED',
@@ -13,11 +13,72 @@ const Set<String> kProductFactoryEvidenceStatuses = {
   'FAILED',
 };
 
-/// Houdt de speciale bewijsweergave strikt afgebakend tot het bedoelde product
-/// en de expliciet ondersteunde eindstatussen.
+const Set<String> kActiveIterationStatuses = {'QUEUED', 'RUNNING'};
+
+enum IterationHistoryKind { terminal, active, unknown }
+
+/// De productslug bepaalt alleen de scope en identificatie. De status bepaalt
+/// voor ieder product welk veilige presentatiemodel van toepassing is.
+IterationHistoryKind iterationHistoryKind(Map<String, dynamic> iteration) {
+  final status = iteration['status'];
+  if (kTerminalIterationStatuses.contains(status)) {
+    return IterationHistoryKind.terminal;
+  }
+  if (kActiveIterationStatuses.contains(status)) {
+    return IterationHistoryKind.active;
+  }
+  return IterationHistoryKind.unknown;
+}
+
+/// Compatibele selector voor de terminale bewijsregel.
 bool shouldShowIterationEvidence(Map<String, dynamic> iteration) =>
-    iteration['productSlug'] == 'product-factory' &&
-    kProductFactoryEvidenceStatuses.contains(iteration['status']);
+    iterationHistoryKind(iteration) == IterationHistoryKind.terminal;
+
+class IterationProgressPresentation {
+  const IterationProgressPresentation({
+    required this.status,
+    this.currentStep,
+    this.progress,
+  });
+
+  final String status;
+  final String? currentStep;
+  final String? progress;
+}
+
+/// Actieve backendstatussen en rollen worden alleen via een gesloten mapping
+/// getoond. Daardoor kan een onbekende vrije waarde niet als stap of voortgang
+/// in het compacte overzicht terechtkomen.
+IterationProgressPresentation iterationProgressPresentation(
+  Map<String, dynamic> iteration,
+) {
+  final status = iteration['status'];
+  final active = kActiveIterationStatuses.contains(status);
+  final rawRole = iteration['currentRole'];
+  final role = rawRole is String ? rawRole.trim().toUpperCase() : null;
+  const roleLabels = {
+    'RESEARCHER': 'Onderzoeker',
+    'PRODUCT_OWNER': 'Product owner',
+    'UX_DESIGNER': 'UX-ontwerp',
+    'STORY_WRITER': 'Story writer',
+    'CRITIC': 'Criticus',
+    'SUMMARY': 'Samenvatting',
+  };
+
+  return IterationProgressPresentation(
+    status: switch (status) {
+      'QUEUED' => 'In wachtrij',
+      'RUNNING' => 'Bezig',
+      _ => kEvidenceUnknown,
+    },
+    currentStep: active ? roleLabels[role] : null,
+    progress: switch (status) {
+      'QUEUED' => 'Wacht op uitvoering',
+      'RUNNING' => 'Wordt uitgevoerd',
+      _ => null,
+    },
+  );
+}
 
 /// Gebruikersgerichte operationele reden. De optionele fallback voorkomt dat
 /// een onbekende backendcode als ruwe waarde in een privacy-minimale weergave
@@ -100,7 +161,7 @@ IterationEvidencePresentation iterationEvidencePresentation(
         : kEvidenceUnknown,
     decisionSource: manualCancellation
         ? decision.source
-        : decision.derived
+        : decision.derived && decision.source != kBeslisbronOnbekend
         ? '${decision.source} (Afgeleid)'
         : kEvidenceUnknown,
   );

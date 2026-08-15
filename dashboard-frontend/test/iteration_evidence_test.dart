@@ -1,6 +1,7 @@
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:product_factory_dashboard/classification.dart';
@@ -11,7 +12,7 @@ Map<String, dynamic> _iteration({
   String id = 'iteration-42',
   String productSlug = 'product-factory',
   Object? sequenceNumber = 42,
-  String status = 'ACCEPTED',
+  Object? status = 'ACCEPTED',
   String? criticVerdict = 'ACCEPT',
   Object? outcomeReason = 'ACCEPT',
   String? errorMessage,
@@ -55,36 +56,73 @@ Widget _harness({
   ),
 );
 
+Widget _progressHarness({
+  required Map<String, dynamic> iteration,
+  double textScale = 1,
+  Future<void> Function()? onOpenDetails,
+}) => MaterialApp(
+  theme: ThemeData(useMaterial3: true),
+  home: MediaQuery(
+    data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+    child: Scaffold(
+      body: SingleChildScrollView(
+        child: IterationProgressCard(
+          iteration: iteration,
+          onOpenDetails: onOpenDetails ?? () async {},
+        ),
+      ),
+    ),
+  ),
+);
+
 Finder _richText(String text) => find.text(text, findRichText: true);
+
+List<String> _semanticsLabelsInTraversalOrder(SemanticsNode root) {
+  final labels = <String>[];
+
+  void visit(SemanticsNode node) {
+    final label = node.getSemanticsData().label;
+    if (label.isNotEmpty) labels.add(label);
+    for (final child in node.debugListChildrenInOrder(
+      DebugSemanticsDumpOrder.traversalOrder,
+    )) {
+      visit(child);
+    }
+  }
+
+  visit(root);
+  return labels;
+}
 
 void main() {
   group('shouldShowIterationEvidence', () {
-    for (final status in kProductFactoryEvidenceStatuses) {
-      test(
-        'ondersteunt terminale status $status voor exact product-factory',
-        () {
+    for (final productSlug in ['product-factory', 'hkh-autopilot']) {
+      for (final status in kTerminalIterationStatuses) {
+        test('ondersteunt terminale status $status voor $productSlug', () {
           expect(
-            shouldShowIterationEvidence(_iteration(status: status)),
+            shouldShowIterationEvidence(
+              _iteration(productSlug: productSlug, status: status),
+            ),
             isTrue,
           );
-        },
-      );
+        });
+      }
     }
 
-    for (final status in ['QUEUED', 'RUNNING', 'CANCELLED', 'accepted']) {
-      test('behoudt bestaande kaart voor status $status', () {
+    for (final status in ['QUEUED', 'RUNNING']) {
+      test('selecteert voortgangskaart voor status $status', () {
         expect(
-          shouldShowIterationEvidence(_iteration(status: status)),
-          isFalse,
+          iterationHistoryKind(_iteration(status: status)),
+          IterationHistoryKind.active,
         );
       });
     }
 
-    test('productslug is exact en hoofdlettergevoelig', () {
-      for (final slug in ['demo', 'Product-Factory', 'product-factory ']) {
+    test('ontbrekende en onbekende status claimen geen eindtoestand', () {
+      for (final status in [null, '', 'CANCELLED', 'accepted']) {
         expect(
-          shouldShowIterationEvidence(_iteration(productSlug: slug)),
-          isFalse,
+          iterationHistoryKind(_iteration(status: status)),
+          IterationHistoryKind.unknown,
         );
       }
     });
@@ -198,7 +236,8 @@ void main() {
 
       expect(result.date, kEvidenceUnknown);
       expect(result.reason, kEvidenceUnknown);
-      expect(result.decisionSource, 'Onbekend (Afgeleid)');
+      expect(result.decisionSource, 'Onbekend');
+      expect(result.decisionSource, isNot(contains('Afgeleid')));
       expect(result.reason, isNot(contains('TOKEN')));
     });
 
@@ -328,22 +367,29 @@ void main() {
         ),
       ];
 
-  for (final fixture in widgetFixtures) {
-    testWidgets(
-      'bewijsregel toont alle gelabelde waarden voor ${fixture.name}',
-      (tester) async {
-        await tester.pumpWidget(
-          _harness(iteration: fixture.iteration, deliveries: const [{}]),
-        );
+  for (final productSlug in ['product-factory', 'hkh-autopilot']) {
+    for (final fixture in widgetFixtures) {
+      testWidgets(
+        'bewijsregel toont dezelfde velden voor $productSlug ${fixture.name}',
+        (tester) async {
+          final iteration = Map<String, dynamic>.of(fixture.iteration)
+            ..['productSlug'] = productSlug;
+          await tester.pumpWidget(
+            _harness(iteration: iteration, deliveries: const [{}]),
+          );
 
-        expect(_richText('Datum: 12-08-2026 10:30'), findsOneWidget);
-        expect(_richText('Cyclusuitkomst: ${fixture.outcome}'), findsOneWidget);
-        expect(_richText('Reden: ${fixture.reason}'), findsOneWidget);
-        expect(_richText('Beslisbron: ${fixture.source}'), findsOneWidget);
-        expect(_richText('Gekoppelde opbrengst: 1'), findsOneWidget);
-        expect(find.text('Bekijk bewijs'), findsOneWidget);
-      },
-    );
+          expect(_richText('Datum: 12-08-2026 10:30'), findsOneWidget);
+          expect(
+            _richText('Cyclusuitkomst: ${fixture.outcome}'),
+            findsOneWidget,
+          );
+          expect(_richText('Reden: ${fixture.reason}'), findsOneWidget);
+          expect(_richText('Beslisbron: ${fixture.source}'), findsOneWidget);
+          expect(_richText('Gekoppelde opbrengst: 1'), findsOneWidget);
+          expect(find.text('Bekijk cyclusdetail'), findsOneWidget);
+        },
+      );
+    }
   }
 
   testWidgets(
@@ -370,26 +416,41 @@ void main() {
         findsOneWidget,
       );
       expect(_richText('Gekoppelde opbrengst: 2'), findsOneWidget);
-      expect(find.text('Bekijk bewijs'), findsOneWidget);
+      expect(find.text('Bekijk cyclusdetail'), findsOneWidget);
       expect(find.text('Toon opbrengst'), findsNothing);
       expect(find.byType(IterationCycleCard), findsNothing);
 
-      final group = tester
-          .getSemantics(find.byType(IterationEvidenceRow))
-          .getSemanticsData();
+      final row = find.byType(IterationEvidenceRow);
+      final rowSemantics = tester.getSemantics(row);
+      final group = rowSemantics.getSemanticsData();
       expect(group.label, contains('product product-factory, cyclus 42'));
-      for (final label in [
+      final expectedFieldOrder = [
         'Datum: 12-08-2026 10:30',
         'Cyclusuitkomst: richting-gekozen',
         'Reden: Alle kandidaten zijn leverbaar',
         'Beslisbron: Evaluatie-agent (Afgeleid)',
         'Gekoppelde opbrengst: 2',
-      ]) {
+      ];
+      for (final label in expectedFieldOrder) {
         expect(find.bySemanticsLabel(label), findsOneWidget);
       }
+      final visibleFieldOrder = find
+          .descendant(of: row, matching: find.byType(RichText))
+          .evaluate()
+          .map((element) => (element.widget as RichText).text.toPlainText())
+          .where(expectedFieldOrder.contains)
+          .toList();
+      final semanticsFieldOrder = _semanticsLabelsInTraversalOrder(
+        rowSemantics,
+      ).where(expectedFieldOrder.contains).toList();
+      expect(visibleFieldOrder, expectedFieldOrder);
+      expect(semanticsFieldOrder, visibleFieldOrder);
+
       final button = find.byType(OutlinedButton);
       final buttonData = tester.getSemantics(button).getSemanticsData();
       expect(buttonData.label, contains('product product-factory, cyclus 42'));
+      expect(buttonData.label, contains('cyclusdatum 12-08-2026 10:30'));
+      expect(buttonData.label, contains('uitkomst richting-gekozen'));
       expect(buttonData.flagsCollection.isButton, isTrue);
       semantics.dispose();
 
@@ -400,6 +461,146 @@ void main() {
       ]) {
         expect(find.textContaining(forbidden), findsNothing);
       }
+    },
+  );
+
+  for (final productSlug in ['product-factory', 'hkh-autopilot']) {
+    for (final status in ['QUEUED', 'RUNNING']) {
+      testWidgets(
+        '$productSlug $status toont alleen veilige actieve voortgang',
+        (tester) async {
+          final iteration = _iteration(
+            productSlug: productSlug,
+            status: status,
+            criticVerdict: 'ONBEKENDE_PROVENANCE',
+            outcomeReason: 'TOKEN=terminal-geheim',
+            errorMessage: 'RUWE_FOUT_SENTINEL',
+          )..['currentRole'] = status == 'RUNNING' ? 'CRITIC' : null;
+          await tester.pumpWidget(_progressHarness(iteration: iteration));
+          final semantics = tester.ensureSemantics();
+
+          expect(find.byType(IterationProgressCard), findsOneWidget);
+          expect(
+            _richText(
+              'Status: ${status == 'RUNNING' ? 'Bezig' : 'In wachtrij'}',
+            ),
+            findsOneWidget,
+          );
+          if (status == 'RUNNING') {
+            expect(_richText('Huidige stap: Criticus'), findsOneWidget);
+          } else {
+            expect(find.textContaining('Huidige stap'), findsNothing);
+          }
+          expect(find.text('Bekijk cyclusdetail'), findsOneWidget);
+          expect(find.byType(OutlinedButton), findsOneWidget);
+
+          final semanticsText = tester
+              .getSemantics(find.byType(IterationProgressCard))
+              .toStringDeep();
+          for (final forbidden in [
+            'Cyclusuitkomst',
+            'Reden',
+            'Beslisbron',
+            'Onbekend',
+            'Afgeleid',
+            'TOKEN=terminal-geheim',
+            'RUWE_FOUT_SENTINEL',
+          ]) {
+            expect(find.textContaining(forbidden), findsNothing);
+            expect(semanticsText, isNot(contains(forbidden)));
+          }
+          expect(find.byType(ClassificationBadge), findsNothing);
+          expect(find.textContaining('Gekoppelde opbrengst'), findsNothing);
+          semantics.dispose();
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'ontbrekende rol en onbekende status verzinnen geen stap of uitkomst',
+    (tester) async {
+      final iteration = _iteration(status: 'TOEKOMSTIG')
+        ..['currentRole'] = 'token@example.invalid';
+      await tester.pumpWidget(_progressHarness(iteration: iteration));
+      final semantics = tester.ensureSemantics();
+
+      expect(_richText('Status: Onbekend'), findsOneWidget);
+      expect(find.textContaining('Huidige stap'), findsNothing);
+      expect(find.textContaining('Voortgang'), findsNothing);
+      expect(find.textContaining('token@example.invalid'), findsNothing);
+      expect(find.textContaining('Cyclusuitkomst'), findsNothing);
+      expect(find.textContaining('Beslisbron'), findsNothing);
+      expect(find.text('Bekijk cyclusdetail'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.byType(IterationProgressCard)).toStringDeep(),
+        isNot(contains('token@example.invalid')),
+      );
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'actieve detailactie werkt met muis, Enter en Spatie en herstelt focus',
+    (tester) async {
+      Future<void> openDialog() => showDialog<void>(
+        context: tester.element(find.byType(IterationProgressCard)),
+        builder: (context) => AlertDialog(
+          title: const Text('Bestaand actief cyclusdetail'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Sluiten'),
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        _progressHarness(
+          iteration: _iteration(status: 'RUNNING')
+            ..['currentRole'] = 'RESEARCHER',
+          onOpenDetails: openDialog,
+        ),
+      );
+      final button = find.byType(OutlinedButton);
+
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        isNot(Tristate.isTrue),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.text('Bestaand actief cyclusdetail'), findsOneWidget);
+      await tester.tap(find.text('Sluiten'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        Tristate.isTrue,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.text('Bestaand actief cyclusdetail'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('Bestaand actief cyclusdetail'), findsNothing);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(find.text('Bestaand actief cyclusdetail'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(find.text('Bestaand actief cyclusdetail'), findsOneWidget);
     },
   );
 
@@ -445,7 +646,17 @@ void main() {
       await tester.pumpWidget(_harness(onOpenDetails: openDialog));
       final button = find.byType(OutlinedButton);
 
-      await tester.tap(button);
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        isNot(Tristate.isTrue),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(find.text('Bestaand cyclusdetail'), findsOneWidget);
       for (var tab = 0; tab < 6; tab++) {
@@ -495,6 +706,12 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.pumpAndSettle();
       expect(find.text('Bestaand cyclusdetail'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(find.text('Bestaand cyclusdetail'), findsOneWidget);
     },
   );
 
@@ -513,23 +730,31 @@ void main() {
     );
   });
 
-  for (final size in [const Size(320, 1600), const Size(1200, 900)]) {
-    testWidgets('${size.width.toInt()}px bij 200% blijft zonder overflow', (
-      tester,
-    ) async {
-      tester.view.physicalSize = size;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
+  for (final productSlug in ['product-factory', 'hkh-autopilot']) {
+    for (final size in [const Size(320, 1600), const Size(1200, 900)]) {
+      testWidgets(
+        '$productSlug ${size.width.toInt()}px bij 200% blijft zonder overflow',
+        (tester) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(_harness(textScale: 2));
-      await tester.pump();
+          await tester.pumpWidget(
+            _harness(
+              iteration: _iteration(productSlug: productSlug),
+              textScale: 2,
+            ),
+          );
+          await tester.pump();
 
-      expect(tester.takeException(), isNull);
-      expect(_richText('Datum: 12-08-2026 10:30'), findsOneWidget);
-      expect(find.text('Bekijk bewijs'), findsOneWidget);
-      final rowRect = tester.getRect(find.byType(IterationEvidenceRow));
-      expect(rowRect.left, greaterThanOrEqualTo(0));
-      expect(rowRect.right, lessThanOrEqualTo(size.width));
-    });
+          expect(tester.takeException(), isNull);
+          expect(_richText('Datum: 12-08-2026 10:30'), findsOneWidget);
+          expect(find.text('Bekijk cyclusdetail'), findsOneWidget);
+          final rowRect = tester.getRect(find.byType(IterationEvidenceRow));
+          expect(rowRect.left, greaterThanOrEqualTo(0));
+          expect(rowRect.right, lessThanOrEqualTo(size.width));
+        },
+      );
+    }
   }
 }

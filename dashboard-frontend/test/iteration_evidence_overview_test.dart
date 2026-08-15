@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:product_factory_dashboard/product_scope.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _iteration({
@@ -34,14 +35,19 @@ Map<String, dynamic> _iteration({
   'prompt': 'Ruwe prompt die niet in het overzicht hoort',
 };
 
-final _terminal = _iteration(
-  id: 'pf-terminal',
-  productSlug: 'product-factory',
-  sequence: 41,
-  status: 'ACCEPTED',
-  verdict: 'ACCEPT',
-  outcomeReason: 'ACCEPT',
-);
+final _terminal =
+    _iteration(
+      id: 'pf-terminal',
+      productSlug: 'product-factory',
+      sequence: 41,
+      status: 'ACCEPTED',
+      verdict: 'ACCEPT',
+      outcomeReason: 'ACCEPT',
+    )..addAll({
+      'ownerEmail': 'privacy.person@example.invalid',
+      'accessToken': 'TOKEN_SENTINEL_abc123',
+      'errorMessage': 'RUWE_FOUT_SENTINEL_met_stacktrace',
+    });
 
 final _iterations = <Map<String, dynamic>>[
   _terminal,
@@ -76,9 +82,11 @@ final _iterations = <Map<String, dynamic>>[
 http.Response _json(Object body, {int status = 200}) =>
     http.Response(jsonEncode(body), status);
 
-MockClient _client(List<String> calls, {bool ambiguous = false}) =>
+typedef _RequestCall = ({String method, String path});
+
+MockClient _client(List<_RequestCall> calls, {bool ambiguous = false}) =>
     MockClient((request) async {
-      calls.add(request.url.path);
+      calls.add((method: request.method, path: request.url.path));
       switch (request.url.path) {
         case '/api/products':
           return _json([
@@ -167,14 +175,18 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets(
-    'overzicht vervangt alleen terminal product-factory en telt exact gekoppelde leveringen',
+    'overzicht gebruikt terminale bewijsregels en veilige actieve kaarten',
     (tester) async {
-      final calls = <String>[];
+      final calls = <_RequestCall>[];
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
+        final browserUrlBeforeDetails = Uri.base.toString();
+        final callsAfterRender = List<_RequestCall>.of(calls);
+        final semantics = tester.ensureSemantics();
 
         expect(find.byType(IterationEvidenceRow), findsOneWidget);
-        expect(find.byType(IterationCycleCard), findsNWidgets(2));
+        expect(find.byType(IterationProgressCard), findsNWidgets(2));
+        expect(find.byType(IterationCycleCard), findsNothing);
         expect(
           find.descendant(
             of: find.byType(IterationEvidenceRow),
@@ -192,46 +204,123 @@ void main() {
 
         final runningCard = find.ancestor(
           of: find.text('product-factory · iteratie 40'),
-          matching: find.byType(IterationCycleCard),
+          matching: find.byType(IterationProgressCard),
         );
         expect(runningCard, findsOneWidget);
         expect(
           find.descendant(
             of: runningCard,
-            matching: find.byType(IterationProgressIndicator),
+            matching: find.text('Status: Bezig', findRichText: true),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: runningCard,
+            matching: find.text('Huidige stap: Criticus', findRichText: true),
           ),
           findsOneWidget,
         );
         final queuedCard = find.ancestor(
           of: find.text('product-factory · iteratie 38'),
-          matching: find.byType(IterationCycleCard),
+          matching: find.byType(IterationProgressCard),
         );
         expect(queuedCard, findsOneWidget);
         expect(
           find.descendant(
             of: queuedCard,
-            matching: find.byType(IterationProgressIndicator),
+            matching: find.text('Status: In wachtrij', findRichText: true),
           ),
           findsOneWidget,
         );
         expect(find.textContaining('ander-product · iteratie'), findsNothing);
 
-        await tester.tap(find.text('Bekijk bewijs'));
+        final compactSemantics = tester
+            .getSemantics(find.byType(IterationEvidenceRow))
+            .toStringDeep();
+        for (final sentinel in [
+          'privacy.person@example.invalid',
+          'TOKEN_SENTINEL_abc123',
+          'RUWE_FOUT_SENTINEL_met_stacktrace',
+        ]) {
+          expect(compactSemantics, isNot(contains(sentinel)));
+          expect(browserUrlBeforeDetails, isNot(contains(sentinel)));
+        }
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(IterationEvidenceRow),
+            matching: find.text('Bekijk cyclusdetail'),
+          ),
+        );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.text('Productcyclus 41'), findsOneWidget);
         expect(
           calls.where(
-            (path) =>
-                path == '/api/shadow-iterations/pf-terminal' ||
-                path == '/api/shadow-iterations/pf-terminal/steps' ||
-                path == '/api/shadow-iterations/pf-terminal/artifacts',
+            (call) =>
+                call.path == '/api/shadow-iterations/pf-terminal' ||
+                call.path == '/api/shadow-iterations/pf-terminal/steps' ||
+                call.path == '/api/shadow-iterations/pf-terminal/artifacts',
           ),
           hasLength(3),
         );
         expect(
           find.text('Ruwe prompt die niet in het overzicht hoort'),
           findsNothing,
+        );
+        expect(Uri.base.toString(), browserUrlBeforeDetails);
+        final callsAfterOpen = List<_RequestCall>.of(calls);
+        expect(callsAfterOpen.length - callsAfterRender.length, 3);
+        expect(
+          callsAfterOpen
+              .skip(callsAfterRender.length)
+              .map((call) => call.method),
+          everyElement('GET'),
+        );
+
+        await tester.ensureVisible(find.text('Sluiten'));
+        await tester.pump();
+        await tester.tap(find.text('Sluiten'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('Productcyclus 41'), findsNothing);
+        expect(calls, callsAfterOpen);
+        expect(calls.map((call) => call.method), everyElement('GET'));
+        expect(Uri.base.toString(), browserUrlBeforeDetails);
+        semantics.dispose();
+      }, () => _client(calls));
+    },
+  );
+
+  testWidgets(
+    'een ander product gebruikt exact hetzelfde terminale bewijscomponent',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        activeProductSlugPreferenceKey: 'ander-product',
+      });
+      final calls = <_RequestCall>[];
+      await http.runWithClient(() async {
+        await _pumpDashboard(tester);
+
+        expect(find.byType(IterationEvidenceRow), findsOneWidget);
+        expect(find.byType(IterationProgressCard), findsOneWidget);
+        expect(find.byType(IterationCycleCard), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(IterationEvidenceRow),
+            matching: find.text(
+              'Cyclusuitkomst: richting-verworpen',
+              findRichText: true,
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(
+            'Cyclusgeschiedenis voor product ander-product',
+          ),
+          findsOneWidget,
         );
       }, () => _client(calls));
     },
@@ -240,7 +329,7 @@ void main() {
   testWidgets('ambigue cyclus-id levert voor geen bewijsregel opbrengst op', (
     tester,
   ) async {
-    final calls = <String>[];
+    final calls = <_RequestCall>[];
     await http.runWithClient(() async {
       await _pumpDashboard(tester);
 

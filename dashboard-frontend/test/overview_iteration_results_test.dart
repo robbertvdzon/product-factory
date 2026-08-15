@@ -133,15 +133,14 @@ void main() {
 
         expect(tester.takeException(), isNull);
         expect(find.text('demo · iteratie 6'), findsNWidgets(2));
-        expect(find.byType(IterationCycleCard), findsNWidgets(5));
+        expect(find.byType(IterationEvidenceRow), findsNWidgets(5));
+        expect(find.byType(IterationCycleCard), findsNothing);
         expect(
           find.byKey(const ValueKey('unlinked-iteration-results')),
           findsNothing,
         );
         expect(
-          find.textContaining(
-            'Software Factory-leveringen: 0 · geladen gegevens',
-          ),
+          find.text('Gekoppelde opbrengst: 0', findRichText: true),
           findsNWidgets(5),
         );
         await tester.pumpWidget(const SizedBox.shrink());
@@ -150,7 +149,7 @@ void main() {
   );
 
   testWidgets(
-    'scope sluit niet-koppelbare records uit en groepering gebruikt ook verborgen cycli',
+    'scope sluit niet-koppelbare records uit en lijstbeperking overleeft verversen',
     (tester) async {
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
@@ -160,62 +159,27 @@ void main() {
           findsNothing,
         );
         final hiddenCycleTitle = find.descendant(
-          of: find.byType(IterationCycleCard),
+          of: find.byType(IterationEvidenceRow),
           matching: find.text('demo · iteratie 1'),
         );
         expect(hiddenCycleTitle, findsNothing);
         expect(
-          find.textContaining('Interne kandidaten: 0 · geladen gegevens'),
+          find.text('Gekoppelde opbrengst: 0', findRichText: true),
           findsNWidgets(5),
         );
 
         await tester.tap(find.text('Meer (nog 1)'));
         await tester.pump();
         expect(hiddenCycleTitle, findsOneWidget);
-        final hiddenCycle = find.ancestor(
-          of: hiddenCycleTitle,
-          matching: find.byType(IterationCycleCard),
-        );
-        expect(
-          find.descendant(
-            of: hiddenCycle,
-            matching: find.textContaining(
-              'Interne kandidaten: 1 · geladen gegevens',
-            ),
-          ),
-          findsOneWidget,
-        );
-
-        final hiddenCycleToggle = find.descendant(
-          of: hiddenCycle,
-          matching: find.byKey(
-            const ValueKey('iteration-results-toggle-iteration-1'),
-          ),
-        );
-        await tester.tap(hiddenCycleToggle);
-        await tester.pump();
-        expect(
-          find.descendant(
-            of: hiddenCycle,
-            matching: find.text('Verberg opbrengst'),
-          ),
-          findsOneWidget,
-        );
+        expect(find.byType(IterationEvidenceRow), findsNWidgets(6));
+        expect(find.text('Toon opbrengst'), findsNothing);
 
         await tester.tap(find.byTooltip('Vernieuwen'));
         for (var pump = 0; pump < 5; pump++) {
           await tester.pump();
         }
-        expect(
-          find.descendant(
-            of: find.ancestor(
-              of: hiddenCycleTitle,
-              matching: find.byType(IterationCycleCard),
-            ),
-            matching: find.text('Verberg opbrengst'),
-          ),
-          findsOneWidget,
-        );
+        expect(find.byType(IterationEvidenceRow), findsNWidgets(6));
+        expect(hiddenCycleTitle, findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
       }, () => _client());
     },
@@ -228,16 +192,11 @@ void main() {
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
 
-        expect(
-          find.textContaining('Interne kandidaten: laden…'),
-          findsNWidgets(5),
-        );
+        expect(find.textContaining('Interne kandidaten:'), findsNothing);
         expect(_metricValue(tester, 'Interne storykandidaten'), 'Laden…');
         expect(_metricValue(tester, 'Software Factory-stories'), 'Laden…');
         expect(
-          find.textContaining(
-            'Software Factory-leveringen: 0 · geladen gegevens',
-          ),
+          find.text('Gekoppelde opbrengst: 0', findRichText: true),
           findsNWidgets(5),
         );
         expect(
@@ -253,10 +212,7 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        expect(
-          find.textContaining('Interne kandidaten: niet beschikbaar'),
-          findsNWidgets(5),
-        );
+        expect(find.textContaining('Interne kandidaten:'), findsNothing);
         expect(
           _metricValue(tester, 'Interne storykandidaten'),
           'Niet beschikbaar',
@@ -265,7 +221,10 @@ void main() {
           _metricValue(tester, 'Software Factory-stories'),
           'Niet beschikbaar',
         );
-        expect(find.textContaining('Interne kandidaten: 0'), findsNothing);
+        expect(
+          find.text('Gekoppelde opbrengst: 0', findRichText: true),
+          findsNWidgets(5),
+        );
         expect(
           find.text('Gekoppelde stories zijn niet beschikbaar.'),
           findsOneWidget,

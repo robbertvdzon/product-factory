@@ -88,10 +88,9 @@ Map<String, dynamic> _sessionWith({
   'dossier': null,
 };
 
-/// Eén representatieve, afgeronde (niet QUEUED/RUNNING) iteratie per van de vijf toegestane
-/// classificatiewaarden, zodat lijstkaart en dialoog voor dezelfde data vergeleken kunnen worden.
-/// QUEUED/RUNNING blijven hier bewust buiten beeld: de lijstkaart toont dan `IterationProgressIndicator`
-/// in plaats van de badge (main.dart:589-591), dus die statussen zijn geen geldige paritietscase.
+/// Eén representatieve terminale iteratie per classificatiewaarde die het
+/// detaildialoog kan tonen. Een onbekende status heeft in het nieuwe
+/// toestandsmodel geen terminale uitkomst en is daarom geen badgecase.
 final Map<String, Map<String, dynamic>> _sampleIterationByClassification = {
   kRichtingGekozen: {'status': 'ACCEPTED', 'criticVerdict': 'ACCEPT'},
   kOnderzoekOnvoldoende: {
@@ -103,7 +102,6 @@ final Map<String, Map<String, dynamic>> _sampleIterationByClassification = {
     'status': 'FAILED',
     'errorMessage': 'Workspace-publicatie tijdelijk niet beschikbaar.',
   },
-  kNietClassificeerbaar: {'status': 'ONVOORZIEN_TOEKOMSTIG_LABEL'},
 };
 
 Future<void> _openDialog(
