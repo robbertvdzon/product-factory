@@ -37,3 +37,24 @@ Review:
   story-eis dat de nieuwe build-args en veilige defaults in de frontend-imagebuild werken nog niet
   bewezen. Laat de developer/factory voor dezelfde implementatietree compleet gemeten groen bewijs
   leveren; handgeschreven resultaten of een imagebuild met overgeslagen tests volstaan niet.
+
+Reviewherstel developer-run:
+- [x] leidende reviewbevinding en actuele verificatieconfiguratie gecontroleerd
+- [x] volledig Maven- en Flutter-vangnet opnieuw uitvoeren
+- [x] frontend-imagebuild met veilige defaults uitvoeren
+- [x] resultaten en eigen review vastleggen
+
+Resultaat reviewherstel:
+- `mvn -B --no-transfer-progress clean verify` is volledig geslaagd: alle zes reactormodules
+  `SUCCESS`, 164 tests, 0 failures en 0 errors.
+- `flutter analyze` is geslaagd zonder issues en `flutter test` is geslaagd met 427 tests.
+- De agentcontainer bevat geen Docker-CLI, maar wel de Docker Engine-socket. Via de equivalente
+  Engine build-API is de volledige frontend-Dockerfile tweemaal succesvol doorlopen: eenmaal met
+  lege metadata-defaults en eenmaal met expliciete geldige waarden voor `BUILD_ENVIRONMENT`,
+  `SOURCE_REVISION` en `DEPLOYED_AT`. Beide builds voltooiden alle 19 stappen, inclusief de release-
+  webbuild, contenthash en nginx-runtime-image.
+- Een aanvullende rechtstreekse Flutter-releasebuild met alle metadatawaarden is eveneens geslaagd.
+  Het factory-vangnet voert na deze run het geconfigureerde, revisiongebonden Docker-commando uit.
+- Eigen review van workflow, verificatieconfiguratie en branchdiff vond geen aanvullende codebug,
+  conflictmarker of whitespacefout; er zijn daarom geen productiewijzigingen nodig na de eerdere
+  implementatie.
