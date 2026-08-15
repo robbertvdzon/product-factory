@@ -7,8 +7,13 @@ Het volledige vangnet (identiek aan `.factory/verification.yaml`):
 - Build + backendtests: `mvn -B --no-transfer-progress clean verify` (vanuit de repo-root)
 - Frontend-lint: `flutter analyze` (vanuit `dashboard-frontend`)
 - Frontend-tests: `flutter test` (vanuit `dashboard-frontend`)
+- Docker Engine-runner-tests: `python3 -B .factory/test_docker_engine_build.py`
 - Agent-image (niet agent-runnable, draait in CI): `docker build --target build -f Dockerfile.agent .`
-- Frontend-image (niet agent-runnable, draait in CI): `docker build -f dashboard-frontend/Dockerfile dashboard-frontend`
+- Frontend-image met veilige defaults: `python3 -B .factory/docker_engine_build.py --context dashboard-frontend`
+- Frontend-image met metadata: `python3 -B .factory/docker_engine_build.py --context dashboard-frontend --build-arg BUILD_ENVIRONMENT=preview --build-arg SOURCE_REVISION=0123456789abcdef0123456789abcdef01234567 --build-arg DEPLOYED_AT=2026-08-15T18:00:00Z`
+
+De frontend-imagecommando's gebruiken de lokale Docker Engine-socket omdat de agentcontainer bewust
+geen Docker-CLI bevat. In CI blijft de workflow de normale Buildx-action gebruiken.
 
 Aanvullend lokaal:
 

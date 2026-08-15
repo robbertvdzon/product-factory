@@ -214,6 +214,15 @@
   `Wrap` gebruikt één, twee of drie kolommen. De native `OutlinedButton` heeft een eigen `FocusNode`,
   opent de bestaande `_showIteration`-detailroute en herstelt focus na sluiten of Escape. De
   toegankelijke actienaam bevat product, cyclus, datum en uitkomst.
+- `EnvironmentIdentityPresentation` in `environment_identity.dart` leest uitsluitend de drie via
+  `AppConfig` aangeleverde Dart-defines `BUILD_ENVIRONMENT`, `SOURCE_REVISION` en `DEPLOYED_AT`.
+  De gesloten omgevingsmapping, exacte volledige Git-revisiecontrole en ISO-8601-controle met
+  verplichte tijdzone valideren ieder veld onafhankelijk; het model bewaart geen ruwe invoer.
+  `OverviewPage` maakt dit buildgebonden model eenmaal en deelt exact die instantie met
+  `EnvironmentIdentityBlock` in Beheer en iedere terminale `EnvironmentIdentityReference`.
+  Het volledige blok heeft drie afzonderlijke semantics-labels; de compacte referentie bevat alleen
+  omgeving en de eerste twaalf revisietekens. Actieve en onbekende kaarten krijgen het model niet.
+  Dit voegt geen runtimebestandslezing, request, backendcontract of opslag toe.
 - `IterationProgressCard` rendert actieve cycli uitsluitend met de gesloten veilige statusmapping,
   een bekende `currentRole`, rechtstreeks uit status bepaalde voortgang en één neutrale
   `IterationProgressButton`. Voor onbekende status blijven alleen `Status: Onbekend` en die actie
@@ -262,6 +271,9 @@ Exact de commandoset uit `.factory/verification.yaml`:
 | `repository-maven-verify` | `mvn -B --no-transfer-progress clean verify` | `.` |
 | `dashboard-flutter-analyze` | `flutter analyze` | `dashboard-frontend` |
 | `dashboard-flutter-test` | `flutter test` | `dashboard-frontend` |
+| `factory-docker-engine-build-runner-test` | unittest voor de lokale Engine-runner | `.` |
+| `dashboard-frontend-image-build-defaults` | frontend-image via de Docker Engine-socket, zonder metadata | `.` |
+| `dashboard-frontend-image-build-metadata` | frontend-image via de Docker Engine-socket, met alle drie metadatawaarden | `.` |
 | `agent-image-build` | `docker build --target build -f Dockerfile.agent .` (niet agent-runnable) | `.` |
 
 Na een tester-AI-run voert de agentworker deze zelf uit en schrijft additive revisiongebonden evidence in

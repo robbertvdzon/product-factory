@@ -226,6 +226,12 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   brede schermen en bij 200% tekstvergroting en toont geen ruwe foutgegevens, prompts, tokens,
   persoonsgegevens of artefactinhoud.
 
+  Iedere terminale bewijsregel bevat daarnaast een subtiele, niet-interactieve verwijzing met
+  uitsluitend `Omgeving` en `Revisie/build-ID`. Deze waarden komen uit exact dezelfde gevalideerde
+  buildidentiteit als het volledige blok in Beheer. `Uitgerold op` staat bewust niet in de compacte
+  bewijsregel. Actieve `QUEUED`-/`RUNNING`-kaarten en kaarten met een onbekende status krijgen geen
+  omgevingsverwijzing.
+
   `QUEUED` en `RUNNING` verschijnen als veilige voortgangskaart met alleen de gesloten statusmapping,
   een bekende `currentRole` als huidige stap, voortgang die rechtstreeks uit de actieve status volgt
   en de neutrale detailactie `Bekijk cyclusdetail`. Ontbrekende of onbekende rollen worden
@@ -397,7 +403,16 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
 De twee globale lijsten staan niet op het productoverzicht. De link `Beheer` opent binnen dezelfde
 dashboardpagina de beheerweergave met het actieve product als scope. Daar staat `Terug naar
 overzicht` als eerste focusbare actie; ook deze link heeft linksemantiek, zichtbare toetsenbordfocus
-en blijft tijdens auto-refresh bruikbaar. De keuze `Beheerscope` biedt ieder geldig product én,
+en blijft tijdens auto-refresh bruikbaar. Direct na de titel `Beheer` en vóór `Beheerscope` staat
+het alleen-lezen blok `Omgevingsidentiteit`, met in leesvolgorde `Omgeving`, `Revisie/build-ID` en
+`Uitgerold op`. De gesloten omgevingsmapping toont uitsluitend `production`, `acceptance` en
+`preview` als respectievelijk `Productie`, `Acceptatie` en `Preview`. Een revisie verschijnt alleen
+als de invoer een volledige hexadecimale bronrevisie is en wordt dan tot de eerste twaalf tekens
+ingekort. Een uitroltijd verschijnt alleen bij geldige ISO-8601-invoer met tijdzone, in de lokale
+browsertijd als `dd-MM-yyyy HH:mm`. Ieder ontbrekend of ongeldig veld valt onafhankelijk terug op
+`Onbekend`; het blok heeft geen laadstatus of bediening en gebruikt geen product- of cyclusdata.
+
+De keuze `Beheerscope` biedt ieder geldig product én,
 alleen in Beheer, `Alle producten`. Iedere lijstkop toont de gekozen productnaam of `Alle producten`.
 Een productkeuze wordt ook het actieve product op het hoofdscherm en wordt lokaal bewaard;
 `Alle producten` is tijdelijk en overschrijft die voorkeur niet. Een zichtbare live-status meldt

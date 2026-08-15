@@ -25,6 +25,15 @@ origin en callbackconfiguratie toe aan dezelfde Google OAuth-client als de ander
 De twee publieke Cloudflare-routes staan in `deploy/README.md`. De interne runtime-route is alleen
 voor operationele health/deploycontrole en hoort niet als gebruikersendpoint te worden gedeeld.
 
+## Dashboardidentiteit bij uitrol
+
+Productie, standing acceptatie en PR-previews krijgen elk hun eigen omgevingscode, volledige
+bronrevisie en één UTC-tijd mee tijdens de frontend-imagebuild. Deze waarden zijn compile-time
+metadata in de Flutter-bundle, geen secret of runtime-environmentvariabele. Beheer toont ze
+veldgewijs gevalideerd; een gewone podrestart wijzigt de identiteit dus niet. De exacte bron,
+betekenis en veilige fallbacks staan in
+[deploy/README.md](../../deploy/README.md#buildgebonden-dashboardidentiteit).
+
 ## Standing acceptatie
 
 Naast productie bestaat de geïsoleerde overlay `deploy/overlays/acceptance` in namespace

@@ -18,6 +18,7 @@ jobs:
       dashboard_frontend: ${{ steps.filter.outputs.dashboard_frontend }}
       ref: ${{ steps.resolve.outputs.ref }}
       sha: ${{ steps.resolve.outputs.sha }}
+      deployed_at: ${{ steps.resolve.outputs.deployed_at }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -42,6 +43,8 @@ jobs:
             echo "ref=${{ github.sha }}" >> "$GITHUB_OUTPUT"
             echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
+          # Eén UTC-tijd wordt per workflowrun vastgelegd en voor alle frontendvarianten hergebruikt.
+          echo "deployed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
   runtime:
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.changes.outputs.runtime == 'true'
@@ -116,6 +119,9 @@ jobs:
             API_BASE_URL=${{ steps.config.outputs.api_base_url }}
             GOOGLE_CLIENT_ID=${{ steps.config.outputs.google_client_id }}
             AUTH_REQUIRED=${{ steps.config.outputs.auth_required }}
+            BUILD_ENVIRONMENT=${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+            SOURCE_REVISION=${{ needs.changes.outputs.sha }}
+            DEPLOYED_AT=${{ needs.changes.outputs.deployed_at }}
           cache-from: type=gha,scope=product-factory-dashboard-frontend
           cache-to: type=gha,mode=max,scope=product-factory-dashboard-frontend
       # De standing acceptatieomgeving heeft, net als een PR-preview, een eigen frontendbuild nodig
@@ -136,6 +142,9 @@ jobs:
             GOOGLE_CLIENT_ID=
             AUTH_REQUIRED=false
             ACCEPTANCE_DATASET=true
+            BUILD_ENVIRONMENT=acceptance
+            SOURCE_REVISION=${{ needs.changes.outputs.sha }}
+            DEPLOYED_AT=${{ needs.changes.outputs.deployed_at }}
           cache-from: type=gha,scope=product-factory-dashboard-frontend
           cache-to: type=gha,mode=max,scope=product-factory-dashboard-frontend
   # GitOps promotion: ArgoCD only redeploys when the manifest actually changes. Our images use a

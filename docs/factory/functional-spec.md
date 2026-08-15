@@ -108,6 +108,11 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
      leveringskoppelingen tellen niet mee. Tijdens laden staat er `laden…`, bij bronfalen
      `niet beschikbaar`, nooit een misleidende nul.
 
+   Iedere terminale bewijsregel toont daarnaast één subtiele, niet-interactieve verwijzing met
+   uitsluitend `Omgeving` en `Revisie/build-ID` uit dezelfde genormaliseerde buildidentiteit als
+   Beheer. `Uitgerold op` staat niet in een bewijsregel. Actieve `QUEUED`-/`RUNNING`-kaarten en
+   onbekende-statuskaarten krijgen geen omgevingsverwijzing.
+
    De bewijsregel toont geen tokens, prompts, ruwe foutmeldingen of foutpayloads, stacktraces,
    persoonsgegevens, artefactinhoud of gegevens van andere producten. De native actie `Bekijk
    cyclusdetail` opent met muis, Enter of Spatie het bestaande detail van precies dezelfde cyclus;
@@ -257,7 +262,17 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
 ### De beheerweergave
 
 Beheer begint met de als link vormgegeven navigatieactie `Terug naar overzicht`, gevolgd door de titel
-`Beheer`. De link is de eerste focusbare actie, heeft linksemantiek en een zichtbare focusrand, werkt met
+`Beheer`. Direct na die titel staat onder de semantische kop `Omgevingsidentiteit` één alleen-lezen
+blok met de gekoppelde labels `Omgeving`, `Revisie/build-ID` en `Uitgerold op`, in die leesvolgorde.
+Alleen `production`, `acceptance` en `preview` worden respectievelijk `Productie`, `Acceptatie` en
+`Preview`; elke andere of ontbrekende waarde wordt `Onbekend`. Alleen een volledige hexadecimale
+bronrevisie is geldig en daarvan verschijnen de eerste twaalf tekens. Alleen een ISO-8601-tijd met
+expliciete tijdzone is geldig; die verschijnt in de lokale browsertijd als `dd-MM-yyyy HH:mm`.
+Ieder ongeldig of ontbrekend veld valt onafhankelijk terug op `Onbekend`. Het blok heeft geen laad-,
+fout- of bedieningstoestand en leest geen product- of cyclusdata. Daarna volgt de bestaande
+`Beheerscope`.
+
+De teruglink is de eerste focusbare actie, heeft linksemantiek en een zichtbare focusrand, werkt met
 muis en toetsenbord en brengt de gebruiker terug naar het bestaande productoverzicht. De focus blijft
 over de automatische verversing behouden. Daaronder staat een `Beheerscope`-keuze die opent met het
 actieve product. Naast ieder geldig product is hier, en uitsluitend hier, `Alle producten` beschikbaar.

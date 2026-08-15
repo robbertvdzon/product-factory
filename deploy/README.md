@@ -39,6 +39,29 @@ Cloudflare publiceert `product-factory.vdzonsoftware.nl` naar
 `product-factory-api.vdzonsoftware.nl` naar
 `http://dashboard-backend.product-factory.svc.cluster.local:8081`.
 
+## Buildgebonden dashboardidentiteit
+
+De imageworkflow geeft de frontend bij het bouwen drie niet-gevoelige waarden mee:
+
+- `BUILD_ENVIRONMENT`: `production` voor de productie-image, `acceptance` voor de afzonderlijke
+  acceptance-image en `preview` voor een PR-preview;
+- `SOURCE_REVISION`: de volledige uitgecheckte broncommit; bij een PR is dit de headcommit en niet
+  de synthetische mergecommit;
+- `DEPLOYED_AT`: één UTC-tijd in ISO-8601-formaat, aan het begin van de workflow vastgelegd en
+  hergebruikt voor alle frontendvarianten uit die run.
+
+De Dockerfile compileert deze waarden met `--dart-define` in de Flutter-webbundle. Het dashboard
+toont de genormaliseerde waarden onder `Beheer` > `Omgevingsidentiteit`; terminale bewijsregels tonen
+dezelfde omgeving en de eerste twaalf tekens van dezelfde revisie, maar niet de uitroltijd. De tijd
+is dus vaste metadata van de gebouwde frontendvariant en geen live podstarttijd. De identiteit zegt
+welke frontendbuild wordt geserveerd en doet geen uitspraak dat iedere backendcomponent dezelfde
+revisie draait.
+
+De frontend accepteert alleen de drie genoemde omgevingscodes, een volledige hexadecimale
+bronrevisie en een geldige ISO-8601-tijd met tijdzone. Ieder ontbrekend of ongeldig veld wordt
+afzonderlijk `Onbekend`. Lokale builds zonder build-args blijven daardoor bruikbaar. De draaiende
+container leest hiervoor geen repositorybestand of secret en doet geen extra API-request.
+
 ## Standing acceptatieomgeving
 
 `deploy/overlays/acceptance` is een blijvende, van productie en PR-previews gescheiden omgeving in

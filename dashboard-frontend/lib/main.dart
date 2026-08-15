@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'classification.dart';
 import 'config.dart';
+import 'environment_identity.dart';
 import 'formatting.dart';
 import 'google_button_stub.dart'
     if (dart.library.html) 'google_button_web.dart'
@@ -263,10 +264,12 @@ class OverviewPage extends StatefulWidget {
   const OverviewPage({
     required this.session,
     this.acceptanceDataset = AppConfig.acceptanceDataset,
+    this.environmentIdentity,
     super.key,
   });
   final AuthenticatedSession? session;
   final bool acceptanceDataset;
+  final EnvironmentIdentityPresentation? environmentIdentity;
   @override
   State<OverviewPage> createState() => _OverviewPageState();
 }
@@ -277,6 +280,7 @@ class _OverviewPageState extends State<OverviewPage> {
   late Future<DashboardSource<List<dynamic>>> candidateData;
   late Future<DashboardSource<List<dynamic>>> deliveryData;
   late final DashboardApi api;
+  late final EnvironmentIdentityPresentation environmentIdentity;
   final ProductScopePreferences productScopePreferences =
       const ProductScopePreferences();
   Timer? refreshTimer;
@@ -317,6 +321,8 @@ class _OverviewPageState extends State<OverviewPage> {
   @override
   void initState() {
     super.initState();
+    environmentIdentity =
+        widget.environmentIdentity ?? AppConfig.environmentIdentity;
     api = DashboardApi(AppConfig.apiBaseUrl, widget.session?.token);
     _reload();
     refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -625,6 +631,8 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
           const SizedBox(height: 12),
           Text('Beheer', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 16),
+          EnvironmentIdentityBlock(identity: environmentIdentity),
           const SizedBox(height: 16),
           ProductScopePicker(
             products: availableProducts,
@@ -1042,6 +1050,7 @@ class _OverviewPageState extends State<OverviewPage> {
                         return IterationEvidenceRow(
                           key: cardKey,
                           iteration: iteration,
+                          environmentIdentity: environmentIdentity,
                           deliveries: deliverySource.loaded
                               ? linked.deliveries
                               : null,
@@ -1733,6 +1742,7 @@ class SourceNotice extends StatelessWidget {
 class IterationEvidenceRow extends StatelessWidget {
   const IterationEvidenceRow({
     required this.iteration,
+    required this.environmentIdentity,
     required this.deliveries,
     required this.deliveriesLoading,
     required this.onOpenDetails,
@@ -1740,6 +1750,7 @@ class IterationEvidenceRow extends StatelessWidget {
   });
 
   final Map<String, dynamic> iteration;
+  final EnvironmentIdentityPresentation environmentIdentity;
   final List<Map<String, dynamic>>? deliveries;
   final bool deliveriesLoading;
   final Future<void> Function() onOpenDetails;
@@ -1791,6 +1802,8 @@ class IterationEvidenceRow extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  EnvironmentIdentityReference(identity: environmentIdentity),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 16,
@@ -1849,6 +1862,103 @@ class IterationEvidenceRow extends StatelessWidget {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Volledig, alleen-lezen omgevingsblok. De kop en ieder label-waardepaar
+/// vormen afzonderlijke semanticsnodes in dezelfde zichtbare leesvolgorde.
+class EnvironmentIdentityBlock extends StatelessWidget {
+  const EnvironmentIdentityBlock({required this.identity, super.key});
+
+  final EnvironmentIdentityPresentation identity;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    explicitChildNodes: true,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              header: true,
+              child: Text(
+                'Omgevingsidentiteit',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _EnvironmentIdentityValue(
+              label: 'Omgeving',
+              value: identity.environment,
+            ),
+            const SizedBox(height: 8),
+            _EnvironmentIdentityValue(
+              label: 'Revisie/build-ID',
+              value: identity.revision,
+            ),
+            const SizedBox(height: 8),
+            _EnvironmentIdentityValue(
+              label: 'Uitgerold op',
+              value: identity.deployedAt,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _EnvironmentIdentityValue extends StatelessWidget {
+  const _EnvironmentIdentityValue({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: '$label: $value',
+    excludeSemantics: true,
+    child: Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          TextSpan(text: value),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Compacte, niet-interactieve verwijzing voor uitsluitend terminale
+/// bewijsregels. De uitroltijd behoort bewust niet tot deze widget.
+class EnvironmentIdentityReference extends StatelessWidget {
+  const EnvironmentIdentityReference({required this.identity, super.key});
+
+  final EnvironmentIdentityPresentation identity;
+
+  @override
+  Widget build(BuildContext context) {
+    final label =
+        'Omgeving: ${identity.environment} · '
+        'Revisie/build-ID: ${identity.revision}';
+    return Semantics(
+      container: true,
+      label: label,
+      excludeSemantics: true,
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: kCycleCardSecondaryText,
         ),
       ),
     );

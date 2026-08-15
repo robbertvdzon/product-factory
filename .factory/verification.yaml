@@ -1,7 +1,7 @@
 version: 1
 commands:
   - id: repository-maven-verify
-    pathPrefixes: [productfactory-contracts/, productfactory-common/, productfactory/, agentworker/, dashboard-backend/, pom.xml, Dockerfile.agent, .factory/verification.yaml]
+    pathPrefixes: [productfactory-contracts/, productfactory-common/, productfactory/, agentworker/, dashboard-backend/, dashboard-frontend/, pom.xml, Dockerfile.agent, .factory/verification.yaml]
     argv: [mvn, -B, --no-transfer-progress, clean, verify]
     workingDirectory: .
     timeoutSeconds: 1800
@@ -15,13 +15,21 @@ commands:
     argv: [flutter, test]
     workingDirectory: dashboard-frontend
     timeoutSeconds: 900
-  # De frontend-image wordt op elke PR en op main gebouwd (.github/workflows/images.yml) en is het
-  # enige pad waar pubspec.lock tegen de gepinde Flutter-base wordt opgelost. Zonder deze entry viel
-  # die build buiten het vangnet.
-  - id: dashboard-frontend-image-build
-    agentRunnable: false
-    pathPrefixes: [dashboard-frontend/]
-    argv: [docker, build, -f, dashboard-frontend/Dockerfile, dashboard-frontend]
+  - id: factory-docker-engine-build-runner-test
+    pathPrefixes: [.factory/docker_engine_build.py, .factory/test_docker_engine_build.py, .factory/verification.yaml]
+    argv: [python3, -B, .factory/test_docker_engine_build.py]
+    workingDirectory: .
+    timeoutSeconds: 60
+  # De agentcontainer heeft geen Docker-CLI, maar wel de lokale Engine-socket. Deze twee
+  # revisiongebonden builds bewijzen zowel de veilige defaults als alle metadata-build-args.
+  - id: dashboard-frontend-image-build-defaults
+    pathPrefixes: [dashboard-frontend/, .factory/docker_engine_build.py, .factory/verification.yaml]
+    argv: [python3, -B, .factory/docker_engine_build.py, --context, dashboard-frontend]
+    workingDirectory: .
+    timeoutSeconds: 1800
+  - id: dashboard-frontend-image-build-metadata
+    pathPrefixes: [dashboard-frontend/, .factory/docker_engine_build.py, .factory/verification.yaml]
+    argv: [python3, -B, .factory/docker_engine_build.py, --context, dashboard-frontend, --build-arg, BUILD_ENVIRONMENT=preview, --build-arg, SOURCE_REVISION=0123456789abcdef0123456789abcdef01234567, --build-arg, DEPLOYED_AT=2026-08-15T18:00:00Z]
     workingDirectory: .
     timeoutSeconds: 1800
   - id: agent-image-build

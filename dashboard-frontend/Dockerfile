@@ -7,11 +7,16 @@ ARG API_BASE_URL
 ARG GOOGLE_CLIENT_ID
 ARG AUTH_REQUIRED=true
 ARG ACCEPTANCE_DATASET=false
+ARG BUILD_ENVIRONMENT
+ARG SOURCE_REVISION
+ARG DEPLOYED_AT
 WORKDIR /app
 COPY . .
 RUN flutter pub get && flutter build web --release --pwa-strategy=none \
     --dart-define=API_BASE_URL=${API_BASE_URL} --dart-define=GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID} --dart-define=AUTH_REQUIRED=${AUTH_REQUIRED} \
-    --dart-define=ACCEPTANCE_DATASET=${ACCEPTANCE_DATASET}
+    --dart-define=ACCEPTANCE_DATASET=${ACCEPTANCE_DATASET} \
+    --dart-define=BUILD_ENVIRONMENT=${BUILD_ENVIRONMENT} --dart-define=SOURCE_REVISION=${SOURCE_REVISION} \
+    --dart-define=DEPLOYED_AT=${DEPLOYED_AT}
 
 # Flutter gebruikt standaard een vaste main.dart.js-naam. Geef iedere inhoud een eigen URL,
 # zodat browsers nooit een oude app-bundle onder dezelfde naam kunnen blijven serveren.
