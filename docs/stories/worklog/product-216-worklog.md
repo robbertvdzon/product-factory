@@ -58,3 +58,16 @@ Resultaat reviewherstel:
 - Eigen review van workflow, verificatieconfiguratie en branchdiff vond geen aanvullende codebug,
   conflictmarker of whitespacefout; er zijn daarom geen productiewijzigingen nodig na de eerdere
   implementatie.
+
+Vervolgreview:
+- [blocker] De eerdere bewijsblocker is niet opgelost. Het nieuwste
+  `[FACTORY VERIFICATION EVIDENCE]` hoort bij de actuele developer-tree
+  `049c3815bc3c6fe6c3f91295011225e20e3feec8`, maar `repository-maven-verify` staat opnieuw op
+  `skipped` en het gemeten commandoblok bevat geen geslaagde `dashboard-frontend-image-build`.
+  De handmatig beschreven Maven- en Docker Engine-resultaten zijn geen agentworker-gemeten,
+  revisiongebonden bewijs. Laat de factory voor dezelfde developer-tree zowel het volledige Maven-
+  vangnet als de frontend-imagebuild met exitcode 0 meten; overgeslagen of alleen in proza
+  vastgelegde controles blijven blokkerend.
+- [info] Sinds de vorige review is alleen dit worklog aangevuld. Er is daarom geen door een codefix
+  veroorzaakte regressie gevonden; de eerdere conclusie dat er geen aanvullende codebug was blijft
+  ongewijzigd.
