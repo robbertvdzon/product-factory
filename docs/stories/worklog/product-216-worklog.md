@@ -93,3 +93,14 @@ Resultaat tweede reviewherstel:
   0 errors), `flutter analyze` zonder issues en `flutter test` met 427 geslaagde tests.
 - Factory-ontwikkel- en technische documentatie beschrijven de uitvoerbare commandoset. Eigen review
   vond geen conflictmarkers, whitespacefouten, onbedoelde lockfilewijziging of open testproces.
+
+Derde review:
+- [info] De eerdere bewijsblocker is opgelost. Het nieuwste agentworker-gemeten bewijs hoort bij
+  tree `479be6a9d4beac95e23b6282e325d27d718aca2b`, exact gelijk aan de huidige `HEAD^{tree}`.
+  Maven, Flutter-analyse, Flutter-tests, de runner-unittests en beide frontend-imagebuilds hebben
+  daarin status `passed` en exitcode 0.
+- [info] De herstelwijziging is fail-closed gecontroleerd: de Engine-runner faalt bij ontbrekende
+  invoer/socket, HTTP-, protocol-, JSON- en Docker-buildfouten; de verificatieconfiguratie activeert
+  Maven en beide imagevarianten voor frontendwijzigingen. Er is geen door de fix veroorzaakte
+  regressie gevonden. De eerdere conclusie dat de volledige story-diff geen aanvullende codebug
+  bevat blijft ongewijzigd.
