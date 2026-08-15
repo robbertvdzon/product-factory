@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/main.dart';
+import 'package:product_factory_dashboard/product_scope.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _iteration({
@@ -167,14 +168,15 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets(
-    'overzicht vervangt alleen terminal product-factory en telt exact gekoppelde leveringen',
+    'overzicht gebruikt terminale bewijsregels en veilige actieve kaarten',
     (tester) async {
       final calls = <String>[];
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
 
         expect(find.byType(IterationEvidenceRow), findsOneWidget);
-        expect(find.byType(IterationCycleCard), findsNWidgets(2));
+        expect(find.byType(IterationProgressCard), findsNWidgets(2));
+        expect(find.byType(IterationCycleCard), findsNothing);
         expect(
           find.descendant(
             of: find.byType(IterationEvidenceRow),
@@ -192,31 +194,43 @@ void main() {
 
         final runningCard = find.ancestor(
           of: find.text('product-factory · iteratie 40'),
-          matching: find.byType(IterationCycleCard),
+          matching: find.byType(IterationProgressCard),
         );
         expect(runningCard, findsOneWidget);
         expect(
           find.descendant(
             of: runningCard,
-            matching: find.byType(IterationProgressIndicator),
+            matching: find.text('Status: Bezig', findRichText: true),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: runningCard,
+            matching: find.text('Huidige stap: Criticus', findRichText: true),
           ),
           findsOneWidget,
         );
         final queuedCard = find.ancestor(
           of: find.text('product-factory · iteratie 38'),
-          matching: find.byType(IterationCycleCard),
+          matching: find.byType(IterationProgressCard),
         );
         expect(queuedCard, findsOneWidget);
         expect(
           find.descendant(
             of: queuedCard,
-            matching: find.byType(IterationProgressIndicator),
+            matching: find.text('Status: In wachtrij', findRichText: true),
           ),
           findsOneWidget,
         );
         expect(find.textContaining('ander-product · iteratie'), findsNothing);
 
-        await tester.tap(find.text('Bekijk bewijs'));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(IterationEvidenceRow),
+            matching: find.text('Bekijk cyclusdetail'),
+          ),
+        );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.text('Productcyclus 41'), findsOneWidget);
@@ -232,6 +246,39 @@ void main() {
         expect(
           find.text('Ruwe prompt die niet in het overzicht hoort'),
           findsNothing,
+        );
+      }, () => _client(calls));
+    },
+  );
+
+  testWidgets(
+    'een ander product gebruikt exact hetzelfde terminale bewijscomponent',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        activeProductSlugPreferenceKey: 'ander-product',
+      });
+      final calls = <String>[];
+      await http.runWithClient(() async {
+        await _pumpDashboard(tester);
+
+        expect(find.byType(IterationEvidenceRow), findsOneWidget);
+        expect(find.byType(IterationProgressCard), findsOneWidget);
+        expect(find.byType(IterationCycleCard), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(IterationEvidenceRow),
+            matching: find.text(
+              'Cyclusuitkomst: richting-verworpen',
+              findRichText: true,
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(
+            'Cyclusgeschiedenis voor product ander-product',
+          ),
+          findsOneWidget,
         );
       }, () => _client(calls));
     },

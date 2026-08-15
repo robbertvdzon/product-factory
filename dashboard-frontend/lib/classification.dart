@@ -72,13 +72,19 @@ IterationDecisionPresentation iterationDecisionPresentation(
       decidedAt: rawDecision['decidedAt'],
     );
   }
+  final criticVerdict = iteration['criticVerdict'];
+  final status = iteration['status'];
+  final errorMessage = iteration['errorMessage'];
+  final source = classifyDecisionSource(
+    criticVerdict: criticVerdict is String ? criticVerdict : null,
+    status: status is String ? status : null,
+    errorMessage: errorMessage is String ? errorMessage : null,
+  );
   return IterationDecisionPresentation(
-    source: classifyDecisionSource(
-      criticVerdict: iteration['criticVerdict'] as String?,
-      status: iteration['status'] as String?,
-      errorMessage: iteration['errorMessage'] as String?,
-    ),
-    derived: true,
+    source: source,
+    // "Afgeleid" is alleen een bewijsclaim wanneer de classifier ook een
+    // aantoonbare bron vond. Onbekende provenance blijft uitsluitend Onbekend.
+    derived: source != kBeslisbronOnbekend,
   );
 }
 

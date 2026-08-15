@@ -119,11 +119,13 @@ Future<void> _withDashboard(
   }, () => mockClient);
 }
 
-Finder _decisionButton(String id) =>
-    find.byKey(ValueKey('iteration-decision-source-$id'));
+Finder _detailButton(String id) =>
+    find.byKey(ValueKey('iteration-evidence-$id'));
 
-Finder _iterationRow(String id) =>
-    find.ancestor(of: _decisionButton(id), matching: find.byType(ListTile));
+Finder _iterationRow(String id) => find.ancestor(
+  of: _detailButton(id),
+  matching: find.byType(IterationEvidenceRow),
+);
 
 Future<void> _finishDialogTransition(WidgetTester tester) async {
   await tester.pump();
@@ -134,16 +136,27 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets(
-    'iedere cyclusregel toont één native beslisbronbutton zonder interactieve rij of ruwe inhoud',
+    'iedere terminale cyclus toont één native detailactie zonder ruwe inhoud',
     (tester) async {
       final callLog = <Map<String, String>>[];
       await _withDashboard(tester, callLog, () async {
         final semantics = tester.ensureSemantics();
-        expect(find.byType(IterationDecisionSourceButton), findsNWidgets(2));
-        expect(find.text('Beslisbron: Mens'), findsOneWidget);
-        expect(find.text('Reden: Handmatig geannuleerd'), findsOneWidget);
+        expect(find.byType(IterationEvidenceRow), findsNWidgets(2));
+        expect(find.byType(IterationEvidenceButton), findsNWidgets(2));
+        expect(find.byType(IterationDecisionSourceButton), findsNothing);
         expect(
-          find.text('Beslisbron: Technische fout (Afgeleid)'),
+          find.text('Beslisbron: Mens', findRichText: true),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Reden: Handmatig geannuleerd', findRichText: true),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            'Beslisbron: Technische fout (Afgeleid)',
+            findRichText: true,
+          ),
           findsOneWidget,
         );
         final explicitRow = _iterationRow('iter-34');
@@ -166,15 +179,14 @@ void main() {
 
         final historicalRow = _iterationRow('iter-12');
         expect(
-          tester
-              .widget<ClassificationBadge>(
-                find.descendant(
-                  of: historicalRow,
-                  matching: find.byType(ClassificationBadge),
-                ),
-              )
-              .classification,
-          kTechnischeFout,
+          find.descendant(
+            of: historicalRow,
+            matching: find.text(
+              'Cyclusuitkomst: technische fout',
+              findRichText: true,
+            ),
+          ),
+          findsOneWidget,
         );
         expect(
           find.descendant(
@@ -187,22 +199,23 @@ void main() {
         );
 
         for (final iteration in _iterations) {
-          final button = _decisionButton('${iteration['id']}');
+          final button = _detailButton('${iteration['id']}');
           expect(button, findsOneWidget);
           expect(
             find.descendant(of: button, matching: find.byType(OutlinedButton)),
             findsOneWidget,
           );
 
-          final listTileFinder = find.ancestor(
-            of: button,
-            matching: find.byType(ListTile),
-          );
-          expect(listTileFinder, findsOneWidget);
-          expect(tester.widget<ListTile>(listTileFinder).onTap, isNull);
           expect(
             find.descendant(
-              of: listTileFinder,
+              of: _iterationRow('${iteration['id']}'),
+              matching: find.byType(OutlinedButton),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: _iterationRow('${iteration['id']}'),
               matching: find.byIcon(Icons.chevron_right),
             ),
             findsNothing,
@@ -216,25 +229,25 @@ void main() {
           tester
               .getSemantics(
                 find.descendant(
-                  of: _decisionButton('iter-34'),
+                  of: _detailButton('iter-34'),
                   matching: find.byType(OutlinedButton),
                 ),
               )
               .getSemanticsData()
               .label,
-          contains('Beslisbron: Mens. Reden: Handmatig geannuleerd'),
+          contains('uitkomst Handmatig geannuleerd'),
         );
         expect(
           tester
               .getSemantics(
                 find.descendant(
-                  of: _decisionButton('iter-12'),
+                  of: _detailButton('iter-12'),
                   matching: find.byType(OutlinedButton),
                 ),
               )
               .getSemanticsData()
               .label,
-          contains('Beslisbron: Technische fout (Afgeleid)'),
+          contains('uitkomst technische fout'),
         );
 
         for (final forbiddenText in [
@@ -258,15 +271,21 @@ void main() {
       await _withDashboard(tester, callLog, () async {
         await tester.tap(
           find.descendant(
-            of: _decisionButton('iter-34'),
+            of: _detailButton('iter-34'),
             matching: find.byType(OutlinedButton),
           ),
         );
         await _finishDialogTransition(tester);
 
         expect(find.text('Productcyclus 34'), findsOneWidget);
-        expect(find.text('Beslisbron: Mens'), findsNWidgets(2));
-        expect(find.text('Reden: Handmatig geannuleerd'), findsNWidgets(2));
+        expect(
+          find.text('Beslisbron: Mens', findRichText: true),
+          findsNWidgets(2),
+        );
+        expect(
+          find.text('Reden: Handmatig geannuleerd', findRichText: true),
+          findsNWidgets(2),
+        );
         expect(find.text('Mechanisme: Handmatige annulering'), findsOneWidget);
         expect(find.text('Beslist op: 12-08-2026 11:01'), findsOneWidget);
         expect(
@@ -294,7 +313,7 @@ void main() {
     (tester) async {
       final callLog = <Map<String, String>>[];
       await _withDashboard(tester, callLog, () async {
-        final button = _decisionButton('iter-12');
+        final button = _detailButton('iter-12');
         final nativeButton = find.descendant(
           of: button,
           matching: find.byType(OutlinedButton),

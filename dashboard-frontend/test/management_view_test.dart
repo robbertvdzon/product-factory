@@ -280,7 +280,7 @@ void main() {
   );
 
   testWidgets(
-    'hoofdscherm behoudt metrieken, productactie en zelfstandig openende cycluskaart',
+    'hoofdscherm behoudt metrieken, productactie en terminale bewijsregel',
     (tester) async {
       final requests = <String>[];
       final candidate = _candidate(1, title: 'Gekoppelde cyclusopbrengst')
@@ -361,41 +361,31 @@ void main() {
         }
         expect(requests, contains('POST /api/products/demo/cycles'));
 
-        expect(find.textContaining('Status: ACCEPTED'), findsOneWidget);
+        expect(find.byType(IterationEvidenceRow), findsOneWidget);
         expect(
-          find.text('Kernreden: Alle kandidaten zijn leverbaar'),
+          find.text('Cyclusuitkomst: richting-gekozen', findRichText: true),
           findsOneWidget,
         );
         expect(
-          find.text('Beslisbron: Evaluatie-agent (Afgeleid)'),
+          find.text(
+            'Reden: Alle kandidaten zijn leverbaar',
+            findRichText: true,
+          ),
           findsOneWidget,
         );
         expect(
-          find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
-          findsOneWidget,
-        );
-
-        await tester.tap(find.text('Toon opbrengst'));
-        await tester.pump();
-        expect(
-          find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
-          findsNWidgets(2),
-        );
-        await tester.tap(find.text('Verberg opbrengst'));
-        await tester.pump();
-        expect(
-          find.textContaining('Gekoppelde cyclusopbrengst', findRichText: true),
-          findsOneWidget,
-        );
-        expect(find.textContaining('Status: ACCEPTED'), findsOneWidget);
-        expect(
-          find.text('Kernreden: Alle kandidaten zijn leverbaar'),
+          find.text(
+            'Beslisbron: Evaluatie-agent (Afgeleid)',
+            findRichText: true,
+          ),
           findsOneWidget,
         );
         expect(
-          find.text('Beslisbron: Evaluatie-agent (Afgeleid)'),
+          find.textContaining('Gekoppelde opbrengst:', findRichText: true),
           findsOneWidget,
         );
+        expect(find.text('Bekijk cyclusdetail'), findsOneWidget);
+        expect(find.text('Toon opbrengst'), findsNothing);
         await _disposeDashboard(tester);
       }, () => client);
     },

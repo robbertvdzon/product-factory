@@ -61,14 +61,15 @@ void main() {
       },
     );
 
-    test('niet-classificeerbare historie blijft onbekend en afgeleid', () {
+    test('niet-classificeerbare historie blijft uitsluitend onbekend', () {
       final result = iterationDecisionPresentation({
         'status': 'TOEKOMSTIGE_STATUS',
         'criticVerdict': 'ONBEKEND',
         'errorMessage': null,
       });
 
-      expect(result.sourceText, 'Beslisbron: Onbekend (Afgeleid)');
+      expect(result.sourceText, 'Beslisbron: Onbekend');
+      expect(result.derived, isFalse);
       expect(result.source, isNot(kBeslisbronMens));
       expect(result.source, isNot(kBeslisbronTechnischeFout));
     });
