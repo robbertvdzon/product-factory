@@ -314,9 +314,9 @@ Staat er meer klaar, dan verschijnt eronder een knop **'Meer (nog N)'** die er t
 de knop verdwijnt zodra alles zichtbaar is. Elke sectie heeft een eigen, onafhankelijke teller, en die
 teller overleeft de auto-refresh en het wisselen tussen overzicht en Beheer: een uitgeklapte lijst blijft
 uitgeklapt en nieuwe items verschijnen bovenaan.
-Ook de open/dicht-toestand van iedere geladen cycluskaart blijft bij de normale auto-refresh behouden;
-meerdere kaarten kunnen onafhankelijk openstaan. Verdwijnt een cyclus uit de geladen gegevens, dan
-verdwijnt ook zijn kaarttoestand.
+De afzonderlijke cyclusregels en voortgangskaarten zijn niet uitklapbaar. Hun stabiele identiteit
+zorgt tijdens de normale auto-refresh uitsluitend dat een zichtbare cyclus dezelfde widget en
+detailopener houdt; verdwijnt de cyclus uit de geladen gegevens, dan verdwijnt ook de kaart.
 
 Lijsten met een bruikbaar tijdstempel staan gesorteerd op nieuwste eerst; workspace-publicaties hebben geen
 tijdstempel en houden de volgorde van de backend.

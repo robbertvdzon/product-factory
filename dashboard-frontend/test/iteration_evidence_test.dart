@@ -1,6 +1,7 @@
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:product_factory_dashboard/classification.dart';
@@ -75,6 +76,23 @@ Widget _progressHarness({
 );
 
 Finder _richText(String text) => find.text(text, findRichText: true);
+
+List<String> _semanticsLabelsInTraversalOrder(SemanticsNode root) {
+  final labels = <String>[];
+
+  void visit(SemanticsNode node) {
+    final label = node.getSemanticsData().label;
+    if (label.isNotEmpty) labels.add(label);
+    for (final child in node.debugListChildrenInOrder(
+      DebugSemanticsDumpOrder.traversalOrder,
+    )) {
+      visit(child);
+    }
+  }
+
+  visit(root);
+  return labels;
+}
 
 void main() {
   group('shouldShowIterationEvidence', () {
@@ -402,19 +420,32 @@ void main() {
       expect(find.text('Toon opbrengst'), findsNothing);
       expect(find.byType(IterationCycleCard), findsNothing);
 
-      final group = tester
-          .getSemantics(find.byType(IterationEvidenceRow))
-          .getSemanticsData();
+      final row = find.byType(IterationEvidenceRow);
+      final rowSemantics = tester.getSemantics(row);
+      final group = rowSemantics.getSemanticsData();
       expect(group.label, contains('product product-factory, cyclus 42'));
-      for (final label in [
+      final expectedFieldOrder = [
         'Datum: 12-08-2026 10:30',
         'Cyclusuitkomst: richting-gekozen',
         'Reden: Alle kandidaten zijn leverbaar',
         'Beslisbron: Evaluatie-agent (Afgeleid)',
         'Gekoppelde opbrengst: 2',
-      ]) {
+      ];
+      for (final label in expectedFieldOrder) {
         expect(find.bySemanticsLabel(label), findsOneWidget);
       }
+      final visibleFieldOrder = find
+          .descendant(of: row, matching: find.byType(RichText))
+          .evaluate()
+          .map((element) => (element.widget as RichText).text.toPlainText())
+          .where(expectedFieldOrder.contains)
+          .toList();
+      final semanticsFieldOrder = _semanticsLabelsInTraversalOrder(
+        rowSemantics,
+      ).where(expectedFieldOrder.contains).toList();
+      expect(visibleFieldOrder, expectedFieldOrder);
+      expect(semanticsFieldOrder, visibleFieldOrder);
+
       final button = find.byType(OutlinedButton);
       final buttonData = tester.getSemantics(button).getSemanticsData();
       expect(buttonData.label, contains('product product-factory, cyclus 42'));
@@ -534,7 +565,17 @@ void main() {
       );
       final button = find.byType(OutlinedButton);
 
-      await tester.tap(button);
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        isNot(Tristate.isTrue),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(find.text('Bestaand actief cyclusdetail'), findsOneWidget);
       await tester.tap(find.text('Sluiten'));
@@ -552,6 +593,12 @@ void main() {
       expect(find.text('Bestaand actief cyclusdetail'), findsNothing);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(find.text('Bestaand actief cyclusdetail'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      await tester.tap(button);
       await tester.pumpAndSettle();
       expect(find.text('Bestaand actief cyclusdetail'), findsOneWidget);
     },
@@ -599,7 +646,17 @@ void main() {
       await tester.pumpWidget(_harness(onOpenDetails: openDialog));
       final button = find.byType(OutlinedButton);
 
-      await tester.tap(button);
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        isNot(Tristate.isTrue),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        tester.getSemantics(button).flagsCollection.isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(find.text('Bestaand cyclusdetail'), findsOneWidget);
       for (var tab = 0; tab < 6; tab++) {
@@ -647,6 +704,12 @@ void main() {
       );
 
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(find.text('Bestaand cyclusdetail'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      await tester.tap(button);
       await tester.pumpAndSettle();
       expect(find.text('Bestaand cyclusdetail'), findsOneWidget);
     },

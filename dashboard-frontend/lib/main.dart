@@ -467,7 +467,6 @@ class _OverviewPageState extends State<OverviewPage> {
         iterationId: '${iteration['id']}',
       ),
     );
-    if (mounted) setState(_reload);
   }
 
   Future<void> _openMeeting(String productSlug, String meetingId) async {

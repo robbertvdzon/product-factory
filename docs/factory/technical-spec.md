@@ -108,7 +108,8 @@
   `session.dart` — Google-login; `formatting.dart` — datum/tijd- en duurformattering;
   `limited_list.dart` — de 5/+10-lijstbeperking; `iteration_results.dart` — pure, verliesvrije
   client-side koppeling van geladen kandidaten en leveringen aan cycli; `iteration_evidence.dart` —
-  de pure selector en veilige presentatie-opbouw voor terminale `product-factory`-cycli;
+  de pure, productslug-onafhankelijke selector en veilige presentatie-opbouw voor terminale,
+  actieve en onbekende cycli van ieder product;
   `product_scope.dart` — canonieke productselectie, scopefilters en browservoorkeur;
   `start_availability.dart` — het pure, gedeelde presentatiemodel voor de handmatige
   startbeschikbaarheid;
@@ -227,8 +228,8 @@
 - Paginering gebeurt client-side: alle lijstdata komt in één refresh binnen, de frontend toont er
   standaard 5 van en laat er per klik op 'Meer' 10 extra zien. De zichtbaarheidstellers staan in
   `_OverviewPageState` (dus buiten de `FutureBuilder`) zodat de auto-refresh van 5 s de
-  lijstbeperking behoudt. De expanded-state van cycluskaarten staat in de stateful kaarten zelf en
-  blijft via hun stabiele keys behouden zolang de betreffende cycli geladen blijven.
+  lijstbeperking behoudt. Cyclusregels en voortgangskaarten zijn niet uitklapbaar; hun stabiele keys
+  behouden uitsluitend de juiste widgetidentiteit en openerfocus tijdens een auto-refresh.
 - Teksten in de UI zijn Nederlands; commentaar legt het *waarom* vast, niet het *wat*.
 - Formatteer nieuwe of gewijzigde code met `dart format`; laat ongerelateerde regels met rust, zodat de
   diff van een story leesbaar blijft (het bestand is historisch niet volledig dart-formatted).
