@@ -16,6 +16,7 @@ import 'meeting_dialog.dart';
 import 'product_scope.dart';
 import 'roadmap.dart';
 import 'session.dart';
+import 'start_availability.dart';
 
 void main() => runApp(const ProductFactoryDashboard());
 
@@ -446,6 +447,14 @@ class _OverviewPageState extends State<OverviewPage> {
         ).showSnackBar(SnackBar(content: Text('$error')));
       }
     }
+  }
+
+  Widget _startCycleSection(Map<String, dynamic> product) {
+    final availability = StartAvailability.fromProduct(product);
+    return StartAvailabilityPanel(
+      availability: availability,
+      onStart: () => _startCycle(product['slug'] as String),
+    );
   }
 
   Future<void> _showIteration(Map<String, dynamic> iteration) async {
@@ -994,13 +1003,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
-              StartCycleButton(
-                onPressed:
-                    activeProduct['status'] == 'active' &&
-                        activeProduct['workspaceOwnership'] == 'product-factory'
-                    ? () => _startCycle(activeProduct['slug'] as String)
-                    : null,
-              ),
+              _startCycleSection(activeProduct),
               const SizedBox(height: 24),
               Text(
                 'Eerdere cycli',
@@ -3929,6 +3932,186 @@ class _AddProductDialogState extends State<AddProductDialog> {
 /// zelfde aanpak als `kClassificationColors` in `classification.dart`.
 const Color kStartCycleButtonBackground = Color(0xFF1B4332);
 const Color kStartCycleButtonForeground = Colors.white;
+
+/// Presenteert de startactie en, wanneer die niet beschikbaar is, de direct zichtbare reden en de
+/// lokale read-only detailactie vanuit exact dezelfde [StartAvailability]-instantie.
+class StartAvailabilityPanel extends StatelessWidget {
+  const StartAvailabilityPanel({
+    required this.availability,
+    required this.onStart,
+    super.key,
+  });
+
+  final StartAvailability availability;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    if (availability.canStart) {
+      return StartCycleButton(onPressed: onStart);
+    }
+
+    final additionalReason = availability.additionalReason;
+    final semanticLabel = [
+      'Start productcyclus nu.',
+      availability.primaryReason!,
+      if (additionalReason != null) additionalReason,
+    ].join(' ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          key: const ValueKey('start-availability-blocked-group'),
+          container: true,
+          button: true,
+          enabled: false,
+          label: semanticLabel,
+          child: ExcludeSemantics(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const StartCycleButton(onPressed: null),
+                const SizedBox(height: 8),
+                Text(availability.primaryReason!),
+                if (additionalReason != null) ...[
+                  const SizedBox(height: 4),
+                  Text(additionalReason),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        StartAvailabilityDetailsButton(availability: availability),
+      ],
+    );
+  }
+}
+
+/// Toetsenbordbedienbare opener die na iedere sluitwijze focus terugzet op de detailactie.
+class StartAvailabilityDetailsButton extends StatefulWidget {
+  const StartAvailabilityDetailsButton({
+    required this.availability,
+    super.key,
+  });
+
+  final StartAvailability availability;
+
+  @override
+  State<StartAvailabilityDetailsButton> createState() =>
+      _StartAvailabilityDetailsButtonState();
+}
+
+class _StartAvailabilityDetailsButtonState
+    extends State<StartAvailabilityDetailsButton> {
+  final FocusNode _focusNode = FocusNode(
+    debugLabel: 'Bekijk-productdetails-knop',
+  );
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openDetails() async {
+    await showDialog<void>(
+      context: context,
+      traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+      builder: (_) => StartAvailabilityDetailsDialog(
+        availability: widget.availability,
+      ),
+    );
+    if (mounted) _focusNode.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    focusNode: _focusNode,
+    onPressed: _openDetails,
+    icon: const Icon(Icons.info_outline),
+    label: const Text('Bekijk productdetails'),
+  );
+}
+
+/// Lokale detailweergave zonder productrecord, API-client of muterende callback. Daarmee kan deze
+/// dialoog uitsluitend de veilige labels en voorwaarden uit het gedeelde model tonen.
+class StartAvailabilityDetailsDialog extends StatelessWidget {
+  const StartAvailabilityDetailsDialog({
+    required this.availability,
+    super.key,
+  });
+
+  final StartAvailability availability;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Productdetails'),
+    content: SizedBox(
+      width: 480,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(availability.primaryReason!),
+            if (availability.additionalReason != null) ...[
+              const SizedBox(height: 4),
+              Text(availability.additionalReason!),
+            ],
+            const SizedBox(height: 16),
+            _StartAvailabilityDetailRow(
+              label: 'Productstatus',
+              value: availability.productStatusLabel,
+            ),
+            const SizedBox(height: 12),
+            _StartAvailabilityDetailRow(
+              label: 'Workspacebeheer',
+              value: availability.workspaceOwnershipLabel,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Niet-vervulde voorwaarden',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            for (final condition in availability.unmetConditions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('• $condition'),
+              ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Sluiten'),
+      ),
+    ],
+  );
+}
+
+class _StartAvailabilityDetailRow extends StatelessWidget {
+  const _StartAvailabilityDetailRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: Theme.of(context).textTheme.labelLarge),
+      Text(value),
+    ],
+  );
+}
 
 /// Primaire CTA 'Start productcyclus nu' op de productkaart: een eigen, losstaand knop-widget met
 /// een zichtbare rand (onderscheid door rand, niet uitsluitend kleur, t.o.v. de secundaire
