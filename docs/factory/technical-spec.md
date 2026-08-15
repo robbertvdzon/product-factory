@@ -271,6 +271,9 @@ Exact de commandoset uit `.factory/verification.yaml`:
 | `repository-maven-verify` | `mvn -B --no-transfer-progress clean verify` | `.` |
 | `dashboard-flutter-analyze` | `flutter analyze` | `dashboard-frontend` |
 | `dashboard-flutter-test` | `flutter test` | `dashboard-frontend` |
+| `factory-docker-engine-build-runner-test` | unittest voor de lokale Engine-runner | `.` |
+| `dashboard-frontend-image-build-defaults` | frontend-image via de Docker Engine-socket, zonder metadata | `.` |
+| `dashboard-frontend-image-build-metadata` | frontend-image via de Docker Engine-socket, met alle drie metadatawaarden | `.` |
 | `agent-image-build` | `docker build --target build -f Dockerfile.agent .` (niet agent-runnable) | `.` |
 
 Na een tester-AI-run voert de agentworker deze zelf uit en schrijft additive revisiongebonden evidence in

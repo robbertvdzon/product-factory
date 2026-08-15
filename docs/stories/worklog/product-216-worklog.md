@@ -71,3 +71,25 @@ Vervolgreview:
 - [info] Sinds de vorige review is alleen dit worklog aangevuld. Er is daarom geen door een codefix
   veroorzaakte regressie gevonden; de eerdere conclusie dat er geen aanvullende codebug was blijft
   ongewijzigd.
+
+Tweede reviewherstel developer-run:
+- [x] leidende reviewerbevinding, factoryregels en bestaand bewijs gelezen
+- [x] oorzaak van overgeslagen revisiongebonden commando's herstellen
+- [x] gerichte verificatie van configuratie en imagebuild uitvoeren
+- [x] volledig Maven- en Flutter-vangnet tot exitcode 0 uitvoeren
+- [x] resultaten en eigen review vastleggen
+
+Resultaat tweede reviewherstel:
+- `repository-maven-verify` matcht nu ook `dashboard-frontend/`; een frontendtree levert dus niet
+  langer een overgeslagen Maven-resultaat op.
+- De frontend-imagebuilds zijn agent-runnable gemaakt met een kleine stdlib-only Engine-client. De
+  runner maakt een contexttar met `.dockerignore`, stuurt die naar de aanwezige lokale Docker-socket,
+  streamt het echte buildresultaat en faalt op HTTP-, protocol- en Docker-buildfouten. Drie unittests
+  dekken contextfiltering, overdracht van alle metadata-buildargs en ongeldige argumenten.
+- Twee afzonderlijke stabiele verificatiecommando's bouwen de volledige frontend-Dockerfile: één met
+  veilige lege defaults en één met expliciete geldige omgeving, volledige bronrevisie en UTC-tijd.
+  Beide lokale builds zijn geslaagd met 19/19 stappen en een succesvolle runtime-image.
+- Het volledige overige vangnet is groen: Maven alle zes modules `SUCCESS` (164 tests, 0 failures,
+  0 errors), `flutter analyze` zonder issues en `flutter test` met 427 geslaagde tests.
+- Factory-ontwikkel- en technische documentatie beschrijven de uitvoerbare commandoset. Eigen review
+  vond geen conflictmarkers, whitespacefouten, onbedoelde lockfilewijziging of open testproces.
