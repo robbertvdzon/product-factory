@@ -107,6 +107,25 @@ class AgentContractTest {
         assertFalse(command.contains("read-only"))
     }
 
+    @Test fun `codex command grants the meeting agent browser access while retaining read only instructions`() {
+        val workspace = Files.createTempDirectory("pf-agent-workspace-meeting")
+        val executor = CodexAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                workspace, "/opt/homebrew/bin/codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+
+        val command = executor.command(
+            AgentTask("run-meeting", "hkh-autopilot", "meeting-chat", "Bekijk de productieomgeving"),
+            workspace.resolve("last-message"),
+        )
+
+        assertTrue(command.containsAll(listOf("--sandbox", "danger-full-access")))
+        assertTrue(command.last().contains("tijdelijke Playwright-scripts en screenshots"))
+        assertTrue(command.last().contains("Voer geen Git-, GitHub-, OpenShift-, database- of clusterwijzigingen uit"))
+    }
+
     @Test fun `codex command passes a structured output schema`() {
         val workspace = Files.createTempDirectory("pf-agent-schema")
         val executor = CodexAgentTaskExecutor(
@@ -187,6 +206,20 @@ class AgentContractTest {
         val command = executor.command(
             AgentTask("run-3c", "hkh-autopilot", "delivery-verification", "Controleer de oplevering"),
         )
+
+        assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch,Bash,Read")))
+    }
+
+    @Test fun `claude command grants the meeting agent Bash and Read for browser research`() {
+        val workspace = Files.createTempDirectory("pf-claude-workspace-meeting")
+        val executor = ClaudeAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                workspace, "codex", "gpt-5.6-terra", "/opt/homebrew/bin/claude",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+
+        val command = executor.command(AgentTask("run-meeting", "hkh-autopilot", "meeting-chat", "Test acceptatie"))
 
         assertTrue(command.containsAll(listOf("--tools", "WebSearch,WebFetch,Bash,Read")))
     }

@@ -52,6 +52,8 @@ class MeetingControllerTest(
         }
         jdbc.update("delete from meeting_message where product_slug = ?", slug)
         jdbc.update("delete from meeting where product_slug = ?", slug)
+        jdbc.update("delete from product_memory_retraction where product_slug = ?", slug)
+        jdbc.update("delete from product_memory where product_slug = ?", slug)
         // agent_run.run_id is uniek; overleg-run-ID's zijn deterministisch afgeleid van meeting-ID
         // (dat zelf weer begint bij sequence 1 na de reset hierboven), dus die moeten ook weg.
         jdbc.update("delete from agent_run where product_slug = ?", slug)
@@ -73,6 +75,8 @@ class MeetingControllerTest(
             status { isOk() }
             jsonPath("$.sender") { value("ai") }
             jsonPath("$.content") { value("Nepantwoord van de AI.") }
+            jsonPath("$.consultedSources[0]") { value("product-factory://testbron") }
+            jsonPath("$.memoryChanges[0].action") { value("ADD") }
         }
 
         mvc.get("/api/products/$slug/meetings/$meetingId/messages").andExpect {
@@ -80,6 +84,14 @@ class MeetingControllerTest(
             jsonPath("$.length()") { value(2) }
             jsonPath("$[0].sender") { value("owner") }
             jsonPath("$[1].sender") { value("ai") }
+            jsonPath("$[1].consultedSources[0]") { value("product-factory://testbron") }
+            jsonPath("$[1].memoryChanges[0].title") { value("Besluit uit overleg") }
+        }
+
+        mvc.get("/api/products/$slug/memory").andExpect {
+            status { isOk() }
+            jsonPath("$[0].title") { value("Besluit uit overleg") }
+            jsonPath("$[0].content") { value("Dit blijft actief beschikbaar voor volgende agents.") }
         }
 
         mvc.post("/api/products/$slug/meetings/$meetingId/close").andExpect {
@@ -119,7 +131,15 @@ class MeetingControllerTest(
         @Primary
         fun fakeAgentDispatch(): AgentDispatchPort = AgentDispatchPort { task ->
             val summary = when (task.taskType) {
-                "meeting-chat" -> """{"reply":"Nepantwoord van de AI."}"""
+                "meeting-chat" -> """{
+                    "reply":"Nepantwoord van de AI.",
+                    "consultedSources":["product-factory://testbron"],
+                    "memoryActions":[{
+                      "action":"ADD","productSlug":"meeting-controller-test","targetMemoryId":null,
+                      "title":"Besluit uit overleg","content":"Dit blijft actief beschikbaar voor volgende agents.",
+                      "reason":"De eigenaar vroeg dit tijdens het overleg vast te leggen."
+                    }]
+                }""".trimIndent()
                 "meeting-close" -> """{"outcomeSummary":"Nepsamenvatting van het overleg."}"""
                 else -> """{"summary":"onbekend"}"""
             }

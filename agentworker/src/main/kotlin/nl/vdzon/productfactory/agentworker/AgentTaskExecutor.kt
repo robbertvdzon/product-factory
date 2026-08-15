@@ -76,11 +76,13 @@ fun interface AgentTaskExecutor {
  * browser nodig, omdat Cloudflare's bot-bescherming WebFetch/websearch met HTTP 403 blokkeert. Chromium
  * gebruikt op macOS bovendien Mach-services die Codex' workspace-sandbox blokkeert. Alleen deze twee
  * browserrollen draaien daarom buiten die sandbox; de prompt begrenst ze tot read-only productgebruik
- * en tijdelijke browserartefacten. Alle andere rollen blijven read-only.
+ * en tijdelijke browserartefacten. Ook de overlegagent kan zo op verzoek productomgevingen onderzoeken.
+ * Alle andere rollen blijven read-only.
  */
 internal fun requiresBrowserAccess(task: AgentTask): Boolean = task.taskType in setOf(
     "shadow-researcher",
     "delivery-verification",
+    "meeting-chat",
 )
 
 /** Gedeelde veiligheidsinstructie voor iedere providerimplementatie: dezelfde grenzen, ongeacht de gekozen AI. */

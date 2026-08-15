@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import nl.vdzon.productfactory.contracts.MeetingMessageView
 import nl.vdzon.productfactory.contracts.MeetingView
+import nl.vdzon.productfactory.contracts.MemoryChangeView
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -42,7 +43,8 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
     fun messages(productSlug: String, id: String): List<MeetingMessageView> {
         require(productSlug, id)
         return jdbc.query(
-            "select id, meeting_id, sender, content, created_at from meeting_message where meeting_id = ? order by id",
+            """select id, meeting_id, sender, content, created_at, consulted_sources, memory_changes
+                from meeting_message where meeting_id = ? order by id""".trimIndent(),
             ::mapMessage,
             id,
         )
@@ -71,17 +73,29 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         return require(product.slug, id)
     }
 
-    fun addMessage(productSlug: String, meetingId: String, sender: String, content: String): MeetingMessageView {
+    fun addMessage(
+        productSlug: String,
+        meetingId: String,
+        sender: String,
+        content: String,
+        consultedSources: List<String> = emptyList(),
+        memoryChanges: List<MemoryChangeView> = emptyList(),
+    ): MeetingMessageView {
         require(sender in setOf("owner", "ai")) { "Ongeldige afzender" }
         jdbc.update(
-            "insert into meeting_message(meeting_id, product_slug, sender, content) values (?, ?, ?, ?)",
+            """insert into meeting_message(
+                meeting_id, product_slug, sender, content, consulted_sources, memory_changes
+            ) values (?, ?, ?, ?, ?, ?)""".trimIndent(),
             meetingId,
             productSlug,
             sender,
             content,
+            consultedSources.takeIf { it.isNotEmpty() }?.let(mapper::writeValueAsString),
+            memoryChanges.takeIf { it.isNotEmpty() }?.let(mapper::writeValueAsString),
         )
         return jdbc.query(
-            "select id, meeting_id, sender, content, created_at from meeting_message where meeting_id = ? order by id desc limit 1",
+            """select id, meeting_id, sender, content, created_at, consulted_sources, memory_changes
+                from meeting_message where meeting_id = ? order by id desc limit 1""".trimIndent(),
             ::mapMessage,
             meetingId,
         ).first()
@@ -173,6 +187,12 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         sender = row.getString("sender"),
         content = row.getString("content"),
         createdAt = row.getTimestamp("created_at").toInstant(),
+        consultedSources = row.getString("consulted_sources")?.let { json ->
+            runCatching { mapper.readValue<List<String>>(json) }.getOrDefault(emptyList())
+        } ?: emptyList(),
+        memoryChanges = row.getString("memory_changes")?.let { json ->
+            runCatching { mapper.readValue<List<MemoryChangeView>>(json) }.getOrDefault(emptyList())
+        } ?: emptyList(),
     )
 
     companion object {

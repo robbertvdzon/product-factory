@@ -124,6 +124,17 @@ data class ProductRecordView(
     val content: String,
     val sourceUrl: String? = null,
     val createdAt: Instant,
+    val supersedesId: Long? = null,
+    val changeReason: String? = null,
+    val createdBy: String = "system",
+)
+
+data class MemoryChangeView(
+    val action: String,
+    val productSlug: String,
+    val memoryId: Long,
+    val title: String,
+    val reason: String,
 )
 
 data class ShadowIterationDecisionView(
@@ -199,6 +210,8 @@ data class MeetingMessageView(
     val sender: String,
     val content: String,
     val createdAt: Instant,
+    val consultedSources: List<String> = emptyList(),
+    val memoryChanges: List<MemoryChangeView> = emptyList(),
 )
 
 data class RoadmapEpicView(

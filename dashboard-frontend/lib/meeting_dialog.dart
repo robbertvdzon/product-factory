@@ -173,7 +173,9 @@ class _MeetingDialogState extends State<MeetingDialog> {
       return AlertDialog(
         title: Row(
           children: [
-            Expanded(child: Text('Overleg ${meeting?['sequenceNumber'] ?? ''}')),
+            Expanded(
+              child: Text('Overleg ${meeting?['sequenceNumber'] ?? ''}'),
+            ),
             if (initiator == 'product')
               Tooltip(
                 message: topics.isEmpty
@@ -211,13 +213,18 @@ class _MeetingDialogState extends State<MeetingDialog> {
                                 Expanded(
                                   child: Text(
                                     'Samenvatting',
-                                    style: Theme.of(context).textTheme.titleSmall,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleSmall,
                                   ),
                                 ),
                                 if (workspaceRunId != null)
                                   TextButton.icon(
-                                    onPressed: () => _showMinutes(workspaceRunId),
-                                    icon: const Icon(Icons.description_outlined),
+                                    onPressed: () =>
+                                        _showMinutes(workspaceRunId),
+                                    icon: const Icon(
+                                      Icons.description_outlined,
+                                    ),
                                     label: const Text('Volledige notulen'),
                                   ),
                               ],
@@ -319,6 +326,18 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fromOwner = message['sender'] == 'owner';
+    final consultedSources =
+        (message['consultedSources'] as List?)
+            ?.map((source) => '$source')
+            .where((source) => source.isNotEmpty)
+            .toList() ??
+        const <String>[];
+    final memoryChanges =
+        (message['memoryChanges'] as List?)
+            ?.whereType<Map>()
+            .map((change) => Map<String, dynamic>.from(change))
+            .toList() ??
+        const <Map<String, dynamic>>[];
     return Align(
       alignment: fromOwner ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -340,6 +359,38 @@ class _MessageBubble extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text('${message['content']}'),
+            if (consultedSources.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                dense: true,
+                title: Text(
+                  'Geraadpleegde bronnen (${consultedSources.length})',
+                ),
+                children: [
+                  for (final source in consultedSources)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SelectableText('• $source'),
+                    ),
+                ],
+              ),
+            ],
+            if (memoryChanges.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Geheugen aangepast',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              for (final change in memoryChanges)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '${change['action']}: ${change['productSlug']} / ${change['title']}\n${change['reason']}',
+                  ),
+                ),
+            ],
             const SizedBox(height: 4),
             Text(
               formatDateTime(message['createdAt']),

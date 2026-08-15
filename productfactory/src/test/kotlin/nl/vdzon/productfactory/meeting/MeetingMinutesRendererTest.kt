@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.meeting
 
 import nl.vdzon.productfactory.contracts.MeetingMessageView
 import nl.vdzon.productfactory.contracts.MeetingView
+import nl.vdzon.productfactory.contracts.MemoryChangeView
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
@@ -23,7 +24,15 @@ class MeetingMinutesRendererTest {
         )
         val messages = listOf(
             MeetingMessageView(1, meeting.id, "owner", "Wat vind je van de huidige richting?", Instant.now()),
-            MeetingMessageView(2, meeting.id, "ai", "Ik zou eerst de UI-overload aanpakken.", Instant.now()),
+            MeetingMessageView(
+                2,
+                meeting.id,
+                "ai",
+                "Ik zou eerst de UI-overload aanpakken.",
+                Instant.now(),
+                consultedSources = listOf("https://acceptatie.example/product"),
+                memoryChanges = listOf(MemoryChangeView("ADD", "castle-guide", 7, "UI-richting", "Eigenaar heeft dit besloten")),
+            ),
         )
 
         val markdown = MeetingMinutesRenderer.render(meeting, messages, "Besloten om eerst UI-overload aan te pakken.", LocalDate.of(2026, 8, 10))
@@ -36,5 +45,8 @@ class MeetingMinutesRendererTest {
         assertTrue(markdown.contains("Besloten om eerst UI-overload aan te pakken."))
         assertTrue(markdown.contains("**Eigenaar:** Wat vind je van de huidige richting?"))
         assertTrue(markdown.contains("**AI:** Ik zou eerst de UI-overload aanpakken."))
+        assertTrue(markdown.contains("Geraadpleegde bronnen"))
+        assertTrue(markdown.contains("https://acceptatie.example/product"))
+        assertTrue(markdown.contains("ADD: castle-guide / UI-richting (memory 7)"))
     }
 }

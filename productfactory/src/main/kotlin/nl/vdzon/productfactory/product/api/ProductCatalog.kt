@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import nl.vdzon.productfactory.contracts.ProductRecordView
 import nl.vdzon.productfactory.contracts.ProductView
+import nl.vdzon.productfactory.contracts.MemoryChangeView
 import nl.vdzon.productfactory.contracts.WeeklyScheduleView
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.support.GeneratedKeyHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
@@ -66,6 +68,15 @@ data class ProductContext(
     val workspaceDirectory: String,
     val workspaceOwnership: String,
     val allowedWritePaths: List<String>,
+)
+
+data class MemoryMutation(
+    val action: String,
+    val productSlug: String,
+    val targetMemoryId: Long?,
+    val title: String?,
+    val content: String?,
+    val reason: String,
 )
 
 @Service
@@ -257,6 +268,30 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun listRecords(slug: String, kind: String): List<ProductRecordView> {
         requireProduct(slug)
         val table = recordTable(kind)
+        if (kind == "memory") {
+            return jdbc.query(
+                """select m.id, m.product_slug, m.title, m.content, m.created_at,
+                    m.supersedes_id, m.change_reason, m.created_by
+                    from product_memory m
+                    where m.product_slug = ?
+                      and not exists (select 1 from product_memory successor where successor.supersedes_id = m.id)
+                      and not exists (select 1 from product_memory_retraction retraction where retraction.memory_id = m.id)
+                    order by m.id""".trimIndent(),
+                { row, _ ->
+                    ProductRecordView(
+                        id = row.getLong("id"),
+                        productSlug = row.getString("product_slug"),
+                        title = row.getString("title"),
+                        content = row.getString("content"),
+                        createdAt = row.getTimestamp("created_at").toInstant(),
+                        supersedesId = row.getLong("supersedes_id").takeUnless { row.wasNull() },
+                        changeReason = row.getString("change_reason"),
+                        createdBy = row.getString("created_by"),
+                    )
+                },
+                normalizeSlug(slug),
+            )
+        }
         val sourceColumn = if (kind == "research") ", source_url" else ""
         return jdbc.query(
             "select id, product_slug, title, content$sourceColumn, created_at from $table where product_slug = ? order by id",
@@ -279,6 +314,87 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             "select id, product_slug, title, content$sourceColumn, created_at from $table where product_slug = ? order by id desc",
             { row, _ -> mapRecord(row, kind == "research") }, normalizeSlug(slug),
         ).first()
+    }
+
+    /**
+     * Past door een overlegagent voorgestelde geheugenwijzigingen atomair en append-only toe. Een
+     * vervanging schrijft een nieuwe regel met een verwijzing naar de oude; een intrekking schrijft
+     * uitsluitend een tombstone. [listRecords] laat beide oude vormen daarna volledig weg.
+     */
+    @Transactional
+    fun applyMemoryMutations(mutations: List<MemoryMutation>, actor: String): List<MemoryChangeView> = mutations.map { mutation ->
+        require(mutation.action in setOf("ADD", "REPLACE", "RETRACT")) { "Onbekende memoryactie '${mutation.action}'" }
+        val slug = normalizeSlug(mutation.productSlug)
+        requireProduct(slug)
+        require(mutation.reason.isNotBlank() && mutation.reason.length <= 2_000) { "Een memorywijziging vereist een korte reden" }
+
+        when (mutation.action) {
+            "ADD" -> {
+                val title = mutation.title?.trim().orEmpty()
+                val content = mutation.content?.trim().orEmpty()
+                require(title.isNotBlank() && content.isNotBlank()) { "Nieuwe memory vereist titel en inhoud" }
+                val id = insertMemory(slug, title, content, null, mutation.reason.trim(), actor)
+                MemoryChangeView("ADD", slug, id, title, mutation.reason.trim())
+            }
+            "REPLACE" -> {
+                val target = requireActiveMemory(slug, mutation.targetMemoryId)
+                val title = mutation.title?.trim().orEmpty()
+                val content = mutation.content?.trim().orEmpty()
+                require(title.isNotBlank() && content.isNotBlank()) { "Vervangende memory vereist titel en inhoud" }
+                val id = insertMemory(slug, title, content, target.id, mutation.reason.trim(), actor)
+                MemoryChangeView("REPLACE", slug, id, title, mutation.reason.trim())
+            }
+            else -> {
+                val target = requireActiveMemory(slug, mutation.targetMemoryId)
+                jdbc.update(
+                    "insert into product_memory_retraction(memory_id, product_slug, reason, created_by) values (?, ?, ?, ?)",
+                    target.id,
+                    slug,
+                    mutation.reason.trim(),
+                    actor.take(120),
+                )
+                MemoryChangeView("RETRACT", slug, target.id, target.title, mutation.reason.trim())
+            }
+        }
+    }
+
+    fun activeMemoryForAllProducts(): List<ProductRecordView> = list().flatMap { listRecords(it.slug, "memory") }
+
+    private fun requireActiveMemory(slug: String, id: Long?): ProductRecordView {
+        require(id != null) { "Deze memoryactie vereist targetMemoryId" }
+        return listRecords(slug, "memory").singleOrNull { it.id == id }
+            ?: throw IllegalArgumentException("Memory-item $id is niet actief voor '$slug'")
+    }
+
+    private fun insertMemory(
+        slug: String,
+        title: String,
+        content: String,
+        supersedesId: Long?,
+        reason: String,
+        actor: String,
+    ): Long {
+        require(title.length <= 240) { "Memorytitel is te lang" }
+        require(content.length <= 20_000) { "Memory-inhoud is te lang" }
+        val keyHolder = GeneratedKeyHolder()
+        jdbc.update(
+            { connection ->
+                connection.prepareStatement(
+                    """insert into product_memory(product_slug, title, content, supersedes_id, change_reason, created_by)
+                        values (?, ?, ?, ?, ?, ?)""".trimIndent(),
+                    arrayOf("id"),
+                ).apply {
+                    setString(1, slug)
+                    setString(2, title)
+                    setString(3, content)
+                    if (supersedesId == null) setNull(4, java.sql.Types.BIGINT) else setLong(4, supersedesId)
+                    setString(5, reason)
+                    setString(6, actor.take(120))
+                }
+            },
+            keyHolder,
+        )
+        return keyHolder.key!!.toLong()
     }
 
     private fun validate(candidate: ProductConfiguration): ProductConfiguration {
@@ -371,9 +487,12 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     private fun mapRecord(row: ResultSet, hasSource: Boolean): ProductRecordView {
         val createdAtIndex = if (hasSource) 6 else 5
         return ProductRecordView(
-            row.getLong(1), row.getString(2), row.getString(3), row.getString(4),
-            if (hasSource) row.getString(5) else null,
-            row.getTimestamp(createdAtIndex).toInstant(),
+            id = row.getLong(1),
+            productSlug = row.getString(2),
+            title = row.getString(3),
+            content = row.getString(4),
+            sourceUrl = if (hasSource) row.getString(5) else null,
+            createdAt = row.getTimestamp(createdAtIndex).toInstant(),
         )
     }
 

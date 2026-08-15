@@ -15,6 +15,7 @@ management:
 server:
   port: ${PF_RUNTIME_PORT:8080}
 product-factory:
+  public-runtime-url: ${PF_PUBLIC_RUNTIME_URL:https://product-factory-runtime.apps.sno.vdzonsoftware.nl}
   agent-bridge:
     base-url: ${PF_AGENT_BRIDGE_BASE_URL:http://localhost:8081}
     poll-interval: ${PF_AGENT_BRIDGE_POLL_INTERVAL:PT2S}
