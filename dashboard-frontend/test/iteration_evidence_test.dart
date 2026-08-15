@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:product_factory_dashboard/classification.dart';
+import 'package:product_factory_dashboard/environment_identity.dart';
 import 'package:product_factory_dashboard/iteration_evidence.dart';
 import 'package:product_factory_dashboard/main.dart';
 
@@ -47,6 +48,8 @@ Widget _harness({
       body: SingleChildScrollView(
         child: IterationEvidenceRow(
           iteration: iteration ?? _iteration(),
+          environmentIdentity:
+              EnvironmentIdentityPresentation.fromBuildMetadata(),
           deliveries: deliveries,
           deliveriesLoading: deliveriesLoading,
           onOpenDetails: onOpenDetails ?? () async {},

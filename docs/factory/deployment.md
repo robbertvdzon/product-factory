@@ -20,6 +20,25 @@ Die genereert per PR-nummer een namespace en drie Routes op basis van `deploy/ov
 
 Testers gebruiken de frontend-URL hierboven om de preview in de browser te bekijken.
 
+## Buildgebonden omgevingsidentiteit
+
+De frontend-imagebuild legt per workflowrun eenmaal drie niet-gevoelige Dart-defines vast:
+
+- `BUILD_ENVIRONMENT`: `production` voor de productievariant, `acceptance` voor de afzonderlijke
+  acceptance-variant en `preview` voor iedere PR-preview;
+- `SOURCE_REVISION`: de volledige broncommit die door de workflow wordt uitgecheckt. Voor een PR is
+  dit de headcommit en niet de synthetische mergecommit; voor main is dit de main-commit;
+- `DEPLOYED_AT`: één aan het begin van de imageworkflow vastgelegde UTC-tijd in ISO-8601-formaat,
+  hergebruikt door alle frontendvarianten uit die workflowrun.
+
+`dashboard-frontend/Dockerfile` geeft deze waarden uitsluitend compile-time via `--dart-define` aan
+de Flutter-webbuild door. De draaiende nginx-container leest daarom geen repositorybestanden en
+heeft geen runtimeconfiguratie of extra API-call nodig. Zonder build-args blijven de Dockerfile- en
+lokale builddefaults leeg; de UI normaliseert ieder veld dan onafhankelijk naar `Onbekend`.
+Commitberichten, auteursinformatie, e-mailadressen, URLs en configuratie/secrets zijn geen invoer.
+De identiteit beschrijft uitsluitend de geserveerde frontendbuild, niet noodzakelijk iedere
+backendcomponent.
+
 De preview-database is een wegwerpbare in-namespace Postgres (`deploy/overlays/preview`)
 met een vaste, niet-gevoelige connectiestring — geen echt secret om op te halen, vandaar de
 simpele recipe hierboven in plaats van een `oc get secret`-aanroep.

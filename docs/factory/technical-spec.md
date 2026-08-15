@@ -214,6 +214,15 @@
   `Wrap` gebruikt één, twee of drie kolommen. De native `OutlinedButton` heeft een eigen `FocusNode`,
   opent de bestaande `_showIteration`-detailroute en herstelt focus na sluiten of Escape. De
   toegankelijke actienaam bevat product, cyclus, datum en uitkomst.
+- `EnvironmentIdentityPresentation` in `environment_identity.dart` leest uitsluitend de drie via
+  `AppConfig` aangeleverde Dart-defines `BUILD_ENVIRONMENT`, `SOURCE_REVISION` en `DEPLOYED_AT`.
+  De gesloten omgevingsmapping, exacte volledige Git-revisiecontrole en ISO-8601-controle met
+  verplichte tijdzone valideren ieder veld onafhankelijk; het model bewaart geen ruwe invoer.
+  `OverviewPage` maakt dit buildgebonden model eenmaal en deelt exact die instantie met
+  `EnvironmentIdentityBlock` in Beheer en iedere terminale `EnvironmentIdentityReference`.
+  Het volledige blok heeft drie afzonderlijke semantics-labels; de compacte referentie bevat alleen
+  omgeving en de eerste twaalf revisietekens. Actieve en onbekende kaarten krijgen het model niet.
+  Dit voegt geen runtimebestandslezing, request, backendcontract of opslag toe.
 - `IterationProgressCard` rendert actieve cycli uitsluitend met de gesloten veilige statusmapping,
   een bekende `currentRole`, rechtstreeks uit status bepaalde voortgang en één neutrale
   `IterationProgressButton`. Voor onbekende status blijven alleen `Status: Onbekend` en die actie
