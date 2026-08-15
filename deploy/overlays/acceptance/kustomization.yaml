@@ -198,6 +198,14 @@ patches:
     name: runtime
     version: v1
 - patch: |-
+    - op: replace
+      path: /data/PF_PUBLIC_RUNTIME_URL
+      value: https://product-factory-runtime-acceptance.vdzonsoftware.nl
+  target:
+    kind: ConfigMap
+    name: product-factory-config
+    version: v1
+- patch: |-
     - op: add
       path: /spec/template/spec/containers/0/env
       value:
