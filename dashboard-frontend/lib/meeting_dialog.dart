@@ -361,20 +361,23 @@ class _MessageBubble extends StatelessWidget {
             Text('${message['content']}'),
             if (consultedSources.isNotEmpty) ...[
               const SizedBox(height: 8),
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(bottom: 8),
-                dense: true,
-                title: Text(
-                  'Geraadpleegde bronnen (${consultedSources.length})',
+              Material(
+                type: MaterialType.transparency,
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: 8),
+                  dense: true,
+                  title: Text(
+                    'Geraadpleegde bronnen (${consultedSources.length})',
+                  ),
+                  children: [
+                    for (final source in consultedSources)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SelectableText('• $source'),
+                      ),
+                  ],
                 ),
-                children: [
-                  for (final source in consultedSources)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: SelectableText('• $source'),
-                    ),
-                ],
               ),
             ],
             if (memoryChanges.isNotEmpty) ...[
