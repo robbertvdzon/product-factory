@@ -45,9 +45,36 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    semantische en toetsenbordvolgorde hierna steeds `Cyclus starten`, `Eerdere cycli` en
    `Gekoppelde stories`.
 3. **Cyclus starten** — de bestaande visueel dominante `StartCycleButton`, met hetzelfde
-   `_startCycle`-gedrag, dezelfde foutafhandeling en dezelfde beschikbaarheidsvoorwaarde: alleen
-   actief wanneer het gekozen product status `active` en workspace-eigenaarschap
-   `product-factory` heeft.
+   `_startCycle`-gedrag en dezelfde foutafhandeling. Eén gedeeld presentatiemodel bepaalt de
+   knopstatus, blokkaderedenen, veilige statuslabels en onvervulde voorwaarden uitsluitend uit
+   `Product.status` en `Product.workspaceOwnership`. De knop is alleen actief wanneer die waarden
+   exact `active` en `product-factory` zijn; er wordt niet getrimd, genormaliseerd of
+   hoofdletterongevoelig vergeleken. De bekende onvoldoende waarden zijn `draft`, `paused` en
+   `archived` voor de productstatus en `owner` voor workspacebeheer. Een ontbrekende sleutel,
+   `null`, lege tekst, ander type of andere niet-lege tekst geldt als onbekend en dus als een
+   onvervulde voorwaarde.
+
+   Bij een uitgeschakelde knop staat direct precies één primaire reden. Ontbrekende of onbekende
+   metadata heeft de hoogste prioriteit en toont `Startbeschikbaarheid kan niet betrouwbaar worden
+   vastgesteld.`; daarna volgt een bekende niet-actieve status met `Starten is niet beschikbaar
+   omdat dit product niet actief is.`; als laatste volgt een actief product met ander bekend
+   workspacebeheer met `Starten is niet beschikbaar omdat deze workspace niet door Product Factory
+   wordt beheerd.` Zijn beide voorwaarden onvervuld, dan staat daarnaast exact `Daarnaast is nog 1
+   andere voorwaarde niet vervuld.` De uitgeschakelde actie en deze redencontext vormen samen één
+   betekenisvolle semanticsgroep.
+
+   Alleen bij blokkade staat de toetsenbordbedienbare actie `Bekijk productdetails`. Deze opent
+   zonder netwerkverzoek een lokale, alleen-lezen dialoog binnen dezelfde productscope met dezelfde
+   redencontext, `Productstatus` als `Actief`, `Niet actief` of `Onbekend`, `Workspacebeheer` als
+   `Door Product Factory beheerd`, `Niet door Product Factory beheerd` of `Onbekend`, en uitsluitend
+   de toepasselijke voorwaarden `Product moet actief zijn.` en/of `Workspace moet door Product
+   Factory worden beheerd.` De dialoog toont geen ruwe backendwaarden, identifiers, overige
+   productconfiguratie of muterende acties; alleen sluiten is mogelijk. De detailactie is bereikbaar
+   met Tab en activeerbaar met Enter en Spatie. Sluiten via de zichtbare sluitactie of Escape zet de
+   focus terug op `Bekijk productdetails`. Bij een beschikbare start ontbreken blokkademelding en
+   detailactie. Cycli — inclusief een zichtbare of langlopende `RUNNING`-cyclus — en alle andere
+   productgegevens beïnvloeden deze presentatie niet; de algemene dashboardverversing blijft
+   ongewijzigd.
 4. **Eerdere cycli** — uitsluitend cycli waarvan de niet-lege `Iteration.productSlug` exact gelijk
    is aan de actieve `Product.slug`, in de bestaande sorteervolgorde en met de bestaande
    5/+10-lijstbeperking. Cycli staan standaard in een compacte, zelfstandig

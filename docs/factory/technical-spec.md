@@ -110,6 +110,8 @@
   client-side koppeling van geladen kandidaten en leveringen aan cycli; `iteration_evidence.dart` —
   de pure selector en veilige presentatie-opbouw voor terminale `product-factory`-cycli;
   `product_scope.dart` — canonieke productselectie, scopefilters en browservoorkeur;
+  `start_availability.dart` — het pure, gedeelde presentatiemodel voor de handmatige
+  startbeschikbaarheid;
   `classification.dart` — de bestaande pure
   mappings op `status`/`criticVerdict`/`errorMessage` plus
   `iterationDecisionPresentation`, dat eerst een aan het iteratie-id gekoppeld `decision`-record
@@ -139,6 +141,22 @@
   `roadmap.dart` bevat het epic-contract voor de UI, de horizontale dependencygrafiek, kaartjes en
   de maak-/detaildialogen. De process-rank en score zijn daar alleen-lezen; klant-rank,
   dependencies, titel, beschrijving en status worden via de epic-routes opgeslagen.
+- `StartAvailability.fromProduct` leest uitsluitend de sleutels `status` en `workspaceOwnership`.
+  Het model vergelijkt bekende waarden exact en hoofdlettergevoelig, zonder trimmen of normaliseren,
+  en levert uit één instantie `canStart`, de geprioriteerde primaire reden, de aanvullende telling,
+  veilige labels en de lijst met onvervulde voorwaarden. Ontbrekende sleutels, `null`, lege tekst,
+  andere typen en onbekende teksten vallen fail-closed in de categorie `unknown`; ruwe invoer wordt
+  niet bewaard of gerenderd. Andere productvelden en alle cyclusdata worden niet geconsumeerd.
+- `_OverviewPageState._startCycleSection` bouwt het model eenmaal voor het geselecteerde product.
+  `StartAvailabilityPanel` gebruikt dezelfde instantie voor de bestaande `StartCycleButton`, de
+  blokkademelding en `StartAvailabilityDetailsDialog`. Bij blokkade groepeert één expliciete
+  `Semantics`-container de uitgeschakelde button met primaire en eventuele aanvullende reden.
+  `StartAvailabilityDetailsButton` opent met een native `TextButton` de lokale `AlertDialog`, zonder
+  API-client, productrecord of muterende callback. De dialoog krijgt alleen het veilige model, heeft
+  een gesloten focuslus en uitsluitend de actie `Sluiten`; na sluiten via die actie of Escape vraagt
+  de openerfocusnode opnieuw focus. Het beschikbare pad roept ongewijzigd `_startCycle` aan en toont
+  geen blokkademelding of detailactie. Er zijn geen nieuwe routes, requests, contractvelden,
+  dependencies, opslag of telemetrie toegevoegd.
 - `DashboardSource<T>` en `_OverviewResultsBuilder` in `main.dart` volgen de drie bestaande
   leesverzoeken voor cycli, kandidaten en leveringen onafhankelijk als loading, loaded of failure.
   De bijbehorende metrics en secties renderen daarom geen nul of compleet resultaat voor een bron

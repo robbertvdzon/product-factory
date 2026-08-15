@@ -12,7 +12,10 @@ Een cyclus (in de code een "shadow-iteratie", ook voor autonome producten) start
 
 - **Handmatig** vanuit het dashboard: onder `Cyclus starten` start de knop "Start productcyclus nu"
   een cyclus voor het actieve product via `POST /api/products/{slug}/cycles`. De knop is alleen
-  beschikbaar bij een actief product met workspace-eigenaarschap `product-factory`; de runtime
+  beschikbaar bij de exacte waarden productstatus `active` en workspace-eigenaarschap
+  `product-factory`. Bij blokkade staat de primaire reden direct bij de knop en opent `Bekijk
+  productdetails` lokaal een veilige, alleen-lezen uitleg van beide startvoorwaarden. Een lopende
+  cyclus en andere product- of cyclusgegevens veranderen deze startbeschikbaarheid niet. De runtime
   leidt de modus af uit de productinstelling (`autonomous` blijft autonoom, iedere andere
   ontwikkelmodus wordt `shadow`).
 - **Automatisch**, uitsluitend in `autonomous`-modus: de `AutonomousCoordinator` controleert elke
@@ -173,8 +176,23 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   scope en tellingen. Op brede en smalle schermen is de zichtbare, semantische en tabvolgorde daarna
   steeds `Cyclus starten`, `Eerdere cycli` en `Gekoppelde stories`.
 - **Cyclus starten**: de bestaande visueel dominante `StartCycleButton` voor het actieve product.
-  Gedrag, foutafhandeling en beschikbaarheid blijven gelijk: de knop is alleen actief bij status
-  `active` en workspace-eigenaarschap `product-factory`.
+  Gedrag en foutafhandeling blijven gelijk. Eén presentatiemodel leest uitsluitend `status` en
+  `workspaceOwnership`; alleen de exacte waarden `active` en `product-factory` activeren de knop.
+  `draft`, `paused`, `archived` en `owner` zijn bekende maar onvoldoende waarden. Een ontbrekende
+  sleutel, `null`, lege tekst, ander type of andere tekst is onbekend; vergelijking trimt of
+  normaliseert niet en blijft hoofdlettergevoelig.
+
+  Bij blokkade staat direct één primaire reden, in de vaste prioriteit onbekende metadata, product
+  niet actief en workspace niet door Product Factory beheerd. Zijn beide voorwaarden onvervuld, dan
+  meldt de weergave daarnaast dat nog één andere voorwaarde niet is vervuld. De uitgeschakelde knop
+  en redencontext vormen één semanticsgroep. `Bekijk productdetails` is met Tab, Enter en Spatie
+  bedienbaar en opent zonder netwerkverzoek een lokale, alleen-lezen dialoog. Die toont alleen
+  dezelfde redencontext, veilige labels voor productstatus en workspacebeheer en de toepasselijke
+  voorwaarden `Product moet actief zijn.` en `Workspace moet door Product Factory worden beheerd.`
+  Ruwe waarden, technische identifiers, overige configuratie en muterende acties ontbreken; alleen
+  sluiten is mogelijk. Sluiten of Escape herstelt de focus naar de opener. Bij beschikbaarheid zijn
+  blokkademelding en detailactie afwezig. Een zichtbare of langlopende `RUNNING`-cyclus en alle
+  overige gegevens beïnvloeden de uitkomst niet; de vijfsecondenrefresh blijft ongewijzigd.
 - **Eerdere cycli**: uitsluitend cycli waarvan `Iteration.productSlug` exact gelijk is aan de
   actieve `Product.slug`. De bestaande sortering en 5/+10-lijstbeperking blijven behouden. Cycli
   staan standaard in een compacte, zelfstandig
