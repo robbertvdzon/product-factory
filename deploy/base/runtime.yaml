@@ -56,7 +56,9 @@ metadata:
   name: runtime
   namespace: product-factory
 spec:
-  host: product-factory-runtime.apps.sno.vdzonsoftware.nl
+  host: product-factory-runtime.vdzonsoftware.nl
   to: {kind: Service, name: runtime}
   port: {targetPort: 8080}
-  tls: {termination: edge, insecureEdgeTerminationPolicy: Redirect}
+  # Cloudflare benadert de OpenShift-router achter deze publieke host via HTTP. Allow voorkomt
+  # een redirectlus/TLS-fout en is gelijk aan de werkende dashboard- en acceptatieroutes.
+  tls: {termination: edge, insecureEdgeTerminationPolicy: Allow}

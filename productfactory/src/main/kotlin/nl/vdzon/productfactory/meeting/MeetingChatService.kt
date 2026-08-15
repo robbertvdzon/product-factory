@@ -63,7 +63,7 @@ class MeetingChatService(
     private val agentRuns: AgentRunRegistry,
     private val workspace: WorkspacePublicationPort,
     private val mapper: ObjectMapper,
-    @Value("\${product-factory.public-runtime-url:https://product-factory-runtime.apps.sno.vdzonsoftware.nl}")
+    @Value("\${product-factory.public-runtime-url:https://product-factory-runtime.vdzonsoftware.nl}")
     private val publicRuntimeUrl: String,
 ) {
     fun sendTurn(productSlug: String, meetingId: String, ownerMessage: String): MeetingMessageView {

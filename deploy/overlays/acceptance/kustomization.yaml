@@ -192,12 +192,6 @@ patches:
     - op: replace
       path: /spec/host
       value: product-factory-runtime-acceptance.vdzonsoftware.nl
-    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
-    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
-    # cluster-intern altijd via HTTP benadert.
-    - op: replace
-      path: /spec/tls/insecureEdgeTerminationPolicy
-      value: Allow
   target:
     group: route.openshift.io
     kind: Route
