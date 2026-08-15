@@ -28,3 +28,12 @@ Done / rationale:
 - Functionele, technische en deploymentdocumentatie is bijgewerkt. Het volledige verplichte vangnet
   is groen: Maven `clean verify` (0 failures/errors), `flutter analyze` (0 issues) en `flutter test`
   (427 tests geslaagd).
+
+Review:
+- [blocker] Het revisiongebonden factorybewijs voor tree
+  `c9516e45094ccbe971170deb36519208d2c33767` is niet volledig groen:
+  `repository-maven-verify` staat op `skipped` en het bewijs bevat geen geslaagde
+  `dashboard-frontend-image-build`. Daarmee zijn zowel het volledige bestaande vangnet als de
+  story-eis dat de nieuwe build-args en veilige defaults in de frontend-imagebuild werken nog niet
+  bewezen. Laat de developer/factory voor dezelfde implementatietree compleet gemeten groen bewijs
+  leveren; handgeschreven resultaten of een imagebuild met overgeslagen tests volstaan niet.
