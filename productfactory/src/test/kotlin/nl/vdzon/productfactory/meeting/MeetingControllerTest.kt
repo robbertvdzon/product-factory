@@ -63,6 +63,8 @@ class MeetingControllerTest(
         // (dat zelf weer begint bij sequence 1 na de reset hierboven), dus die moeten ook weg.
         jdbc.update("delete from agent_run where product_slug = ?", slug)
         fakeAgent.tasks.clear()
+        fakeAgent.malformedGeneratedImage = false
+        fakeAgent.failMeetingChat = false
     }
 
     @Test
@@ -88,13 +90,12 @@ class MeetingControllerTest(
             contentType = MediaType.APPLICATION_JSON
             content = """{"content":"Wat vind je van deze huidige richting?","imageAssetIds":["$imageId"]}"""
         }.andExpect {
-            status { isOk() }
-            jsonPath("$.sender") { value("ai") }
-            jsonPath("$.content") { value("Nepantwoord van de AI.") }
-            jsonPath("$.consultedSources[0]") { value("product-factory://testbron") }
-            jsonPath("$.memoryChanges[0].action") { value("ADD") }
-            jsonPath("$.images[0].source") { value("ai") }
+            status { isAccepted() }
+            jsonPath("$.sender") { value("owner") }
+            jsonPath("$.content") { value("Wat vind je van deze huidige richting?") }
+            jsonPath("$.images[0].source") { value("owner") }
         }
+        awaitAiReply(meetingId)
         val prompt = fakeAgent.tasks.single { it.taskType == "meeting-chat" }.prompt
         kotlin.test.assertTrue(prompt.contains("/memory?asOf=YYYY-MM-DD"))
         kotlin.test.assertTrue(prompt.contains("HISTORISCH GEHEUGEN"))
@@ -158,6 +159,68 @@ class MeetingControllerTest(
         }.andExpect { status { isConflict() } }
     }
 
+    @Test
+    fun `a malformed generated image does not discard the AI reply`() {
+        fakeAgent.malformedGeneratedImage = true
+        val meetingId = mapper.readTree(
+            mvc.post("/api/products/$slug/meetings").andReturn().response.contentAsString,
+        ).path("id").asText()
+
+        mvc.post("/api/products/$slug/meetings/$meetingId/messages") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"Maak een visueel voorstel"}"""
+        }.andExpect { status { isAccepted() } }
+        awaitAiReply(meetingId)
+
+        mvc.get("/api/products/$slug/meetings/$meetingId/messages").andExpect {
+            status { isOk() }
+            jsonPath("$[1].sender") { value("ai") }
+            jsonPath("$[1].content") { value(org.hamcrest.Matchers.containsString("technisch niet worden opgeslagen")) }
+        }
+        kotlin.test.assertEquals(
+            0L,
+            jdbc.queryForObject("select count(*) from product_media where product_slug = ?", Long::class.java, slug),
+        )
+        kotlin.test.assertEquals(
+            "COMPLETED",
+            jdbc.queryForObject(
+                "select status from agent_run where product_slug = ? and task_type = 'meeting-chat'",
+                String::class.java,
+                slug,
+            ),
+        )
+    }
+
+    @Test
+    fun `a failed agent turn becomes a visible AI error reply`() {
+        fakeAgent.failMeetingChat = true
+        val meetingId = mapper.readTree(
+            mvc.post("/api/products/$slug/meetings").andReturn().response.contentAsString,
+        ).path("id").asText()
+
+        mvc.post("/api/products/$slug/meetings/$meetingId/messages") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"content":"Beantwoord dit bericht"}"""
+        }.andExpect { status { isAccepted() } }
+        awaitAiReply(meetingId)
+
+        mvc.get("/api/products/$slug/meetings/$meetingId/messages").andExpect {
+            status { isOk() }
+            jsonPath("$[1].sender") { value("ai") }
+            jsonPath("$[1].content") { value(org.hamcrest.Matchers.containsString("technisch mislukt")) }
+        }
+    }
+
+    private fun awaitAiReply(meetingId: String) {
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+        while (System.nanoTime() < deadline) {
+            val response = mvc.get("/api/products/$slug/meetings/$meetingId/messages").andReturn().response
+            if (mapper.readTree(response.contentAsString).size() >= 2) return
+            Thread.sleep(20)
+        }
+        kotlin.test.fail("Asynchrone AI-reactie verscheen niet binnen vijf seconden")
+    }
+
     @TestConfiguration
     class Fakes {
         @Bean
@@ -182,10 +245,15 @@ class MeetingControllerTest(
     }
 
     class FakeAgentDispatch : AgentDispatchPort {
-        val tasks = mutableListOf<AgentTask>()
+        val tasks = java.util.concurrent.CopyOnWriteArrayList<AgentTask>()
+        @Volatile var malformedGeneratedImage = false
+        @Volatile var failMeetingChat = false
 
         override fun execute(task: AgentTask): AgentResult {
             tasks += task
+            if (task.taskType == "meeting-chat" && failMeetingChat) {
+                return AgentResult(runId = task.runId, status = "FAILED", summary = "Gesimuleerde agentfout")
+            }
             val summary = when (task.taskType) {
                 "meeting-chat" -> """{
                     "reply":"Nepantwoord van de AI.",
@@ -193,7 +261,7 @@ class MeetingControllerTest(
                     "imageAssetIds":[],
                     "generatedImages":[{
                       "filename":"ai-voorstel.png","mediaType":"image/png",
-                      "base64Content":"${java.util.Base64.getEncoder().encodeToString(ONE_PIXEL_PNG)}",
+                      "base64Content":"${if (malformedGeneratedImage) "AAAA=" else java.util.Base64.getEncoder().encodeToString(ONE_PIXEL_PNG)}",
                       "altText":"Door de AI gemaakt visueel voorstel"
                     }],
                     "memoryActions":[{

@@ -35,6 +35,7 @@ class _MeetingDialogState extends State<MeetingDialog> {
   bool _closing = false;
   String? _error;
   int _lastRenderedMessageCount = 0;
+  int? _awaitingReplyAfterMessageId;
   final List<Map<String, dynamic>> _pendingImages = [];
 
   @override
@@ -42,15 +43,35 @@ class _MeetingDialogState extends State<MeetingDialog> {
     super.initState();
     _reload();
     refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted && !_sending) setState(_reload);
+      if (mounted) setState(_reload);
     });
   }
 
   void _reload() {
-    data = Future.wait<dynamic>([
+    final next = Future.wait<dynamic>([
       widget.api.meeting(widget.productSlug, widget.meetingId),
       widget.api.meetingMessages(widget.productSlug, widget.meetingId),
     ]);
+    data = next;
+    final awaiting = _awaitingReplyAfterMessageId;
+    if (awaiting == null) return;
+    next.then<void>((result) {
+      if (!mounted || _awaitingReplyAfterMessageId != awaiting) return;
+      final messages = (result[1] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      final answered = messages.any(
+        (message) =>
+            message['sender'] == 'ai' &&
+            ((message['id'] as num?)?.toInt() ?? 0) > awaiting,
+      );
+      if (answered) {
+        setState(() {
+          _sending = false;
+          _awaitingReplyAfterMessageId = null;
+          _error = null;
+        });
+      }
+    }, onError: (_, _) {});
   }
 
   @override
@@ -83,7 +104,7 @@ class _MeetingDialogState extends State<MeetingDialog> {
       _error = null;
     });
     try {
-      await widget.api.sendMeetingMessage(
+      final accepted = await widget.api.sendMeetingMessage(
         widget.productSlug,
         widget.meetingId,
         content,
@@ -91,7 +112,7 @@ class _MeetingDialogState extends State<MeetingDialog> {
       );
       if (mounted) {
         setState(() {
-          _sending = false;
+          _awaitingReplyAfterMessageId = (accepted['id'] as num).toInt();
           _controller.clear();
           _pendingImages.clear();
           _reload();

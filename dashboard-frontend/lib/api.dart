@@ -252,7 +252,7 @@ class DashboardApi {
       headers: headers,
       body: jsonEncode({'content': content, 'imageAssetIds': imageAssetIds}),
     );
-    if (response.statusCode != 200) {
+    if (response.statusCode != 200 && response.statusCode != 202) {
       throw StateError(
         'Bericht kon niet worden verstuurd (${response.statusCode}).',
       );

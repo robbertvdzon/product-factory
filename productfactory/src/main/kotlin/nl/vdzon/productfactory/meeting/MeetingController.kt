@@ -30,10 +30,10 @@ class MeetingController(private val catalog: MeetingCatalog, private val chat: M
     @ResponseStatus(HttpStatus.CREATED)
     fun start(@PathVariable slug: String): MeetingView = catalog.create(slug)
 
-    /** Synchroon: staat open tot de AI heeft geantwoord (tot enkele minuten), zie MeetingChatService. */
     @PostMapping("/{id}/messages")
+    @ResponseStatus(HttpStatus.ACCEPTED)
     fun sendMessage(@PathVariable slug: String, @PathVariable id: String, @RequestBody request: SendMeetingMessageRequest): MeetingMessageView =
-        chat.sendTurn(slug, id, request.content, request.imageAssetIds)
+        chat.startTurn(slug, id, request.content, request.imageAssetIds)
 
     @PostMapping("/{id}/close")
     fun close(@PathVariable slug: String, @PathVariable id: String): MeetingView = chat.closeOut(slug, id)

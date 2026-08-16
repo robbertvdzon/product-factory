@@ -15,7 +15,16 @@ import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.ApplicationEventPublisher
+import org.springframework.http.HttpStatus
+import org.springframework.scheduling.annotation.Async
+import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.event.TransactionPhase
+import org.springframework.transaction.event.TransactionalEventListener
+import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Base64
@@ -57,13 +66,26 @@ internal object MeetingSchemas {
         """{"type":"object","additionalProperties":false,"required":[${required.joinToString(",") { "\"$it\"" }}],"properties":{$properties}}"""
 }
 
+data class MeetingTurnStarted(val productSlug: String, val meetingId: String, val ownerMessageId: Long)
+
+@Component
+class MeetingTurnRunner(private val chat: MeetingChatService) {
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun start(event: MeetingTurnStarted) {
+        runCatching { chat.completeTurn(event) }
+            .onFailure { logger.error("Overlegbeurt {} voor {} mislukte", event.ownerMessageId, event.meetingId, it) }
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(MeetingTurnRunner::class.java)
+    }
+}
+
 /**
- * Voert een overleg-chatbeurt of -afsluiting uit als één single-shot AI-aanroep (geen sessie/multi-
- * turn-ondersteuning in de agentworker, zie AgentDispatchPort): elke beurt krijgt de volledige
- * transcript-tot-nu-toe als tekst-context mee, net zoals de bestaande REVISE-lus van een cyclus dat
- * al doet. De aanroep is synchroon/blocking; de aanroepende controller-thread wacht tot de eigenaar
- * live in de dashboard-chat een antwoord ziet, dus de timeout ligt bewust lager dan de 900s van een
- * gewone cyclusrol.
+ * Voert een overleg-chatbeurt of -afsluiting uit als één single-shot AI-aanroep. Een chatbeurt wordt
+ * eerst duurzaam opgeslagen en daarna na commit asynchroon uitgevoerd, zodat een lang browser- of
+ * screenshotonderzoek niet tegen de proxy-time-out van de dashboardrequest aanloopt.
  */
 @Service
 class MeetingChatService(
@@ -74,6 +96,7 @@ class MeetingChatService(
     private val workspace: WorkspacePublicationPort,
     private val media: ProductMediaCatalog,
     private val mapper: ObjectMapper,
+    private val events: ApplicationEventPublisher,
     @Value("\${product-factory.public-runtime-url:https://product-factory-runtime.vdzonsoftware.nl}")
     private val publicRuntimeUrl: String,
     @Value("\${PF_PREVIEW_PR_NUMBER:}")
@@ -84,7 +107,8 @@ class MeetingChatService(
             ?.let { "https://product-factory-runtime-pr-$it.vdzonsoftware.nl" }
             ?: publicRuntimeUrl
 
-    fun sendTurn(
+    @Transactional
+    fun startTurn(
         productSlug: String,
         meetingId: String,
         ownerMessage: String,
@@ -93,36 +117,54 @@ class MeetingChatService(
         val trimmed = ownerMessage.trim()
         require(trimmed.length <= 4000) { "Een bericht mag maximaal 4000 tekens bevatten" }
         require(trimmed.isNotBlank() || imageAssetIds.isNotEmpty()) { "Voeg tekst of minimaal één afbeelding toe" }
-        val meeting = catalog.requireOpen(productSlug, meetingId)
+        catalog.requireOpen(productSlug, meetingId)
         val product = products.requireProduct(productSlug)
-        val transcriptSoFar = renderTranscript(catalog.messages(productSlug, meetingId))
+        if (agentRuns.hasRunning(
+                product.slug,
+                "meeting-chat",
+                "$meetingId-turn-",
+                Instant.now().minusSeconds(MEETING_TURN_TIMEOUT_SECONDS + ACTIVE_RUN_GRACE_SECONDS),
+            )
+        ) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "De AI werkt nog aan het vorige overlegbericht")
+        }
         val ownerImages = media.requireAll(productSlug, imageAssetIds)
         val ownerMsg = catalog.addMessage(productSlug, meetingId, "owner", trimmed, imageIds = ownerImages.map { it.id })
-
         val runId = "$meetingId-turn-${ownerMsg.id}"
         agentRuns.register(runId, product.slug, "meeting-chat")
-        val result = try {
-            agents.execute(
+        events.publishEvent(MeetingTurnStarted(product.slug, meetingId, ownerMsg.id))
+        return ownerMsg
+    }
+
+    fun completeTurn(event: MeetingTurnStarted) {
+        val runId = "${event.meetingId}-turn-${event.ownerMessageId}"
+        try {
+            val meeting = catalog.requireOpen(event.productSlug, event.meetingId)
+            val product = products.requireProduct(event.productSlug)
+            val messages = catalog.messages(event.productSlug, event.meetingId)
+            val ownerMsg = messages.singleOrNull { it.id == event.ownerMessageId && it.sender == "owner" }
+                ?: error("Het eigenaarbericht voor overlegbeurt ${event.ownerMessageId} ontbreekt")
+            val transcriptSoFar = renderTranscript(messages.filter { it.id < ownerMsg.id })
+            val result = agents.execute(
                 AgentTask(
                     runId = runId,
                     productSlug = product.slug,
                     taskType = "meeting-chat",
-                    prompt = turnPrompt(product, meeting, transcriptSoFar, trimmed, ownerImages.map { it.id }, productContext(product)),
+                    prompt = turnPrompt(
+                        product,
+                        meeting,
+                        transcriptSoFar,
+                        ownerMsg.content,
+                        ownerMsg.images.map { it.id },
+                        productContext(product),
+                    ),
                     timeoutSeconds = MEETING_TURN_TIMEOUT_SECONDS,
                     model = product.aiModel.takeUnless { it == "default" },
                     provider = product.aiProvider,
                     responseSchema = MeetingSchemas.reply,
                 ),
             )
-        } catch (exception: Exception) {
-            runCatching { agentRuns.complete(product.slug, runId, "FAILED", null) }
-            throw exception
-        }
-        if (result.status != "COMPLETED") {
-            runCatching { agentRuns.complete(product.slug, runId, "FAILED", null) }
-            error("Overlegbeurt mislukte: ${result.summary.take(1000)}")
-        }
-        val parsed = try {
+            if (result.status != "COMPLETED") error("Overlegbeurt mislukte: ${result.summary.take(1000)}")
             val output = mapper.readTree(result.summary)
             val parsedReply = output.path("reply").asText().trim()
             require(parsedReply.isNotBlank()) { "AI gaf geen antwoord" }
@@ -138,32 +180,65 @@ class MeetingChatService(
                     reason = action.path("reason").asText(),
                 )
             }
-            val referencedImages = media.requireAll(productSlug, output.path("imageAssetIds").map { it.asText() })
-            val generatedImages = output.path("generatedImages").map { image ->
-                val bytes = Base64.getDecoder().decode(image.path("base64Content").asText())
-                require(bytes.size <= MAX_AI_IMAGE_BYTES) { "Een AI-afbeelding mag maximaal 512 KB groot zijn" }
-                media.store(
-                    productSlug = productSlug,
-                    filename = image.path("filename").asText(),
-                    mediaType = image.path("mediaType").asText(),
-                    bytes = bytes,
-                    altText = image.path("altText").asText(),
-                    source = "ai",
-                    sourceReference = runId,
-                )
+            val referencedImages = media.requireAll(event.productSlug, output.path("imageAssetIds").map { it.asText() })
+            val generatedImageNodes = output.path("generatedImages").toList()
+            val generatedImages = generatedImageNodes.mapNotNull { image ->
+                runCatching {
+                    val bytes = Base64.getDecoder().decode(image.path("base64Content").asText())
+                    require(bytes.size <= MAX_AI_IMAGE_BYTES) { "Een AI-afbeelding mag maximaal 512 KB groot zijn" }
+                    media.store(
+                        productSlug = event.productSlug,
+                        filename = image.path("filename").asText(),
+                        mediaType = image.path("mediaType").asText(),
+                        bytes = bytes,
+                        altText = image.path("altText").asText(),
+                        source = "ai",
+                        sourceReference = runId,
+                    )
+                }.onFailure {
+                    logger.warn("AI-afbeelding voor overlegbeurt {} kon niet worden opgeslagen: {}", runId, it.message)
+                }.getOrNull()
             }
-            ParsedTurn(
-                parsedReply,
+            val effectiveReply = if (generatedImageNodes.isNotEmpty() && generatedImages.isEmpty()) {
+                "$parsedReply\n\nDe afbeelding kon technisch niet worden opgeslagen; mijn tekstuele antwoord is wel bewaard."
+            } else {
+                parsedReply
+            }
+            val parsed = ParsedTurn(
+                effectiveReply,
                 parsedSources,
-                products.applyMemoryMutations(mutations, actor = "meeting:$meetingId"),
+                products.applyMemoryMutations(mutations, actor = "meeting:${event.meetingId}"),
                 (referencedImages + generatedImages).distinctBy { it.id }.take(ProductMediaCatalog.MAX_IMAGES_PER_MESSAGE).map { it.id },
             )
+            catalog.addMessage(
+                event.productSlug,
+                event.meetingId,
+                "ai",
+                parsed.reply,
+                parsed.sources,
+                parsed.memoryChanges,
+                parsed.imageIds,
+            )
+            agentRuns.complete(product.slug, runId, "COMPLETED", "meeting:${event.meetingId}")
         } catch (exception: Exception) {
-            runCatching { agentRuns.complete(product.slug, runId, "FAILED", null) }
+            runCatching { agentRuns.complete(event.productSlug, runId, "FAILED", null) }
+            runCatching {
+                catalog.requireOpen(event.productSlug, event.meetingId)
+                val replyAlreadyStored = catalog.messages(event.productSlug, event.meetingId)
+                    .any { it.sender == "ai" && it.id > event.ownerMessageId }
+                if (!replyAlreadyStored) {
+                    catalog.addMessage(
+                        event.productSlug,
+                        event.meetingId,
+                        "ai",
+                        "Het maken van mijn antwoord is technisch mislukt. Probeer je bericht opnieuw.",
+                    )
+                }
+            }.onFailure {
+                logger.warn("Kon de mislukte overlegbeurt {} niet zichtbaar maken: {}", runId, it.message)
+            }
             throw exception
         }
-        agentRuns.complete(product.slug, runId, "COMPLETED", "meeting:$meetingId")
-        return catalog.addMessage(productSlug, meetingId, "ai", parsed.reply, parsed.sources, parsed.memoryChanges, parsed.imageIds)
     }
 
     fun closeOut(productSlug: String, meetingId: String): MeetingView {
@@ -397,6 +472,7 @@ class MeetingChatService(
     companion object {
         private val logger = LoggerFactory.getLogger(MeetingChatService::class.java)
         private const val MEETING_TURN_TIMEOUT_SECONDS = 900L
+        private const val ACTIVE_RUN_GRACE_SECONDS = 60L
         private const val MAX_INLINE_CONTEXT_CHARS = 80_000
         private const val MAX_AI_IMAGE_BYTES = 512 * 1024
     }

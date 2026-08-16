@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.sql.Timestamp
+import java.time.Instant
 
 @Service
 class AgentRunRegistry(private val jdbc: JdbcTemplate, private val products: ProductCatalog) {
@@ -46,6 +48,20 @@ class AgentRunRegistry(private val jdbc: JdbcTemplate, private val products: Pro
     fun list(productSlug: String): List<AgentRunView> {
         val product = products.requireContext(productSlug)
         return jdbc.query(SELECT + " where product_slug = ? order by started_at desc", mapper, product.slug)
+    }
+
+    fun hasRunning(productSlug: String, taskType: String, runIdPrefix: String, startedAfter: Instant): Boolean {
+        val product = products.requireContext(productSlug)
+        return (jdbc.queryForObject(
+            """select count(*) from agent_run
+                where product_slug = ? and task_type = ? and status = 'RUNNING'
+                  and run_id like ? and started_at >= ?""".trimIndent(),
+            Long::class.java,
+            product.slug,
+            taskType,
+            "$runIdPrefix%",
+            Timestamp.from(startedAfter),
+        ) ?: 0) > 0
     }
 
     fun requireRun(productSlug: String, runId: String): AgentRunView {
