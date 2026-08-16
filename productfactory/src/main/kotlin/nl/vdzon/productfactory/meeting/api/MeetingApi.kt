@@ -5,6 +5,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import nl.vdzon.productfactory.contracts.MeetingMessageView
 import nl.vdzon.productfactory.contracts.MeetingView
 import nl.vdzon.productfactory.contracts.MemoryChangeView
+import nl.vdzon.productfactory.media.api.ProductMediaCatalog
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -24,7 +25,12 @@ import java.time.Instant
  * van de AI dat een overleg "mag".
  */
 @Service
-class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: ProductCatalog, private val mapper: ObjectMapper) {
+class MeetingCatalog(
+    private val jdbc: JdbcTemplate,
+    private val products: ProductCatalog,
+    private val mapper: ObjectMapper,
+    private val media: ProductMediaCatalog,
+) {
     fun list(productSlug: String): List<MeetingView> {
         val product = products.requireContext(productSlug)
         return jdbc.query(SELECT + " where product_slug = ? order by sequence_number desc", ::mapMeeting, product.slug)
@@ -47,7 +53,7 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
                 from meeting_message where meeting_id = ? order by id""".trimIndent(),
             ::mapMessage,
             id,
-        )
+        ).map { withImages(productSlug, it) }
     }
 
     @Transactional
@@ -73,6 +79,7 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         return require(product.slug, id)
     }
 
+    @Transactional
     fun addMessage(
         productSlug: String,
         meetingId: String,
@@ -80,8 +87,10 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         content: String,
         consultedSources: List<String> = emptyList(),
         memoryChanges: List<MemoryChangeView> = emptyList(),
+        imageIds: List<String> = emptyList(),
     ): MeetingMessageView {
         require(sender in setOf("owner", "ai")) { "Ongeldige afzender" }
+        val images = media.requireAll(productSlug, imageIds)
         jdbc.update(
             """insert into meeting_message(
                 meeting_id, product_slug, sender, content, consulted_sources, memory_changes
@@ -93,12 +102,21 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
             consultedSources.takeIf { it.isNotEmpty() }?.let(mapper::writeValueAsString),
             memoryChanges.takeIf { it.isNotEmpty() }?.let(mapper::writeValueAsString),
         )
-        return jdbc.query(
+        val message = jdbc.query(
             """select id, meeting_id, sender, content, created_at, consulted_sources, memory_changes
                 from meeting_message where meeting_id = ? order by id desc limit 1""".trimIndent(),
             ::mapMessage,
             meetingId,
         ).first()
+        images.forEachIndexed { index, image ->
+            jdbc.update(
+                "insert into meeting_message_media(message_id, media_id, position) values (?, ?, ?)",
+                message.id,
+                image.id,
+                index,
+            )
+        }
+        return message.copy(images = images)
     }
 
     /**
@@ -194,6 +212,15 @@ class MeetingCatalog(private val jdbc: JdbcTemplate, private val products: Produ
             runCatching { mapper.readValue<List<MemoryChangeView>>(json) }.getOrDefault(emptyList())
         } ?: emptyList(),
     )
+
+    private fun withImages(productSlug: String, message: MeetingMessageView): MeetingMessageView {
+        val ids = jdbc.query(
+            "select media_id from meeting_message_media where message_id = ? order by position",
+            { row, _ -> row.getString("media_id") },
+            message.id,
+        )
+        return message.copy(images = media.requireAll(productSlug, ids))
+    }
 
     companion object {
         private val log = LoggerFactory.getLogger(MeetingCatalog::class.java)

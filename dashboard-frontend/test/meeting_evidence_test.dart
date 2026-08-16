@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:product_factory_dashboard/api.dart';
@@ -35,8 +38,24 @@ class _FakeMeetingApi extends DashboardApi {
           'reason': 'De eigenaar bevestigde de overstap.',
         },
       ],
+      'images': [
+        {
+          'id': 'media-ai-1',
+          'filename': 'voorstel.png',
+          'altText': 'Visueel voorstel van de AI',
+          'source': 'ai',
+        },
+      ],
     },
   ];
+
+  @override
+  Future<Uint8List> meetingImage(
+    String slug,
+    String mediaId,
+  ) async => base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  );
 }
 
 void main() {
@@ -66,6 +85,7 @@ void main() {
         find.textContaining('REPLACE: demo / Actieve databasekeuze'),
         findsOneWidget,
       );
+      expect(find.bySemanticsLabel('Visueel voorstel van de AI'), findsWidgets);
 
       await tester.tap(find.text('Geraadpleegde bronnen (2)'));
       await tester.pumpAndSettle();

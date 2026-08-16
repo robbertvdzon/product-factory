@@ -84,6 +84,9 @@ internal fun requiresBrowserAccess(task: AgentTask): Boolean = task.taskType in 
     "delivery-verification",
     "meeting-chat",
     "test-session",
+    "roadmap-visionary",
+    "roadmap-strategist",
+    "roadmap-manager",
 )
 
 /** Gedeelde veiligheidsinstructie voor iedere providerimplementatie: dezelfde grenzen, ongeacht de gekozen AI. */

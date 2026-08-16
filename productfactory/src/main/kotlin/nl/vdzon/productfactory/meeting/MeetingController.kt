@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
-data class SendMeetingMessageRequest(val content: String)
+data class SendMeetingMessageRequest(val content: String = "", val imageAssetIds: List<String> = emptyList())
 
 @RestController
 @RequestMapping("/api/products/{slug}/meetings")
@@ -33,7 +33,7 @@ class MeetingController(private val catalog: MeetingCatalog, private val chat: M
     /** Synchroon: staat open tot de AI heeft geantwoord (tot enkele minuten), zie MeetingChatService. */
     @PostMapping("/{id}/messages")
     fun sendMessage(@PathVariable slug: String, @PathVariable id: String, @RequestBody request: SendMeetingMessageRequest): MeetingMessageView =
-        chat.sendTurn(slug, id, request.content)
+        chat.sendTurn(slug, id, request.content, request.imageAssetIds)
 
     @PostMapping("/{id}/close")
     fun close(@PathVariable slug: String, @PathVariable id: String): MeetingView = chat.closeOut(slug, id)

@@ -3,8 +3,12 @@ package nl.vdzon.productfactory.dashboard
 import nl.vdzon.productfactory.contracts.AgentTask
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.ParameterizedTypeReference
+import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
+import org.springframework.http.client.MultipartBodyBuilder
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.server.ResponseStatusException
@@ -121,10 +125,28 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/products/{slug}/meetings", slug)
         .retrieve().body(Any::class.java)!!
 
-    fun sendMeetingMessage(slug: String, id: String, content: String): Any = runtime.post()
+    fun sendMeetingMessage(slug: String, id: String, content: String, imageAssetIds: List<String>): Any = runtime.post()
         .uri("/api/products/{slug}/meetings/{id}/messages", slug, id)
-        .body(mapOf("content" to content))
+        .body(mapOf("content" to content, "imageAssetIds" to imageAssetIds))
         .retrieve().body(Any::class.java)!!
+
+    fun uploadProductMedia(slug: String, filename: String, contentType: String, bytes: ByteArray, altText: String?): Any {
+        val body = MultipartBodyBuilder().apply {
+            part("file", object : ByteArrayResource(bytes) {
+                override fun getFilename(): String = filename
+            }).contentType(MediaType.parseMediaType(contentType))
+            altText?.takeIf(String::isNotBlank)?.let { part("altText", it) }
+        }.build()
+        return runtime.post()
+            .uri("/api/products/{slug}/media", slug)
+            .contentType(MediaType.MULTIPART_FORM_DATA)
+            .body(body)
+            .retrieve().body(Any::class.java)!!
+    }
+
+    fun productMediaContent(slug: String, id: String): ResponseEntity<ByteArray> = runtime.get()
+        .uri("/api/products/{slug}/media/{id}/content", slug, id)
+        .retrieve().toEntity(ByteArray::class.java)
 
     fun closeMeeting(slug: String, id: String): Any = runtime.post()
         .uri("/api/products/{slug}/meetings/{id}/close", slug, id)

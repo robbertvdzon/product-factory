@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class DashboardApi {
   const DashboardApi(this.baseUrl, this.token);
@@ -242,12 +244,13 @@ class DashboardApi {
   Future<Map<String, dynamic>> sendMeetingMessage(
     String slug,
     String id,
-    String content,
-  ) async {
+    String content, {
+    List<String> imageAssetIds = const [],
+  }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/products/$slug/meetings/$id/messages'),
       headers: headers,
-      body: jsonEncode({'content': content}),
+      body: jsonEncode({'content': content, 'imageAssetIds': imageAssetIds}),
     );
     if (response.statusCode != 200) {
       throw StateError(
@@ -255,6 +258,52 @@ class DashboardApi {
       );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> uploadMeetingImage(
+    String slug,
+    String filename,
+    String mediaType,
+    Uint8List bytes, {
+    String? altText,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/products/$slug/meetings/media-library'),
+    );
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(mediaType),
+      ),
+    );
+    if (altText != null && altText.trim().isNotEmpty) {
+      request.fields['altText'] = altText.trim();
+    }
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode != 200) {
+      throw StateError(
+        _errorMessage(response, 'Afbeelding kon niet worden opgeslagen'),
+      );
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Uint8List> meetingImage(String slug, String mediaId) async {
+    final response = await http.get(
+      Uri.parse(
+        '$baseUrl/api/products/$slug/meetings/media-library/$mediaId/content',
+      ),
+      headers: headers,
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Afbeelding kon niet worden geladen.');
+    }
+    return response.bodyBytes;
   }
 
   Future<Map<String, dynamic>> startRoadmapSession(String slug) async {

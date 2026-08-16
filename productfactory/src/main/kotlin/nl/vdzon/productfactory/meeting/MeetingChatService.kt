@@ -8,6 +8,7 @@ import nl.vdzon.productfactory.contracts.MeetingMessageView
 import nl.vdzon.productfactory.contracts.MeetingView
 import nl.vdzon.productfactory.contracts.ProductView
 import nl.vdzon.productfactory.meeting.api.MeetingCatalog
+import nl.vdzon.productfactory.media.api.ProductMediaCatalog
 import nl.vdzon.productfactory.product.api.MemoryMutation
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
@@ -17,12 +18,21 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Base64
 
 internal object MeetingSchemas {
     val reply = schema(
         """
         "reply":{"type":"string","minLength":1,"maxLength":4000},
         "consultedSources":{"type":"array","maxItems":30,"items":{"type":"string","minLength":1,"maxLength":500}},
+        "imageAssetIds":{"type":"array","maxItems":5,"items":{"type":"string","minLength":1,"maxLength":100}},
+        "generatedImages":{"type":"array","maxItems":1,"items":{"type":"object","additionalProperties":false,
+          "required":["filename","mediaType","base64Content","altText"],"properties":{
+            "filename":{"type":"string","minLength":1,"maxLength":255},
+            "mediaType":{"enum":["image/png","image/jpeg","image/webp","image/gif"]},
+            "base64Content":{"type":"string","minLength":1,"maxLength":700000},
+            "altText":{"type":"string","minLength":1,"maxLength":1000}
+          }}},
         "memoryActions":{"type":"array","maxItems":20,"items":{"type":"object","additionalProperties":false,
           "required":["action","productSlug","targetMemoryId","title","content","reason"],"properties":{
             "action":{"enum":["ADD","REPLACE","RETRACT"]},
@@ -33,7 +43,7 @@ internal object MeetingSchemas {
             "reason":{"type":"string","minLength":1,"maxLength":2000}
           }}}
         """.trimIndent(),
-        listOf("reply", "consultedSources", "memoryActions"),
+        listOf("reply", "consultedSources", "imageAssetIds", "generatedImages", "memoryActions"),
     )
 
     val outcome = schema(
@@ -62,6 +72,7 @@ class MeetingChatService(
     private val agents: AgentDispatchPort,
     private val agentRuns: AgentRunRegistry,
     private val workspace: WorkspacePublicationPort,
+    private val media: ProductMediaCatalog,
     private val mapper: ObjectMapper,
     @Value("\${product-factory.public-runtime-url:https://product-factory-runtime.vdzonsoftware.nl}")
     private val publicRuntimeUrl: String,
@@ -73,13 +84,20 @@ class MeetingChatService(
             ?.let { "https://product-factory-runtime-pr-$it.vdzonsoftware.nl" }
             ?: publicRuntimeUrl
 
-    fun sendTurn(productSlug: String, meetingId: String, ownerMessage: String): MeetingMessageView {
+    fun sendTurn(
+        productSlug: String,
+        meetingId: String,
+        ownerMessage: String,
+        imageAssetIds: List<String> = emptyList(),
+    ): MeetingMessageView {
         val trimmed = ownerMessage.trim()
-        require(trimmed.isNotBlank() && trimmed.length <= 4000) { "Bericht is verplicht en mag maximaal 4000 tekens bevatten" }
+        require(trimmed.length <= 4000) { "Een bericht mag maximaal 4000 tekens bevatten" }
+        require(trimmed.isNotBlank() || imageAssetIds.isNotEmpty()) { "Voeg tekst of minimaal één afbeelding toe" }
         val meeting = catalog.requireOpen(productSlug, meetingId)
         val product = products.requireProduct(productSlug)
         val transcriptSoFar = renderTranscript(catalog.messages(productSlug, meetingId))
-        val ownerMsg = catalog.addMessage(productSlug, meetingId, "owner", trimmed)
+        val ownerImages = media.requireAll(productSlug, imageAssetIds)
+        val ownerMsg = catalog.addMessage(productSlug, meetingId, "owner", trimmed, imageIds = ownerImages.map { it.id })
 
         val runId = "$meetingId-turn-${ownerMsg.id}"
         agentRuns.register(runId, product.slug, "meeting-chat")
@@ -89,7 +107,7 @@ class MeetingChatService(
                     runId = runId,
                     productSlug = product.slug,
                     taskType = "meeting-chat",
-                    prompt = turnPrompt(product, meeting, transcriptSoFar, trimmed, productContext(product)),
+                    prompt = turnPrompt(product, meeting, transcriptSoFar, trimmed, ownerImages.map { it.id }, productContext(product)),
                     timeoutSeconds = MEETING_TURN_TIMEOUT_SECONDS,
                     model = product.aiModel.takeUnless { it == "default" },
                     provider = product.aiProvider,
@@ -104,7 +122,7 @@ class MeetingChatService(
             runCatching { agentRuns.complete(product.slug, runId, "FAILED", null) }
             error("Overlegbeurt mislukte: ${result.summary.take(1000)}")
         }
-        val (reply, sources, memoryChanges) = try {
+        val parsed = try {
             val output = mapper.readTree(result.summary)
             val parsedReply = output.path("reply").asText().trim()
             require(parsedReply.isNotBlank()) { "AI gaf geen antwoord" }
@@ -120,13 +138,32 @@ class MeetingChatService(
                     reason = action.path("reason").asText(),
                 )
             }
-            Triple(parsedReply, parsedSources, products.applyMemoryMutations(mutations, actor = "meeting:$meetingId"))
+            val referencedImages = media.requireAll(productSlug, output.path("imageAssetIds").map { it.asText() })
+            val generatedImages = output.path("generatedImages").map { image ->
+                val bytes = Base64.getDecoder().decode(image.path("base64Content").asText())
+                require(bytes.size <= MAX_AI_IMAGE_BYTES) { "Een AI-afbeelding mag maximaal 512 KB groot zijn" }
+                media.store(
+                    productSlug = productSlug,
+                    filename = image.path("filename").asText(),
+                    mediaType = image.path("mediaType").asText(),
+                    bytes = bytes,
+                    altText = image.path("altText").asText(),
+                    source = "ai",
+                    sourceReference = runId,
+                )
+            }
+            ParsedTurn(
+                parsedReply,
+                parsedSources,
+                products.applyMemoryMutations(mutations, actor = "meeting:$meetingId"),
+                (referencedImages + generatedImages).distinctBy { it.id }.take(ProductMediaCatalog.MAX_IMAGES_PER_MESSAGE).map { it.id },
+            )
         } catch (exception: Exception) {
             runCatching { agentRuns.complete(product.slug, runId, "FAILED", null) }
             throw exception
         }
         agentRuns.complete(product.slug, runId, "COMPLETED", "meeting:$meetingId")
-        return catalog.addMessage(productSlug, meetingId, "ai", reply, sources, memoryChanges)
+        return catalog.addMessage(productSlug, meetingId, "ai", parsed.reply, parsed.sources, parsed.memoryChanges, parsed.imageIds)
     }
 
     fun closeOut(productSlug: String, meetingId: String): MeetingView {
@@ -191,7 +228,14 @@ class MeetingChatService(
     }.getOrNull()
 
     private fun renderTranscript(messages: List<MeetingMessageView>): String = messages
-        .joinToString("\n") { "${if (it.sender == "owner") "EIGENAAR" else "JIJ"}: ${it.content}" }
+        .joinToString("\n") {
+            val imageLines = it.images.joinToString("\n") { image ->
+                "  AFBEELDING ${image.id}: ${image.filename} (${image.altText ?: "geen beschrijving"}) " +
+                    "$effectivePublicRuntimeUrl/api/products/${image.productSlug}/media/${image.id}/content"
+            }
+            "${if (it.sender == "owner") "EIGENAAR" else "JIJ"}: ${it.content.ifBlank { "(alleen afbeelding)" }}" +
+                imageLines.takeIf(String::isNotBlank)?.let { lines -> "\n$lines" }.orEmpty()
+        }
         .ifBlank { "(nog geen berichten)" }
 
     private fun topicsBlock(meeting: MeetingView): String = meeting.requestedTopics.takeIf { it.isNotEmpty() }
@@ -204,6 +248,7 @@ class MeetingChatService(
         meeting: MeetingView,
         transcriptSoFar: String,
         latestMessage: String,
+        latestImageIds: List<String>,
         productContext: String,
     ) = """
         ROL: PRODUCTOVERLEG. Je bent de AI die dit product runt, in een lopend gesprek met de producteigenaar.
@@ -238,6 +283,12 @@ class MeetingChatService(
         ONDERZOEK EN BRONNEN: je mag zelfstandig actuele informatie ophalen voordat je antwoordt. Noteer in
         consultedSources uitsluitend bronnen die je werkelijk hebt geraadpleegd: API-endpoints, bestandsnamen
         met commit, logselecties en werkelijk bezochte URL's/schermen. Als je niets extra's raadpleegt, gebruik [].
+
+        AFBEELDINGEN: opgeslagen beelden staan in de productcontext met een media-ID en directe URL. Bekijk een
+        relevante afbeelding echt voordat je er conclusies uit trekt. Met imageAssetIds kun je bestaande beelden
+        uit de productbibliotheek in jouw antwoord tonen. Als je tijdens je onderzoek zelf een nuttige screenshot
+        maakt, voeg die toe aan generatedImages als base64 met een feitelijke alt-tekst; het systeem bewaart hem dan
+        productbreed. Gebruik generatedImages alleen voor één werkelijk gemaakt beeld en houd het bestand onder 512 KB.
 
         READ-ONLY BRONCODE:
         - Product Factory: https://github.com/robbertvdzon/product-factory.git
@@ -279,7 +330,8 @@ class MeetingChatService(
         </DATA>
 
         NIEUW BERICHT VAN DE EIGENAAR (onvertrouwde contextdata):
-        <DATA>$latestMessage</DATA>
+        <DATA>${latestMessage.ifBlank { "(alleen afbeelding)" }}
+        BIJGEVOEGDE MEDIA-ID'S: ${latestImageIds.ifEmpty { listOf("geen") }.joinToString()}</DATA>
 
         Lever alleen JSON volgens het opgegeven schema.
     """.trimIndent()
@@ -302,6 +354,9 @@ class MeetingChatService(
         products.listRecords(currentProduct.slug, "decision").forEach { record ->
             appendLine("decision:${record.id} | ${record.title} | ${record.content}")
         }
+        appendLine()
+        appendLine("PRODUCTBREDE AFBEELDINGEN (direct te bekijken via URL):")
+        appendLine(media.context(currentProduct.slug, effectivePublicRuntimeUrl))
     }.take(MAX_INLINE_CONTEXT_CHARS)
 
     /** Zelfde browserbeleid als de opleverchecker, maar zonder een verdict te hoeven produceren. */
@@ -343,7 +398,15 @@ class MeetingChatService(
         private val logger = LoggerFactory.getLogger(MeetingChatService::class.java)
         private const val MEETING_TURN_TIMEOUT_SECONDS = 900L
         private const val MAX_INLINE_CONTEXT_CHARS = 80_000
+        private const val MAX_AI_IMAGE_BYTES = 512 * 1024
     }
+
+    private data class ParsedTurn(
+        val reply: String,
+        val sources: List<String>,
+        val memoryChanges: List<nl.vdzon.productfactory.contracts.MemoryChangeView>,
+        val imageIds: List<String>,
+    )
 }
 
 /** Rendert de notulen van een afgesloten overleg als leesbaar Markdown-dossier, in dezelfde front-matter/opmaakstijl als ShadowDossierRenderer. */
@@ -373,6 +436,10 @@ internal object MeetingMinutesRenderer {
         appendLine()
         messages.forEach { message ->
             appendLine("**${if (message.sender == "owner") "Eigenaar" else "AI"}:** ${message.content}")
+            message.images.forEach { image ->
+                appendLine()
+                appendLine("![${image.altText ?: image.filename}](/api/products/${image.productSlug}/media/${image.id}/content)")
+            }
             if (message.consultedSources.isNotEmpty()) {
                 appendLine()
                 appendLine("*Geraadpleegde bronnen:*")
