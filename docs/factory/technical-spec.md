@@ -31,6 +31,10 @@
   `product-factory-acceptance` zonder PR-nummer, en anders `NONE`. Een ingeschakelde synthetische
   modus accepteert uitsluitend de in-namespace PostgreSQL-URL. `PreviewDataStartup` routeert op
   deze selectie; daardoor kan een acceptance-start nooit de PR-previewseed laden en omgekeerd.
+- Flyway configureert expliciet alleen schema `public`. Herstel na een validatiefout mag uitsluitend
+  voor `PR_PREVIEW` opschonen wanneer de JDBC-URL uit de daadwerkelijke Flyway-datasource bytegelijk
+  is aan de gevalideerde `PF_DB_URL` en zowel default- als cleanschema exact `public` zijn. Ontbrekende
+  of afwijkende targetmetadata houdt het normale fail-closed gedrag.
 - De bestaande PR-previewcatalogus voor `hkh-autopilot` blijft ongewijzigd. Alleen `ACCEPTANCE`
   laadt `AcceptanceFixtureCatalog` versie `acceptance-product-factory-cycles-v1` voor exact slug
   `product-factory`: vier cycli met vaste ids, nummers 9201–9204 en UTC-tijden, één expliciet

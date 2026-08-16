@@ -62,3 +62,42 @@ De niet-agent-runnable `agent-image-build` blijft conform `.factory/verification
 Het agentworker-bewijs is verder geldig: de actuele HEAD-tree
 `4613209d4beb06ddf1f253b81cab6dfc56ff3418` is gelijk aan `Tested worktree tree` en alle zeven
 agent-runnable verificatiecommando's staan op `passed`.
+
+## Developer — reviewherstel tweede ronde
+
+- [x] Reviewerfeedback, factory-regels en actuele checkout opnieuw controleren.
+- [x] Effectieve Flyway-JDBC-target en schema's fail-closed aan de gevalideerde PR-preview binden.
+- [x] Positieve en negatieve hersteltests uitbreiden en gericht uitvoeren.
+- [x] Volledig vangnet uit `docs/factory/development.md` zonder timeout uitvoeren.
+- [x] Eigen review doen en definitief verificatiebewijs vastleggen.
+
+Deze ronde herstelt uitsluitend de blocker uit reviewercomment 3592. De vrijgave van `clean()` moet
+niet alleen op de omgevingsclassificatie vertrouwen, maar ook bewijzen dat Flyway zelf exact de
+gevalideerde wegwerp-previewdatabase en de toegestane schema's target.
+
+De herstelstrategie vergelijkt daarom de JDBC-URL uit de metadata van de daadwerkelijke
+Flyway-datasource bytegelijk met de reeds gevalideerde `PF_DB_URL`. Daarnaast moet Flyway expliciet
+alleen `public` als default- en cleanschema configureren. Bij ontbrekende of afwijkende metadata,
+URL of schema wordt de oorspronkelijke validatiefout doorgeworpen en blijft `clean()` onbereikbaar.
+Gerichte tests bewijzen zowel succesvol herstel van een overeenkomstige testtarget als behoud van
+de oude tabel bij een afwijkende JDBC-target en bij een afwijkend schema: 14 tests, 0 failures/errors.
+
+De eerste volledige Maven-run vond na de main-merge twee migraties op V27: de productmediamigratie
+uit main en de handmatige-startmigratie uit deze story. Conform de mergeconventie blijft main op V27
+en is de storymigratie naar de eerstvolgende vrije versie V28 verplaatst; de volgende volledige run
+wordt opnieuw met `clean verify` opgebouwd zodat geen oud migratiebestand in buildoutput achterblijft.
+
+Definitief volledig vangnet, alle agent-runnable commando's met exitcode 0:
+
+- `mvn -B --no-transfer-progress clean verify`: 198 tests, 0 failures/errors/skips, `BUILD SUCCESS`;
+- `flutter analyze`: geen issues;
+- `flutter test`: 441 tests groen;
+- versioned Flutter-Web-DOM-test: benoemde `alertdialog` bewezen;
+- Docker Engine-runner: 3 tests groen;
+- frontend-image met veilige defaults en met expliciete metadata: beide 19/19 stappen geslaagd.
+
+De afsluitende review controleerde de volledige wijziging op het bereik van `clean()`, exacte
+datasource-URL- en schemavergelijking, gesloten falen bij ontbrekende metadata, migratievolgorde,
+gevoelige data in logging, conflictmarkers, whitespacefouten en onverwachte buildwijzigingen. De
+productie- en acceptatiepaden behouden de oorspronkelijke Flyway-validatiefout; alleen de al
+gevalideerde PR-preview met een exact overeenkomstige effectieve target kan worden opgeschoond.

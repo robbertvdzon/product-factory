@@ -27,7 +27,10 @@ internal class PreviewFlywayMigrationStrategy(
         try {
             flyway.migrate()
         } catch (exception: FlywayValidateException) {
-            if (previewRuntimeConfig.dataset != SyntheticDataset.PR_PREVIEW) {
+            if (
+                previewRuntimeConfig.dataset != SyntheticDataset.PR_PREVIEW ||
+                !isValidatedDisposableTarget(flyway)
+            ) {
                 throw exception
             }
 
@@ -44,7 +47,20 @@ internal class PreviewFlywayMigrationStrategy(
         }
     }
 
+    private fun isValidatedDisposableTarget(flyway: Flyway): Boolean {
+        val configuration = flyway.configuration
+        if (configuration.defaultSchema != PREVIEW_SCHEMA) return false
+        if (configuration.schemas.toList() != listOf(PREVIEW_SCHEMA)) return false
+
+        val dataSource = configuration.dataSource ?: return false
+        val actualUrl = runCatching {
+            dataSource.connection.use { connection -> connection.metaData.url }
+        }.getOrNull()
+        return actualUrl == previewRuntimeConfig.databaseUrl
+    }
+
     private companion object {
+        const val PREVIEW_SCHEMA = "public"
         val log = LoggerFactory.getLogger(PreviewFlywayMigrationStrategy::class.java)
     }
 }
