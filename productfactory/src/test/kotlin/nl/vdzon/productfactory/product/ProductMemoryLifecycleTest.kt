@@ -11,9 +11,18 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import java.time.Instant
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
-@SpringBootTest
+@SpringBootTest(
+    properties = [
+        "spring.datasource.hikari.maximum-pool-size=2",
+        "spring.datasource.hikari.connection-timeout=1000",
+    ],
+)
 @AutoConfigureMockMvc
 class ProductMemoryLifecycleTest(
     @Autowired private val products: ProductCatalog,
@@ -21,6 +30,24 @@ class ProductMemoryLifecycleTest(
     @Autowired private val mvc: MockMvc,
 ) {
     private val slug = "memory-lifecycle-test"
+
+    @Test
+    fun `concurrent product reads do not deadlock a small connection pool`() {
+        val executor = Executors.newFixedThreadPool(4)
+        val start = CountDownLatch(1)
+        try {
+            val reads = (1..8).map {
+                executor.submit<List<*>> {
+                    start.await()
+                    products.list()
+                }
+            }
+            start.countDown()
+            reads.forEach { read -> assertTrue(read.get(5, TimeUnit.SECONDS).isNotEmpty()) }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
 
     @BeforeEach
     fun prepareProduct() {
