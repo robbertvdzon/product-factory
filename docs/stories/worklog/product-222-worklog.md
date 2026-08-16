@@ -164,3 +164,30 @@ Vervolgreview toegankelijkheidsherstel 2026-08-16:
   `153589e03c45a6aad2b6639feea95cfb7ba98f9b` is exact gelijk aan de developercommit-tree. Maven,
   Flutter analyze/tests en beide toepasselijke frontend-imagebuilds zijn groen; de Engine-runner-test
   is volgens de versievaste pathselectie niet van toepassing op deze frontendfix.
+
+Herontwikkelrun na merge met main 2026-08-16:
+- [x] lees taakcontext, factorydocumentatie, agent-tips en bestaand worklog
+- [x] controleer de gemergde story-implementatie, tests en verificatieconfiguratie
+- [x] draai storygerichte tests
+- [x] draai het volledige agent-runnable factory-vangnet
+- [x] controleer de uiteindelijke worktree en leg de resultaten vast
+
+Aanleiding:
+- De actuele taakcontext bevat de eerdere toegankelijkheidsafwijzing én het latere leidende
+  PO-/reviewcommentaar dat het herstel is goedgekeurd. Na de meest recente merge met `main`
+  verifieert deze ontwikkelrun daarom dat de volledige implementatie en het herstel intact en groen
+  zijn, zonder de gereviewde productcode onnodig opnieuw te wijzigen.
+
+Resultaat herontwikkelrun na merge:
+- De story-diff bevat nog steeds de nullable migratie zonder backfill, gesloten contractwaarden,
+  servervalidatie en serialisatie van gelijktijdige starts, productscope, veilige proxyroute,
+  toegankelijke Flutterdialoog en detailprovenance. De herstelde `AlertDialog.semanticLabel`
+  benoemt de dialoog zelf expliciet als `Productcyclus starten`; de regressietest controleert dit.
+- Storygerichte backendtests: 8 tests, 0 failures/errors/skips. Storygerichte Fluttertests: 7 tests,
+  alles groen.
+- Volledig vangnet: Maven `clean verify` met 178 tests en 0 failures/errors/skips; `flutter analyze`
+  met 0 issues; `flutter test` met 436 tests; Docker Engine-runner met 3 geslaagde tests; beide
+  frontend-imagebuilds met 19/19 succesvolle stappen.
+- `agent-image-build` is volgens `.factory/verification.yaml` niet agent-runnable en wordt door CI
+  uitgevoerd. Er waren geen inhoudelijke codewijzigingen nodig na de merge; alleen dit worklog is
+  voor de actuele ontwikkelrun aangevuld.
