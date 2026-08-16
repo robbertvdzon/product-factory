@@ -43,3 +43,20 @@ Review:
 - Diff gecontroleerd op productscopelekken, vrije-tekstlogging, afgeleide historische provenance,
   verborgen input in requests, dubbele bevestiging, onbedoelde formatteringsruis, conflictmarkers
   en whitespacefouten. Geen open blocker of aanvullende wijziging gevonden.
+
+Reviewer-run 2026-08-16:
+- [bug] Client en server gebruiken niet exact dezelfde trimsemantiek. Dart `String.trim()` verwijdert
+  onder meer U+0085 en U+FEFF, terwijl Kotlin/JVM `String.trim()` deze tekens niet als witruimte
+  behandelt. Een directe `OWNER_INPUT`-request met alleen zo'n teken wordt daardoor door de server
+  als een geldige opdracht opgeslagen, terwijl de client dezelfde invoer als leeg afwijst.
+- [blocker] De geclaimde privacytest controleert alleen dat een door de widgetcallback opgegooide
+  fouttekst niet in de Flutter-melding verschijnt. Er is geen geautomatiseerde controle dat vrije
+  eigenaarinput ontbreekt uit backend-foutresponses, request-/foutlogs en telemetry, zoals het
+  expliciete acceptatiecriterium vereist.
+- [blocker] De concurrency-integratietest telt uitsluitend succesvolle calls en database-rijen. Zij
+  observeert niet hoeveel `ShadowIterationStarted`-events zijn gepubliceerd en bewijst daardoor de
+  expliciete maximaal-een-garantie voor startgebeurtenissen niet.
+- Revisiongebonden factorybewijs gecontroleerd: geteste tree
+  `cac505c0849ecd5a0f5929f7cc9ff2923c4ce44e` is gelijk aan `HEAD^{tree}`; Maven, Flutter analyze,
+  Flutter tests en beide frontend-imagebuilds zijn groen. De Engine-runner-test is terecht door de
+  pathselectie overgeslagen omdat geen runner/configbestand is gewijzigd.
