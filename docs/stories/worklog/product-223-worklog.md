@@ -22,3 +22,26 @@ Resultaat: test afgekeurd.
   `/work/screenshots/product-223-preview-overview.png`.
 - Het volledige vangnet is niet opnieuw gedraaid nadat deze blokkerende gedragsfout was
   vastgesteld; de revisiongebonden harness draait na de tester-run onafhankelijk.
+
+## Hertest na developer/reviewer-ronde
+
+Testdatum: 2026-08-16
+
+Resultaat: opnieuw test afgekeurd.
+
+- Frontend en API-healthcheck van PR-preview 74 reageerden met HTTP 200.
+- De preview rapporteerde revisie/build-ID `5264d06aafdc`, gelijk aan de actuele branch-HEAD
+  `5264d06aafdc39c083117d4f3ee73bc1f01c197c`.
+- Reproductie in headless Chromium: activeer Flutter-Websemantiek, focus
+  `Start productcyclus nu`, druk Enter en inspecteer de toegankelijke dialoogboom.
+- Werkelijk: er is exact één element met `role="alertdialog"`, maar dit element heeft zowel
+  `aria-label=null` als `aria-labelledby=null`. De tekst `Productcyclus starten` staat als
+  `aria-label` op een onderliggende `flt-semantics`-node. Daardoor vindt
+  `getByRole('alertdialog', {name: 'Productcyclus starten', exact: true})` nul elementen.
+- Verwacht: het element met `role="alertdialog"` is zelf programmatisch benoemd als
+  `Productcyclus starten`.
+- Escape sloot de dialoog. Er is niet op `Cyclus starten` geklikt; er is geen startverzoek
+  verstuurd en geen testdata aangemaakt.
+- Screenshot: `/work/screenshots/product-223-preview-failure-head-5264d06.png`.
+- Het volledige vangnet is vanwege deze reeds blokkerende browserregressie niet handmatig
+  gedupliceerd; de revisiongebonden harness draait na deze tester-run onafhankelijk.
