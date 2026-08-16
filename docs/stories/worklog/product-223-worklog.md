@@ -72,3 +72,36 @@ Resultaat: opnieuw test afgekeurd.
   `/work/screenshots/product-223-preview-diagnostic-head-eb8dc26.png`.
 - Het volledige vangnet is na deze blokkerende browserbevinding niet handmatig gedupliceerd; de
   revisiongebonden harness draait na deze tester-run onafhankelijk.
+
+## Hertest na expliciete Flutter-Web DOM-fix
+
+Testdatum: 2026-08-16
+
+Resultaat: test afgekeurd door niet-werkende onbehandelde preview.
+
+- Branch-HEAD is `acf508b`; de preview serveert frontendbronrevisie
+  `22a34d825c9bdbb567ccfc8e5f19131c352181c8`. De commit daarna wijzigt uitsluitend het
+  developer-worklog.
+- De eerdere dialoogbug is opgelost. Zowel de lokale versioned DOM-test als de echte preview vinden
+  exact één `alertdialog` met `aria-label="Productcyclus starten"` op het role-element zelf.
+- Previewtoetsenbordgedrag is groen: twaalf opeenvolgende Tab-acties bleven in de dialoog, Escape
+  sloot hem en focus keerde terug naar dezelfde knop `Start productcyclus nu`.
+- Met uitsluitend in-memory GET- en POST-interceptie zijn autonome samenvatting, clientvalidatie voor
+  lege en 301-tekeninvoer, Unicode-trim, disabled bevestiging/maximaal één POST, foutbehoud,
+  `aria-live="polite"`-foutmelding zonder vrije invoer, verborgen-invoeruitsluiting en de exacte
+  autonome requestbody gecontroleerd. Er is geen echte start-POST verstuurd.
+- Zonder interceptie laadt de actuele preview niet: `GET /api/bugs`, `GET /api/test-sessions` en
+  `GET /api/roadmap/visions` geven HTTP 404. De UI toont uitsluitend
+  `Dashboard kon niet laden: Bad state: Dashboard API gaf 404.` Daardoor zijn de echte start-,
+  refresh- en detailflow op de geleverde preview niet uitvoerbaar.
+- Gerichte Flutter-test `flutter test test/manual_cycle_start_test.dart --reporter expanded`: 7 tests
+  groen, 0 failures/errors.
+- Gerichte root-reactor Maven-run voor `ManualCycleStartIntegrationTest`,
+  `ManualCycleStartMigrationTest` en `DashboardApiManualStartTest`: 8 tests groen, 0
+  failures/errors, `BUILD SUCCESS`.
+- Gerichte web-DOM-test `node test_web/manual_cycle_start_dom_test.mjs`: exitcode 0.
+- Screenshots: `/work/screenshots/product-223-preview-autonomous-head-22a34d8.png`,
+  `/work/screenshots/product-223-preview-error-live-region-head-22a34d8.png` en
+  `/work/screenshots/product-223-preview-unintercepted-head-22a34d8.png`.
+- Het volledige vangnet is conform tester-instructie niet handmatig gedupliceerd; de
+  revisiongebonden harness draait na deze tester-run onafhankelijk.
