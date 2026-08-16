@@ -54,19 +54,22 @@ verbonden zijn; anders eindigt de iteratie fail-closed als `FAILED`.
 ## Starten en volgen
 
 Via het Google-beveiligde dashboard kan bij een actief Product Factory-product een shadow-iteratie
-worden gestart. Rechtstreeks op de runtime kan dit ook:
+worden gestart. De dialoog kiest standaard de canonieke autonome opdracht en kan ook een eigen,
+getrimde onderzoeksvraag van maximaal 300 tekens meesturen. Rechtstreeks op de runtime kan dit ook:
 
 ```bash
-curl -X POST http://localhost:8080/api/products/hkh-autopilot/shadow-iterations \
+curl -X POST http://localhost:8080/api/products/hkh-autopilot/cycles \
   -H 'Content-Type: application/json' \
-  -d '{"focus":"Onderzoek autonoom de belangrijkste volgende kleine productvraag."}'
+  -d '{"focus":"Welke kleine productvraag verdient nu onderzoek?","manualStartOrigin":"OWNER_INPUT"}'
 
 curl 'http://localhost:8080/api/shadow-iterations?productSlug=hkh-autopilot'
 curl 'http://localhost:8080/api/shadow-iterations/shadow-hkh-autopilot-0001/steps?productSlug=hkh-autopilot'
 ```
 
-Per product kan maximaal één iteratie `QUEUED` of `RUNNING` zijn. Het overzicht toont de huidige
-rol, eindstatus, criticusoordeel, aantal kandidaten, aantal leverbare kandidaten, revisierondes,
+`manualStartOrigin` accepteert alleen `AUTONOMOUS_DEFAULT` met de exacte canonieke standaardopdracht
+of `OWNER_INPUT` met na trimmen 1 tot en met 300 tekens. Per product kan maximaal één iteratie
+`QUEUED` of `RUNNING` zijn; de runtime serialiseert gelijktijdige starts op de productrij. Het
+overzicht toont de huidige rol, eindstatus, criticusoordeel, aantal kandidaten, aantal leverbare kandidaten, revisierondes,
 uitkomstreden en de workspace-PR. Een nieuwe iteratie krijgt
 eerdere geaccepteerde uitkomsten en bestaande kandidaten als context. Exact gelijke titel- en
 omschrijvingcombinaties worden bovendien via een stabiele fingerprint geblokkeerd.
@@ -75,6 +78,9 @@ omschrijvingcombinaties worden bovendien via een stabiele fingerprint geblokkeer
 
 PostgreSQL bewaart iteratie- en stapstatus, gevalideerde roloutput, bronnen, beslissingen, UX,
 interne kandidaten, criticusoordeel en workspaceverwijzingen. Dit is het operationele geheugen.
+Voor nieuwe handmatige starts bewaart `shadow_iteration.manual_start_origin` daarnaast uitsluitend
+`AUTONOMOUS_DEFAULT` of `OWNER_INPUT`. Het veld is nullable zonder historische backfill;
+automatische en hervatte cycli houden `null`.
 Git bevat alleen het door de criticus geaccepteerde, leesbare dossier met hetzelfde run-ID. De
 workspace-PR wordt met auto-merge aangeboden en blijft door `Workspace validation` bewaakt.
 

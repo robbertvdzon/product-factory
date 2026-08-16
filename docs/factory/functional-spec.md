@@ -46,9 +46,9 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    alle productgebonden acties en resultaten. Op brede en smalle schermen volgen de zichtbare,
    semantische en toetsenbordvolgorde per gekozen sectie stabiel. De sectiekeuze zelf is horizontaal
    scrollbaar op smalle schermen en blijft binnen dezelfde productscope.
-3. **Cyclus starten** — de bestaande visueel dominante `StartCycleButton`, met hetzelfde
-   `_startCycle`-gedrag en dezelfde foutafhandeling. Eén gedeeld presentatiemodel bepaalt de
-   knopstatus, blokkaderedenen, veilige statuslabels en onvervulde voorwaarden uitsluitend uit
+3. **Cyclus starten** — de bestaande visueel dominante `StartCycleButton`. Eén gedeeld
+   presentatiemodel bepaalt de knopstatus, blokkaderedenen, veilige statuslabels en onvervulde
+   voorwaarden uitsluitend uit
    `Product.status` en `Product.workspaceOwnership`. De knop is alleen actief wanneer die waarden
    exact `active` en `product-factory` zijn; er wordt niet getrimd, genormaliseerd of
    hoofdletterongevoelig vergeleken. De bekende onvoldoende waarden zijn `draft`, `paused` en
@@ -77,6 +77,31 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    detailactie. Cycli — inclusief een zichtbare of langlopende `RUNNING`-cyclus — en alle andere
    productgegevens beïnvloeden deze presentatie niet; de algemene dashboardverversing blijft
    ongewijzigd.
+
+   Activering van een beschikbare start opent de benoemde dialoog `Productcyclus starten` voor de
+   productslug die op dat moment actief is. Een latere dashboardverversing verandert die vastgelegde
+   scope niet. De dialoog kiest standaard `Autonome standaard` en toont daarnaast precies de keuze
+   `Eigen onderzoeksvraag`. De autonome keuze gebruikt exact de vaste opdracht `Bepaal autonoom de
+   belangrijkste nog onbeantwoorde productvraag op basis van missie, bestaand dossier en eerdere
+   iteraties.` De eigen keuze toont één gelabeld tekstveld; na het verwijderen van witruimte aan het
+   begin en einde zijn 1 tot en met 300 tekens toegestaan. Interne witruimte blijft ongewijzigd.
+   Lege, uitsluitend uit witruimte bestaande of te lange invoer toont een veldgebonden fout en start
+   geen cyclus. Wisselen naar de autonome keuze mag eerder ingevoerde tekst lokaal behouden, maar
+   verstuurt of bewaart die tekst niet.
+
+   Vóór bevestiging toont één samenvatting het actieve product, de effectieve opdracht en precies
+   één herkomst: `Autonome standaard` of `Eigenaarinput`. Tijdens het verzoek zijn keuze, invoer,
+   annuleren en bevestigen uitgeschakeld. Bij succes sluit de dialoog, verschijnt de bestaande
+   succesmelding en wordt het overzicht vernieuwd. Bij een fout blijft de dialoog open met behoud
+   van keuze en invoer; de vaste toegankelijke statusmelding herhaalt de vrije opdracht niet en de
+   acties worden opnieuw beschikbaar. De dialoog houdt de tabfocus binnen zichzelf, sluit met
+   Escape en herstelt de focus naar dezelfde startknop.
+
+   De server controleert opnieuw de productscope, startvoorwaarden, gesloten herkomst en passende
+   opdracht. Gelijktijdige starts voor hetzelfde product worden geserialiseerd, zodat maximaal één
+   nieuwe cyclus en één startgebeurtenis ontstaan. De eenmaal getrimde eigenaarinput is bytegelijk in
+   samenvatting, request, opslag en uitvoering. Automatische starts en hervatte cycli krijgen geen
+   handmatige herkomst.
 4. **Eerdere cycli (Productsessies)** — uitsluitend cycli waarvan de niet-lege `Iteration.productSlug` exact gelijk
    is aan de actieve `Product.slug`, in de bestaande sorteervolgorde en met de bestaande
    5/+10-lijstbeperking. De productslug bepaalt uitsluitend de scope en identificatie; status bepaalt
@@ -156,8 +181,14 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    `Mechanisme: Handmatige annulering` en `Beslist op: <lokale datum en tijd>` uit `decidedAt`.
    De afgeleide badge en uitkomstreden blijven daar eveneens verborgen. Voor een historische cyclus
    zonder record toont het detail alleen bij een bewezen classifiercombinatie de beslisbron met
-   `(Afgeleid)`; onbekende provenance blijft ook daar uitsluitend `Onbekend`. De
-   `ClassificationBadge` gebruikt dezelfde `classifyIterationOutcome`-uitkomst als de terminale
+   `(Afgeleid)`; onbekende provenance blijft ook daar uitsluitend `Onbekend`. De opgeslagen
+   cyclusopdracht staat in het detail onder `Opdracht`. Alleen wanneer
+   `manualStartOrigin` een bekende opgeslagen waarde heeft, staat daar direct onder ook
+   `Herkomst: Autonome standaard` of `Herkomst: Eigenaarinput`. Historische, automatisch gestarte en
+   hervatte cycli hebben geen handmatige herkomst en krijgen geen afgeleid herkomstlabel. Compacte
+   bewijsregels en voortgangskaarten tonen opdracht en starthervkomst nooit.
+
+   De `ClassificationBadge` gebruikt dezelfde `classifyIterationOutcome`-uitkomst als de terminale
    bewijsregel (identieke tekst en `kClassificationColors`-kleurenpaar) — geen losse `Chip` met de ruwe
    backend-statuswaarde (bv. 'NEEDS_REVISION') meer. Waar de badge aanwezig is, is deze het eerste
    focusbare element in het dialoog, vóór de secties Voortgang, agentresultaten en

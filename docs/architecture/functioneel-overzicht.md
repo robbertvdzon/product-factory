@@ -10,13 +10,14 @@ en wat je daarvan in het dashboard terugziet. Voor de vertrouwensgrenzen rond sh
 
 Een cyclus (in de code een "shadow-iteratie", ook voor autonome producten) start op twee manieren:
 
-- **Handmatig** vanuit het dashboard: onder `Cyclus starten` start de knop "Start productcyclus nu"
-  een cyclus voor het actieve product via `POST /api/products/{slug}/cycles`. De knop is alleen
+- **Handmatig** vanuit het dashboard: onder `Cyclus starten` opent de knop "Start productcyclus nu"
+  eerst de benoemde dialoog `Productcyclus starten` voor het op dat moment actieve product. De
+  productscope van een geopende dialoog blijft vaststaan. De knop is alleen
   beschikbaar bij de exacte waarden productstatus `active` en workspace-eigenaarschap
   `product-factory`. Bij blokkade staat de primaire reden direct bij de knop en opent `Bekijk
   productdetails` lokaal een veilige, alleen-lezen uitleg van beide startvoorwaarden. Een lopende
   cyclus en andere product- of cyclusgegevens veranderen deze startbeschikbaarheid niet. De runtime
-  leidt de modus af uit de productinstelling (`autonomous` blijft autonoom, iedere andere
+  leidt de modus nog steeds af uit de productinstelling (`autonomous` blijft autonoom, iedere andere
   ontwikkelmodus wordt `shadow`).
 - **Automatisch**, uitsluitend in `autonomous`-modus: de `AutonomousCoordinator` controleert elke
   minuut (`product-factory.autonomy.poll-delay`, standaard elke minuut) of het product aan de
@@ -26,9 +27,14 @@ Een cyclus (in de code een "shadow-iteratie", ook voor autonome producten) start
   openstaande access-tokenacties zijn, en er die dag nog geen automatische cyclus is gestart. Er
   loopt dus nooit meer dan één cyclus tegelijk per product.
 
-Elke cyclus krijgt een korte, vrije "focus" mee (of automatisch: "bepaal zelf de belangrijkste nog
-onbeantwoorde productvraag"), plus de eerder geaccepteerde iteraties en bestaande storykandidaten
-als context, zodat hij niet opnieuw hetzelfde voorstelt.
+Bij een handmatige start kiest de eigenaar tussen de canonieke autonome opdracht en een eigen
+onderzoeksvraag. Eigen invoer wordt eenmaal aan begin en einde getrimd en moet daarna 1 tot en met
+300 tekens bevatten; interne witruimte verandert niet. De dialoog toont vóór bevestiging product,
+effectieve opdracht en de herkomst `Autonome standaard` of `Eigenaarinput`. Dezelfde effectieve
+opdracht gaat via `POST /api/products/{slug}/cycles` naar opslag en uitvoering. Automatische starts
+houden hun bestaande standaardfocus en krijgen geen handmatige herkomst. Iedere cyclus krijgt
+daarnaast de eerder geaccepteerde iteraties en bestaande storykandidaten als context, zodat hij niet
+opnieuw hetzelfde voorstelt.
 
 ## 2. De agentketen binnen één cyclus
 
@@ -176,7 +182,7 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   scope en tellingen. Op brede en smalle schermen is de zichtbare, semantische en tabvolgorde daarna
   steeds `Cyclus starten`, `Eerdere cycli` en `Gekoppelde stories`.
 - **Cyclus starten**: de bestaande visueel dominante `StartCycleButton` voor het actieve product.
-  Gedrag en foutafhandeling blijven gelijk. Eén presentatiemodel leest uitsluitend `status` en
+  Eén presentatiemodel leest uitsluitend `status` en
   `workspaceOwnership`; alleen de exacte waarden `active` en `product-factory` activeren de knop.
   `draft`, `paused`, `archived` en `owner` zijn bekende maar onvoldoende waarden. Een ontbrekende
   sleutel, `null`, lege tekst, ander type of andere tekst is onbekend; vergelijking trimt of
@@ -193,6 +199,21 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   sluiten is mogelijk. Sluiten of Escape herstelt de focus naar de opener. Bij beschikbaarheid zijn
   blokkademelding en detailactie afwezig. Een zichtbare of langlopende `RUNNING`-cyclus en alle
   overige gegevens beïnvloeden de uitkomst niet; de vijfsecondenrefresh blijft ongewijzigd.
+
+  Een beschikbare knop opent de programmatisch benoemde dialoog `Productcyclus starten`, met
+  `Autonome standaard` vooraf geselecteerd en daarnaast `Eigen onderzoeksvraag`. De autonome keuze
+  toont en verstuurt exact de vaste autonome opdracht. Alleen de eigen keuze toont één gelabeld
+  tekstveld; na trimmen aan begin en einde zijn 1–300 tekens toegestaan en toont ongeldige invoer
+  een zichtbaar, veldgebonden foutbericht. Eerder ingevoerde tekst mag bij wisselen bewaard blijven,
+  maar wordt bij de autonome keuze niet verstuurd. De samenvatting toont vóór bevestiging het vaste
+  actieve product, de effectieve opdracht en precies één herkomstlabel. De dialoog houdt focus
+  binnen zichzelf; Escape sluit en herstelt de focus naar dezelfde startknop.
+
+  Tijdens starten zijn alle dialoogacties en invoer uitgeschakeld. Een mislukking houdt keuze en
+  invoer vast en toont een toegankelijke, vaste foutstatus zonder vrije eigenaarinput; daarna kan
+  opnieuw worden bevestigd. Succes sluit de dialoog, meldt de start en vernieuwt het overzicht.
+  Servervalidatie en een product-row-lock zorgen dat onbekende of inconsistente requestcombinaties
+  geen cyclus maken en dat gelijktijdige starts maximaal één cyclus en startgebeurtenis opleveren.
 - **Eerdere cycli**: uitsluitend cycli waarvan `Iteration.productSlug` exact gelijk is aan de
   actieve `Product.slug`. De productslug bepaalt alleen scope en identificatie; de status bepaalt
   voor ieder product hetzelfde niet-uitklapbare presentatiemodel. De bestaande sortering,
@@ -275,7 +296,11 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   ook daar verborgen. Voor cycli zonder record toont het detail alleen een bewezen bron met
   `(Afgeleid)`; onbekende provenance blijft ook daar uitsluitend `Onbekend`.
   De titel van het detailscherm toont het user-facing cyclusnummer (met het interne iteratie-id als
-  fallback) en het scherm bevat de opdracht, alle vijf agentstappen (status, start-/eindtijd,
+  fallback) en het scherm bevat de opdracht. Voor een nieuwe handmatige cyclus staat daar direct
+  onder de opgeslagen herkomst als `Autonome standaard` of `Eigenaarinput`. Historische,
+  automatisch gestarte en hervatte cycli hebben geen handmatige herkomst; het dashboard leidt dan
+  geen label af. De compacte cyclusregel toont opdracht en starthervkomst nooit. Daarna volgen alle
+  vijf agentstappen (status, start-/eindtijd,
   foutmelding), het
   volledige gepubliceerde dossier en per rol (Onderzoeker, Product owner, UX-ontwerp, Story writer,
   Criticus) een leesbare samenvatting van de bekende tekstvelden (bv. `summary`, `findings`,

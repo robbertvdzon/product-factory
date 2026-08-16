@@ -62,6 +62,24 @@ bronrevisie en een geldige ISO-8601-tijd met tijdzone. Ieder ontbrekend of ongel
 afzonderlijk `Onbekend`. Lokale builds zonder build-args blijven daardoor bruikbaar. De draaiende
 container leest hiervoor geen repositorybestand of secret en doet geen extra API-request.
 
+## PR-previewdatabase herstellen
+
+Een PR-preview gebruikt een wegwerpbare PostgreSQL-database in zijn eigen namespace. Omdat die
+database meerdere branchrevisies kan overleven, kan een merge van `main` een Flyway-validatiefout
+geven wanneer twee nog niet gemergde stories hetzelfde migratienummer gebruikten. De runtime
+probeert migratie altijd eerst normaal en voert alleen na een echte `FlywayValidateException` een
+schone herbouw uit wanneer alle volgende controles slagen:
+
+- de gevalideerde synthetische dataset is exact `PR_PREVIEW`;
+- de JDBC-URL van Flyways daadwerkelijke datasource is bytegelijk aan de vooraf gevalideerde
+  in-namespace `PF_DB_URL`;
+- zowel Flyways defaultschema als cleanschema is uitsluitend `public`.
+
+Na `clean` voert Flyway alle migraties opnieuw uit en seedt de runtime de vaste PR-previewdata.
+Ontbrekende of afwijkende targetmetadata stopt fail-closed met de oorspronkelijke validatiefout.
+Productie en standing acceptatie komen nooit in dit herstelpad en hun schema wordt niet automatisch
+opgeschoond.
+
 ## Standing acceptatieomgeving
 
 `deploy/overlays/acceptance` is een blijvende, van productie en PR-previews gescheiden omgeving in

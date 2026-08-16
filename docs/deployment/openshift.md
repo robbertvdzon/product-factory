@@ -43,3 +43,10 @@ publicatie met een afzonderlijke frontendimage (`ACCEPTANCE_DATASET=true`). Alle
 vaste `product-factory`-acceptatiefixtures en de zichtbare synthetische-datamelding geactiveerd;
 productie en PR-previews blijven daarvan vrij. De routes, exacte activatievoorwaarden,
 datasetscheiding en botsingsprocedure staan in [deploy/README.md](../../deploy/README.md#standing-acceptatieomgeving).
+
+## PR-previewherstel
+
+Alleen een aantoonbaar wegwerpbare PR-previewdatabase mag na een Flyway-validatiefout automatisch
+opnieuw worden opgebouwd. De runtime bindt dit fail-closed aan dataset, daadwerkelijke JDBC-target
+en uitsluitend schema `public`; productie en standing acceptatie worden nooit opgeschoond. Zie
+[deploy/README.md](../../deploy/README.md#pr-previewdatabase-herstellen) voor de exacte controles.

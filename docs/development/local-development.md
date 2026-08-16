@@ -70,13 +70,20 @@ asynchroon: de POST retourneert `202`, waarna het resultaat via het statusendpoi
 ## Shadow-iteratie uitvoeren
 
 Controleer eerst met `./product-factory agent-worker-status` dat de Mac-worker draait. Start daarna
-via de dashboardknop **Shadow-iteratie** of rechtstreeks op de runtime:
+via **Start productcyclus nu** in het dashboard of rechtstreeks op de runtime. Een handmatige start
+vereist zowel de effectieve opdracht als de bijpassende gesloten herkomst:
 
 ```bash
-curl -X POST http://localhost:8080/api/products/hkh-autopilot/shadow-iterations \
-  -H 'Content-Type: application/json' -d '{}'
+curl -X POST http://localhost:8080/api/products/hkh-autopilot/cycles \
+  -H 'Content-Type: application/json' \
+  -d '{"focus":"Bepaal autonoom de belangrijkste nog onbeantwoorde productvraag op basis van missie, bestaand dossier en eerdere iteraties.","manualStartOrigin":"AUTONOMOUS_DEFAULT"}'
 curl 'http://localhost:8080/api/shadow-iterations?productSlug=hkh-autopilot'
 ```
+
+Gebruik voor een eigen vraag `manualStartOrigin: "OWNER_INPUT"` en 1 tot en met 300 tekens in
+`focus` na trimmen. De runtime trimt die invoer eenmaal en wijst ontbrekende, onbekende of niet bij
+de opdracht passende herkomst af. De response bevat `manualStartOrigin`; automatische, hervatte en
+historische cycli houden daar `null`.
 
 Een lopende cyclus handmatig annuleren kan via de bestaande runtime-route:
 
