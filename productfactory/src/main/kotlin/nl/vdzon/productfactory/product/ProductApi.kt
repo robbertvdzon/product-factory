@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.product
 
+import nl.vdzon.productfactory.contracts.MemoryVersionView
 import nl.vdzon.productfactory.contracts.ProductRecordView
 import nl.vdzon.productfactory.contracts.ProductView
 import nl.vdzon.productfactory.contracts.WeeklyScheduleView
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -117,7 +119,13 @@ class ProductController(private val catalog: ProductCatalog) {
         catalog.addRecord(slug, "research", request.title, request.content, request.sourceUrl)
 
     @GetMapping("/{slug}/memory")
-    fun memory(@PathVariable slug: String): List<ProductRecordView> = catalog.listRecords(slug, "memory")
+    fun memory(
+        @PathVariable slug: String,
+        @RequestParam(required = false) asOf: String?,
+    ): List<ProductRecordView> = asOf?.let { catalog.memoryAt(slug, it) } ?: catalog.listRecords(slug, "memory")
+
+    @GetMapping("/{slug}/memory/history")
+    fun memoryHistory(@PathVariable slug: String): List<MemoryVersionView> = catalog.memoryHistory(slug)
 
     @PostMapping("/{slug}/memory")
     @ResponseStatus(HttpStatus.CREATED)

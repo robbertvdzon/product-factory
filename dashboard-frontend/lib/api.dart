@@ -10,6 +10,16 @@ class DashboardApi {
     if (token != null) 'Authorization': 'Bearer $token',
   };
   Future<List<dynamic>> products() => _list('/api/products');
+  Future<List<dynamic>> memory(String slug, {String? asOf}) {
+    final encodedSlug = Uri.encodeComponent(slug);
+    final query = asOf == null || asOf.trim().isEmpty
+        ? ''
+        : '?asOf=${Uri.encodeQueryComponent(asOf.trim())}';
+    return _list('/api/products/$encodedSlug/memory$query');
+  }
+
+  Future<List<dynamic>> memoryHistory(String slug) =>
+      _list('/api/products/${Uri.encodeComponent(slug)}/memory/history');
   Future<List<dynamic>> stories() => _list('/api/story-candidates');
   Future<List<dynamic>> publications() => _list('/api/workspace/publications');
   Future<List<dynamic>> shadowIterations() => _list('/api/shadow-iterations');

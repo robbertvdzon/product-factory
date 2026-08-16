@@ -3,6 +3,7 @@ package nl.vdzon.productfactory.meeting
 import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.contracts.AgentResult
+import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.WorkspacePublicationView
 import nl.vdzon.productfactory.product.CreateProductRequest
 import nl.vdzon.productfactory.product.api.ProductCatalog
@@ -34,6 +35,7 @@ class MeetingControllerTest(
     @Autowired private val mapper: ObjectMapper,
     @Autowired private val products: ProductCatalog,
     @Autowired private val jdbc: JdbcTemplate,
+    @Autowired private val fakeAgent: FakeAgentDispatch,
 ) {
     private val slug = "meeting-controller-test"
 
@@ -57,6 +59,7 @@ class MeetingControllerTest(
         // agent_run.run_id is uniek; overleg-run-ID's zijn deterministisch afgeleid van meeting-ID
         // (dat zelf weer begint bij sequence 1 na de reset hierboven), dus die moeten ook weg.
         jdbc.update("delete from agent_run where product_slug = ?", slug)
+        fakeAgent.tasks.clear()
     }
 
     @Test
@@ -78,6 +81,12 @@ class MeetingControllerTest(
             jsonPath("$.consultedSources[0]") { value("product-factory://testbron") }
             jsonPath("$.memoryChanges[0].action") { value("ADD") }
         }
+        val prompt = fakeAgent.tasks.single { it.taskType == "meeting-chat" }.prompt
+        kotlin.test.assertTrue(prompt.contains("/memory?asOf=YYYY-MM-DD"))
+        kotlin.test.assertTrue(prompt.contains("HISTORISCH GEHEUGEN"))
+        kotlin.test.assertTrue(prompt.contains("/memory/history"))
+        kotlin.test.assertTrue(prompt.contains("historische inhoud nooit als"))
+        kotlin.test.assertTrue(prompt.contains("actuele instructie"))
 
         mvc.get("/api/products/$slug/meetings/$meetingId/messages").andExpect {
             status { isOk() }
@@ -129,22 +138,7 @@ class MeetingControllerTest(
     class Fakes {
         @Bean
         @Primary
-        fun fakeAgentDispatch(): AgentDispatchPort = AgentDispatchPort { task ->
-            val summary = when (task.taskType) {
-                "meeting-chat" -> """{
-                    "reply":"Nepantwoord van de AI.",
-                    "consultedSources":["product-factory://testbron"],
-                    "memoryActions":[{
-                      "action":"ADD","productSlug":"meeting-controller-test","targetMemoryId":null,
-                      "title":"Besluit uit overleg","content":"Dit blijft actief beschikbaar voor volgende agents.",
-                      "reason":"De eigenaar vroeg dit tijdens het overleg vast te leggen."
-                    }]
-                }""".trimIndent()
-                "meeting-close" -> """{"outcomeSummary":"Nepsamenvatting van het overleg."}"""
-                else -> """{"summary":"onbekend"}"""
-            }
-            AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)
-        }
+        fun fakeAgentDispatch(): FakeAgentDispatch = FakeAgentDispatch()
 
         // Vermijdt een echte Git-workspace-checkout in deze REST-laag-test; de echte publicatielogica
         // (git-commit, front-matter, padvalidatie) wordt al gedekt door WorkspacePublisherIntegrationTest.
@@ -160,6 +154,28 @@ class MeetingControllerTest(
                 pullRequestUrl = null,
                 commitSha = "test-commit-sha",
             )
+        }
+    }
+
+    class FakeAgentDispatch : AgentDispatchPort {
+        val tasks = mutableListOf<AgentTask>()
+
+        override fun execute(task: AgentTask): AgentResult {
+            tasks += task
+            val summary = when (task.taskType) {
+                "meeting-chat" -> """{
+                    "reply":"Nepantwoord van de AI.",
+                    "consultedSources":["product-factory://testbron"],
+                    "memoryActions":[{
+                      "action":"ADD","productSlug":"meeting-controller-test","targetMemoryId":null,
+                      "title":"Besluit uit overleg","content":"Dit blijft actief beschikbaar voor volgende agents.",
+                      "reason":"De eigenaar vroeg dit tijdens het overleg vast te leggen."
+                    }]
+                }""".trimIndent()
+                "meeting-close" -> """{"outcomeSummary":"Nepsamenvatting van het overleg."}"""
+                else -> """{"summary":"onbekend"}"""
+            }
+            return AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)
         }
     }
 }

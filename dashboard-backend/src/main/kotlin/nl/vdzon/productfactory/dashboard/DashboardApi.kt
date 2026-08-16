@@ -22,6 +22,12 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
 
     @GetMapping("/products") fun products(): Any = runtime.products()
 
+    @GetMapping("/products/{slug}/memory")
+    fun memory(@PathVariable slug: String, @RequestParam(required = false) asOf: String?): Any = runtime.memory(slug, asOf)
+
+    @GetMapping("/products/{slug}/memory/history")
+    fun memoryHistory(@PathVariable slug: String): Any = runtime.memoryHistory(slug)
+
     @PostMapping("/products")
     @ResponseStatus(HttpStatus.CREATED)
     fun createProduct(@RequestBody request: Map<String, Any?>): Any = runtime.createProduct(request)
