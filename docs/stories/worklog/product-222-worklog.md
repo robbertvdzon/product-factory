@@ -313,3 +313,34 @@ Vervolgreview browser-DOM-herstel 2026-08-16:
   `4d83cba081d7571808cba2605dd2acc060b572d8` is exact gelijk aan `HEAD^{tree}`. Maven, Flutter
   analyze/tests, de nieuwe browser-DOM-test, Engine-runner en beide frontend-imagebuilds zijn
   geslaagd. `git diff --check main...HEAD` is schoon.
+
+Herontwikkelrun na previewroute-afwijzing 2026-08-16:
+- [x] lees taakcontext, factorydocumentatie, agent-tips en bestaand testerbewijs
+- [x] verifieer de drie gemelde dashboardroutes en voeg zo nodig gerichte regressiedekking toe
+- [x] draai storygerichte tests
+- [x] draai het volledige agent-runnable factory-vangnet
+- [x] controleer de uiteindelijke worktree en leg de resultaten vast
+
+Aanleiding:
+- De tester bevestigt dat de browser-DOM-fix werkt, maar kon de onbehandelde preview niet laden
+  doordat drie dashboard-GET-routes 404 retourneerden. Het latere leidende reviewcommentaar stelt
+  dat die routes in de actuele backend bestaan. Deze run verifieert daarom de geregistreerde
+  routecontracten en lokale end-to-end backenddekking voordat een inhoudelijke wijziging wordt
+  overwogen.
+
+Resultaat:
+- `DashboardApi` registreert `/api/bugs`, `/api/test-sessions` en `/api/roadmap/visions` al onder
+  dezelfde `/api`-controller. Er is geen frontendfallback of ander productiegedrag toegevoegd:
+  dat zou een previewcomponent-/revisieprobleem maskeren en is strijdig met het leidende
+  reviewcommentaar dat geen storywijziging ontbreekt.
+- Een nieuwe `DashboardApiOverviewRoutesTest` bewijst voor alle drie paden HTTP 200, de verwachte
+  response en productscope-forwarding naar de runtimeclient. De storygerichte set is groen met 9
+  backendtests, 7 Fluttertests en de echte Flutter-Web-DOM-test, zonder failures of errors.
+- Het volledige agent-runnable vangnet is groen: Maven `clean verify` met 193 tests en 0
+  failures/errors/skips; `flutter analyze` met 0 issues; `flutter test` met 441 tests; de
+  browser-DOM-test; Docker Engine-runner met 3 tests; en beide frontend-imagebuilds met 19/19
+  succesvolle stappen. `agent-image-build` blijft volgens `.factory/verification.yaml` uitsluitend
+  CI-runnable.
+- Eindcontrole: geen conflictmarkers of whitespacefouten, geen wijziging in `pubspec.lock` of
+  `.factory/verification.yaml`, en uitsluitend deze routecontracttest plus het worklog staan
+  uncommitted klaar voor de factory.
