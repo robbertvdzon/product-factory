@@ -361,6 +361,7 @@ class _OverviewPageState extends State<OverviewPage> {
       api.aiCatalog(),
       api.meetings(),
       api.roadmapEpics(),
+      api.roadmapVisions(),
       api.roadmapSettledQuestions(),
       api.roadmapSessions(),
       api.bugs(),
@@ -842,17 +843,19 @@ class _OverviewPageState extends State<OverviewPage> {
               );
               final roadmapEpics = (snapshot.data![5] as List<dynamic>)
                   .cast<Map<String, dynamic>>();
+              final roadmapVisions = (snapshot.data![6] as List<dynamic>)
+                  .cast<Map<String, dynamic>>();
               final settledQuestions = sortedByNewestFirst(
-                snapshot.data![6] as List<dynamic>,
+                snapshot.data![7] as List<dynamic>,
                 ['createdAt'],
               );
               final roadmapSessions = sortedByNewestFirst(
-                snapshot.data![7] as List<dynamic>,
+                snapshot.data![8] as List<dynamic>,
                 ['completedAt', 'createdAt'],
               );
-              final allBugs = snapshot.data![8] as List<dynamic>;
+              final allBugs = snapshot.data![9] as List<dynamic>;
               final allTestSessions = sortedByNewestFirst(
-                snapshot.data![9] as List<dynamic>,
+                snapshot.data![10] as List<dynamic>,
                 ['completedAt', 'createdAt'],
               );
               return _OverviewResultsBuilder(
@@ -1324,6 +1327,7 @@ class _OverviewPageState extends State<OverviewPage> {
                                 ? const []
                                 : [activeProduct],
                             epics: scopedRoadmapEpics,
+                            visions: roadmapVisions,
                             stories: stories,
                             deliveries: deliveries,
                             api: api,

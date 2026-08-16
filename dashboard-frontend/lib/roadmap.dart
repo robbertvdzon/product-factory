@@ -18,6 +18,9 @@ class RoadmapEpic {
     required this.roadmapRank,
     required this.dependencyIds,
     required this.blockedByIds,
+    required this.horizon,
+    required this.kind,
+    required this.capabilityKey,
   });
 
   factory RoadmapEpic.fromJson(Map<String, dynamic> json) => RoadmapEpic(
@@ -36,6 +39,9 @@ class RoadmapEpic {
     blockedByIds: (json['blockedByIds'] as List<dynamic>? ?? const [])
         .map((value) => '$value')
         .toList(),
+    horizon: '${json['horizon'] ?? 'UNPLACED'}',
+    kind: '${json['kind'] ?? 'DELIVERY'}',
+    capabilityKey: json['capabilityKey'] as String?,
   );
 
   final String id;
@@ -49,12 +55,16 @@ class RoadmapEpic {
   final int roadmapRank;
   final List<String> dependencyIds;
   final List<String> blockedByIds;
+  final String horizon;
+  final String kind;
+  final String? capabilityKey;
 }
 
 class RoadmapBoard extends StatelessWidget {
   const RoadmapBoard({
     required this.products,
     required this.epics,
+    required this.visions,
     required this.stories,
     required this.deliveries,
     required this.api,
@@ -64,6 +74,7 @@ class RoadmapBoard extends StatelessWidget {
 
   final List<Map<String, dynamic>> products;
   final List<Map<String, dynamic>> epics;
+  final List<Map<String, dynamic>> visions;
   final List<dynamic> stories;
   final List<dynamic> deliveries;
   final DashboardApi api;
@@ -85,6 +96,9 @@ class RoadmapBoard extends StatelessWidget {
               ..sort(
                 (left, right) => left.roadmapRank.compareTo(right.roadmapRank),
               );
+        final productVision = visions
+            .where((vision) => vision['productSlug'] == slug)
+            .firstOrNull;
         return Padding(
           padding: const EdgeInsets.only(top: 12),
           child: Card.outlined(
@@ -120,6 +134,24 @@ class RoadmapBoard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (productVision != null) ...[
+                  _FutureVisionPanel(vision: productVision),
+                  const Divider(height: 1),
+                ] else
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 4, 20, 18),
+                    child: Row(
+                      children: [
+                        Icon(Icons.auto_awesome_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Start een roadmap-sessie om de verre producthorizon te ontwerpen.',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (productEpics.isEmpty)
                   const Padding(
                     padding: EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -173,13 +205,398 @@ class RoadmapBoard extends StatelessWidget {
   }
 }
 
+class _FutureVisionPanel extends StatelessWidget {
+  const _FutureVisionPanel({required this.vision});
+
+  final Map<String, dynamic> vision;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = _map(vision['content']);
+    final futureNarrative = '${content['futureNarrative'] ?? ''}'.trim();
+    final experiences = _maps(content['experiences']);
+    final capabilities = _maps(content['capabilities']);
+    final screens = _maps(content['conceptScreens']);
+    final assumptions = _maps(content['assumptions']);
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
+      label: 'Toekomstvisie versie ${vision['version']}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            margin: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colors.primaryContainer,
+                  colors.tertiaryContainer.withValues(alpha: 0.72),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.auto_awesome, color: colors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'VERRE STIP · VISIE ${vision['version']}',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: colors.primary,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${content['northStarTitle'] ?? 'Toekomstvisie'}',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${content['northStar'] ?? ''}',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                if (futureNarrative.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(futureNarrative),
+                ],
+                if (experiences.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: experiences
+                        .map(
+                          (item) => Chip(
+                            avatar: const Icon(
+                              Icons.explore_outlined,
+                              size: 17,
+                            ),
+                            label: Text('${item['title']}'),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (screens.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Conceptschermen van het eindproduct',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 450,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                scrollDirection: Axis.horizontal,
+                itemCount: screens.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 14),
+                itemBuilder: (context, index) =>
+                    _ConceptScreenCard(screen: screens[index]),
+              ),
+            ),
+          ],
+          ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 20),
+            leading: const Icon(Icons.route_outlined),
+            title: const Text('Route naar de horizon'),
+            subtitle: Text(
+              '${capabilities.length} capabilities · ${assumptions.length} te toetsen aannames',
+            ),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        for (final horizon in const [
+                          'NOW',
+                          'NEXT',
+                          'LATER',
+                          'HORIZON',
+                        ])
+                          _HorizonColumn(
+                            horizon: horizon,
+                            capabilities: capabilities
+                                .where((item) => item['horizon'] == horizon)
+                                .toList(),
+                          ),
+                      ],
+                    ),
+                    if (assumptions.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      Text(
+                        'Te toetsen voordat we de ambitie aanpassen',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 6),
+                      for (final assumption in assumptions)
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.science_outlined, size: 20),
+                          title: Text('${assumption['statement']}'),
+                          subtitle: Text(
+                            '${assumption['probeType']} · ${assumption['proposedProbe']}',
+                          ),
+                          trailing: Text('${assumption['feasibility']}'),
+                        ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Laatste visiewijziging: ${vision['changeSummary']}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Map<String, dynamic> _map(Object? value) => value is Map
+      ? value.map((key, item) => MapEntry('$key', item))
+      : const <String, dynamic>{};
+
+  static List<Map<String, dynamic>> _maps(Object? value) => value is List
+      ? value.map(_map).where((item) => item.isNotEmpty).toList()
+      : const <Map<String, dynamic>>[];
+}
+
+class _ConceptScreenCard extends StatelessWidget {
+  const _ConceptScreenCard({required this.screen});
+
+  final Map<String, dynamic> screen;
+
+  @override
+  Widget build(BuildContext context) {
+    final mobile = screen['viewport'] == 'MOBILE';
+    final colors = Theme.of(context).colorScheme;
+    final highlights = screen['highlights'] is List
+        ? (screen['highlights'] as List).map((item) => '$item').toList()
+        : const <String>[];
+    return Semantics(
+      label: 'Conceptscherm ${screen['title']}: ${screen['visualDescription']}',
+      child: SizedBox(
+        width: mobile ? 270 : 390,
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(mobile ? 28 : 16),
+            side: BorderSide(color: colors.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                height: 30,
+                color: colors.surfaceContainerHighest,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.circle, size: 7),
+                    const SizedBox(width: 5),
+                    const Icon(Icons.circle, size: 7),
+                    const Spacer(),
+                    Text(
+                      '${screen['title']}',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                    const Spacer(),
+                    Icon(
+                      mobile ? Icons.smartphone : Icons.desktop_windows,
+                      size: 14,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                height: 112,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [colors.primary, colors.tertiary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.travel_explore,
+                      color: colors.onPrimary,
+                      size: 46,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        '${screen['visualDescription']}',
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.onPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${screen['eyebrow']}',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: colors.primary),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${screen['headline']}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${screen['body']}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 10),
+                      for (final highlight in highlights.take(3))
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 5),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.auto_awesome, size: 15),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  highlight,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: null,
+                              child: Text('${screen['primaryAction']}'),
+                            ),
+                          ),
+                          if ('${screen['secondaryAction'] ?? ''}'
+                              .isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: null,
+                              tooltip: '${screen['secondaryAction']}',
+                              icon: const Icon(Icons.arrow_forward),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HorizonColumn extends StatelessWidget {
+  const _HorizonColumn({required this.horizon, required this.capabilities});
+
+  final String horizon;
+  final List<Map<String, dynamic>> capabilities;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 245,
+    child: Card.outlined(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(horizon, style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 6),
+            if (capabilities.isEmpty)
+              Text('Nog leeg', style: Theme.of(context).textTheme.bodySmall)
+            else
+              for (final capability in capabilities)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${capability['title']}',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        '${capability['outcome']}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      Text(
+                        '${capability['feasibility']}',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
+                ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _EpicGraph extends StatelessWidget {
   const _EpicGraph({required this.epics, required this.onTap});
 
   static const cardWidth = 226.0;
-  static const cardHeight = 198.0;
+  static const cardHeight = 222.0;
   static const step = 266.0;
-  static const graphHeight = 276.0;
+  static const graphHeight = 304.0;
 
   final List<RoadmapEpic> epics;
   final ValueChanged<RoadmapEpic> onTap;
@@ -259,6 +676,14 @@ class _EpicCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
+              Wrap(
+                spacing: 5,
+                children: [
+                  _MiniLabel(epic.horizon),
+                  if (epic.kind == 'DISCOVERY') const _MiniLabel('PROEF'),
+                ],
+              ),
+              const SizedBox(height: 6),
               Text(
                 epic.title,
                 maxLines: 2,
@@ -301,6 +726,22 @@ class _EpicCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MiniLabel extends StatelessWidget {
+  const _MiniLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(text, style: Theme.of(context).textTheme.labelSmall),
+  );
 }
 
 class _ScoreBadge extends StatelessWidget {

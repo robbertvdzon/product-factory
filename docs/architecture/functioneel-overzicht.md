@@ -381,18 +381,28 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   Instellingen-scherm alleen-lezen; doelrepository, `maxStoriesPerCycle`, `wipLimit`,
   AI-provider/model en cyclustijden zijn daar bewerkbaar. De dialoog houdt toetsenbordfocus binnen
   het scherm en herstelt bij sluiten de focus naar de Instellingen-knop.
+- **Toekomstvisie**: de nieuwste visieversie toont een north star, toekomstige ervaringen,
+  screenshotachtige conceptschermen en capabilities verdeeld over `Nu`, `Hierna`, `Later` en
+  `Horizon`. Technische onzekerheid verwijdert een ambitie niet: zij verschijnt als expliciete
+  aanname met een voorgestelde haalbaarheidsproef. Alleen nieuw bewijs uit zulke proeven mag een
+  volgende roadmap-sessie de horizon gemotiveerd laten aanpassen.
 - **Epic-roadmap**: per product een horizontale grafiek met compacte epic-kaarten in de berekende
   uitvoervolgorde en pijlen voor afhankelijkheden. Elke kaart toont roadmap-rank,
   prioriteitsscore (0–100), klant-rank, process-rank en of de epic uitvoerbaar, geblokkeerd of
-  afgerond is. De klant-rank weegt voor 75% en de door het roadmapproces onderhouden process-rank
+  afgerond is, plus de strategische horizon en of het om levering of discovery gaat. De klant-rank
+  weegt voor 75% en de door het roadmapproces onderhouden process-rank
   voor 25%; afhankelijkheden zijn harde voorwaarden en gaan vóór de score. Een klik opent titel,
   beschrijving, status, gekoppelde stories en opleverrapporten. Daar kan de klant titel,
   beschrijving, eigen rank en dependencies aanpassen; de process-rank blijft alleen-lezen.
   Circulaire dependencies worden atomair geweigerd. Een nieuwe epic krijgt een korte titel van
   maximaal 80 tekens en wordt achteraan in beide ranglijsten toegevoegd. Afgehandelde
   onderzoeksvragen staan, wanneer aanwezig, direct onder de roadmap.
-- **Roadmap-sessies**: status en samenvatting per sessie, met een actie om het gekoppelde verslag te
-  bekijken wanneer dat beschikbaar is.
+- **Roadmap-sessies**: een visionair concretiseert eerst vrij de bewust brede productmissie, een
+  strateeg legt daarna de versieerbare eindvisie en backcast vast en een roadmapmanager maakt daar
+  uitvoer- en discovery-epics van. Moeilijk, duur of nog niet ondersteund is geen reden om een
+  ervaring te schrappen. Onzekerheid wordt een begrensde proef met verwacht bewijs en
+  besliscriterium. Het dashboard toont status en samenvatting per sessie, met een actie om het
+  gekoppelde verslag te bekijken wanneer dat beschikbaar is.
 - **Overleggen**: status, initiatiefnemer en uitkomst per overleg, met de bestaande detailactie en,
   indien beschikbaar, een afzonderlijke notulenactie.
 - **Benodigde access tokens**: alleen zichtbaar zodra er iets openstaat; met een knop "Gereed
