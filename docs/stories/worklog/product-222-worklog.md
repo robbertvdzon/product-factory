@@ -19,7 +19,7 @@ Done / rationale:
 - Story-log aangemaakt zodat plan, voortgang en uitvoering onderdeel worden van de PR.
 - De bestaande startflow en productscope zijn eerst end-to-end geïnventariseerd om automatische
   starts, hervatten, annuleren en compacte cyclusregels buiten de wijziging te houden.
-- Migratie V25 voegt alleen de nullable, door een check-constraint gesloten
+- Migratie V26 voegt alleen de nullable, door een check-constraint gesloten
   `manual_start_origin` toe. Historische rijen krijgen geen backfill; het gedeelde contract levert
   alleen `AUTONOMOUS_DEFAULT`, `OWNER_INPUT` of `null`.
 - De runtime valideert de canonieke autonome opdracht exact en eigenaarinput na één trim op 1..300
@@ -208,3 +208,35 @@ Vervolgreview na merge met main 2026-08-16:
   developer-tree: `59ce6c49c912fc35a669d17105345211933754bd` kwam vóór deze toegestane
   worklognotitie exact overeen met `HEAD^{tree}`. De Engine-runner-test is terecht niet geselecteerd
   omdat de bijbehorende runner- en configuratiepaden niet veranderden.
+
+Ontwikkelrun na nieuwe main-integratie 2026-08-16:
+- [x] lees taakcontext, factorydocumentatie, agent-tips en bestaand worklog
+- [x] los de mergeconflictstatus op met behoud van story- en main-gedrag
+- [x] draai storygerichte tests
+- [x] draai het volledige agent-runnable factory-vangnet
+- [x] controleer de uiteindelijke worktree en leg de resultaten vast
+
+Aanleiding:
+- De factory-checkout bevatte na integratie van de nieuwste `main` één conflict in
+  `ShadowIterationApi.kt`: de story voegde handmatige-startherkomst toe en `main` voegde
+  bugprioriteitsblokkering toe. Beide gedragingen zijn vereist en worden gecombineerd en opnieuw
+  volledig geverifieerd.
+
+Resultaat nieuwe main-integratie:
+- Het serviceconflict is opgelost met behoud van zowel handmatige startvalidatie, herkomst en
+  maximaal-één-garantie als de nieuwe blokkering voor actief P0/P1-bugwerk. De expliciete
+  `AlertDialog.semanticLabel` en bijbehorende storytest voor `Productcyclus starten` bleven intact.
+- De twee branches gebruikten beide Flyway-versie 25. De ongewijzigde nullable
+  handmatige-herkomstschemawijziging staat daarom nu als eerstvolgende vrije migratie V26, na de
+  nieuwe V25 voor bugs en testsessies; de migratietest bewijst nog steeds geen backfill en de
+  gesloten waardenconstraint.
+- De nieuwe bugblokkeringstest gebruikt nu een contractgeldige autonome handmatige startrequest,
+  zodat hij het bedoelde 409-conflict bereikt. Een bestaande cyclusdetailwidgettest opent nu eerst
+  de door `main` geïntroduceerde sectie `Productsessies` voordat zij de detailregels controleert.
+- Gerichte storytests: backend 8/8 en Flutter 7/7 groen; gecombineerde backendregressietests 9/9
+  en de herstelde cyclusdetailtests 3/3 groen.
+- Volledig vangnet groen: Maven `clean verify` met 190 tests en 0 failures/errors/skips; `flutter
+  analyze` met 0 issues; `flutter test` met 440 tests; Docker Engine-runner met 3 tests; beide
+  frontend-imagebuilds met 19/19 succesvolle stappen.
+- `agent-image-build` blijft volgens `.factory/verification.yaml` niet agent-runnable en wordt door
+  CI uitgevoerd. Conflictmarker- en whitespacecontroles zijn schoon; `pubspec.lock` veranderde niet.

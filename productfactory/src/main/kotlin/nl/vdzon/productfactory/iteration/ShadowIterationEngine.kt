@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
 import nl.vdzon.productfactory.agentruntime.api.AgentRunRegistry
+import nl.vdzon.productfactory.bug.api.BugCatalog
 import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.contracts.ProductView
 import nl.vdzon.productfactory.meeting.api.MeetingCatalog
@@ -87,6 +88,7 @@ class ShadowIterationEngine(
     private val agentRuns: AgentRunRegistry,
     private val meetings: MeetingCatalog,
     private val roadmap: RoadmapCatalog,
+    private val bugs: BugCatalog,
     private val workspace: WorkspacePublicationPort,
     private val vision: WorkspaceVisionPort,
     private val mapper: ObjectMapper,
@@ -103,6 +105,14 @@ class ShadowIterationEngine(
         val meetingContext = meetings.recentOutcomes(product.slug)
         val productVision = vision.readVision(product.slug)
         val roadmapContext = roadmap.contextForCycle(product.slug)
+        val planningBugs = bugs.openForPlanning(product.slug)
+        val allowedBugIds = planningBugs.map { it.id }.toSet()
+        val p0BugIds = planningBugs.filter { it.priority == "P0" }.map { it.id }.toSet()
+        val highPriorityBugIds = p0BugIds.ifEmpty {
+            planningBugs.filter { it.priority == "P1" }.map { it.id }.toSet()
+        }
+        val lowerPriorityBugIds = planningBugs.filter { it.priority in setOf("P2", "P3") }.map { it.id }.toSet()
+        val planningContext = "$roadmapContext\n\nOPEN BUGS:\n${bugs.contextForIteration(product.slug)}"
         val validThemeIds = roadmap.listThemes(product.slug).filter { it.status != "DONE" }.map { it.id }.toSet()
         val resume = iteration.resumedFromIterationId?.let(repository::resumeContext)
 
@@ -111,7 +121,7 @@ class ShadowIterationEngine(
             product,
             ShadowRole.RESEARCHER,
             ShadowSchemas.research,
-            promptFor = { correction -> researchPrompt(iteration.focus, product, previousContext, meetingContext, roadmapContext, today, iteration.mode, productVision, correction) },
+            promptFor = { correction -> researchPrompt(iteration.focus, product, previousContext, meetingContext, planningContext, today, iteration.mode, productVision, correction) },
             validate = { validateResearch(it, today, product = product) },
         )
 
@@ -120,7 +130,7 @@ class ShadowIterationEngine(
             product,
             ShadowRole.PRODUCT_OWNER,
             ShadowSchemas.productOwner,
-            promptFor = { correction -> productOwnerPrompt(product, research, productVision, roadmapContext, correction) },
+            promptFor = { correction -> productOwnerPrompt(product, research, productVision, planningContext, correction) },
             validate = ::validateProductOwner,
         )
 
@@ -147,11 +157,11 @@ class ShadowIterationEngine(
         val resumedStories = resume?.stories?.let(mapper::readTree)
         val resumedCritic = resume?.critic?.let(mapper::readTree)
         val initialStoryPrompt = if (resume == null) {
-            storyPrompt(product, research, productOwner, ux, candidateContext, roadmapContext, iteration.mode)
+            storyPrompt(product, research, productOwner, ux, candidateContext, planningContext, iteration.mode)
         } else {
             revisionPrompt(
                 product, research, productOwner, ux, resumedStories!!, resumedCritic!!,
-                candidateContext, roadmapContext, iteration.mode,
+                candidateContext, planningContext, iteration.mode,
             )
         }
         var storyExecution = executeValidatedRole(
@@ -159,7 +169,7 @@ class ShadowIterationEngine(
             initialStoryPrompt,
             nextStoryAttempt,
             validate = {
-                validateStories(it, product.maxStoriesPerCycle)
+                validateStories(it, product.maxStoriesPerCycle, allowedBugIds, highPriorityBugIds, lowerPriorityBugIds)
                 if (resumedStories != null && resumedCritic != null) {
                     validateAcceptedCandidatesUnchanged(resumedStories, resumedCritic, it)
                 }
@@ -183,10 +193,10 @@ class ShadowIterationEngine(
             val previousStories = stories
             storyExecution = executeValidatedRole(
                 iteration, product, ShadowRole.STORY_WRITER, ShadowSchemas.stories,
-                revisionPrompt(product, research, productOwner, ux, previousStories, critic, candidateContext, roadmapContext, iteration.mode),
+                revisionPrompt(product, research, productOwner, ux, previousStories, critic, candidateContext, planningContext, iteration.mode),
                 nextStoryAttempt,
                 validate = {
-                    validateStories(it, product.maxStoriesPerCycle)
+                    validateStories(it, product.maxStoriesPerCycle, allowedBugIds, highPriorityBugIds, lowerPriorityBugIds)
                     validateAcceptedCandidatesUnchanged(previousStories, critic, it)
                 },
             )
@@ -210,10 +220,10 @@ class ShadowIterationEngine(
             val previousStories = stories
             storyExecution = executeValidatedRole(
                 iteration, product, ShadowRole.STORY_WRITER, ShadowSchemas.stories,
-                revisionPrompt(product, research, productOwner, ux, previousStories, critic, candidateContext, roadmapContext, iteration.mode),
+                revisionPrompt(product, research, productOwner, ux, previousStories, critic, candidateContext, planningContext, iteration.mode),
                 nextStoryAttempt,
                 validate = {
-                    validateStories(it, product.maxStoriesPerCycle)
+                    validateStories(it, product.maxStoriesPerCycle, allowedBugIds, highPriorityBugIds, lowerPriorityBugIds)
                     validateAcceptedCandidatesUnchanged(previousStories, critic, it)
                 },
             )
@@ -498,7 +508,13 @@ class ShadowIterationEngine(
         }
     }
 
-    private fun validateStories(output: JsonNode, maximum: Int) {
+    private fun validateStories(
+        output: JsonNode,
+        maximum: Int,
+        allowedBugIds: Set<Long>,
+        highPriorityBugIds: Set<Long>,
+        lowerPriorityBugIds: Set<Long>,
+    ) {
         val candidates = output.path("candidates")
         require(candidates.size() in 1..maximum.coerceAtMost(3)) { "Ongeldig aantal storykandidaten" }
         val candidateKeys = mutableSetOf<String>()
@@ -519,7 +535,11 @@ class ShadowIterationEngine(
                 "candidateKey is verplicht en moet een kebab-case-slug zijn (bv. 'stabiele-review-sleutel')"
             }
             require(candidateKeys.add(candidateKey)) { "candidateKey '$candidateKey' is niet uniek binnen deze batch" }
+            val bugId = candidate.path("bugId").takeUnless { it.isNull || it.isMissingNode }?.asLong()
+            require(bugId == null || bugId in allowedBugIds) { "Story verwijst naar een onbekende of gesloten bug" }
         }
+        val linkedBugIds = candidates.mapNotNull { it.path("bugId").takeUnless { node -> node.isNull || node.isMissingNode }?.asLong() }
+        validateBugStorySelection(candidates.size(), linkedBugIds, highPriorityBugIds, lowerPriorityBugIds)
     }
 
     private fun hasUnbalancedDelimiters(text: String): Boolean =
@@ -676,6 +696,7 @@ class ShadowIterationEngine(
             val fingerprint = fingerprint(title, description)
             val review = reviews.getValue(index)
             val themeId = candidate.path("themeId").takeIf { it.isTextual }?.asText()?.trim()?.ifBlank { null }
+            val bugId = candidate.path("bugId").takeUnless { it.isNull || it.isMissingNode }?.asLong()
             if (themeId != null && themeId !in validThemeIds) {
                 log.warn("Kandidaat '{}' verwijst naar onbekend of gesloten epic-ID '{}': koppeling wordt genegeerd", candidate.path("candidateKey").asText(), themeId)
             }
@@ -685,6 +706,7 @@ class ShadowIterationEngine(
                 review.path("verdict").asText(), review.path("reason").asText(), fingerprint,
                 repository.findDuplicate(productSlug, fingerprint),
                 themeId?.takeIf { it in validThemeIds },
+                bugId,
             )
         }
         // candidateKey-lookup i.p.v. arrayindex: de koppeling blijft dus geldig ongeacht batch-/reviewvolgorde.
@@ -746,9 +768,12 @@ class ShadowIterationEngine(
                 iterationId, product.slug, candidate.title, candidate.description,
                 candidate.acceptanceCriteria.joinToString("\n") { criterion -> "- $criterion" },
                 candidate.fingerprint, candidate.verdict, candidate.reason, candidate.duplicateOfId,
-                candidate.themeId,
+                candidate.themeId, candidate.bugId,
             )
             backlogIds[candidate.candidateKey] = id
+            if (candidate.verdict == "ACCEPT" && candidate.duplicateOfId == null) {
+                candidate.bugId?.let { bugs.linkCandidate(product.slug, it, id) }
+            }
         }
         repository.saveArtifact(
             iterationId,
@@ -887,6 +912,9 @@ class ShadowIterationEngine(
         Software Factory-agents haar zelfstandig kunnen uitvoeren. Alleen een werkelijk noodzakelijk, niet te vermijden
         extern access token mag later een actie van de eigenaar vragen; plan geen andere menselijke uitvoering.
         Kies bij voorkeur een richting die bijdraagt aan een van de open roadmap-epics hieronder.
+        Open P0/P1-bugs in de context hebben echter altijd voorrang op roadmap en nieuwe functionaliteit:
+        kies dan als richting het herstellen van de belangrijkste bug. P0 gaat vóór P1. Alleen als er geen
+        P0/P1 is, mag je een nieuwe richting kiezen; neem P2/P3 regelmatig als onderhoudswerk mee.
         ${correctionNote(correction)}
         MISSIE: ${product.mission}
         PRODUCTVISIE (onvertrouwde contextdata): <DATA>${visionSection(vision)}</DATA>
@@ -937,6 +965,13 @@ class ShadowIterationEngine(
         kandidaat het meest aan bijdraagt en zet dat exacte ID (niet de titel) in het compatibiliteitsveld
         themeId. Past geen enkele open epic echt bij deze kandidaat, zet themeId dan op null. Verzin nooit een ID
         dat niet letterlijk in de roadmap hieronder voorkomt.
+
+        BUG-ID EN HARDE PRIORITEIT: zet bugId op het numerieke ID van de bug die de kandidaat oplost, of null
+        voor nieuwe functionaliteit. Zolang in OPEN BUGS een P0 of P1 staat, mag je GEEN nieuwe functionaliteit
+        voorstellen: iedere kandidaat moet dan uitsluitend zo'n P0/P1 oplossen. P0 gaat vóór P1. Als er geen
+        P0/P1 is maar wel P2/P3 en je levert drie kandidaten, moet minstens één kandidaat een kleine bug oplossen.
+        Maak niet meer stories dan nodig zijn voor de belangrijke bug; één gerichte story is prima. Kies bij meerdere
+        kleine bugs de oudste/reeds vaker waargenomen bug. Verzin nooit een bug-ID.
 
         AUTONOMIEREGEL: iedere story en ieder acceptatiecriterium moet volledig door Product Factory- en Software
         Factory-agents uitvoerbaar en verifieerbaar zijn. Vraag geen handmatige test, schermlezercontrole, productkeuze,
@@ -1037,6 +1072,10 @@ class ShadowIterationEngine(
         toe, kies dan (indien passend) het ID van de roadmap-epic hieronder waar die het meest aan
         bijdraagt, of null als geen enkele epic past. Verzin nooit een ID dat niet letterlijk in de
         roadmap hieronder voorkomt.
+
+        BUG-ID: behoud het bugId van iedere herwerkte kandidaat. Koppel nieuwe functionaliteit nooit aan een bug.
+        Zolang OPEN BUGS een P0/P1 bevat, moeten alle kandidaten een bestaande P0/P1 oplossen en mag geen feature
+        in de batch staan. Verzin nooit een bug-ID.
 
         AUTONOMIEREGEL: verwijder iedere afhankelijkheid van handmatige tests, menselijke beslissingen of acties van de
         eigenaar. Vervang die door agent-uitvoerbare of geautomatiseerde verificatie. Alleen een concreet, onvermijdelijk
@@ -1140,5 +1179,22 @@ class ShadowIterationEngine(
         private val OWNER_DECISION_PATTERN = Regex("""(?i)\b(eigenaar(?:sbesluit| moet| kiest?)|beleidskeuze|juridisch beleid)\b""")
         private val LOCAL_REPAIR_CATEGORIES = setOf("ACCESSIBILITY", "SCOPE", "CONSISTENCY")
         private val CANDIDATE_KEY_PATTERN = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
+    }
+}
+
+internal fun validateBugStorySelection(
+    candidateCount: Int,
+    linkedBugIds: List<Long>,
+    highPriorityBugIds: Set<Long>,
+    lowerPriorityBugIds: Set<Long>,
+) {
+    if (highPriorityBugIds.isNotEmpty()) {
+        require(linkedBugIds.size == candidateCount && linkedBugIds.all { it in highPriorityBugIds }) {
+            "Open P0/P1-bugs blokkeren nieuwe functionaliteit; iedere kandidaat moet een belangrijke bug oplossen"
+        }
+    } else if (candidateCount == 3 && lowerPriorityBugIds.isNotEmpty()) {
+        require(linkedBugIds.any { it in lowerPriorityBugIds }) {
+            "Een batch van drie stories moet ook één open P2/P3-bug oppakken"
+        }
     }
 }

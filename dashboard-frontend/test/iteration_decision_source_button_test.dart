@@ -115,6 +115,10 @@ Future<void> _withDashboard(
     await tester.pumpWidget(const ProductFactoryDashboard());
     await tester.pump();
     await tester.pump();
+    final productSessions = find.text('Productsessies');
+    await tester.ensureVisible(productSessions);
+    await tester.tap(productSessions);
+    await tester.pump();
     await body();
   }, () => mockClient);
 }

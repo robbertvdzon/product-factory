@@ -6,11 +6,13 @@ autonoom staat — als stories naar de Software Factory sturen.
 
 ## De dashboardweergaven
 
-De Flutter-webapp (`dashboard-frontend`) heeft één hoofdscherm, het productoverzicht, en daarbinnen
-een secundaire beheerweergave. Beide gebruiken dezelfde beveiligde dashboardsessie en dezelfde elke
-5 seconden ververste gegevens; Beheer heeft geen eigen URL, gegevensbron of netwerkverzoek. Op het
-productoverzicht staat de als link vormgegeven navigatieactie `Beheer`. Deze is met muis of toetsenbord
-te activeren, heeft linksemantiek en een zichtbare focusrand.
+De Flutter-webapp (`dashboard-frontend`) heeft één hoofdscherm met een blijvend actieve productkeuze
+en afzonderlijke productsecties: `Overzicht`, `Roadmap`, `Productsessies`, `Stories`, `Epics`, `Bugs`,
+`Testsessies` en `Overleggen`. Daardoor staat niet langer alle operationele informatie tegelijk op
+één lange pagina. Daarnaast blijft de secundaire, product-overstijgende beheerweergave beschikbaar.
+Alle weergaven gebruiken dezelfde beveiligde dashboardsessie en elke 5 seconden ververste gegevens;
+Beheer heeft geen eigen URL. Op het productoverzicht staat de als link vormgegeven navigatieactie
+`Beheer`. Deze is met muis of toetsenbord te activeren, heeft linksemantiek en een zichtbare focusrand.
 
 Het productoverzicht bestaat van boven naar beneden uit:
 
@@ -42,8 +44,8 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    De wissel filtert uitsluitend reeds geladen gegevens en start geen netwerkverzoek. Zijn er geen
    geldige producten, dan wordt de voorkeur verwijderd, verschijnt een lege toestand en ontbreken
    alle productgebonden acties en resultaten. Op brede en smalle schermen volgen de zichtbare,
-   semantische en toetsenbordvolgorde hierna steeds `Cyclus starten`, `Eerdere cycli` en
-   `Gekoppelde stories`.
+   semantische en toetsenbordvolgorde per gekozen sectie stabiel. De sectiekeuze zelf is horizontaal
+   scrollbaar op smalle schermen en blijft binnen dezelfde productscope.
 3. **Cyclus starten** — de bestaande visueel dominante `StartCycleButton`, met hetzelfde
    `_startCycle`-gedrag en dezelfde foutafhandeling. Eén gedeeld presentatiemodel bepaalt de
    knopstatus, blokkaderedenen, veilige statuslabels en onvervulde voorwaarden uitsluitend uit
@@ -75,7 +77,7 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    detailactie. Cycli — inclusief een zichtbare of langlopende `RUNNING`-cyclus — en alle andere
    productgegevens beïnvloeden deze presentatie niet; de algemene dashboardverversing blijft
    ongewijzigd.
-4. **Eerdere cycli** — uitsluitend cycli waarvan de niet-lege `Iteration.productSlug` exact gelijk
+4. **Eerdere cycli (Productsessies)** — uitsluitend cycli waarvan de niet-lege `Iteration.productSlug` exact gelijk
    is aan de actieve `Product.slug`, in de bestaande sorteervolgorde en met de bestaande
    5/+10-lijstbeperking. De productslug bepaalt uitsluitend de scope en identificatie; status bepaalt
    voor ieder product hetzelfde niet-uitklapbare presentatiemodel. De geschiedenis is één benoemde
@@ -237,7 +239,7 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    (o.a. `ACCEPTED`, `PENDING`, `QUEUED`, `RUNNING`) blijft het Reden-blok volledig verborgen; het
    bestaande 'Foutreden'-blok en de standaard ingeklapte criticus-roltegel met volledig artefact
    blijven ongewijzigd.
-5. **Gekoppelde stories** — uitsluitend storykandidaten waarvan de niet-lege
+5. **Gekoppelde stories (Stories)** — uitsluitend storykandidaten waarvan de niet-lege
    `StoryCandidate.productSlug` exact gelijk is aan de actieve productslug en waarvan het integer
    `iterationSequenceNumber` exact één `sequenceNumber` binnen de geladen cycli van die scope
    aanwijst. De bestaande kandidaatdetailactie opent precies de gekozen kandidaat. Een ontbrekende,
@@ -251,13 +253,19 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    alleen-lezen tekst, de overige velden — inclusief de doelrepository — bewerkbaar en opslaanbaar.
    Het scherm opent met focus binnen de dialoog, houdt de tab-focus binnen de dialoog en sluit met
    Escape waarbij de focus terugkeert naar de Instellingen-knop.
-7. **Epic-roadmap** — de berekende epicvolgorde per product, met de bestaande detail- en
+7. **Epic-roadmap (Epics)** — de berekende epicvolgorde per product, met de bestaande detail- en
    beheeracties. Eventuele afgehandelde onderzoeksvragen staan direct onder de roadmap.
-8. **Roadmap-sessies** — de sessiestatus, samenvatting en, indien aanwezig, een actie om het verslag
+8. **Roadmap-sessies (Roadmap)** — de sessiestatus, samenvatting en, indien aanwezig, een actie om het verslag
    te bekijken.
 9. **Overleggen** — de overlegstatus en uitkomst, met de bestaande detail- en notulenacties.
-10. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
-11. **Workspace** — gepubliceerde artifacts, klikbaar om de inhoud te tonen.
+10. **Bugs** — de geprioriteerde buglijst van het actieve product. Een kaart toont reproductiestappen,
+    verwacht/werkelijk gedrag, aantal waarnemingen, gekoppelde story en status. Prioriteit en status
+    zijn handmatig corrigeerbaar; roadmap- en testsessies vullen de lijst automatisch aan.
+11. **Testsessies** — de productplanning, een handmatige startactie en de historie met aantallen
+    geteste onderdelen en aangemaakte, bijgewerkte en opgeloste bugs. Nieuwe producten starten met
+    dinsdag en vrijdag om 10:00 in de producttijdzone; de planning is in Instellingen aanpasbaar.
+12. **Benodigde access tokens** — openstaande handmatige acties, af te melden met een toelichting.
+13. **Workspace** — gepubliceerde artifacts, klikbaar om de inhoud te tonen.
 
 ### De beheerweergave
 
@@ -309,6 +317,26 @@ zonder focus te verplaatsen. De weergave bevat daarna in deze volgorde:
 De scopewissel filtert alleen de al geladen bronrecords en veroorzaakt geen extra request. Records
 worden niet herschreven of voor deze weergave aan een cyclus toegeschreven. Alleen `Alle producten`
 mag kandidaten en leveringen zonder eenduidig bepaalbare productrelatie tonen.
+
+### Bugprioriteit en testsessies
+
+- `P0` betekent dat het product of een kernflow onbruikbaar is; `P1` dat een belangrijke functie niet
+  werkt; `P2` hinder met een workaround; `P3` een kleine of cosmetische afwijking.
+- Iedere concrete fout uit een roadmapsessie wordt als bugmutatie vastgelegd, niet alleen als tekst in
+  het sessieverslag. Een fingerprint en de bestaande-bugcontext beperken duplicaten; een herhaalde
+  waarneming verhoogt de occurrence-teller.
+- Zolang een `OPEN` P0 bestaat, accepteert een productcyclus alleen stories voor P0-bugs. Zonder P0
+  geldt hetzelfde voor P1. Nieuwe functionaliteit is dan niet toegestaan. Als er geen P0/P1 is en een
+  cyclus drie stories oplevert, moet bij beschikbare P2/P3-bugs minstens één story zo'n kleine bug
+  oplossen.
+- Bij daadwerkelijke reservering van de bugstory gaat de bug naar `IN_PROGRESS`. Na een afgeronde én
+  uitgerolde Software Factory-levering gaat hij naar `READY_FOR_VERIFICATION`. Een nieuwe productcyclus
+  blijft bij een belangrijke bug in een van die statussen geblokkeerd om dubbel werk of features vóór
+  verificatie te voorkomen.
+- Alleen een onafhankelijke testsessie bevestigt automatisch `RESOLVED`; een nog steeds aanwezige fout
+  wordt opnieuw `OPEN`. Niet meer toepasselijke bugs worden `OBSOLETE`. De testsessie gebruikt de echte
+  geconfigureerde acceptatie-, live- en adminomgeving, voert alleen niet-destructieve browserhandelingen
+  uit en publiceert een leesbaar testrapport in het productgeheugen.
 
 ### Start- en doorlooptijd van een productcyclus
 

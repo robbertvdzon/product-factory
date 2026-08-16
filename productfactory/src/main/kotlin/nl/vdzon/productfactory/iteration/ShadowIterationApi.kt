@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.iteration
 
+import nl.vdzon.productfactory.bug.api.BugCatalog
 import nl.vdzon.productfactory.contracts.ManualStartOrigin
 import nl.vdzon.productfactory.contracts.ShadowIterationDecisionView
 import nl.vdzon.productfactory.contracts.ShadowIterationStepView
@@ -122,6 +123,7 @@ class ShadowIterationController(private val service: ShadowIterationService) {
 class ShadowIterationService(
     private val repository: ShadowIterationRepository,
     private val products: ProductCatalog,
+    private val bugs: BugCatalog,
     private val events: ApplicationEventPublisher,
 ) {
     companion object {
@@ -178,6 +180,20 @@ class ShadowIterationService(
         repository.lockProduct(product.slug)
         if (repository.hasActive(product.slug)) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Er loopt al een productcyclus voor dit product")
+        }
+        val importantWork = bugs.list(product.slug).firstOrNull {
+            it.priority in setOf("P0", "P1") && it.status in setOf("IN_PROGRESS", "READY_FOR_VERIFICATION")
+        }
+        if (importantWork != null) {
+            val reason = if (importantWork.status == "READY_FOR_VERIFICATION") {
+                "wacht op een testsessie ter verificatie"
+            } else {
+                "wordt al opgelost"
+            }
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "BUG-${importantWork.id} (${importantWork.priority}) $reason; nieuwe functionaliteit blijft geblokkeerd",
+            )
         }
         val mode = if (product.developmentMode == "autonomous") "autonomous" else "shadow"
         val iteration = repository.create(product.slug, focus, mode, manualStartOrigin = manualStartOrigin)
@@ -509,6 +525,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         criticReason: String,
         duplicateOfId: Long?,
         themeId: String? = null,
+        bugId: Long? = null,
     ): Long {
         val status = when {
             duplicateOfId != null -> "DUPLICATE"
@@ -521,8 +538,8 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
                 val statement = connection.prepareStatement(
                     """insert into story_candidate(
                         product_slug, title, description, status, iteration_id, fingerprint,
-                        acceptance_criteria, critic_status, critic_reason, duplicate_of_id, theme_id
-                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                        acceptance_criteria, critic_status, critic_reason, duplicate_of_id, theme_id, bug_id
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
                     arrayOf("id"),
                 )
                 statement.setString(1, productSlug)
@@ -536,6 +553,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
                 statement.setString(9, criticReason)
                 if (duplicateOfId != null) statement.setLong(10, duplicateOfId) else statement.setNull(10, java.sql.Types.BIGINT)
                 statement.setString(11, themeId)
+                if (bugId != null) statement.setLong(12, bugId) else statement.setNull(12, java.sql.Types.BIGINT)
                 statement
             },
             keyHolder,

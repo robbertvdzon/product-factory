@@ -83,6 +83,7 @@ class AgentContractTest {
         )
 
         assertTrue(command.containsAll(listOf("--sandbox", "danger-full-access")))
+        assertFalse(command.contains("--ignore-user-config"))
         assertFalse(command.contains("workspace-write"))
         assertFalse(command.contains("read-only"))
         assertTrue(command.last().contains("tijdelijke Playwright-scripts en screenshots"))
@@ -124,6 +125,24 @@ class AgentContractTest {
         assertTrue(command.containsAll(listOf("--sandbox", "danger-full-access")))
         assertTrue(command.last().contains("tijdelijke Playwright-scripts en screenshots"))
         assertTrue(command.last().contains("Voer geen Git-, GitHub-, OpenShift-, database- of clusterwijzigingen uit"))
+    }
+
+    @Test fun `scheduled test session receives browser access`() {
+        val task = AgentTask("test-1", "hkh-autopilot", "test-session", "Test alles")
+        assertTrue(requiresBrowserAccess(task))
+
+        val workspace = Files.createTempDirectory("pf-agent-workspace-test-session")
+        val executor = CodexAgentTaskExecutor(
+            AgentWorkerSettings(
+                "wss://factory.example/agent-worker", "secret", "macbook", "test",
+                workspace, "codex", "gpt-5.6-terra",
+            ),
+        ) { _, _, _ -> error("niet uitvoeren") }
+        val command = executor.command(task, workspace.resolve("last-message"))
+
+        assertFalse(command.contains("--ignore-user-config"))
+        assertTrue(command.last().contains("Browser-plugin"))
+        assertTrue(command.last().contains("curl gelden niet als browsertest"))
     }
 
     @Test fun `codex command passes a structured output schema`() {

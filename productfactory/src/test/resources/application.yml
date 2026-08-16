@@ -20,3 +20,6 @@ product-factory:
   autonomy:
     enabled: false
     poll-delay: PT1H
+  testing:
+    enabled: false
+    poll-delay: PT1H

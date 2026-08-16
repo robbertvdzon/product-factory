@@ -45,6 +45,43 @@ class AgentWorkerHubTest {
     }
 
     @Test
+    fun `submitting the same running task is idempotent`() {
+        val session = openSession()
+        val hub = AgentWorkerHub("bridge-secret")
+        hub.handleMessage(
+            session,
+            TextMessage(mapper.writeValueAsString(AgentWorkerHello(token = "bridge-secret", workerId = "macbook", workerVersion = "abc123"))),
+        )
+        val task = AgentTask("run-idempotent", "hkh-autopilot", "test-session", "Test de omgeving")
+
+        assertEquals(AgentTaskState.RUNNING, hub.submit(task).state)
+        assertEquals(AgentTaskState.RUNNING, hub.submit(task).state)
+
+        val messages = ArgumentCaptor.forClass(org.springframework.web.socket.WebSocketMessage::class.java)
+        verify(session).sendMessage(messages.capture())
+        assertEquals(1, messages.allValues.size)
+    }
+
+    @Test
+    fun `disconnected task is offered again after worker reconnects`() {
+        val firstSession = openSession()
+        val hub = AgentWorkerHub("bridge-secret")
+        val hello = AgentWorkerHello(token = "bridge-secret", workerId = "macbook", workerVersion = "abc123")
+        hub.handleMessage(firstSession, TextMessage(mapper.writeValueAsString(hello)))
+        val task = AgentTask("run-resume", "hkh-autopilot", "test-session", "Test de omgeving")
+        hub.submit(task)
+        hub.afterConnectionClosed(firstSession, CloseStatus.SERVER_ERROR)
+
+        val secondSession = openSession()
+        hub.handleMessage(secondSession, TextMessage(mapper.writeValueAsString(hello)))
+        assertEquals(AgentTaskState.RUNNING, hub.submit(task).state)
+
+        val messages = ArgumentCaptor.forClass(org.springframework.web.socket.WebSocketMessage::class.java)
+        verify(secondSession).sendMessage(messages.capture())
+        assertEquals("task", mapper.readTree((messages.value as TextMessage).payload).path("type").asText())
+    }
+
+    @Test
     fun `invalid hello is rejected without exposing a connected worker`() {
         val session = openSession()
         val hub = AgentWorkerHub("bridge-secret")

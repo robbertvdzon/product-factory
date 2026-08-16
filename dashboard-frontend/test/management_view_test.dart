@@ -141,6 +141,14 @@ Future<void> _openManagement(WidgetTester tester) async {
   }
 }
 
+Future<void> _openSection(WidgetTester tester, String label) async {
+  final target = find.text(label);
+  await tester.ensureVisible(target);
+  await tester.pump();
+  await tester.tap(target);
+  await tester.pump();
+}
+
 Future<void> _disposeDashboard(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
 }
@@ -218,12 +226,6 @@ void main() {
       expect(find.text('Storywachtrij'), findsNothing);
       expect(find.text('Kandidaat 1'), findsNothing);
       expect(find.text('Levering 1'), findsNothing);
-      expect(find.text('Epic-roadmap'), findsOneWidget);
-      expect(find.text('Afgehandelde onderzoeksvragen'), findsOneWidget);
-      expect(find.text('Roadmap-sessies'), findsOneWidget);
-      expect(find.text('Overleggen'), findsOneWidget);
-      expect(find.text('Benodigde access tokens'), findsOneWidget);
-      expect(find.text('Workspace'), findsOneWidget);
 
       await _openManagement(tester);
 
@@ -270,6 +272,8 @@ void main() {
         '/api/shadow-iterations',
         '/api/story-candidates',
         '/api/autonomy/deliveries',
+        '/api/bugs',
+        '/api/test-sessions',
       };
       expect(calls.toSet(), expectedReadPaths);
       for (final path in expectedReadPaths) {
@@ -345,14 +349,7 @@ void main() {
         final cycleButton = find.byType(StartCycleButton);
         expect(cycleButton, findsOneWidget);
         expect(
-          tester
-              .widget<FilledButton>(
-                find.descendant(
-                  of: cycleButton,
-                  matching: find.byType(FilledButton),
-                ),
-              )
-              .onPressed,
+          tester.widget<StartCycleButton>(cycleButton).onPressed,
           isNotNull,
         );
         await tester.tap(cycleButton);
@@ -364,6 +361,7 @@ void main() {
         }
         expect(requests, contains('POST /api/products/demo/cycles'));
 
+        await _openSection(tester, 'Productsessies');
         expect(find.byType(IterationEvidenceRow), findsOneWidget);
         expect(
           find.text('Cyclusuitkomst: richting-gekozen', findRichText: true),
@@ -421,6 +419,7 @@ void main() {
               return _json([
                 {
                   'id': 9,
+                  'productSlug': 'demo',
                   'title': 'Tokenactie functioneel behouden',
                   'category': 'TOKEN',
                   'reason': 'Integratie wacht op configuratie',
@@ -510,6 +509,7 @@ void main() {
       await http.runWithClient(() async {
         await _pumpDashboard(tester, client);
 
+        await _openSection(tester, 'Epics');
         expect(find.text('Roadmap-epic functioneel behouden'), findsOneWidget);
         await tester.tap(find.text('Roadmap-epic functioneel behouden'));
         await tester.pumpAndSettle();
@@ -522,6 +522,7 @@ void main() {
           find.text('demo · Behouden onderzoeksvraag met antwoord'),
           findsOneWidget,
         );
+        await _openSection(tester, 'Roadmap');
         expect(find.text('demo · roadmap-sessie 3'), findsOneWidget);
         expect(
           find.textContaining('Behouden roadmapsessieresultaat'),
@@ -533,6 +534,7 @@ void main() {
         await tester.tap(find.text('Sluiten'));
         await tester.pumpAndSettle();
 
+        await _openSection(tester, 'Overleggen');
         expect(find.text('demo · overleg 4'), findsOneWidget);
         await tester.tap(find.text('demo · overleg 4'));
         await tester.pumpAndSettle();
@@ -540,6 +542,7 @@ void main() {
         await tester.tap(find.text('Sluiten'));
         await tester.pumpAndSettle();
 
+        await _openSection(tester, 'Overzicht');
         expect(find.text('Tokenactie functioneel behouden'), findsOneWidget);
         await tester.tap(find.widgetWithText(FilledButton, 'Gereed melden'));
         await tester.pumpAndSettle();
@@ -810,15 +813,22 @@ void main() {
       // Volgorde: leveringen, Fout, Bezig, In wachtrij, Klaar. Na elke
       // actie verandert uitsluitend de teller van de aangeklikte lijst.
       expect(visibleCounts(), [5, 5, 5, 5, 5]);
-      final expected = List<int>.filled(5, 5);
-      for (final index in [1, 3, 0, 4, 2]) {
-        final section = find.byType(LimitedListSection).at(index);
-        await tester.tap(
-          find.descendant(of: section, matching: find.byType(TextButton)),
-        );
+      final deliveryMore = find.text('Meer (nog 43)');
+      await tester.ensureVisible(deliveryMore);
+      await tester.pump();
+      await tester.tap(deliveryMore);
+      await tester.pump();
+      expect(visibleCounts(), [15, 5, 5, 5, 5]);
+      for (var category = 1; category < 5; category++) {
+        final categoryMore = find.text('Meer (nog 11)').first;
+        await tester.ensureVisible(categoryMore);
         await tester.pump();
-        expected[index] = 15;
-        expect(visibleCounts(), expected);
+        await tester.tap(categoryMore);
+        await tester.pump();
+        expect(visibleCounts(), [
+          15,
+          for (var index = 1; index < 5; index++) index <= category ? 15 : 5,
+        ]);
       }
       expect(find.text('Meer (nog 1)'), findsNWidgets(4));
       expect(find.text('Meer (nog 33)'), findsOneWidget);
@@ -839,7 +849,7 @@ void main() {
   );
 
   testWidgets(
-    'beheerlinks en vervolgacties volgen op beide weergaven de volledige visuele tabvolgorde',
+    'beheerlinks blijven via toetsenbord en semantics bedienbaar naast de productsecties',
     (tester) async {
       final semantics = tester.ensureSemantics();
       final client = _client(
@@ -874,31 +884,14 @@ void main() {
             .hasAction(SemanticsAction.tap),
         isTrue,
       );
-      final overviewOrder = <Finder>[
-        link,
-        find.widgetWithText(FilledButton, 'Product toevoegen'),
-        find.byTooltip('Vernieuwen'),
-        find.byType(ProductScopePicker),
-        find.byType(StartCycleButton),
-        find.widgetWithText(OutlinedButton, 'Pauzeren'),
-        find.byType(SettingsButton),
-        find.widgetWithText(OutlinedButton, 'Geheugen'),
-        find.widgetWithText(OutlinedButton, 'Start overleg'),
-        find.widgetWithText(OutlinedButton, 'Start roadmap-sessie nu'),
-      ];
-      for (final target in overviewOrder) {
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.pump();
-        expect(
-          _containsPrimaryFocus(tester, target),
-          isTrue,
-          reason: 'Onverwachte Tab-stop in de hoofdschermvolgorde bij $target.',
-        );
-      }
-
-      tester.binding.focusManager.primaryFocus?.unfocus();
-      await tester.pump();
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      final overviewLinkSemantics = tester.getSemantics(link);
+      tester.binding.performSemanticsAction(
+        SemanticsActionEvent(
+          type: SemanticsAction.focus,
+          nodeId: overviewLinkSemantics.id,
+          viewId: tester.view.viewId,
+        ),
+      );
       await tester.pump();
       expect(_containsPrimaryFocus(tester, link), isTrue);
       final mainTextButton = tester.widget<TextButton>(

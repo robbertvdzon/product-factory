@@ -25,6 +25,7 @@ internal data class ReviewedCandidate(
     val fingerprint: String,
     val duplicateOfId: Long?,
     val themeId: String? = null,
+    val bugId: Long? = null,
     /** Sleutels uit [dependsOn] die binnen dezelfde batch daadwerkelijk naar een candidateKey verwijzen. */
     val resolvedDependsOn: List<String> = emptyList(),
     /** Resolutiedetail per dependsOn-waarde, inclusief cross-batch-, legacy- en blokkade-informatie. */
@@ -197,6 +198,7 @@ internal object ShadowDossierRenderer {
             appendLine("### ${candidate.title}")
             appendLine()
             appendLine("_Sleutel: `${candidate.candidateKey}`_")
+            candidate.bugId?.let { appendLine("_Bug: `BUG-$it`_") }
             appendLine()
             appendLine(candidate.description)
             appendLine()
