@@ -240,3 +240,24 @@ Resultaat nieuwe main-integratie:
   frontend-imagebuilds met 19/19 succesvolle stappen.
 - `agent-image-build` blijft volgens `.factory/verification.yaml` niet agent-runnable en wordt door
   CI uitgevoerd. Conflictmarker- en whitespacecontroles zijn schoon; `pubspec.lock` veranderde niet.
+
+Vervolgreview na nieuwe main-integratie 2026-08-16:
+- De volledige story-diff `git diff main...HEAD` is opnieuw beoordeeld. Conform de
+  vervolgreviewregels zijn alle eerdere bevindingen expliciet hercontroleerd en is daarnaast alleen
+  onderzocht of de nieuwe mergeoplossingen regressies introduceren; er zijn geen open bevindingen.
+- De oorspronkelijke trimbevinding blijft opgelost: Flutter en Kotlin gebruiken dezelfde expliciete
+  Unicode-randwitruimteset en UTF-16-lengtesemantiek, inclusief tests voor U+0085 en U+FEFF.
+- De oorspronkelijke privacy- en concurrencyblockers blijven opgelost: de HTTP-integratietest
+  controleert response, foutmelding, logging en telemetriemetadata, en de gelijktijdigheidstest
+  bewijst exact één cyclusrij en één gekoppeld `ShadowIterationStarted`-event.
+- De testerbevinding blijft opgelost: `AlertDialog.semanticLabel` benoemt de dialoog exact als
+  `Productcyclus starten`; de test dekt daarnaast gesloten focus, Escape en focusretour.
+- De mergeoplossing behoudt handmatige validatie/provenance en de product-row-lock samen met de
+  nieuwe P0/P1-bugblokkering. De verplaatsing van de ongewijzigde schema-uitbreiding naar V26 volgt
+  correct na mains V25 en de migratietest bewijst nullable opslag zonder backfill en gesloten waarden.
+- Gerichte verificatie is groen: Maven 12/12 tests zonder failures, errors of skips (story-, migratie-,
+  proxy- en bugregressietests) en Flutter 7/7. `git diff --check main...HEAD` is schoon.
+- Het nieuwste factorybewijs is geldig voor de developer-tree: tested tree
+  `c1f1f07dbe3604667a5ef9816a39b6138d7b8d0b` was vóór deze toegestane worklognotitie exact gelijk
+  aan `HEAD^{tree}`. Maven, Flutter analyze/tests en beide toepasselijke frontend-imagebuilds zijn
+  groen; de Engine-runner-test is terecht niet geselecteerd omdat zijn paden niet wijzigden.
