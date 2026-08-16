@@ -30,7 +30,6 @@ class MeetingApi(private val runtime: ProductFactoryRuntimeClient) {
     fun start(@PathVariable slug: String): Any = runtime.startMeeting(slug)
 
     @PostMapping("/{id}/messages")
-    @ResponseStatus(HttpStatus.ACCEPTED)
     fun sendMessage(@PathVariable slug: String, @PathVariable id: String, @RequestBody body: Map<String, Any?>): Any =
         runtime.sendMeetingMessage(
             slug,
