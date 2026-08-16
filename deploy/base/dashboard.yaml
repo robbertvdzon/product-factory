@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
         - name: dashboard-backend
-          image: ghcr.io/robbertvdzon/product-factory-dashboard-backend:sha-664b737b8c328b2828411acecaa9ae76b874681d
+          image: ghcr.io/robbertvdzon/product-factory-dashboard-backend:sha-35c50b8b0cfb2ef966682d323652a0f5e0793ae7
           imagePullPolicy: Always
           envFrom:
             - configMapRef: {name: product-factory-config}
@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
         - name: dashboard-frontend
-          image: ghcr.io/robbertvdzon/product-factory-dashboard-frontend:sha-245177d567dcd4c1297ddba08fda3413c48e7a11
+          image: ghcr.io/robbertvdzon/product-factory-dashboard-frontend:sha-35c50b8b0cfb2ef966682d323652a0f5e0793ae7
           imagePullPolicy: Always
           ports: [{containerPort: 8080}]
           readinessProbe: {httpGet: {path: /, port: 8080}, initialDelaySeconds: 5, periodSeconds: 10}
