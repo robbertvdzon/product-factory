@@ -99,9 +99,9 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
     fun aiCatalog(): Map<String, List<String>> = runtime.get().uri("/api/ai-catalog").retrieve()
         .body(object : ParameterizedTypeReference<Map<String, List<String>>>() {}).orEmpty()
 
-    fun startCycle(slug: String, focus: String?): Any = runtime.post()
+    fun startCycle(slug: String, focus: String?, manualStartOrigin: String?): Any = runtime.post()
         .uri("/api/products/{slug}/cycles", slug)
-        .body(mapOf("focus" to focus))
+        .body(mapOf("focus" to focus, "manualStartOrigin" to manualStartOrigin))
         .retrieve().body(Any::class.java)!!
 
     fun completeHumanAction(id: Long, result: String) = runtime.post()

@@ -15,6 +15,11 @@ commands:
     argv: [flutter, test]
     workingDirectory: dashboard-frontend
     timeoutSeconds: 900
+  - id: dashboard-flutter-web-dom-test
+    pathPrefixes: [dashboard-frontend/]
+    argv: [node, test_web/manual_cycle_start_dom_test.mjs]
+    workingDirectory: dashboard-frontend
+    timeoutSeconds: 300
   - id: factory-docker-engine-build-runner-test
     pathPrefixes: [.factory/docker_engine_build.py, .factory/test_docker_engine_build.py, .factory/verification.yaml]
     argv: [python3, -B, .factory/test_docker_engine_build.py]

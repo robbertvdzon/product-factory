@@ -37,7 +37,11 @@ MockClient _buildMockClient(
   List<Map<String, String>> callLog,
 ) {
   return MockClient((request) async {
-    callLog.add({'method': request.method, 'path': request.url.path});
+    callLog.add({
+      'method': request.method,
+      'path': request.url.path,
+      'body': request.body,
+    });
     switch (request.url.path) {
       case '/api/products':
         return http.Response(jsonEncode([product]), 200);
@@ -219,13 +223,23 @@ void main() {
         await tester.pump();
         await tester.pump();
 
+        expect(find.byType(ManualCycleStartDialog), findsOneWidget);
+        expect(callLog.where((call) => call['method'] == 'POST'), isEmpty);
+        await tester.tap(find.widgetWithText(FilledButton, 'Cyclus starten'));
+        await tester.pumpAndSettle();
+
+        final startCall = callLog.singleWhere(
+          (call) =>
+              call['method'] == 'POST' &&
+              call['path'] == '/api/products/demo/cycles',
+        );
         expect(
-          callLog.any(
-            (call) =>
-                call['method'] == 'POST' &&
-                call['path'] == '/api/products/demo/cycles',
-          ),
-          isTrue,
+          jsonDecode(startCall['body']!),
+          equals({
+            'focus':
+                'Bepaal autonoom de belangrijkste nog onbeantwoorde productvraag op basis van missie, bestaand dossier en eerdere iteraties.',
+            'manualStartOrigin': 'AUTONOMOUS_DEFAULT',
+          }),
         );
       });
     },

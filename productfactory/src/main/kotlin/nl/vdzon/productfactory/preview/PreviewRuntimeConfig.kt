@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component
 class PreviewRuntimeConfig(
     @param:Value("\${PF_PREVIEW_ENABLED:false}") val enabled: Boolean,
     @param:Value("\${PF_PREVIEW_MARKER:}") val marker: String,
-    @param:Value("\${PF_DB_URL:}") databaseUrl: String,
+    @param:Value("\${PF_DB_URL:}") val databaseUrl: String,
     @param:Value("\${PF_PREVIEW_PR_NUMBER:}") previewPrNumber: String,
 ) {
     val prNumber: Int? = previewPrNumber.toIntOrNull()?.takeIf { it > 0 }

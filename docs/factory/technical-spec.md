@@ -16,6 +16,8 @@
 - `productfactory-contracts` — gedeelde datacontracten (`Contracts.kt`) tussen runtime, agentworker en
   dashboard. De view-types die het dashboard toont (`ShadowIterationView`, de daarin optionele
   `ShadowIterationDecisionView`, `StoryCandidateView`, `WorkspacePublicationView`) staan hier;
+  `ShadowIterationView.manualStartOrigin` gebruikt de gesloten enum `ManualStartOrigin` en is
+  nullable voor niet-handmatige en historische cycli;
   `StoryDeliveryView`/`HumanActionView` staan in
   `productfactory/.../autonomy/AutonomousDelivery.kt`.
 - `productfactory-common` — gedeelde infrastructuurcode.
@@ -31,6 +33,10 @@
   `product-factory-acceptance` zonder PR-nummer, en anders `NONE`. Een ingeschakelde synthetische
   modus accepteert uitsluitend de in-namespace PostgreSQL-URL. `PreviewDataStartup` routeert op
   deze selectie; daardoor kan een acceptance-start nooit de PR-previewseed laden en omgekeerd.
+- Flyway configureert expliciet alleen schema `public`. Herstel na een validatiefout mag uitsluitend
+  voor `PR_PREVIEW` opschonen wanneer de JDBC-URL uit de daadwerkelijke Flyway-datasource bytegelijk
+  is aan de gevalideerde `PF_DB_URL` en zowel default- als cleanschema exact `public` zijn. Ontbrekende
+  of afwijkende targetmetadata houdt het normale fail-closed gedrag.
 - De bestaande PR-previewcatalogus voor `hkh-autopilot` blijft ongewijzigd. Alleen `ACCEPTANCE`
   laadt `AcceptanceFixtureCatalog` versie `acceptance-product-factory-cycles-v1` voor exact slug
   `product-factory`: vier cycli met vaste ids, nummers 9201–9204 en UTC-tijden, één expliciet
@@ -57,6 +63,31 @@
   zet deze op `true`. `OverviewPage` voegt dan de statische `AcceptanceDatasetNotice` direct onder
   `Productoverzicht` toe. De bestaande sortering, classificatie, koppeling, beheerweergave,
   verversing en detailbediening blijven hetzelfde.
+
+## Handmatige cyclusstart, opslag en API-contract
+
+- `POST /api/products/{slug}/cycles` vereist voor een handmatige start een JSON-body met `focus` en
+  `manualStartOrigin`. De enige herkomstwaarden zijn `AUTONOMOUS_DEFAULT` en `OWNER_INPUT`.
+  `AUTONOMOUS_DEFAULT` accepteert uitsluitend de constante
+  `ShadowIterationService.AUTONOMOUS_DEFAULT_FOCUS`; `OWNER_INPUT` vereist na de gedeelde trim 1 tot
+  en met 300 UTF-16-code-units. Runtime en Flutter gebruiken daarvoor expliciet dezelfde gesloten
+  Unicode-whitespaceset, zodat de effectieve tekst na één trim bytegelijk blijft. Ontbrekende,
+  onbekende of inconsistente combinaties leveren een clientfout op vóór opslag.
+- De dashboardbackend proxyt dezelfde twee velden naar de runtime. De frontend verstuurt alleen de
+  effectieve opdracht van de geselecteerde keuze; verborgen eigenaarinput komt niet in het request.
+  Fouten en logging gebruiken vaste teksten zonder de vrije opdracht te herhalen.
+- Flyway-migratie `V28__manual_cycle_start_origin.sql` voegt de nullable kolom
+  `shadow_iteration.manual_start_origin` met een checkconstraint voor uitsluitend
+  `AUTONOMOUS_DEFAULT` en `OWNER_INPUT` toe. Er is geen backfill. `ShadowIterationView` geeft het
+  veld ook nullable terug via de productspecifieke lijst- en detailroutes; de frontend toont alleen
+  bekende waarden en leidt ontbrekende herkomst niet af.
+- `ShadowIterationService.createCycle` vergrendelt binnen de starttransactie eerst de rij in
+  `product_definition` en controleert daarna opnieuw op een `QUEUED`- of `RUNNING`-cyclus. Daardoor
+  kunnen twee gelijktijdige starts voor dezelfde productslug niet beide een cyclus opslaan of een
+  `ShadowIterationStarted`-event publiceren. Producten onderling blijven onafhankelijk.
+- Interne automatische starts blijven `startCycle(productSlug, requestedFocus)` gebruiken en
+  hervatten maakt een nieuwe cyclus zonder `manualStartOrigin`; beide behouden dus `null` en hun
+  bestaande opdracht- en uitvoeringsgedrag.
 
 ## Beslisprovenance, opslag en API-contract
 
@@ -158,7 +189,8 @@
   `product_scope.dart` — canonieke productselectie, scopefilters en browservoorkeur;
   `bugs.dart` — productsectienavigatie, bugprioriteit/status en testsessiehistorie;
   `start_availability.dart` — het pure, gedeelde presentatiemodel voor de handmatige
-  startbeschikbaarheid;
+  startbeschikbaarheid; `manual_cycle_start.dart` — de canonieke autonome opdracht, gesloten
+  herkomstmapping, gedeelde trim/validatie en submitwaarde voor de handmatige-startdialoog;
   `classification.dart` — de bestaande pure
   mappings op `status`/`criticVerdict`/`errorMessage` plus
   `iterationDecisionPresentation`, dat eerst een aan het iteratie-id gekoppeld `decision`-record
@@ -188,16 +220,19 @@
   veilige labels en de lijst met onvervulde voorwaarden. Ontbrekende sleutels, `null`, lege tekst,
   andere typen en onbekende teksten vallen fail-closed in de categorie `unknown`; ruwe invoer wordt
   niet bewaard of gerenderd. Andere productvelden en alle cyclusdata worden niet geconsumeerd.
-- `_OverviewPageState._startCycleSection` bouwt het model eenmaal voor het geselecteerde product.
-  `StartAvailabilityPanel` gebruikt dezelfde instantie voor de bestaande `StartCycleButton`, de
+- `_OverviewPageState._startCycleSection` bouwt het beschikbaarheidsmodel eenmaal voor het
+  geselecteerde product. `StartAvailabilityPanel` gebruikt dezelfde instantie voor de bestaande `StartCycleButton`, de
   blokkademelding en `StartAvailabilityDetailsDialog`. Bij blokkade groepeert één expliciete
   `Semantics`-container de uitgeschakelde button met primaire en eventuele aanvullende reden.
   `StartAvailabilityDetailsButton` opent met een native `TextButton` de lokale `AlertDialog`, zonder
   API-client, productrecord of muterende callback. De dialoog krijgt alleen het veilige model, heeft
   een gesloten focuslus en uitsluitend de actie `Sluiten`; na sluiten via die actie of Escape vraagt
-  de openerfocusnode opnieuw focus. Het beschikbare pad roept ongewijzigd `_startCycle` aan en toont
-  geen blokkademelding of detailactie. Er zijn geen nieuwe routes, requests, contractvelden,
-  dependencies, opslag of telemetrie toegevoegd.
+  de openerfocusnode opnieuw focus. Het beschikbare pad opent met een gesloten focuslus
+  `ManualCycleStartDialog` voor de vastgelegde productslug. `_NamedAlertDialog` brengt in Flutter Web
+  rol en naam samen op exact één `alertdialog`-semanticsnode. De dialoog houdt keuze, effectieve
+  opdracht, veldfout, veilige requestfout en pendingstatus lokaal; na succes sluit hij en herlaadt
+  het overzicht, na falen blijft hij met behouden invoer open. Escape sluit via de route en de
+  bestaande startknop herwint focus.
 - `DashboardSource<T>` en `_OverviewResultsBuilder` in `main.dart` volgen de drie bestaande
   leesverzoeken voor cycli, kandidaten en leveringen onafhankelijk als loading, loaded of failure.
   De bijbehorende metrics en secties renderen daarom geen nul of compleet resultaat voor een bron
@@ -304,6 +339,9 @@
   `status in ('QUEUED', 'RUNNING')` mag naar FAILED overgaan. Houd de statusupdate en insert in
   `shadow_iteration_decision` binnen dezelfde `@Transactional`-servicecall; anders kan de
   write-once-garantie losraken van de provenance.
+- Houd de product-row-lock vóór `hasActive` en het aanmaken/publiceren binnen dezelfde
+  `@Transactional`-startservice. Een losse voorafcontrole herintroduceert een race waarin twee
+  bevestigingen dezelfde volgende cyclus kunnen maken of twee startevents publiceren.
 - `WorkspacePublicationView` heeft geen tijdstempel; die lijst kan dus niet op 'nieuwste eerst'
   gesorteerd worden en houdt de volgorde van de backend.
 - Widgettests met lange lijsten hebben een hoog testvenster nodig (`tester.view.physicalSize`), anders
@@ -318,6 +356,7 @@ Exact de commandoset uit `.factory/verification.yaml`:
 | `repository-maven-verify` | `mvn -B --no-transfer-progress clean verify` | `.` |
 | `dashboard-flutter-analyze` | `flutter analyze` | `dashboard-frontend` |
 | `dashboard-flutter-test` | `flutter test` | `dashboard-frontend` |
+| `dashboard-flutter-web-dom-test` | browser-DOM-test van de gebouwde Flutter-Webharness | `dashboard-frontend` |
 | `factory-docker-engine-build-runner-test` | unittest voor de lokale Engine-runner | `.` |
 | `dashboard-frontend-image-build-defaults` | frontend-image via de Docker Engine-socket, zonder metadata | `.` |
 | `dashboard-frontend-image-build-metadata` | frontend-image via de Docker Engine-socket, met alle drie metadatawaarden | `.` |

@@ -7,6 +7,8 @@ spring:
     password: ${PF_DB_PASSWORD}
   flyway:
     enabled: true
+    default-schema: public
+    schemas: public
   servlet:
     multipart:
       max-file-size: 5MB
