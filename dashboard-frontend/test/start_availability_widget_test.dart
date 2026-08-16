@@ -10,15 +10,17 @@ import 'package:product_factory_dashboard/main.dart';
 import 'package:product_factory_dashboard/start_availability.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Widget _panelHarness(Map<String, dynamic> product, {VoidCallback? onStart}) =>
-    MaterialApp(
-      home: Scaffold(
-        body: StartAvailabilityPanel(
-          availability: StartAvailability.fromProduct(product),
-          onStart: onStart ?? () {},
-        ),
-      ),
-    );
+Widget _panelHarness(
+  Map<String, dynamic> product, {
+  Future<void> Function()? onStart,
+}) => MaterialApp(
+  home: Scaffold(
+    body: StartAvailabilityPanel(
+      availability: StartAvailability.fromProduct(product),
+      onStart: onStart ?? () async {},
+    ),
+  ),
+);
 
 Map<String, dynamic> _dashboardProduct() => {
   'slug': 'demo',
@@ -151,10 +153,12 @@ void main() {
     (tester) async {
       var starts = 0;
       await tester.pumpWidget(
-        _panelHarness({
-          'status': 'active',
-          'workspaceOwnership': 'product-factory',
-        }, onStart: () => starts++),
+        _panelHarness(
+          {'status': 'active', 'workspaceOwnership': 'product-factory'},
+          onStart: () async {
+            starts++;
+          },
+        ),
       );
 
       final button = tester.widget<FilledButton>(

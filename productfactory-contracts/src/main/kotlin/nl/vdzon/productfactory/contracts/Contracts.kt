@@ -145,6 +145,11 @@ data class ShadowIterationDecisionView(
     val decidedAt: Instant,
 )
 
+enum class ManualStartOrigin {
+    AUTONOMOUS_DEFAULT,
+    OWNER_INPUT,
+}
+
 data class ShadowIterationView(
     val id: String,
     val productSlug: String,
@@ -168,6 +173,7 @@ data class ShadowIterationView(
     val outcomeReason: String? = null,
     val resumedFromIterationId: String? = null,
     val decision: ShadowIterationDecisionView? = null,
+    val manualStartOrigin: ManualStartOrigin? = null,
 )
 
 data class ShadowIterationStepView(

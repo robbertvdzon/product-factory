@@ -356,6 +356,9 @@ void main() {
           isNotNull,
         );
         await tester.tap(cycleButton);
+        await tester.pumpAndSettle();
+        expect(find.byType(ManualCycleStartDialog), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Cyclus starten'));
         for (var pump = 0; pump < 4; pump++) {
           await tester.pump();
         }

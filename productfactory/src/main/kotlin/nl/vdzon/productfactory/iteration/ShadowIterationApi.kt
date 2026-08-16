@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.iteration
 
+import nl.vdzon.productfactory.contracts.ManualStartOrigin
 import nl.vdzon.productfactory.contracts.ShadowIterationDecisionView
 import nl.vdzon.productfactory.contracts.ShadowIterationStepView
 import nl.vdzon.productfactory.contracts.ShadowIterationView
@@ -25,7 +26,10 @@ import java.sql.Timestamp
 import java.time.Duration
 import java.time.Instant
 
-data class StartCycleRequest(val focus: String? = null)
+data class StartCycleRequest(
+    val focus: String? = null,
+    val manualStartOrigin: ManualStartOrigin? = null,
+)
 data class CancelIterationRequest(val reason: String? = null)
 data class ShadowIterationStarted(val iterationId: String)
 data class ShadowIterationArtifactView(
@@ -50,8 +54,13 @@ class ShadowIterationController(private val service: ShadowIterationService) {
      */
     @PostMapping("/api/products/{slug}/cycles")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun start(@PathVariable slug: String, @RequestBody(required = false) request: StartCycleRequest?): ShadowIterationView =
-        service.startCycle(slug, request?.focus)
+    fun start(@PathVariable slug: String, @RequestBody request: StartCycleRequest): ShadowIterationView =
+        service.startManualCycle(
+            slug,
+            request.focus,
+            request.manualStartOrigin
+                ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Herkomst is verplicht voor een handmatige start"),
+        )
 
     @GetMapping("/api/shadow-iterations")
     fun list(@RequestParam productSlug: String): List<ShadowIterationView> = service.list(productSlug)
@@ -89,21 +98,63 @@ class ShadowIterationService(
     private val products: ProductCatalog,
     private val events: ApplicationEventPublisher,
 ) {
+    companion object {
+        const val AUTONOMOUS_DEFAULT_FOCUS =
+            "Bepaal autonoom de belangrijkste nog onbeantwoorde productvraag op basis van missie, bestaand dossier en eerdere iteraties."
+        const val MAX_OWNER_FOCUS_LENGTH = 300
+    }
+
     /** Modus wordt afgeleid van de productinstelling, niet gekozen door de aanroeper. */
     @Transactional
+    fun startManualCycle(
+        productSlug: String,
+        requestedFocus: String?,
+        manualStartOrigin: ManualStartOrigin,
+    ): ShadowIterationView {
+        val focus = when (manualStartOrigin) {
+            ManualStartOrigin.AUTONOMOUS_DEFAULT -> {
+                if (requestedFocus != AUTONOMOUS_DEFAULT_FOCUS) {
+                    throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Opdracht past niet bij de gekozen herkomst")
+                }
+                AUTONOMOUS_DEFAULT_FOCUS
+            }
+            ManualStartOrigin.OWNER_INPUT -> {
+                val trimmed = requestedFocus?.trim().orEmpty()
+                if (trimmed.length !in 1..MAX_OWNER_FOCUS_LENGTH) {
+                    throw ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Eigen onderzoeksvraag moet na trimmen 1 tot en met 300 tekens bevatten",
+                    )
+                }
+                trimmed
+            }
+        }
+        return createCycle(productSlug, focus, manualStartOrigin)
+    }
+
+    /** Automatische starts behouden hun bestaande focusgedrag en krijgen geen handmatige provenance. */
+    @Transactional
     fun startCycle(productSlug: String, requestedFocus: String?): ShadowIterationView {
+        val focus = requestedFocus?.trim()?.ifBlank { null } ?: AUTONOMOUS_DEFAULT_FOCUS
+        require(focus.length <= 1000) { "Focus mag maximaal 1000 tekens bevatten" }
+        return createCycle(productSlug, focus, null)
+    }
+
+    private fun createCycle(
+        productSlug: String,
+        focus: String,
+        manualStartOrigin: ManualStartOrigin?,
+    ): ShadowIterationView {
         val product = products.requireActive(productSlug)
         if (product.workspaceOwnership != "product-factory") {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Productcycli vereisen workspace-eigenaarschap product-factory")
         }
+        repository.lockProduct(product.slug)
         if (repository.hasActive(product.slug)) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Er loopt al een productcyclus voor dit product")
         }
         val mode = if (product.developmentMode == "autonomous") "autonomous" else "shadow"
-        val focus = requestedFocus?.trim()?.ifBlank { null }
-            ?: "Bepaal autonoom de belangrijkste nog onbeantwoorde productvraag op basis van missie, bestaand dossier en eerdere iteraties."
-        require(focus.length <= 1000) { "Focus mag maximaal 1000 tekens bevatten" }
-        val iteration = repository.create(product.slug, focus, mode)
+        val iteration = repository.create(product.slug, focus, mode, manualStartOrigin = manualStartOrigin)
         events.publishEvent(ShadowIterationStarted(iteration.id))
         return iteration
     }
@@ -178,6 +229,15 @@ internal fun isResumableIteration(status: String, outcomeReason: String?): Boole
 
 @Repository
 class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
+    /** Row lock voor de maximaal-een-garantie van starts binnen de omringende servicetransactie. */
+    fun lockProduct(productSlug: String) {
+        jdbc.queryForObject(
+            "select slug from product_definition where slug = ? for update",
+            String::class.java,
+            productSlug,
+        )
+    }
+
     fun hasActive(productSlug: String): Boolean = (jdbc.queryForObject(
         "select count(*) from shadow_iteration where product_slug = ? and status in ('QUEUED', 'RUNNING')",
         Long::class.java,
@@ -235,7 +295,13 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         return orphaned
     }
 
-    fun create(productSlug: String, focus: String, mode: String = "shadow", resumeFromIterationId: String? = null): ShadowIterationView {
+    fun create(
+        productSlug: String,
+        focus: String,
+        mode: String = "shadow",
+        resumeFromIterationId: String? = null,
+        manualStartOrigin: ManualStartOrigin? = null,
+    ): ShadowIterationView {
         val sequence = (jdbc.queryForObject(
             "select coalesce(max(sequence_number), 0) + 1 from shadow_iteration where product_slug = ?",
             Int::class.java,
@@ -243,13 +309,17 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
         ) ?: 1)
         val id = "shadow-$productSlug-${sequence.toString().padStart(4, '0')}"
         jdbc.update(
-            "insert into shadow_iteration(id, product_slug, sequence_number, focus, mode, status, resume_from_iteration_id) values (?, ?, ?, ?, ?, 'QUEUED', ?)",
+            """insert into shadow_iteration(
+                id, product_slug, sequence_number, focus, mode, status,
+                resume_from_iteration_id, manual_start_origin
+            ) values (?, ?, ?, ?, ?, 'QUEUED', ?, ?)""".trimIndent(),
             id,
             productSlug,
             sequence,
             focus,
             mode,
             resumeFromIterationId,
+            manualStartOrigin?.name,
         )
         return require(productSlug, id)
     }
@@ -627,6 +697,7 @@ class ShadowIterationRepository(private val jdbc: JdbcTemplate) {
                     row.getTimestamp("decision_decided_at").toInstant(),
                 )
             },
+            row.getString("manual_start_origin")?.let(ManualStartOrigin::valueOf),
         )
     }
 

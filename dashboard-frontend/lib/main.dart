@@ -13,6 +13,7 @@ import 'google_button_stub.dart'
 import 'iteration_evidence.dart';
 import 'iteration_results.dart';
 import 'limited_list.dart';
+import 'manual_cycle_start.dart';
 import 'meeting_dialog.dart';
 import 'product_scope.dart';
 import 'roadmap.dart';
@@ -438,21 +439,23 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   Future<void> _startCycle(String slug) async {
-    try {
-      await api.startCycle(slug);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Productcyclus voor $slug is gestart.')),
-        );
-        setState(_reload);
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$error')));
-      }
-    }
+    final started = await showDialog<bool>(
+      context: context,
+      traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+      builder: (_) => ManualCycleStartDialog(
+        productSlug: slug,
+        onStart: (submission) => api.startCycle(
+          slug,
+          focus: submission.focus,
+          manualStartOrigin: submission.origin.requestValue,
+        ),
+      ),
+    );
+    if (started != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Productcyclus voor $slug is gestart.')),
+    );
+    setState(_reload);
   }
 
   Widget _startCycleSection(Map<String, dynamic> product) {
@@ -2745,6 +2748,12 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
                   ),
                   const SizedBox(height: 4),
                   SelectableText('${iteration['focus']}'),
+                  if (manualStartOriginLabel(
+                        iteration['manualStartOrigin'],
+                      ) case final originLabel?) ...[
+                    const SizedBox(height: 4),
+                    Text('Herkomst: $originLabel'),
+                  ],
                   if (iteration['resumedFromIterationId'] != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -4175,6 +4184,197 @@ class _AddProductDialogState extends State<AddProductDialog> {
   );
 }
 
+class ManualCycleStartDialog extends StatefulWidget {
+  const ManualCycleStartDialog({
+    required this.productSlug,
+    required this.onStart,
+    super.key,
+  });
+
+  final String productSlug;
+  final Future<void> Function(ManualCycleStartSubmission submission) onStart;
+
+  @override
+  State<ManualCycleStartDialog> createState() => _ManualCycleStartDialogState();
+}
+
+class _ManualCycleStartDialogState extends State<ManualCycleStartDialog> {
+  final TextEditingController _ownerFocusController = TextEditingController();
+  ManualStartOrigin _origin = ManualStartOrigin.autonomousDefault;
+  String? _fieldError;
+  String? _startError;
+  bool _starting = false;
+
+  String get _effectiveFocus => _origin == ManualStartOrigin.autonomousDefault
+      ? autonomousDefaultFocus
+      : _ownerFocusController.text.trim();
+
+  @override
+  void dispose() {
+    _ownerFocusController.dispose();
+    super.dispose();
+  }
+
+  void _selectOrigin(ManualStartOrigin? origin) {
+    if (origin == null || _starting) return;
+    setState(() {
+      _origin = origin;
+      _fieldError = null;
+      _startError = null;
+    });
+  }
+
+  Future<void> _submit() async {
+    if (_starting) return;
+    final fieldError = _origin == ManualStartOrigin.ownerInput
+        ? validateOwnerFocus(_ownerFocusController.text)
+        : null;
+    if (fieldError != null) {
+      setState(() {
+        _fieldError = fieldError;
+        _startError = null;
+      });
+      return;
+    }
+    setState(() {
+      _starting = true;
+      _fieldError = null;
+      _startError = null;
+    });
+    try {
+      await widget.onStart(
+        ManualCycleStartSubmission(focus: _effectiveFocus, origin: _origin),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _starting = false;
+          _startError =
+              'Productcyclus kon niet worden gestart. Controleer of er al een cyclus loopt en probeer het opnieuw.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+      title: Semantics(
+        namesRoute: true,
+        header: true,
+        child: const Text('Productcyclus starten'),
+      ),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Actief product: ${widget.productSlug}'),
+              const SizedBox(height: 16),
+              const Text('Kies de opdracht voor deze cyclus:'),
+              RadioGroup<ManualStartOrigin>(
+                groupValue: _origin,
+                onChanged: _selectOrigin,
+                child: const Column(
+                  children: [
+                    RadioListTile<ManualStartOrigin>(
+                      value: ManualStartOrigin.autonomousDefault,
+                      title: Text('Autonome standaard'),
+                    ),
+                    RadioListTile<ManualStartOrigin>(
+                      value: ManualStartOrigin.ownerInput,
+                      title: Text('Eigen onderzoeksvraag'),
+                    ),
+                  ],
+                ),
+              ),
+              if (_origin == ManualStartOrigin.ownerInput) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  key: const ValueKey('owner-focus-field'),
+                  controller: _ownerFocusController,
+                  enabled: !_starting,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    labelText: 'Eigen onderzoeksvraag',
+                    helperText: 'Maximaal 300 tekens na trimmen',
+                    errorText: _fieldError,
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (_) {
+                    if (_fieldError != null || _startError != null) {
+                      setState(() {
+                        _fieldError = null;
+                        _startError = null;
+                      });
+                    } else {
+                      setState(() {});
+                    }
+                  },
+                ),
+              ],
+              const SizedBox(height: 16),
+              Semantics(
+                key: const ValueKey('manual-start-summary'),
+                container: true,
+                label:
+                    'Bevestigingssamenvatting. Actief product: ${widget.productSlug}. '
+                    'Opdracht: ${_effectiveFocus.isEmpty ? 'Nog niet ingevuld' : _effectiveFocus}. '
+                    'Herkomst: ${_origin.label}.',
+                child: ExcludeSemantics(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Samenvatting',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Actief product: ${widget.productSlug}'),
+                          Text(
+                            'Opdracht: ${_effectiveFocus.isEmpty ? 'Nog niet ingevuld' : _effectiveFocus}',
+                          ),
+                          Text('Herkomst: ${_origin.label}'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (_startError != null) ...[
+                const SizedBox(height: 12),
+                Semantics(
+                  key: const ValueKey('manual-start-error-status'),
+                  liveRegion: true,
+                  label: _startError,
+                  child: Text(
+                    _startError!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _starting ? null : () => Navigator.pop(context, false),
+          child: const Text('Annuleren'),
+        ),
+        FilledButton(
+          onPressed: _starting ? null : _submit,
+          child: Text(_starting ? 'Starten…' : 'Cyclus starten'),
+        ),
+      ],
+  );
+}
+
 /// Achtergrond-/tekstkleur van [StartCycleButton]. Losstaand van het thema-kleurenschema (dat via
 /// `seedColor` kan wijzigen) zodat de AA-contrastverhouding (>=4.5:1, zie
 /// `test/start_cycle_button_test.dart`) niet afhankelijk is van toekomstige themawijzigingen —
@@ -4192,7 +4392,7 @@ class StartAvailabilityPanel extends StatelessWidget {
   });
 
   final StartAvailability availability;
-  final VoidCallback onStart;
+  final Future<void> Function() onStart;
 
   @override
   Widget build(BuildContext context) {
@@ -4369,7 +4569,7 @@ class _StartAvailabilityDetailRow extends StatelessWidget {
 /// ongewijzigd uit de aanroepende `_OverviewPageState`.
 class StartCycleButton extends StatefulWidget {
   const StartCycleButton({required this.onPressed, super.key});
-  final VoidCallback? onPressed;
+  final Future<void> Function()? onPressed;
 
   @override
   State<StartCycleButton> createState() => _StartCycleButtonState();
@@ -4389,7 +4589,15 @@ class _StartCycleButtonState extends State<StartCycleButton> {
   @override
   Widget build(BuildContext context) => FilledButton.icon(
     focusNode: _focusNode,
-    onPressed: widget.onPressed,
+    onPressed: widget.onPressed == null
+        ? null
+        : () async {
+            try {
+              await widget.onPressed!();
+            } finally {
+              if (mounted) _focusNode.requestFocus();
+            }
+          },
     style: FilledButton.styleFrom(
       backgroundColor: kStartCycleButtonBackground,
       foregroundColor: kStartCycleButtonForeground,
