@@ -7,6 +7,8 @@ Het volledige vangnet (identiek aan `.factory/verification.yaml`):
 - Build + backendtests: `mvn -B --no-transfer-progress clean verify` (vanuit de repo-root)
 - Frontend-lint: `flutter analyze` (vanuit `dashboard-frontend`)
 - Frontend-tests: `flutter test` (vanuit `dashboard-frontend`)
+- Frontend browser-DOM-test: `node test_web/manual_cycle_start_dom_test.mjs` (vanuit
+  `dashboard-frontend`)
 - Docker Engine-runner-tests: `python3 -B .factory/test_docker_engine_build.py`
 - Agent-image (niet agent-runnable, draait in CI): `docker build --target build -f Dockerfile.agent .`
 - Frontend-image met veilige defaults: `python3 -B .factory/docker_engine_build.py --context dashboard-frontend`
@@ -49,3 +51,5 @@ Dart-ondergrens die de oudere image niet meer haalt. Controleer bij elke fronten
   (`test/formatting_test.dart`), UI-gedrag met widgettests op herbruikbare widgets
   (`test/limited_list_test.dart`). Widgettests doen géén echte HTTP-calls.
 - UI-teksten zijn Nederlands; commentaar beschrijft het *waarom*.
+- Browsersemantiek die Flutter-widgettests niet bewijzen wordt via de kleine gebouwde webharness in
+  `test_web` en Playwright tegen de echte DOM gecontroleerd.

@@ -156,11 +156,18 @@ class DashboardApi {
     }
   }
 
-  Future<void> startCycle(String slug) async {
+  Future<void> startCycle(
+    String slug, {
+    required String focus,
+    required String manualStartOrigin,
+  }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/products/$slug/cycles'),
       headers: headers,
-      body: '{}',
+      body: jsonEncode({
+        'focus': focus,
+        'manualStartOrigin': manualStartOrigin,
+      }),
     );
     if (response.statusCode != 202) {
       throw StateError(

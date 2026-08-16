@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.bug
 
 import nl.vdzon.productfactory.bug.api.BugCatalog
 import nl.vdzon.productfactory.bug.api.BugMutation
+import nl.vdzon.productfactory.iteration.ShadowIterationService
 import nl.vdzon.productfactory.product.CreateProductRequest
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import org.junit.jupiter.api.BeforeEach
@@ -75,7 +76,8 @@ class BugControllerTest(
 
         val response = mvc.post("/api/products/$slug/cycles") {
             contentType = MediaType.APPLICATION_JSON
-            content = "{}"
+            content =
+                """{"focus":"${ShadowIterationService.AUTONOMOUS_DEFAULT_FOCUS}","manualStartOrigin":"AUTONOMOUS_DEFAULT"}"""
         }.andExpect {
             status { isConflict() }
         }.andReturn().response

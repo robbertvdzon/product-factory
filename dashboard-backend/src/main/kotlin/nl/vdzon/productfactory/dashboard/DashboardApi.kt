@@ -107,8 +107,8 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
 
     @PostMapping("/products/{slug}/cycles")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun startCycle(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =
-        runtime.startCycle(slug, request?.get("focus"))
+    fun startCycle(@PathVariable slug: String, @RequestBody request: Map<String, String>): Any =
+        runtime.startCycle(slug, request["focus"], request["manualStartOrigin"])
 
     @PostMapping("/autonomy/human-actions/{id}/complete")
     fun completeHumanAction(@PathVariable id: Long, @RequestBody request: Map<String, String>) =

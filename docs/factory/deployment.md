@@ -43,6 +43,12 @@ De preview-database is een wegwerpbare in-namespace Postgres (`deploy/overlays/p
 met een vaste, niet-gevoelige connectiestring — geen echt secret om op te halen, vandaar de
 simpele recipe hierboven in plaats van een `oc get secret`-aanroep.
 
+Een PR-previewdatabase kan meerdere branchrevisies overleven. Wanneer Flyway na integratie van
+`main` een validatiefout vindt door een botsende, nog niet gemergde migratieversie, bouwt de runtime
+uitsluitend deze gevalideerde per-PR-wegwerpdatabase schoon opnieuw op en seedt daarna de vaste
+previewdata. Productie en de vaste acceptatieomgeving houden het normale fail-closed Flywaygedrag;
+hun schema wordt nooit door dit herstelpad opgeschoond.
+
 ## Standing acceptatieomgeving
 
 De afzonderlijke overlay `deploy/overlays/acceptance` draait in namespace
