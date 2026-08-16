@@ -73,8 +73,9 @@ Future<void> _withDashboard(
   final mockClient = _buildMockClient(product, callLog);
   await http.runWithClient(() async {
     await tester.pumpWidget(const ProductFactoryDashboard());
-    await tester.pump();
-    await tester.pump();
+    for (var pump = 0; pump < 6; pump++) {
+      await tester.pump();
+    }
     await body();
   }, () => mockClient);
 }
@@ -117,16 +118,10 @@ void main() {
         _product(status: 'active'),
         callLog,
         () async {
-          expect(
-            find.widgetWithText(OutlinedButton, 'Pauzeren'),
-            findsOneWidget,
-          );
-          expect(
-            find.widgetWithText(OutlinedButton, 'Start overleg'),
-            findsOneWidget,
-          );
+          expect(find.text('Pauzeren'), findsOneWidget);
+          expect(find.text('Start overleg'), findsOneWidget);
 
-          await tester.tap(find.widgetWithText(OutlinedButton, 'Pauzeren'));
+          await tester.tap(find.text('Pauzeren'));
           await tester.pump();
           await tester.pump();
 

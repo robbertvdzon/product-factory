@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'bugs.dart';
 import 'classification.dart';
 import 'config.dart';
 import 'environment_identity.dart';
@@ -243,22 +244,22 @@ class _OverviewResultsBuilder extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       FutureBuilder<DashboardSource<List<dynamic>>>(
-    future: iterationFuture,
-    builder: (context, iterationSnapshot) =>
-        FutureBuilder<DashboardSource<List<dynamic>>>(
-      future: candidateFuture,
-      builder: (context, candidateSnapshot) =>
-          FutureBuilder<DashboardSource<List<dynamic>>>(
-        future: deliveryFuture,
-        builder: (context, deliverySnapshot) => builder(
-          context,
-          iterationSnapshot.data ?? DashboardSource.loading(),
-          candidateSnapshot.data ?? DashboardSource.loading(),
-          deliverySnapshot.data ?? DashboardSource.loading(),
-        ),
-      ),
-    ),
-  );
+        future: iterationFuture,
+        builder: (context, iterationSnapshot) =>
+            FutureBuilder<DashboardSource<List<dynamic>>>(
+              future: candidateFuture,
+              builder: (context, candidateSnapshot) =>
+                  FutureBuilder<DashboardSource<List<dynamic>>>(
+                    future: deliveryFuture,
+                    builder: (context, deliverySnapshot) => builder(
+                      context,
+                      iterationSnapshot.data ?? DashboardSource.loading(),
+                      candidateSnapshot.data ?? DashboardSource.loading(),
+                      deliverySnapshot.data ?? DashboardSource.loading(),
+                    ),
+                  ),
+            ),
+      );
 }
 
 class OverviewPage extends StatefulWidget {
@@ -286,6 +287,7 @@ class _OverviewPageState extends State<OverviewPage> {
       const ProductScopePreferences();
   Timer? refreshTimer;
   bool managementView = false;
+  DashboardSection dashboardSection = DashboardSection.overview;
   bool productPreferenceLoaded = false;
   String? activeProductSlug;
   String? managementProductSlug;
@@ -361,6 +363,8 @@ class _OverviewPageState extends State<OverviewPage> {
       api.roadmapEpics(),
       api.roadmapSettledQuestions(),
       api.roadmapSessions(),
+      api.bugs(),
+      api.testSessions(),
       preference,
     ]);
     final storedPreference = result.removeLast();
@@ -561,6 +565,24 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
+  Future<void> _startTestSession(String slug) async {
+    try {
+      await api.startTestSession(slug);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Testsessie voor $slug is gestart.')),
+        );
+        setState(_reload);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
+
   Future<void> _completeHumanAction(Map<String, dynamic> action) async {
     final controller = TextEditingController();
     final result = await showDialog<String>(
@@ -616,10 +638,9 @@ class _OverviewPageState extends State<OverviewPage> {
               productSlug: selectedSlug,
             );
       final stories = sortedByNewestFirst(scopedStories, ['createdAt']);
-      final sortedDeliveries = sortedByNewestFirst(
-        scopedDeliveries,
-        ['createdAt'],
-      );
+      final sortedDeliveries = sortedByNewestFirst(scopedDeliveries, [
+        'createdAt',
+      ]);
       final selectedProduct = selectedSlug == null
           ? null
           : availableProducts
@@ -628,7 +649,8 @@ class _OverviewPageState extends State<OverviewPage> {
       final scopeLabel = selectedSlug == null
           ? 'Alle producten'
           : _productDisplayName(selectedProduct!);
-      final scopedDeliveriesLoaded = deliverySource.loaded &&
+      final scopedDeliveriesLoaded =
+          deliverySource.loaded &&
           (selectedSlug == null || candidateSource.loaded);
 
       return ListView(
@@ -667,10 +689,7 @@ class _OverviewPageState extends State<OverviewPage> {
               final product = availableProducts.firstWhere(
                 (candidate) => candidate['slug'] == slug,
               );
-              final nextStories = candidatesInManagementScope(
-                allStories,
-                slug,
-              );
+              final nextStories = candidatesInManagementScope(allStories, slug);
               final nextDeliveries = deliveriesInManagementScope(
                 deliveries: allDeliveries,
                 candidates: allStories,
@@ -684,10 +703,7 @@ class _OverviewPageState extends State<OverviewPage> {
                     'Gekozen product ${_productDisplayName(product)}. '
                     '${_sourceCount(candidateSource, nextStories.length)} '
                     'storykandidaten en '
-                    '${_derivedSourceCount(
-                      [candidateSource, deliverySource],
-                      nextDeliveries.length,
-                    )} leveringen.';
+                    '${_derivedSourceCount([candidateSource, deliverySource], nextDeliveries.length)} leveringen.';
               });
               await productScopePreferences.save(slug);
             },
@@ -793,601 +809,831 @@ class _OverviewPageState extends State<OverviewPage> {
     body: managementView
         ? _managementBody()
         : FutureBuilder<List<dynamic>>(
-      future: data,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done &&
-            !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Text('Dashboard kon niet laden: ${snapshot.error}'),
-          );
-        }
-        final products = availableProducts;
-        final activeProduct = activeProductSlug == null
-            ? null
-            : products
-                  .where((product) => product['slug'] == activeProductSlug)
-                  .firstOrNull;
-        // Workspace-publicaties hebben geen tijdstempel in de contracts; daar geldt alleen de beperking.
-        final publications = (snapshot.data![1] as List<dynamic>)
-            .cast<Map<String, dynamic>>();
-        final humanActions = sortedByNewestFirst(
-          snapshot.data![2] as List<dynamic>,
-          ['createdAt'],
-        );
-        final aiCatalog = snapshot.data![3] as Map<String, dynamic>;
-        final meetings = sortedByNewestFirst(
-          snapshot.data![4] as List<dynamic>,
-          ['closedAt', 'createdAt'],
-        );
-        final roadmapEpics = (snapshot.data![5] as List<dynamic>)
-            .cast<Map<String, dynamic>>();
-        final settledQuestions = sortedByNewestFirst(
-          snapshot.data![6] as List<dynamic>,
-          ['createdAt'],
-        );
-        final roadmapSessions = sortedByNewestFirst(
-          snapshot.data![7] as List<dynamic>,
-          ['completedAt', 'createdAt'],
-        );
-        return _OverviewResultsBuilder(
-          iterationFuture: iterationData,
-          candidateFuture: candidateData,
-          deliveryFuture: deliveryData,
-          builder: (context, iterationSource, candidateSource, deliverySource) {
-            final iterations = sortedByNewestFirst(
-              iterationSource.value ?? const <dynamic>[],
-              ['startedAt', 'createdAt'],
-            );
-            final stories = candidateSource.value ?? const <dynamic>[];
-            final deliveries = deliverySource.value ?? const <dynamic>[];
-            final scopedIterations = activeProduct == null
-                ? const <Map<String, dynamic>>[]
-                : iterationsInProductScope(
-                    iterations,
-                    activeProduct['slug'] as String,
-                  );
-            final linkedStories = activeProduct == null
-                ? const <Map<String, dynamic>>[]
-                : linkedStoriesInProductScope(
-                    candidates: stories,
-                    iterations: iterations,
-                    productSlug: activeProduct['slug'] as String,
-                  );
-            final scopedDeliveries = activeProduct == null
-                ? const <Map<String, dynamic>>[]
-                : deliveriesInManagementScope(
-                    deliveries: deliveries,
-                    candidates: stories,
-                    productSlug: activeProduct['slug'] as String,
-                  );
-            final iterationDeliveries = activeProduct == null
-                ? const <Map<String, dynamic>>[]
-                : deliveries
-                      .whereType<Map<String, dynamic>>()
-                      .where(
-                        (delivery) =>
-                            delivery['productSlug'] == activeProduct['slug'],
-                      )
-                      .toList(growable: false);
-            final grouping = iterationSource.loaded && activeProduct != null
-                ? groupIterationResults(
-                    iterations: scopedIterations,
-                    candidates: linkedStories,
-                    deliveries: iterationDeliveries,
-                  )
-                : null;
-            return ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Productoverzicht',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                if (widget.acceptanceDataset) ...[
-                  const SizedBox(height: 16),
-                  const AcceptanceDatasetNotice(),
-                ],
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      DashboardNavigationLink(
-                        label: 'Beheer',
-                        onPressed: () => setState(() {
-                          managementProductSlug = activeProductSlug;
-                          managementProductScopeAnnouncement = null;
-                          managementView = true;
-                        }),
-                      ),
-                      FilledButton.icon(
-                        onPressed: () => _addProduct(aiCatalog),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Product toevoegen'),
-                      ),
-                      IconButton(
-                        onPressed: () => setState(_reload),
-                        tooltip: 'Vernieuwen',
-                        icon: const Icon(Icons.refresh),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: [
-                MetricCard(
-                  label: 'Producten',
-                  value: '${products.length}',
-                  icon: Icons.apps,
-                ),
-                MetricCard(
-                  label: 'Interne storykandidaten',
-                  value: _derivedSourceCount(
-                    [candidateSource, iterationSource],
-                    linkedStories.length,
-                  ),
-                  icon: Icons.lightbulb_outline,
-                ),
-                MetricCard(
-                  label: 'Workspace-publicaties',
-                  value: '${publications.length}',
-                  icon: Icons.folder_open,
-                ),
-                MetricCard(
-                  label: 'Shadow-iteraties',
-                  value: _sourceCount(
-                    iterationSource,
-                    scopedIterations.length,
-                  ),
-                  icon: Icons.science_outlined,
-                ),
-                MetricCard(
-                  label: 'Software Factory-stories',
-                  value: _derivedSourceCount(
-                    [candidateSource, deliverySource],
-                    scopedDeliveries.length,
-                  ),
-                  icon: Icons.precision_manufacturing_outlined,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            if (activeProduct == null)
-              const SourceNotice(
-                key: ValueKey('empty-product-scope'),
-                icon: Icons.inventory_2_outlined,
-                text:
-                    'Geen producten beschikbaar. Voeg een product toe om een productscope te openen.',
-              )
-            else ...[
-              ProductScopePicker(
-                products: products,
-                value: activeProduct['slug'] as String,
-                label: 'Actief product',
-                onChanged: (slug) async {
-                  if (slug == null) return;
-                  final product = products.firstWhere(
-                    (candidate) => candidate['slug'] == slug,
-                  );
-                  final nextIterations = iterationsInProductScope(
-                    iterations,
-                    slug,
-                  );
-                  final nextStories = linkedStoriesInProductScope(
-                    candidates: stories,
-                    iterations: iterations,
-                    productSlug: slug,
-                  );
-                  await _selectProduct(
-                    slug,
-                    announcement:
-                        'Gekozen product ${_productDisplayName(product)}. '
-                        '${_sourceCount(iterationSource, nextIterations.length)} '
-                        'eerdere cycli en '
-                        '${_derivedSourceCount(
-                          [candidateSource, iterationSource],
-                          nextStories.length,
-                        )} gekoppelde stories.',
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _productDisplayName(activeProduct),
-                key: const ValueKey('active-product-name'),
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              if (overviewProductScopeAnnouncement != null)
-                ProductScopeStatus(
-                  key: const ValueKey('product-scope-status'),
-                  message: overviewProductScopeAnnouncement!,
-                ),
-              const SizedBox(height: 24),
-              Text(
-                'Cyclus starten',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              _startCycleSection(activeProduct),
-              const SizedBox(height: 24),
-              Text(
-                'Eerdere cycli',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              if (iterationSource.loading)
-                const SourceNotice(
-                  icon: Icons.hourglass_top,
-                  text: 'Cycli voor het actieve product worden geladen.',
-                )
-              else if (iterationSource.failed)
-                const SourceNotice(
-                  icon: Icons.error_outline,
-                  text: 'Cycli voor het actieve product zijn niet beschikbaar.',
-                  error: true,
-                )
-              else if (scopedIterations.isEmpty)
-                const ListTile(
-                  leading: Icon(Icons.hourglass_empty),
-                  title: Text('Nog geen cycli voor dit product'),
-                ),
-              if (iterationSource.loaded)
-                Semantics(
-                  container: true,
-                  explicitChildNodes: true,
-                  label:
-                      'Cyclusgeschiedenis voor product ${activeProduct['slug']}',
-                  child: _limitedSection(
-                    'iterations-${activeProduct['slug']}',
-                    scopedIterations,
-                    (iteration) {
-                      final linked = grouping!.resultsFor(iteration);
-                      final cardKey = ValueKey(
-                        _iterationCardIdentity(scopedIterations, iteration),
-                      );
-                      if (shouldShowIterationEvidence(iteration)) {
-                        return IterationEvidenceRow(
-                          key: cardKey,
-                          iteration: iteration,
-                          environmentIdentity: environmentIdentity,
-                          deliveries: deliverySource.loaded
-                              ? linked.deliveries
-                              : null,
-                          deliveriesLoading: deliverySource.loading,
-                          onOpenDetails: () => _showIteration(iteration),
-                        );
-                      }
-                      return IterationProgressCard(
-                        key: cardKey,
-                        iteration: iteration,
-                        onOpenDetails: () => _showIteration(iteration),
-                      );
-                    },
-                  ),
-                ),
-              const SizedBox(height: 24),
-              Text(
-                'Gekoppelde stories',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              if (candidateSource.loading || iterationSource.loading)
-                const SourceNotice(
-                  icon: Icons.hourglass_top,
-                  text: 'Gekoppelde stories worden geladen.',
-                )
-              else if (candidateSource.failed || iterationSource.failed)
-                const SourceNotice(
-                  icon: Icons.error_outline,
-                  text: 'Gekoppelde stories zijn niet beschikbaar.',
-                  error: true,
-                )
-              else if (linkedStories.isEmpty)
-                const ListTile(
-                  leading: Icon(Icons.hourglass_empty),
-                  title: Text('Nog geen eenduidig gekoppelde stories'),
-                )
-              else
-                _limitedSection(
-                  'linked-stories-${activeProduct['slug']}',
-                  linkedStories,
-                  (story) {
-                    final matchingDeliveries = scopedDeliveries
+            future: data,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done &&
+                  !snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text('Dashboard kon niet laden: ${snapshot.error}'),
+                );
+              }
+              final products = availableProducts;
+              final activeProduct = activeProductSlug == null
+                  ? null
+                  : products
                         .where(
-                          (delivery) =>
-                              delivery['candidateId'] == story['id'],
+                          (product) => product['slug'] == activeProductSlug,
                         )
-                        .toList(growable: false);
-                    return LinkedStoryTile(
-                      story: story,
-                      onOpenDetails: () => _showStoryCandidateDetails(
-                        context,
-                        story,
-                        matchingDeliveries.length == 1
-                            ? matchingDeliveries.single
-                            : null,
-                      ),
-                    );
-                  },
-                ),
-              const SizedBox(height: 24),
-              Text(
-                'Product beheren',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _changeStatus(
-                      activeProduct['slug'] as String,
-                      activeProduct['status'] == 'active'
-                          ? 'pause'
-                          : 'resume',
-                    ),
-                    icon: Icon(
-                      activeProduct['status'] == 'active'
-                          ? Icons.pause
-                          : Icons.play_arrow,
-                    ),
-                    label: Text(
-                      activeProduct['status'] == 'active'
-                          ? 'Pauzeren'
-                          : 'Hervatten',
-                    ),
-                  ),
-                  SettingsButton(
-                    onPressed: () =>
-                        _editProductSettings(activeProduct, aiCatalog),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _showMemory(
-                      activeProduct['slug'] as String,
-                      _productDisplayName(activeProduct),
-                    ),
-                    icon: const Icon(Icons.history_outlined),
-                    label: const Text('Geheugen'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: activeProduct['status'] == 'active'
-                        ? () => _startMeeting(activeProduct['slug'] as String)
-                        : null,
-                    icon: const Icon(Icons.forum_outlined),
-                    label: const Text('Start overleg'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: activeProduct['status'] == 'active'
-                        ? () => _startRoadmapSession(
-                            activeProduct['slug'] as String,
-                          )
-                        : null,
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('Start roadmap-sessie nu'),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Epic-roadmap',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                const Tooltip(
-                  message:
-                      'De score combineert klant-rank (75%) en process-rank (25%). Dependencies bepalen de uitvoerbare volgorde.',
-                  child: Icon(Icons.info_outline),
-                ),
-              ],
-            ),
-            if (candidateSource.loaded && deliverySource.loaded)
-              RoadmapBoard(
-                products: products,
-                epics: roadmapEpics,
-                stories: stories,
-                deliveries: deliveries,
-                api: api,
-                onChanged: () => setState(_reload),
-              )
-            else
-              const SourceNotice(
-                icon: Icons.info_outline,
-                text:
-                    'Epic-roadmap is onvolledig totdat kandidaten en leveringen beschikbaar zijn.',
-              ),
-            if (settledQuestions.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Afgehandelde onderzoeksvragen',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              _limitedSection('roadmapSettledQuestions', settledQuestions, (
-                question,
-              ) {
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.check, size: 18),
-                  title: Text(
-                    '${question['productSlug']} · ${question['content']}',
-                  ),
-                );
-              }),
-            ],
-            const SizedBox(height: 24),
-            Text(
-              'Roadmap-sessies',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            if (roadmapSessions.isEmpty)
-              const ListTile(
-                leading: Icon(Icons.hourglass_empty),
-                title: Text('Nog geen roadmap-sessies'),
-              ),
-            _limitedSection('roadmapSessions', roadmapSessions, (session) {
-              final sessionStatus = '${session['status']}';
-              final summary = session['summary'] as String?;
-              final workspaceRunId = session['workspaceRunId'] as String?;
-              return Card(
-                child: ListTile(
-                  leading: const Icon(Icons.map_outlined),
-                  title: Text(
-                    '${session['productSlug']} · roadmap-sessie ${session['sequenceNumber']}',
-                  ),
-                  subtitle: Text(
-                    [
-                      sessionStatus,
-                      if (summary != null && summary.isNotEmpty)
-                        summary.length > 150
-                            ? '${summary.substring(0, 150)}…'
-                            : summary,
-                    ].join(' · '),
-                  ),
-                  trailing: workspaceRunId == null
-                      ? null
-                      : IconButton(
-                          tooltip: 'Verslag bekijken',
-                          icon: const Icon(Icons.description_outlined),
-                          onPressed: () => _showMeetingMinutes(
-                            '${session['productSlug']}',
-                            workspaceRunId,
-                          ),
-                        ),
-                ),
+                        .firstOrNull;
+              // Workspace-publicaties hebben geen tijdstempel in de contracts; daar geldt alleen de beperking.
+              final publications = (snapshot.data![1] as List<dynamic>)
+                  .cast<Map<String, dynamic>>();
+              final humanActions = sortedByNewestFirst(
+                snapshot.data![2] as List<dynamic>,
+                ['createdAt'],
               );
-            }),
-            const SizedBox(height: 24),
-            Text('Overleggen', style: Theme.of(context).textTheme.titleLarge),
-            if (meetings.isEmpty)
-              const ListTile(
-                leading: Icon(Icons.hourglass_empty),
-                title: Text('Nog geen overleggen'),
-              ),
-            _limitedSection('meetings', meetings, (meeting) {
-              final meetingStatus = '${meeting['status']}';
-              final outcome = meeting['outcomeSummary'] as String?;
-              final workspaceRunId = meeting['workspaceRunId'] as String?;
-              return Card(
-                child: ListTile(
-                  leading: Icon(
-                    meeting['initiator'] == 'product'
-                        ? Icons.forum
-                        : Icons.forum_outlined,
-                  ),
-                  title: Text(
-                    '${meeting['productSlug']} · overleg ${meeting['sequenceNumber']}',
-                  ),
-                  subtitle: Text(
-                    [
-                      meetingStatus,
-                      '${meeting['initiator']} gestart',
-                      if (outcome != null && outcome.isNotEmpty)
-                        outcome.length > 150
-                            ? '${outcome.substring(0, 150)}…'
-                            : outcome,
-                    ].join(' · '),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+              final aiCatalog = snapshot.data![3] as Map<String, dynamic>;
+              final meetings = sortedByNewestFirst(
+                snapshot.data![4] as List<dynamic>,
+                ['closedAt', 'createdAt'],
+              );
+              final roadmapEpics = (snapshot.data![5] as List<dynamic>)
+                  .cast<Map<String, dynamic>>();
+              final settledQuestions = sortedByNewestFirst(
+                snapshot.data![6] as List<dynamic>,
+                ['createdAt'],
+              );
+              final roadmapSessions = sortedByNewestFirst(
+                snapshot.data![7] as List<dynamic>,
+                ['completedAt', 'createdAt'],
+              );
+              final allBugs = snapshot.data![8] as List<dynamic>;
+              final allTestSessions = sortedByNewestFirst(
+                snapshot.data![9] as List<dynamic>,
+                ['completedAt', 'createdAt'],
+              );
+              return _OverviewResultsBuilder(
+                iterationFuture: iterationData,
+                candidateFuture: candidateData,
+                deliveryFuture: deliveryData,
+                builder: (context, iterationSource, candidateSource, deliverySource) {
+                  final iterations = sortedByNewestFirst(
+                    iterationSource.value ?? const <dynamic>[],
+                    ['startedAt', 'createdAt'],
+                  );
+                  final stories = candidateSource.value ?? const <dynamic>[];
+                  final deliveries = deliverySource.value ?? const <dynamic>[];
+                  final scopedIterations = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : iterationsInProductScope(
+                          iterations,
+                          activeProduct['slug'] as String,
+                        );
+                  final linkedStories = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : linkedStoriesInProductScope(
+                          candidates: stories,
+                          iterations: iterations,
+                          productSlug: activeProduct['slug'] as String,
+                        );
+                  final scopedDeliveries = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : deliveriesInManagementScope(
+                          deliveries: deliveries,
+                          candidates: stories,
+                          productSlug: activeProduct['slug'] as String,
+                        );
+                  final iterationDeliveries = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : deliveries
+                            .whereType<Map<String, dynamic>>()
+                            .where(
+                              (delivery) =>
+                                  delivery['productSlug'] ==
+                                  activeProduct['slug'],
+                            )
+                            .toList(growable: false);
+                  final grouping =
+                      iterationSource.loaded && activeProduct != null
+                      ? groupIterationResults(
+                          iterations: scopedIterations,
+                          candidates: linkedStories,
+                          deliveries: iterationDeliveries,
+                        )
+                      : null;
+                  final scopedBugs = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : bugsForProduct(
+                          allBugs,
+                          activeProduct['slug'] as String,
+                        );
+                  final scopedTestSessions = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : testSessionsForProduct(
+                          allTestSessions,
+                          activeProduct['slug'] as String,
+                        );
+                  final scopedRoadmapEpics = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : roadmapEpics
+                            .where(
+                              (item) =>
+                                  item['productSlug'] == activeProduct['slug'],
+                            )
+                            .toList(growable: false);
+                  final scopedSettledQuestions = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : settledQuestions
+                            .where(
+                              (item) =>
+                                  item['productSlug'] == activeProduct['slug'],
+                            )
+                            .toList(growable: false);
+                  final scopedRoadmapSessions = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : roadmapSessions
+                            .where(
+                              (item) =>
+                                  item['productSlug'] == activeProduct['slug'],
+                            )
+                            .toList(growable: false);
+                  final scopedMeetings = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : meetings
+                            .where(
+                              (item) =>
+                                  item['productSlug'] == activeProduct['slug'],
+                            )
+                            .toList(growable: false);
+                  final scopedHumanActions = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : humanActions
+                            .where(
+                              (item) =>
+                                  item['productSlug'] == activeProduct['slug'],
+                            )
+                            .toList(growable: false);
+                  final scopedPublications = activeProduct == null
+                      ? const <Map<String, dynamic>>[]
+                      : publications
+                            .where(
+                              (item) =>
+                                  item['productSlug'] == activeProduct['slug'],
+                            )
+                            .toList(growable: false);
+                  return ListView(
+                    padding: const EdgeInsets.all(24),
                     children: [
-                      if (workspaceRunId != null)
-                        IconButton(
-                          tooltip: 'Notulen bekijken',
-                          icon: const Icon(Icons.description_outlined),
-                          onPressed: () => _showMeetingMinutes(
-                            '${meeting['productSlug']}',
-                            workspaceRunId,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Productoverzicht',
+                            style: Theme.of(context).textTheme.headlineMedium,
                           ),
-                        ),
-                      const Icon(Icons.chevron_right),
-                    ],
-                  ),
-                  onTap: () => _openMeeting(
-                    '${meeting['productSlug']}',
-                    '${meeting['id']}',
-                  ),
-                ),
-              );
-            }),
-            if (humanActions.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              Text(
-                'Benodigde access tokens',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              _limitedSection('humanActions', humanActions, (action) {
-                return ListTile(
-                  leading: const Icon(Icons.warning_amber_outlined),
-                  title: Text('${action['title']}'),
-                  subtitle: Text('${action['category']} · ${action['reason']}'),
-                  trailing: action['status'] == 'OPEN'
-                      ? FilledButton(
-                          onPressed: () => _completeHumanAction(action),
-                          child: const Text('Gereed melden'),
-                        )
-                      : null,
-                );
-              }),
-            ],
-            const SizedBox(height: 24),
-            Text('Workspace', style: Theme.of(context).textTheme.titleLarge),
-            _limitedSection('publications', publications, (publication) {
-              final runId = '${publication['runId']}';
-              final productSlug = '${publication['productSlug']}';
-              return ListTile(
-                title: Text('${publication['artifactPath']}'),
-                subtitle: Text(
-                  '$productSlug · $runId · ${publication['status']}',
-                ),
-                leading: const Icon(Icons.description_outlined),
-                trailing: const Icon(Icons.open_in_new),
-                onTap: () async {
-                  final content = await api.artifact(productSlug, runId);
-                  if (context.mounted) {
-                    showDialog<void>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text('${publication['artifactPath']}'),
-                        content: SizedBox(
-                          width: 720,
-                          child: SingleChildScrollView(
-                            child: SelectableText(content),
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Sluiten'),
+                          if (widget.acceptanceDataset) ...[
+                            const SizedBox(height: 16),
+                            const AcceptanceDatasetNotice(),
+                          ],
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                DashboardNavigationLink(
+                                  label: 'Beheer',
+                                  onPressed: () => setState(() {
+                                    managementProductSlug = activeProductSlug;
+                                    managementProductScopeAnnouncement = null;
+                                    managementView = true;
+                                  }),
+                                ),
+                                FilledButton.icon(
+                                  onPressed: () => _addProduct(aiCatalog),
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Product toevoegen'),
+                                ),
+                                IconButton(
+                                  onPressed: () => setState(_reload),
+                                  tooltip: 'Vernieuwen',
+                                  icon: const Icon(Icons.refresh),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    );
-                  }
+                      if (dashboardSection == DashboardSection.overview) ...[
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 16,
+                          runSpacing: 16,
+                          children: [
+                            MetricCard(
+                              label: 'Producten',
+                              value: '${products.length}',
+                              icon: Icons.apps,
+                            ),
+                            MetricCard(
+                              label: 'Interne storykandidaten',
+                              value: _derivedSourceCount([
+                                candidateSource,
+                                iterationSource,
+                              ], linkedStories.length),
+                              icon: Icons.lightbulb_outline,
+                            ),
+                            MetricCard(
+                              label: 'Workspace-publicaties',
+                              value: '${publications.length}',
+                              icon: Icons.folder_open,
+                            ),
+                            MetricCard(
+                              label: 'Shadow-iteraties',
+                              value: _sourceCount(
+                                iterationSource,
+                                scopedIterations.length,
+                              ),
+                              icon: Icons.science_outlined,
+                            ),
+                            MetricCard(
+                              label: 'Software Factory-stories',
+                              value: _derivedSourceCount([
+                                candidateSource,
+                                deliverySource,
+                              ], scopedDeliveries.length),
+                              icon: Icons.precision_manufacturing_outlined,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                      ],
+                      if (activeProduct == null)
+                        const SourceNotice(
+                          key: ValueKey('empty-product-scope'),
+                          icon: Icons.inventory_2_outlined,
+                          text:
+                              'Geen producten beschikbaar. Voeg een product toe om een productscope te openen.',
+                        )
+                      else ...[
+                        ProductScopePicker(
+                          products: products,
+                          value: activeProduct['slug'] as String,
+                          label: 'Actief product',
+                          onChanged: (slug) async {
+                            if (slug == null) return;
+                            final product = products.firstWhere(
+                              (candidate) => candidate['slug'] == slug,
+                            );
+                            final nextIterations = iterationsInProductScope(
+                              iterations,
+                              slug,
+                            );
+                            final nextStories = linkedStoriesInProductScope(
+                              candidates: stories,
+                              iterations: iterations,
+                              productSlug: slug,
+                            );
+                            await _selectProduct(
+                              slug,
+                              announcement:
+                                  'Gekozen product ${_productDisplayName(product)}. '
+                                  '${_sourceCount(iterationSource, nextIterations.length)} '
+                                  'eerdere cycli en '
+                                  '${_derivedSourceCount([candidateSource, iterationSource], nextStories.length)} gekoppelde stories.',
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _productDisplayName(activeProduct),
+                          key: const ValueKey('active-product-name'),
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 16),
+                        DashboardSectionNavigation(
+                          value: dashboardSection,
+                          onChanged: (section) =>
+                              setState(() => dashboardSection = section),
+                        ),
+                        if (overviewProductScopeAnnouncement != null)
+                          ProductScopeStatus(
+                            key: const ValueKey('product-scope-status'),
+                            message: overviewProductScopeAnnouncement!,
+                          ),
+                        if (dashboardSection == DashboardSection.overview) ...[
+                          const SizedBox(height: 24),
+                          ImportantBugSummary(bugs: scopedBugs),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Cyclus starten',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          _startCycleSection(activeProduct),
+                        ],
+                        if (dashboardSection ==
+                            DashboardSection.productSessions) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            'Eerdere cycli',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          if (iterationSource.loading)
+                            const SourceNotice(
+                              icon: Icons.hourglass_top,
+                              text:
+                                  'Cycli voor het actieve product worden geladen.',
+                            )
+                          else if (iterationSource.failed)
+                            const SourceNotice(
+                              icon: Icons.error_outline,
+                              text:
+                                  'Cycli voor het actieve product zijn niet beschikbaar.',
+                              error: true,
+                            )
+                          else if (scopedIterations.isEmpty)
+                            const ListTile(
+                              leading: Icon(Icons.hourglass_empty),
+                              title: Text('Nog geen cycli voor dit product'),
+                            ),
+                          if (iterationSource.loaded)
+                            Semantics(
+                              container: true,
+                              explicitChildNodes: true,
+                              label:
+                                  'Cyclusgeschiedenis voor product ${activeProduct['slug']}',
+                              child: _limitedSection(
+                                'iterations-${activeProduct['slug']}',
+                                scopedIterations,
+                                (iteration) {
+                                  final linked = grouping!.resultsFor(
+                                    iteration,
+                                  );
+                                  final cardKey = ValueKey(
+                                    _iterationCardIdentity(
+                                      scopedIterations,
+                                      iteration,
+                                    ),
+                                  );
+                                  if (shouldShowIterationEvidence(iteration)) {
+                                    return IterationEvidenceRow(
+                                      key: cardKey,
+                                      iteration: iteration,
+                                      environmentIdentity: environmentIdentity,
+                                      deliveries: deliverySource.loaded
+                                          ? linked.deliveries
+                                          : null,
+                                      deliveriesLoading: deliverySource.loading,
+                                      onOpenDetails: () =>
+                                          _showIteration(iteration),
+                                    );
+                                  }
+                                  return IterationProgressCard(
+                                    key: cardKey,
+                                    iteration: iteration,
+                                    onOpenDetails: () =>
+                                        _showIteration(iteration),
+                                  );
+                                },
+                              ),
+                            ),
+                        ],
+                        if (dashboardSection == DashboardSection.stories) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            'Gekoppelde stories',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          if (candidateSource.loading ||
+                              iterationSource.loading)
+                            const SourceNotice(
+                              icon: Icons.hourglass_top,
+                              text: 'Gekoppelde stories worden geladen.',
+                            )
+                          else if (candidateSource.failed ||
+                              iterationSource.failed)
+                            const SourceNotice(
+                              icon: Icons.error_outline,
+                              text: 'Gekoppelde stories zijn niet beschikbaar.',
+                              error: true,
+                            )
+                          else if (linkedStories.isEmpty)
+                            const ListTile(
+                              leading: Icon(Icons.hourglass_empty),
+                              title: Text(
+                                'Nog geen eenduidig gekoppelde stories',
+                              ),
+                            )
+                          else
+                            _limitedSection(
+                              'linked-stories-${activeProduct['slug']}',
+                              linkedStories,
+                              (story) {
+                                final matchingDeliveries = scopedDeliveries
+                                    .where(
+                                      (delivery) =>
+                                          delivery['candidateId'] ==
+                                          story['id'],
+                                    )
+                                    .toList(growable: false);
+                                return LinkedStoryTile(
+                                  story: story,
+                                  onOpenDetails: () =>
+                                      _showStoryCandidateDetails(
+                                        context,
+                                        story,
+                                        matchingDeliveries.length == 1
+                                            ? matchingDeliveries.single
+                                            : null,
+                                      ),
+                                );
+                              },
+                            ),
+                        ],
+                        if (dashboardSection == DashboardSection.overview) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            'Product beheren',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () => _changeStatus(
+                                  activeProduct['slug'] as String,
+                                  activeProduct['status'] == 'active'
+                                      ? 'pause'
+                                      : 'resume',
+                                ),
+                                icon: Icon(
+                                  activeProduct['status'] == 'active'
+                                      ? Icons.pause
+                                      : Icons.play_arrow,
+                                ),
+                                label: Text(
+                                  activeProduct['status'] == 'active'
+                                      ? 'Pauzeren'
+                                      : 'Hervatten',
+                                ),
+                              ),
+                              SettingsButton(
+                                onPressed: () => _editProductSettings(
+                                  activeProduct,
+                                  aiCatalog,
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () => _showMemory(
+                                  activeProduct['slug'] as String,
+                                  _productDisplayName(activeProduct),
+                                ),
+                                icon: const Icon(Icons.history_outlined),
+                                label: const Text('Geheugen'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: activeProduct['status'] == 'active'
+                                    ? () => _startMeeting(
+                                        activeProduct['slug'] as String,
+                                      )
+                                    : null,
+                                icon: const Icon(Icons.forum_outlined),
+                                label: const Text('Start overleg'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: activeProduct['status'] == 'active'
+                                    ? () => _startRoadmapSession(
+                                        activeProduct['slug'] as String,
+                                      )
+                                    : null,
+                                icon: const Icon(Icons.map_outlined),
+                                label: const Text('Start roadmap-sessie nu'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                      if (dashboardSection == DashboardSection.epics) ...[
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Epic-roadmap',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            const Tooltip(
+                              message:
+                                  'De score combineert klant-rank (75%) en process-rank (25%). Dependencies bepalen de uitvoerbare volgorde.',
+                              child: Icon(Icons.info_outline),
+                            ),
+                          ],
+                        ),
+                        if (candidateSource.loaded && deliverySource.loaded)
+                          RoadmapBoard(
+                            products: activeProduct == null
+                                ? const []
+                                : [activeProduct],
+                            epics: scopedRoadmapEpics,
+                            stories: stories,
+                            deliveries: deliveries,
+                            api: api,
+                            onChanged: () => setState(_reload),
+                          )
+                        else
+                          const SourceNotice(
+                            icon: Icons.info_outline,
+                            text:
+                                'Epic-roadmap is onvolledig totdat kandidaten en leveringen beschikbaar zijn.',
+                          ),
+                        if (scopedSettledQuestions.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Afgehandelde onderzoeksvragen',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          _limitedSection(
+                            'roadmapSettledQuestions',
+                            scopedSettledQuestions,
+                            (question) {
+                              return ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.check, size: 18),
+                                title: Text(
+                                  '${question['productSlug']} · ${question['content']}',
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ],
+                      if (dashboardSection == DashboardSection.roadmap) ...[
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Roadmap-sessies',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            FilledButton.icon(
+                              onPressed: activeProduct?['status'] == 'active'
+                                  ? () => _startRoadmapSession(
+                                      activeProduct!['slug'] as String,
+                                    )
+                                  : null,
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('Start roadmap-sessie nu'),
+                            ),
+                          ],
+                        ),
+                        if (scopedRoadmapSessions.isEmpty)
+                          const ListTile(
+                            leading: Icon(Icons.hourglass_empty),
+                            title: Text('Nog geen roadmap-sessies'),
+                          ),
+                        _limitedSection(
+                          'roadmapSessions',
+                          scopedRoadmapSessions,
+                          (session) {
+                            final sessionStatus = '${session['status']}';
+                            final summary = session['summary'] as String?;
+                            final workspaceRunId =
+                                session['workspaceRunId'] as String?;
+                            return Card(
+                              child: ListTile(
+                                leading: const Icon(Icons.map_outlined),
+                                title: Text(
+                                  '${session['productSlug']} · roadmap-sessie ${session['sequenceNumber']}',
+                                ),
+                                subtitle: Text(
+                                  [
+                                    sessionStatus,
+                                    if (summary != null && summary.isNotEmpty)
+                                      summary.length > 150
+                                          ? '${summary.substring(0, 150)}…'
+                                          : summary,
+                                  ].join(' · '),
+                                ),
+                                trailing: workspaceRunId == null
+                                    ? null
+                                    : IconButton(
+                                        tooltip: 'Verslag bekijken',
+                                        icon: const Icon(
+                                          Icons.description_outlined,
+                                        ),
+                                        onPressed: () => _showMeetingMinutes(
+                                          '${session['productSlug']}',
+                                          workspaceRunId,
+                                        ),
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                      if (dashboardSection == DashboardSection.meetings) ...[
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Overleggen',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            FilledButton.icon(
+                              onPressed: activeProduct?['status'] == 'active'
+                                  ? () => _startMeeting(
+                                      activeProduct!['slug'] as String,
+                                    )
+                                  : null,
+                              icon: const Icon(Icons.add_comment_outlined),
+                              label: const Text('Start overleg'),
+                            ),
+                          ],
+                        ),
+                        if (scopedMeetings.isEmpty)
+                          const ListTile(
+                            leading: Icon(Icons.hourglass_empty),
+                            title: Text('Nog geen overleggen'),
+                          ),
+                        _limitedSection('meetings', scopedMeetings, (meeting) {
+                          final meetingStatus = '${meeting['status']}';
+                          final outcome = meeting['outcomeSummary'] as String?;
+                          final workspaceRunId =
+                              meeting['workspaceRunId'] as String?;
+                          return Card(
+                            child: ListTile(
+                              leading: Icon(
+                                meeting['initiator'] == 'product'
+                                    ? Icons.forum
+                                    : Icons.forum_outlined,
+                              ),
+                              title: Text(
+                                '${meeting['productSlug']} · overleg ${meeting['sequenceNumber']}',
+                              ),
+                              subtitle: Text(
+                                [
+                                  meetingStatus,
+                                  '${meeting['initiator']} gestart',
+                                  if (outcome != null && outcome.isNotEmpty)
+                                    outcome.length > 150
+                                        ? '${outcome.substring(0, 150)}…'
+                                        : outcome,
+                                ].join(' · '),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (workspaceRunId != null)
+                                    IconButton(
+                                      tooltip: 'Notulen bekijken',
+                                      icon: const Icon(
+                                        Icons.description_outlined,
+                                      ),
+                                      onPressed: () => _showMeetingMinutes(
+                                        '${meeting['productSlug']}',
+                                        workspaceRunId,
+                                      ),
+                                    ),
+                                  const Icon(Icons.chevron_right),
+                                ],
+                              ),
+                              onTap: () => _openMeeting(
+                                '${meeting['productSlug']}',
+                                '${meeting['id']}',
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                      if (dashboardSection == DashboardSection.bugs) ...[
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Buglijst',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            Text(
+                              '${scopedBugs.where(isActiveBug).length} open',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        BugList(
+                          bugs: scopedBugs,
+                          api: api,
+                          onChanged: () => setState(_reload),
+                        ),
+                      ],
+                      if (dashboardSection ==
+                          DashboardSection.testSessions) ...[
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Testsessies',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            FilledButton.icon(
+                              onPressed: activeProduct?['status'] == 'active'
+                                  ? () => _startTestSession(
+                                      activeProduct!['slug'] as String,
+                                    )
+                                  : null,
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('Start testsessie nu'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        if (activeProduct != null)
+                          Text(
+                            'Planning: ${(activeProduct['testSchedule'] as List<dynamic>? ?? const []).map((entry) => '${entry['dayOfWeek']} ${entry['time']}').join(' · ')}',
+                          ),
+                        const SizedBox(height: 8),
+                        TestSessionList(
+                          sessions: scopedTestSessions,
+                          onOpenReport: _showMeetingMinutes,
+                        ),
+                      ],
+                      if (dashboardSection == DashboardSection.overview &&
+                          scopedHumanActions.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        Text(
+                          'Benodigde access tokens',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        _limitedSection('humanActions', scopedHumanActions, (
+                          action,
+                        ) {
+                          return ListTile(
+                            leading: const Icon(Icons.warning_amber_outlined),
+                            title: Text('${action['title']}'),
+                            subtitle: Text(
+                              '${action['category']} · ${action['reason']}',
+                            ),
+                            trailing: action['status'] == 'OPEN'
+                                ? FilledButton(
+                                    onPressed: () =>
+                                        _completeHumanAction(action),
+                                    child: const Text('Gereed melden'),
+                                  )
+                                : null,
+                          );
+                        }),
+                      ],
+                      if (dashboardSection == DashboardSection.overview) ...[
+                        const SizedBox(height: 24),
+                        Text(
+                          'Workspace',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        _limitedSection('publications', scopedPublications, (
+                          publication,
+                        ) {
+                          final runId = '${publication['runId']}';
+                          final productSlug = '${publication['productSlug']}';
+                          return ListTile(
+                            title: Text('${publication['artifactPath']}'),
+                            subtitle: Text(
+                              '$productSlug · $runId · ${publication['status']}',
+                            ),
+                            leading: const Icon(Icons.description_outlined),
+                            trailing: const Icon(Icons.open_in_new),
+                            onTap: () async {
+                              final content = await api.artifact(
+                                productSlug,
+                                runId,
+                              );
+                              if (context.mounted) {
+                                showDialog<void>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text(
+                                      '${publication['artifactPath']}',
+                                    ),
+                                    content: SizedBox(
+                                      width: 720,
+                                      child: SingleChildScrollView(
+                                        child: SelectableText(content),
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('Sluiten'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                            },
+                          );
+                        }),
+                      ],
+                    ],
+                  );
                 },
               );
-            }),
-              ],
-            );
-          },
-        );
-      },
-    ),
+            },
+          ),
   );
 }
 
@@ -1739,10 +1985,7 @@ class SourceNotice extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          color: error ? kCycleErrorText : kCycleCardSecondaryText,
-        ),
+        Icon(icon, color: error ? kCycleErrorText : kCycleCardSecondaryText),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -1810,8 +2053,7 @@ class IterationEvidenceRow extends StatelessWidget {
                   ? 2
                   : 1;
               final fieldWidth =
-                  (constraints.maxWidth - (columnCount - 1) * 16) /
-                  columnCount;
+                  (constraints.maxWidth - (columnCount - 1) * 16) / columnCount;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1977,9 +2219,9 @@ class EnvironmentIdentityReference extends StatelessWidget {
       excludeSemantics: true,
       child: Text(
         label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: kCycleCardSecondaryText,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: kCycleCardSecondaryText),
       ),
     );
   }
@@ -2336,8 +2578,7 @@ class _IterationCycleCardState extends State<IterationCycleCard> {
                         'Status: $status',
                         if (role != null) 'bezig: ${_roleLabel('$role')}',
                         'gestart ${timing.startLabel}',
-                        if (timing.durationLabel != null)
-                          timing.durationLabel!,
+                        if (timing.durationLabel != null) timing.durationLabel!,
                       ].join(' · '),
                       style: const TextStyle(color: kCycleCardSecondaryText),
                     ),
@@ -4064,6 +4305,10 @@ class _AddProductDialogState extends State<AddProductDialog> {
       (widget.aiCatalog[aiProvider] as List<dynamic>).first as String;
   List<String> iterationTimes = ['03:00'];
   List<Map<String, String>> roadmapSchedule = [];
+  List<Map<String, String>> testSchedule = [
+    {'dayOfWeek': 'TUESDAY', 'time': '10:00'},
+    {'dayOfWeek': 'FRIDAY', 'time': '10:00'},
+  ];
 
   @override
   void dispose() {
@@ -4098,6 +4343,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
       'maxStoriesPerCycle': stories,
       'iterationTimes': iterationTimes,
       'roadmapSchedule': roadmapSchedule,
+      'testSchedule': testSchedule,
     });
   }
 
@@ -4181,6 +4427,15 @@ class _AddProductDialogState extends State<AddProductDialog> {
               schedule: roadmapSchedule,
               onChanged: (value) => setState(() => roadmapSchedule = value),
             ),
+            const SizedBox(height: 16),
+            WeeklyRoadmapScheduleField(
+              schedule: testSchedule,
+              title: 'Testplanning',
+              description:
+                  'Automatische brede regressietests. Standaard twee keer per week.',
+              fieldKey: 'test-weekday',
+              onChanged: (value) => setState(() => testSchedule = value),
+            ),
           ],
         ),
       ),
@@ -4260,10 +4515,7 @@ class StartAvailabilityPanel extends StatelessWidget {
 
 /// Toetsenbordbedienbare opener die na iedere sluitwijze focus terugzet op de detailactie.
 class StartAvailabilityDetailsButton extends StatefulWidget {
-  const StartAvailabilityDetailsButton({
-    required this.availability,
-    super.key,
-  });
+  const StartAvailabilityDetailsButton({required this.availability, super.key});
 
   final StartAvailability availability;
 
@@ -4288,9 +4540,8 @@ class _StartAvailabilityDetailsButtonState
     await showDialog<void>(
       context: context,
       traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
-      builder: (_) => StartAvailabilityDetailsDialog(
-        availability: widget.availability,
-      ),
+      builder: (_) =>
+          StartAvailabilityDetailsDialog(availability: widget.availability),
     );
     if (mounted) _focusNode.requestFocus();
   }
@@ -4307,10 +4558,7 @@ class _StartAvailabilityDetailsButtonState
 /// Lokale detailweergave zonder productrecord, API-client of muterende callback. Daarmee kan deze
 /// dialoog uitsluitend de veilige labels en voorwaarden uit het gedeelde model tonen.
 class StartAvailabilityDetailsDialog extends StatelessWidget {
-  const StartAvailabilityDetailsDialog({
-    required this.availability,
-    super.key,
-  });
+  const StartAvailabilityDetailsDialog({required this.availability, super.key});
 
   final StartAvailability availability;
 
@@ -4364,10 +4612,7 @@ class StartAvailabilityDetailsDialog extends StatelessWidget {
 }
 
 class _StartAvailabilityDetailRow extends StatelessWidget {
-  const _StartAvailabilityDetailRow({
-    required this.label,
-    required this.value,
-  });
+  const _StartAvailabilityDetailRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -4491,6 +4736,14 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
             ),
           )
           .toList();
+  late List<Map<String, String>> testSchedule =
+      ((widget.product['testSchedule'] as List<dynamic>?) ?? const [])
+          .map(
+            (entry) => Map<String, String>.from(
+              Map<String, dynamic>.from(entry as Map),
+            ),
+          )
+          .toList();
 
   @override
   void dispose() {
@@ -4512,6 +4765,7 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
       'aiModel': aiModel,
       'iterationTimes': iterationTimes,
       'roadmapSchedule': roadmapSchedule,
+      'testSchedule': testSchedule,
       'targetRepositoryName': targetRepositoryName.text.trim(),
     });
   }
@@ -4619,6 +4873,15 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
             WeeklyRoadmapScheduleField(
               schedule: roadmapSchedule,
               onChanged: (value) => setState(() => roadmapSchedule = value),
+            ),
+            const SizedBox(height: 16),
+            WeeklyRoadmapScheduleField(
+              schedule: testSchedule,
+              title: 'Testplanning',
+              description:
+                  'Automatische brede regressietests. Zonder momenten start je ze alleen handmatig.',
+              fieldKey: 'test-weekday',
+              onChanged: (value) => setState(() => testSchedule = value),
             ),
           ],
         ),
@@ -4761,11 +5024,18 @@ class WeeklyRoadmapScheduleField extends StatefulWidget {
   const WeeklyRoadmapScheduleField({
     required this.schedule,
     required this.onChanged,
+    this.title = 'Roadmapplanning',
+    this.description =
+        'Automatische roadmap-sessies per week. Zonder momenten start je ze alleen handmatig.',
+    this.fieldKey = 'roadmap-weekday',
     super.key,
   });
 
   final List<Map<String, String>> schedule;
   final ValueChanged<List<Map<String, String>>> onChanged;
+  final String title;
+  final String description;
+  final String fieldKey;
 
   @override
   State<WeeklyRoadmapScheduleField> createState() =>
@@ -4815,11 +5085,9 @@ class _WeeklyRoadmapScheduleFieldState
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text('Roadmapplanning', style: Theme.of(context).textTheme.titleSmall),
+      Text(widget.title, style: Theme.of(context).textTheme.titleSmall),
       const SizedBox(height: 4),
-      const Text(
-        'Automatische roadmap-sessies per week. Zonder momenten start je ze alleen handmatig.',
-      ),
+      Text(widget.description),
       const SizedBox(height: 8),
       Wrap(
         spacing: 8,
@@ -4838,7 +5106,7 @@ class _WeeklyRoadmapScheduleFieldState
           SizedBox(
             width: 210,
             child: DropdownButtonFormField<String>(
-              key: const Key('roadmap-weekday'),
+              key: Key(widget.fieldKey),
               initialValue: selectedDay,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Weekdag'),

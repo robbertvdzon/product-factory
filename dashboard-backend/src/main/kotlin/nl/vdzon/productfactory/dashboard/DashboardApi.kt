@@ -88,6 +88,20 @@ class DashboardApi(private val runtime: ProductFactoryRuntimeClient) {
     @GetMapping("/roadmap/sessions")
     fun roadmapSessions(): Any = runtime.products().flatMap { product -> runtime.roadmapSessions(product["slug"].toString()) }
 
+    @GetMapping("/bugs")
+    fun bugs(): Any = runtime.products().flatMap { product -> runtime.bugs(product["slug"].toString()) }
+
+    @PutMapping("/products/{slug}/bugs/{id}")
+    fun updateBug(@PathVariable slug: String, @PathVariable id: Long, @RequestBody body: Map<String, Any?>): Any =
+        runtime.updateBug(slug, id, body)
+
+    @GetMapping("/test-sessions")
+    fun testSessions(): Any = runtime.products().flatMap { product -> runtime.testSessions(product["slug"].toString()) }
+
+    @PostMapping("/products/{slug}/test-sessions")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun startTestSession(@PathVariable slug: String): Any = runtime.startTestSession(slug)
+
     @PostMapping("/products/{slug}/cycles")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun startCycle(@PathVariable slug: String, @RequestBody(required = false) request: Map<String, String>?): Any =

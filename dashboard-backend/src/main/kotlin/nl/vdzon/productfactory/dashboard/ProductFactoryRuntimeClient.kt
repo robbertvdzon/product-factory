@@ -186,6 +186,23 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/products/{slug}/roadmap/sessions", slug)
         .retrieve().body(Any::class.java)!!
 
+    fun bugs(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/bugs", slug)
+        .retrieve().body(listType).orEmpty()
+
+    fun updateBug(slug: String, id: Long, body: Map<String, Any?>): Any = runtime.put()
+        .uri("/api/products/{slug}/bugs/{id}", slug, id)
+        .body(body)
+        .retrieve().body(Any::class.java)!!
+
+    fun testSessions(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/test-sessions", slug)
+        .retrieve().body(listType).orEmpty()
+
+    fun startTestSession(slug: String): Any = runtime.post()
+        .uri("/api/products/{slug}/test-sessions", slug)
+        .retrieve().body(Any::class.java)!!
+
     fun requireRunnableProduct(slug: String) {
         val product = product(slug)
         if (product["status"] != "active") throw ResponseStatusException(HttpStatus.CONFLICT, "Product is niet actief")

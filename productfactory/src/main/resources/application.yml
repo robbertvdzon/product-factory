@@ -35,3 +35,6 @@ product-factory:
   roadmap:
     enabled: ${PF_ROADMAP_ENABLED:false}
     poll-delay: ${PF_ROADMAP_POLL_DELAY:PT1H}
+  testing:
+    enabled: ${PF_TESTING_ENABLED:true}
+    poll-delay: ${PF_TESTING_POLL_DELAY:PT1H}

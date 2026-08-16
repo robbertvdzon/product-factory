@@ -37,6 +37,10 @@ data class CreateProductRequest(
     val developmentMode: String = "manual",
     val iterationTimes: List<String> = listOf("03:00"),
     val roadmapSchedule: List<WeeklyScheduleView> = emptyList(),
+    val testSchedule: List<WeeklyScheduleView> = listOf(
+        WeeklyScheduleView("TUESDAY", "10:00"),
+        WeeklyScheduleView("FRIDAY", "10:00"),
+    ),
     val timezone: String = "Europe/Amsterdam",
     val maxStoriesPerCycle: Int = 3,
     val wipLimit: Int = 1,
@@ -67,6 +71,7 @@ data class CreateProductRequest(
         developmentMode = developmentMode,
         iterationTimes = iterationTimes,
         roadmapSchedule = roadmapSchedule,
+        testSchedule = testSchedule,
         timezone = timezone,
         maxStoriesPerCycle = maxStoriesPerCycle,
         wipLimit = wipLimit,

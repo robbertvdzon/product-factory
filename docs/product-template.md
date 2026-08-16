@@ -19,6 +19,11 @@ Gebruik het beheerdashboard of stuur onderstaand contract naar `POST /api/produc
   "status": "draft",
   "developmentMode": "manual",
   "iterationTimes": ["03:00"],
+  "roadmapSchedule": [],
+  "testSchedule": [
+    {"dayOfWeek": "TUESDAY", "time": "10:00"},
+    {"dayOfWeek": "FRIDAY", "time": "10:00"}
+  ],
   "timezone": "Europe/Amsterdam",
   "maxStoriesPerCycle": 3,
   "wipLimit": 1,
@@ -44,6 +49,8 @@ Gebruik het beheerdashboard of stuur onderstaand contract naar `POST /api/produc
 - `status: paused` blokkeert nieuwe runs, kennis, kandidaten en publicaties voor alleen dit product.
 - Een externe story kan pas worden gepubliceerd wanneer status `active` én ontwikkelmodus
   `autonomous` zijn.
+- `testSchedule` gebruikt de producttijdzone. Voor nieuwe producten zijn dinsdag en vrijdag om
+  10:00 de standaard; een lege lijst schakelt alleen de automatische testsessies voor dat product uit.
 - Begin met `draft` en `manual`. Zet een product pas na controle op `active` en eventueel
   `autonomous`.
 

@@ -110,6 +110,14 @@ Future<void> _pumpDashboard(WidgetTester tester) async {
   }
 }
 
+Future<void> _openSection(WidgetTester tester, String label) async {
+  final target = find.text(label);
+  await tester.ensureVisible(target);
+  await tester.pump();
+  await tester.tap(target);
+  await tester.pump();
+}
+
 String _metricValue(WidgetTester tester, String label) {
   final card = find.ancestor(
     of: find.text(label),
@@ -130,6 +138,7 @@ void main() {
     (tester) async {
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
+        await _openSection(tester, 'Productsessies');
 
         expect(tester.takeException(), isNull);
         expect(find.text('demo · iteratie 6'), findsNWidgets(2));
@@ -153,6 +162,7 @@ void main() {
     (tester) async {
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
+        await _openSection(tester, 'Productsessies');
 
         expect(
           find.byKey(const ValueKey('unlinked-iteration-results')),
@@ -195,6 +205,7 @@ void main() {
         expect(find.textContaining('Interne kandidaten:'), findsNothing);
         expect(_metricValue(tester, 'Interne storykandidaten'), 'Laden…');
         expect(_metricValue(tester, 'Software Factory-stories'), 'Laden…');
+        await _openSection(tester, 'Productsessies');
         expect(
           find.text('Gekoppelde opbrengst: 0', findRichText: true),
           findsNWidgets(5),
@@ -213,6 +224,7 @@ void main() {
         await tester.pump();
 
         expect(find.textContaining('Interne kandidaten:'), findsNothing);
+        await _openSection(tester, 'Overzicht');
         expect(
           _metricValue(tester, 'Interne storykandidaten'),
           'Niet beschikbaar',
@@ -223,8 +235,9 @@ void main() {
         );
         expect(
           find.text('Gekoppelde opbrengst: 0', findRichText: true),
-          findsNWidgets(5),
+          findsNothing,
         );
+        await _openSection(tester, 'Stories');
         expect(
           find.text('Gekoppelde stories zijn niet beschikbaar.'),
           findsOneWidget,
@@ -248,6 +261,7 @@ void main() {
         await _pumpDashboard(tester);
 
         expect(_metricValue(tester, 'Interne storykandidaten'), 'Laden…');
+        await _openSection(tester, 'Stories');
         expect(
           find.text('Nog geen eenduidig gekoppelde stories'),
           findsNothing,
@@ -259,10 +273,12 @@ void main() {
         await tester.pump();
         await tester.pump();
 
+        await _openSection(tester, 'Overzicht');
         expect(
           _metricValue(tester, 'Interne storykandidaten'),
           'Niet beschikbaar',
         );
+        await _openSection(tester, 'Stories');
         expect(
           find.text('Gekoppelde stories zijn niet beschikbaar.'),
           findsOneWidget,

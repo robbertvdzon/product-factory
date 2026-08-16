@@ -36,6 +36,8 @@ class DashboardApi {
   Future<List<dynamic>> roadmapSettledQuestions() =>
       _list('/api/roadmap/settled-questions');
   Future<List<dynamic>> roadmapSessions() => _list('/api/roadmap/sessions');
+  Future<List<dynamic>> bugs() => _list('/api/bugs');
+  Future<List<dynamic>> testSessions() => _list('/api/test-sessions');
   Future<Map<String, dynamic>> aiCatalog() => _object('/api/ai-catalog');
 
   Future<void> createRoadmapEpic(
@@ -259,6 +261,41 @@ class DashboardApi {
       );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> startTestSession(String slug) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/products/$slug/test-sessions'),
+      headers: headers,
+      body: '{}',
+    );
+    if (response.statusCode != 202) {
+      throw StateError(
+        _errorMessage(response, 'Testsessie kon niet worden gestart'),
+      );
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<void> updateBug(
+    String slug,
+    int id, {
+    String? priority,
+    String? status,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/products/$slug/bugs/$id'),
+      headers: headers,
+      body: jsonEncode({
+        if (priority != null) 'priority': priority,
+        if (status != null) 'status': status,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw StateError(
+        _errorMessage(response, 'Bug kon niet worden bijgewerkt'),
+      );
+    }
   }
 
   Future<void> closeMeeting(String slug, String id) async {

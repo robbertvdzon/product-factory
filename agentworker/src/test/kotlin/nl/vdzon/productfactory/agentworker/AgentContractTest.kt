@@ -126,6 +126,10 @@ class AgentContractTest {
         assertTrue(command.last().contains("Voer geen Git-, GitHub-, OpenShift-, database- of clusterwijzigingen uit"))
     }
 
+    @Test fun `scheduled test session receives browser access`() {
+        assertTrue(requiresBrowserAccess(AgentTask("test-1", "hkh-autopilot", "test-session", "Test alles")))
+    }
+
     @Test fun `codex command passes a structured output schema`() {
         val workspace = Files.createTempDirectory("pf-agent-schema")
         val executor = CodexAgentTaskExecutor(

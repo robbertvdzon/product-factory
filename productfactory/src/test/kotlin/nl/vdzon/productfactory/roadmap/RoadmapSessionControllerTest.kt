@@ -53,6 +53,7 @@ class RoadmapSessionControllerTest(
         jdbc.update("delete from roadmap_session where product_slug = ?", slug)
         jdbc.update("delete from roadmap_theme where product_slug = ?", slug)
         jdbc.update("delete from roadmap_settled_question where product_slug = ?", slug)
+        jdbc.update("delete from product_bug where product_slug = ?", slug)
         jdbc.update("delete from agent_run where product_slug = ?", slug)
     }
 
@@ -75,6 +76,12 @@ class RoadmapSessionControllerTest(
             status { isOk() }
             jsonPath("$.length()") { value(1) }
             jsonPath("$[0].title") { value("UX verbeteren") }
+        }
+        mvc.get("/api/products/$slug/bugs").andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+            jsonPath("$[0].priority") { value("P1") }
+            jsonPath("$[0].sourceType") { value("ROADMAP_SESSION") }
         }
     }
 
@@ -106,7 +113,7 @@ class RoadmapSessionControllerTest(
         @Primary
         fun fakeAgentDispatch(): AgentDispatchPort = AgentDispatchPort { task ->
             val summary = when (task.taskType) {
-                "roadmap-session" -> """{"summary":"Nepsamenvatting van de roadmap-sessie.","epicUpdates":[{"action":"CREATE","epicId":null,"title":"UX verbeteren","description":"Navigatie begrijpelijker maken voor nieuwe bezoekers.","processRank":1,"dependencyIds":[]}],"settledQuestions":["Archief X is publiek benaderbaar zonder token"]}"""
+                "roadmap-session" -> """{"summary":"Nepsamenvatting van de roadmap-sessie.","epicUpdates":[{"action":"CREATE","epicId":null,"title":"UX verbeteren","description":"Navigatie begrijpelijker maken voor nieuwe bezoekers.","processRank":1,"dependencyIds":[]}],"settledQuestions":["Archief X is publiek benaderbaar zonder token"],"bugUpdates":[{"action":"CREATE","bugId":null,"title":"Navigatie opent niet","description":"De primaire navigatie reageert niet op activering.","reproductionSteps":"Open het menu en activeer de eerste link","expectedResult":"De doelpagina wordt geopend","actualResult":"De huidige pagina blijft zichtbaar","priority":"P1"}]}"""
                 else -> """{"summary":"onbekend"}"""
             }
             AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)

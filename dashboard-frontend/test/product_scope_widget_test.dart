@@ -136,6 +136,14 @@ Future<void> _chooseScope(WidgetTester tester, String label) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+Future<void> _openSection(WidgetTester tester, String label) async {
+  final target = find.text(label);
+  await tester.ensureVisible(target);
+  await tester.pump();
+  await tester.tap(target);
+  await tester.pump();
+}
+
 bool _containsFocus(WidgetTester tester, Finder finder) {
   final context = tester.binding.focusManager.primaryFocus?.context;
   if (context is! Element) return false;
@@ -164,8 +172,10 @@ void main() {
             .data,
         'Beta product',
       );
+      await _openSection(tester, 'Productsessies');
       expect(find.text('Beta · iteratie 2'), findsOneWidget);
       expect(find.text('Alpha · iteratie 1'), findsNothing);
+      await _openSection(tester, 'Stories');
       expect(find.text('Beta gekoppeld'), findsOneWidget);
       expect(find.text('Alpha gekoppeld'), findsNothing);
     },
@@ -238,12 +248,14 @@ void main() {
         }),
         originalJson,
       );
+      expect(_containsFocus(tester, find.byType(ProductScopePicker)), isTrue);
+      await _openSection(tester, 'Productsessies');
       expect(find.text('Beta · iteratie 2'), findsOneWidget);
       expect(find.text('Alpha · iteratie 1'), findsNothing);
+      await _openSection(tester, 'Stories');
       expect(find.text('Beta gekoppeld'), findsOneWidget);
       expect(find.text('Alpha ambigu'), findsNothing);
       expect(find.text('Alpha zonder cyclus'), findsNothing);
-      expect(_containsFocus(tester, find.byType(ProductScopePicker)), isTrue);
       final status = tester.widget<ProductScopeStatus>(
         find.byType(ProductScopeStatus),
       );
@@ -284,11 +296,11 @@ void main() {
           .getTopLeft(find.byKey(const ValueKey('active-product-name')))
           .dy;
       final startY = tester.getTopLeft(find.text('Cyclus starten')).dy;
-      final cyclesY = tester.getTopLeft(find.text('Eerdere cycli')).dy;
-      final storiesY = tester.getTopLeft(find.text('Gekoppelde stories')).dy;
       expect(activeY, lessThan(startY));
-      expect(startY, lessThan(cyclesY));
-      expect(cyclesY, lessThan(storiesY));
+      await _openSection(tester, 'Productsessies');
+      expect(find.text('Eerdere cycli'), findsOneWidget);
+      await _openSection(tester, 'Stories');
+      expect(find.text('Gekoppelde stories'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.tap(find.text('Alpha gekoppeld'));
@@ -305,13 +317,17 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await _pumpDashboard(tester, _client(_Fixture(), <String>[]));
 
-    final positions = [
-      tester.getTopLeft(find.byKey(const ValueKey('active-product-name'))).dy,
-      tester.getTopLeft(find.text('Cyclus starten')).dy,
-      tester.getTopLeft(find.text('Eerdere cycli')).dy,
-      tester.getTopLeft(find.text('Gekoppelde stories')).dy,
-    ];
-    expect(positions, orderedEquals(List<double>.of(positions)..sort()));
+    final activeY = tester
+        .getTopLeft(find.byKey(const ValueKey('active-product-name')))
+        .dy;
+    expect(
+      activeY,
+      lessThan(tester.getTopLeft(find.text('Cyclus starten')).dy),
+    );
+    await _openSection(tester, 'Productsessies');
+    expect(find.text('Eerdere cycli'), findsOneWidget);
+    await _openSection(tester, 'Stories');
+    expect(find.text('Gekoppelde stories'), findsOneWidget);
   });
 
   testWidgets(

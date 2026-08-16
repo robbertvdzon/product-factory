@@ -102,6 +102,22 @@
   `customerRank`, `processRank`, `priorityScore`, `roadmapRank`, `dependencyIds`, `blockedByIds`
   en `blocksIds`.
 
+## Bugs, buggestuurde iteraties en testsessies
+
+- Flyway-migratie `V25__bugs_and_test_sessions.sql` introduceert `product_bug`, `test_session` en
+  `product_test_schedule`, plus de optionele `story_candidate.bug_id`-relatie. Bugstatussen zijn
+  `OPEN`, `IN_PROGRESS`, `READY_FOR_VERIFICATION`, `RESOLVED` en `OBSOLETE`; prioriteiten zijn P0-P3.
+- De runtime ontsluit bugs via `GET/PUT /api/products/{slug}/bugs[/id]` en testsessies via
+  `GET/POST /api/products/{slug}/test-sessions`. De dashboardbackend aggregeert de leesroutes per
+  product en proxyt mutaties en handmatige starts.
+- `RoadmapSessionEngine` levert gestructureerde `bugUpdates`. `ShadowIterationEngine` valideert
+  server-side dat P0/P1-bugs featurewerk blokkeren en dat een batch van drie stories, indien mogelijk,
+  P2/P3-onderhoud bevat. Het veld `bugId` blijft van agentuitvoer tot storykandidaat en levering intact.
+- `TestSessionCoordinator` vergelijkt ieder uur de wekelijkse slots in de producttijdzone en start
+  maximaal één actieve testsessie per product. `TestSessionEngine` gebruikt het browsertakenprofiel,
+  verwerkt gestructureerde CREATE/UPDATE/RESOLVE/OBSOLETE-mutaties en publiceert het testrapport onder
+  `product-memory/test-session-NNNN.md`.
+
 ## Versiebeheerd productgeheugen
 
 - `product_memory` is append-only: een vervanging is een nieuwe rij met `supersedes_id`; een
@@ -129,6 +145,7 @@
   de pure, productslug-onafhankelijke selector en veilige presentatie-opbouw voor terminale,
   actieve en onbekende cycli van ieder product;
   `product_scope.dart` — canonieke productselectie, scopefilters en browservoorkeur;
+  `bugs.dart` — productsectienavigatie, bugprioriteit/status en testsessiehistorie;
   `start_availability.dart` — het pure, gedeelde presentatiemodel voor de handmatige
   startbeschikbaarheid;
   `classification.dart` — de bestaande pure

@@ -87,6 +87,7 @@ data class ProductView(
     val developmentMode: String,
     val iterationTimes: List<String>,
     val roadmapSchedule: List<WeeklyScheduleView>,
+    val testSchedule: List<WeeklyScheduleView>,
     val timezone: String,
     val maxStoriesPerCycle: Int,
     val wipLimit: Int,
@@ -116,6 +117,7 @@ data class StoryCandidateView(
     val blocked: Boolean = false,
     val blockedReason: String? = null,
     val themeId: String? = null,
+    val bugId: Long? = null,
 )
 data class ProductRecordView(
     val id: Long,
@@ -287,4 +289,43 @@ data class DeliveryVerificationView(
     val report: String?,
     val createdAt: Instant,
     val completedAt: Instant?,
+)
+
+data class BugView(
+    val id: Long,
+    val productSlug: String,
+    val title: String,
+    val description: String,
+    val reproductionSteps: String,
+    val expectedResult: String,
+    val actualResult: String,
+    val priority: String,
+    val status: String,
+    val sourceType: String,
+    val sourceId: String?,
+    val occurrenceCount: Int,
+    val linkedCandidateId: Long?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+    val lastVerifiedAt: Instant?,
+    val resolvedAt: Instant?,
+)
+
+data class TestSessionView(
+    val id: String,
+    val productSlug: String,
+    val sequenceNumber: Int,
+    val status: String,
+    val summary: String?,
+    val errorMessage: String?,
+    val testedAreas: Int,
+    val bugsCreated: Int,
+    val bugsUpdated: Int,
+    val bugsResolved: Int,
+    val createdAt: Instant,
+    val startedAt: Instant?,
+    val completedAt: Instant?,
+    val workspaceRunId: String? = null,
+    val workspacePullRequestUrl: String? = null,
+    val workspaceCommitSha: String? = null,
 )

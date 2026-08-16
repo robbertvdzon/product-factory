@@ -155,6 +155,8 @@ void main() {
         for (var pump = 0; pump < 5; pump++) {
           await tester.pump();
         }
+        await tester.tap(find.text('Productsessies'));
+        await tester.pump();
 
         final terminalRows = find.byType(IterationEvidenceRow);
         expect(terminalRows, findsNWidgets(5));

@@ -171,6 +171,14 @@ Future<void> _pumpDashboard(WidgetTester tester) async {
   }
 }
 
+Future<void> _openProductSessions(WidgetTester tester) async {
+  final target = find.text('Productsessies');
+  await tester.ensureVisible(target);
+  await tester.pump();
+  await tester.tap(target);
+  await tester.pump();
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -180,6 +188,7 @@ void main() {
       final calls = <_RequestCall>[];
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
+        await _openProductSessions(tester);
         final browserUrlBeforeDetails = Uri.base.toString();
         final callsAfterRender = List<_RequestCall>.of(calls);
         final semantics = tester.ensureSemantics();
@@ -302,6 +311,7 @@ void main() {
       final calls = <_RequestCall>[];
       await http.runWithClient(() async {
         await _pumpDashboard(tester);
+        await _openProductSessions(tester);
 
         expect(find.byType(IterationEvidenceRow), findsOneWidget);
         expect(find.byType(IterationProgressCard), findsOneWidget);
@@ -332,6 +342,7 @@ void main() {
     final calls = <_RequestCall>[];
     await http.runWithClient(() async {
       await _pumpDashboard(tester);
+      await _openProductSessions(tester);
 
       expect(find.byType(IterationEvidenceRow), findsNWidgets(2));
       expect(

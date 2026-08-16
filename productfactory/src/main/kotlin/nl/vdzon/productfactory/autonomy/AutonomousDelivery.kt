@@ -190,6 +190,12 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
         } catch (_: DuplicateKeyException) {
             return null
         }
+        jdbc.update(
+            """update product_bug set status = 'IN_PROGRESS', updated_at = current_timestamp
+                where id = (select bug_id from story_candidate where id = ?)
+                  and product_slug = ? and status = 'OPEN'""".trimIndent(),
+            candidate.candidateId, candidate.productSlug,
+        )
         return byCandidate(candidate.candidateId)
     }
 
@@ -219,6 +225,14 @@ class AutonomousDeliveryRepository(private val jdbc: JdbcTemplate) {
                 where id = ?""".trimIndent(),
             status, phase, complete, confirmedDeployed, deployedAt?.let(::databaseTimestamp), id,
         )
+        if (complete && confirmedDeployed) {
+            jdbc.update(
+                """update product_bug set status = 'READY_FOR_VERIFICATION', updated_at = current_timestamp
+                    where id = (select c.bug_id from story_delivery d join story_candidate c on c.id = d.candidate_id where d.id = ?)
+                      and status = 'IN_PROGRESS'""".trimIndent(),
+                id,
+            )
+        }
     }
 
     fun active(productSlug: String): List<StoryDeliveryView> = list(productSlug).filter { it.status in ACTIVE_STATUSES }

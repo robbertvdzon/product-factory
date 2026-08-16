@@ -40,6 +40,7 @@ data class ProductConfiguration(
     val developmentMode: String,
     val iterationTimes: List<String>,
     val roadmapSchedule: List<WeeklyScheduleView>,
+    val testSchedule: List<WeeklyScheduleView>,
     val timezone: String,
     val maxStoriesPerCycle: Int,
     val wipLimit: Int,
@@ -57,6 +58,7 @@ data class UpdateProductSettingsRequest(
     val developmentMode: String? = null,
     val iterationTimes: List<String>? = null,
     val roadmapSchedule: List<WeeklyScheduleView>? = null,
+    val testSchedule: List<WeeklyScheduleView>? = null,
     val maxStoriesPerCycle: Int? = null,
     val wipLimit: Int? = null,
     val aiProvider: String? = null,
@@ -155,6 +157,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         }
         replaceIterationTimes(product.slug, product.iterationTimes)
         replaceRoadmapSchedule(product.slug, product.roadmapSchedule)
+        replaceTestSchedule(product.slug, product.testSchedule)
         return requireProduct(product.slug)
     }
 
@@ -169,6 +172,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         val aiModel = (request.aiModel ?: current.aiModel).trim()
         val iterationTimes = request.iterationTimes ?: current.iterationTimes
         val roadmapSchedule = request.roadmapSchedule ?: current.roadmapSchedule
+        val testSchedule = request.testSchedule ?: current.testSchedule
         val targetRepositoryName = (request.targetRepositoryName ?: current.targetRepositoryName).trim()
         val acceptanceUrl = request.acceptanceUrl?.trim()?.ifBlank { null } ?: current.acceptanceUrl
 
@@ -179,6 +183,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         require(iterationTimes.isNotEmpty()) { "Minimaal één cyclustijd is verplicht" }
         iterationTimes.forEach { require(it.matches(TIME_OF_DAY)) { "Ongeldige cyclustijd '$it', gebruik HH:mm" } }
         validateRoadmapSchedule(roadmapSchedule)
+        validateWeeklySchedule(testSchedule, "test")
         require(targetRepositoryName.matches(REPOSITORY)) { "Ongeldige repositorynaam" }
         validateUrl(acceptanceUrl)
 
@@ -190,6 +195,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         )
         replaceIterationTimes(normalized, iterationTimes)
         replaceRoadmapSchedule(normalized, roadmapSchedule)
+        replaceTestSchedule(normalized, testSchedule)
         return requireProduct(normalized)
     }
 
@@ -228,6 +234,18 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         schedule.distinct().forEach {
             jdbc.update(
                 "insert into product_roadmap_schedule(product_slug, day_of_week, time_of_day) values (?, ?, ?)",
+                slug,
+                it.dayOfWeek,
+                java.sql.Time.valueOf("${it.time}:00"),
+            )
+        }
+    }
+
+    private fun replaceTestSchedule(slug: String, schedule: List<WeeklyScheduleView>) {
+        jdbc.update("delete from product_test_schedule where product_slug = ?", slug)
+        schedule.distinct().forEach {
+            jdbc.update(
+                "insert into product_test_schedule(product_slug, day_of_week, time_of_day) values (?, ?, ?)",
                 slug,
                 it.dayOfWeek,
                 java.sql.Time.valueOf("${it.time}:00"),
@@ -523,6 +541,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         require(candidate.iterationTimes.isNotEmpty()) { "Minimaal één cyclustijd is verplicht" }
         candidate.iterationTimes.forEach { require(it.matches(TIME_OF_DAY)) { "Ongeldige cyclustijd '$it', gebruik HH:mm" } }
         validateRoadmapSchedule(candidate.roadmapSchedule)
+        validateWeeklySchedule(candidate.testSchedule, "test")
         require(AiCatalog.isValid(candidate.aiProvider, candidate.aiModel)) {
             "Onbekende combinatie van AI-provider '${candidate.aiProvider}' en model '${candidate.aiModel}'"
         }
@@ -564,9 +583,20 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
                     },
                     product.slug,
                 ),
+                testSchedule = weeklySchedule(product.slug, "product_test_schedule"),
             )
         }
     }
+
+    private fun weeklySchedule(productSlug: String, table: String): List<WeeklyScheduleView> = jdbc.query(
+        """select day_of_week, time_of_day from $table where product_slug = ?
+            order by case day_of_week
+                when 'MONDAY' then 1 when 'TUESDAY' then 2 when 'WEDNESDAY' then 3
+                when 'THURSDAY' then 4 when 'FRIDAY' then 5 when 'SATURDAY' then 6 else 7 end,
+                time_of_day""".trimIndent(),
+        { row, _ -> WeeklyScheduleView(row.getString("day_of_week"), row.getTime("time_of_day").toLocalTime().toString().take(5)) },
+        productSlug,
+    )
 
     private fun mapProduct(row: ResultSet): ProductView = ProductView(
         id = row.getString("id"),
@@ -588,6 +618,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         developmentMode = row.getString("development_mode"),
         iterationTimes = emptyList(),
         roadmapSchedule = emptyList(),
+        testSchedule = emptyList(),
         timezone = row.getString("timezone"),
         maxStoriesPerCycle = row.getInt("max_stories_per_cycle"),
         wipLimit = row.getInt("wip_limit"),
@@ -658,11 +689,15 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     }
 
     private fun validateRoadmapSchedule(schedule: List<WeeklyScheduleView>) {
+        validateWeeklySchedule(schedule, "roadmap")
+    }
+
+    private fun validateWeeklySchedule(schedule: List<WeeklyScheduleView>, label: String) {
         schedule.forEach {
-            require(it.dayOfWeek in DAYS_OF_WEEK) { "Ongeldige roadmap-weekdag '${it.dayOfWeek}'" }
-            require(it.time.matches(TIME_OF_DAY)) { "Ongeldige roadmap-tijd '${it.time}', gebruik HH:mm" }
+            require(it.dayOfWeek in DAYS_OF_WEEK) { "Ongeldige $label-weekdag '${it.dayOfWeek}'" }
+            require(it.time.matches(TIME_OF_DAY)) { "Ongeldige $label-tijd '${it.time}', gebruik HH:mm" }
         }
-        require(schedule.distinct().size == schedule.size) { "Dubbele roadmap-planning is niet toegestaan" }
+        require(schedule.distinct().size == schedule.size) { "Dubbele $label-planning is niet toegestaan" }
     }
 
     companion object {
