@@ -879,6 +879,7 @@ void main() {
         find.byType(StartCycleButton),
         find.widgetWithText(OutlinedButton, 'Pauzeren'),
         find.byType(SettingsButton),
+        find.widgetWithText(OutlinedButton, 'Geheugen'),
         find.widgetWithText(OutlinedButton, 'Start overleg'),
         find.widgetWithText(OutlinedButton, 'Start roadmap-sessie nu'),
       ];
@@ -888,7 +889,7 @@ void main() {
         expect(
           _containsPrimaryFocus(tester, target),
           isTrue,
-          reason: 'Onverwachte Tab-stop in de hoofdschermvolgorde.',
+          reason: 'Onverwachte Tab-stop in de hoofdschermvolgorde bij $target.',
         );
       }
 
