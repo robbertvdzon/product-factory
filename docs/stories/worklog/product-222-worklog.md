@@ -261,3 +261,35 @@ Vervolgreview na nieuwe main-integratie 2026-08-16:
   `c1f1f07dbe3604667a5ef9816a39b6138d7b8d0b` was vóór deze toegestane worklognotitie exact gelijk
   aan `HEAD^{tree}`. Maven, Flutter analyze/tests en beide toepasselijke frontend-imagebuilds zijn
   groen; de Engine-runner-test is terecht niet geselecteerd omdat zijn paden niet wijzigden.
+
+Herstelrun na browser-DOM-bevinding 2026-08-16:
+- [x] lees taakcontext, factorydocumentatie, agent-tips, testerbewijs en bestaande implementatie
+- [x] maak het echte Flutter-Web `alertdialog` programmatisch benoemd
+- [x] voeg een browser-DOM-regressietest toe en houd de widgetdekking groen
+- [x] draai gerichte tests en het volledige agent-runnable factory-vangnet
+- [x] controleer de uiteindelijke diff en leg de resultaten vast
+
+Aanleiding:
+- De actuele hertest bewijst dat `AlertDialog.semanticLabel` in Flutter 3.44 CanvasKit alleen op een
+  kindnode belandt. De productie-DOM moet daarom aanvullend het element met `role="alertdialog"`
+  zelf een naam geven; een widgetassertie op `semanticLabel` alleen is onvoldoende.
+
+Resultaat browser-DOM-herstel:
+- De handmatige-startdialoog gebruikt nu één expliciete semantieknode die tegelijk
+  `SemanticsRole.alertDialog`, route-scope, routenaam en `Productcyclus starten` draagt. De visuele
+  Material-`Dialog` eronder heeft bewust geen tweede semantische rol, zodat Flutter Web exact één
+  `alertdialog` met het `aria-label` op diezelfde DOM-node bouwt.
+- De widgettest bewijst dat rol, scope, routenaam en label op één node samenkomen. Een nieuwe kleine
+  webharness bouwt daarnaast echte CanvasKit-output; de Playwright-test activeert websemantiek en
+  vindt de dialoog via een exacte rol-en-naamquery. Dit nieuwe commando staat ook in de versioned
+  verificatieconfiguratie en factorydocumentatie.
+- De laatste merge met main introduceerde tevens een tweede Flyway V26. Mains
+  `V26__roadmap_future_vision.sql` blijft staan en de ongewijzigde storymigratie is conform de
+  factoryregel verplaatst naar `V27__manual_cycle_start_origin.sql`. Een schone migratierun heeft
+  alle 27 migraties in volgorde toegepast.
+- Volledig vangnet groen: Maven `clean verify` met 192 tests en 0 failures/errors/skips; `flutter
+  analyze` met 0 issues; `flutter test` met 441 tests; de browser-DOM-test groen; Docker
+  Engine-runner met 3 tests; beide frontend-imagebuilds met 19/19 succesvolle stappen.
+- `agent-image-build` blijft volgens `.factory/verification.yaml` niet agent-runnable en wordt door
+  CI uitgevoerd. Eindcontrole op conflictmarkers, whitespace en onverwachte lockfilewijzigingen is
+  schoon.

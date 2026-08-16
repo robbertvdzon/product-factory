@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsRole;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -80,10 +81,13 @@ void main() {
       await _open(tester, _harness(onStart: (_) async {}));
 
       expect(find.byType(ManualCycleStartDialog), findsOneWidget);
-      expect(
-        tester.widget<AlertDialog>(find.byType(AlertDialog)).semanticLabel,
-        'Productcyclus starten',
-      );
+      final dialogSemantics = tester
+          .getSemantics(find.byKey(const ValueKey('manual-start-alertdialog')))
+          .getSemanticsData();
+      expect(dialogSemantics.role, SemanticsRole.alertDialog);
+      expect(dialogSemantics.flagsCollection.scopesRoute, isTrue);
+      expect(dialogSemantics.flagsCollection.namesRoute, isTrue);
+      expect(dialogSemantics.label, 'Productcyclus starten');
       expect(find.text('Actief product: actief-product'), findsNWidgets(2));
       expect(find.textContaining(autonomousDefaultFocus), findsOneWidget);
       expect(find.text('Herkomst: Autonome standaard'), findsOneWidget);
