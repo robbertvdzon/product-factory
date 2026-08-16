@@ -344,3 +344,22 @@ Resultaat:
 - Eindcontrole: geen conflictmarkers of whitespacefouten, geen wijziging in `pubspec.lock` of
   `.factory/verification.yaml`, en uitsluitend deze routecontracttest plus het worklog staan
   uncommitted klaar voor de factory.
+
+Vervolgreview na previewroute-afwijzing 2026-08-16:
+- De volledige story-diff `git diff main...HEAD` is opnieuw beoordeeld. Sinds de laatste
+  reviewgoedkeuring is uitsluitend een dashboardbackend-regressietest plus worklogbewijs toegevoegd;
+  productiecode en deploymentconfiguratie zijn niet gewijzigd.
+- Alle eerdere bevindingen blijven opgelost: Kotlin en Dart delen de expliciete Unicode-trimset, de
+  backendprivacytest dekt response/logging/telemetrie, de concurrencytest telt exact één cyclus en
+  startevent, en de echte Flutter-Web-DOM-test bewijst één benoemde `alertdialog`.
+- De nieuwe `DashboardApiOverviewRoutesTest` bouwt de echte MVC-controller op, controleert HTTP 200
+  en de verwachte response voor `/api/bugs`, `/api/test-sessions` en `/api/roadmap/visions`, en
+  verifieert dat alle drie via de bekende productslug naar de runtimeclient worden doorgestuurd.
+  Gerichte reviewrun: 1 test, 0 failures/errors/skips, `BUILD SUCCESS`.
+- De PR-imageworkflow bouwt dashboardfrontend en dashboardbackend voor dezelfde head-SHA; in de
+  aanwezige previewmanifesten is geen routerings- of image-selectieregressie gevonden die deze drie
+  routes structureel kan uitsluiten. De eerdere preview-404 past daarom niet bij de actuele
+  bron-/routecontracten en vereist geen speculatieve productiecodefallback.
+- Het nieuwste factorybewijs is volledig groen voor alle agent-runnable controles. De geteste tree
+  `c6329a90cd847aa027f3b1dbdc7e05308606f244` is exact gelijk aan `HEAD^{tree}`; `git diff --check`
+  voor zowel de volledige story als de laatste wijziging is schoon.
