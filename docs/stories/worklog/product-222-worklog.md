@@ -1,5 +1,25 @@
 # product-222 - Worklog
 
+Vervolgreview Flyway-herstel 2026-08-16:
+- De volledige story-diff `git diff main...HEAD` en de wijziging sinds het vorige reviewakkoord zijn
+  beoordeeld. De eerdere trim-, privacy-, concurrency- en Flutter-Web-dialoogbevindingen blijven
+  opgelost; het nieuwste factorybewijs is voor alle zeven toepasselijke controles groen en tested
+  tree `8d96d3f883bd6e2d9588a897063cf4fb7ae5eb85` is exact gelijk aan `HEAD^{tree}`.
+- Gerichte reviewrun `PreviewFlywayRecoveryTest`: 3/3 groen, zonder failures, errors of skips.
+  `git diff --check` is schoon voor zowel de volledige story-diff als de laatste fixdiff.
+- [blocker] Het nieuwe destructieve herstel is niet gekoppeld aan de database die door
+  `PreviewRuntimeConfig` is gevalideerd. Die configuratie controleert alleen de losse property
+  `PF_DB_URL`, terwijl `PreviewFlywayMigrationStrategy` `clean()` uitvoert op de datasource uit de
+  aangeleverde `Flyway.configuration`. Die daadwerkelijke datasource kan via de standaard
+  Spring-datasource-/Flyway-properties afwijken. De nieuwe test demonstreert de ontkoppeling zelfs:
+  `prPreviewConfig()` valideert een PostgreSQL-URL naar host `postgres`, maar de strategie schoont
+  succesvol een onafhankelijk aangeleverde H2-database. Met geldige previewmarker en PR-nummer kan
+  een foutieve datasource-override daardoor bij een validatiefout een niet-wegwerpdatabase wissen,
+  in strijd met de gedocumenteerde fail-closed-grens. Controleer vóór `clean()` de daadwerkelijke
+  Flyway-connectie en schemas tegen dezelfde strikte preview-allowlist (of maak één niet te
+  omzeilen gevalideerde datasourcebron) en voeg een regressietest toe die bij een afwijkende
+  daadwerkelijke datasource de validatiefout doorgeeft en de data behoudt.
+
 Herstelrun na Flyway-checksummismatch 2026-08-16:
 - [x] lees taakcontext, factorydocumentatie, agent-tips en bestaand testerbewijs
 - [x] herleid de botsende migratiegeschiedenis van PR-preview en main
