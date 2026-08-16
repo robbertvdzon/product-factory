@@ -105,3 +105,27 @@ Resultaat: test afgekeurd door niet-werkende onbehandelde preview.
   `/work/screenshots/product-223-preview-unintercepted-head-22a34d8.png`.
 - Het volledige vangnet is conform tester-instructie niet handmatig gedupliceerd; de
   revisiongebonden harness draait na deze tester-run onafhankelijk.
+
+## Hertest na dashboardroute-regressietest
+
+Testdatum: 2026-08-16
+
+Resultaat: test afgekeurd; de HEAD-preview is niet operationeel.
+
+- Branch-HEAD en frontendbronrevisie zijn beide
+  `a3fb43d7f67378e92e60dbb494ed7d58cd1a48cb`.
+- De nieuwe dashboard-backend- en frontendpods zijn gereed, maar de nieuwe runtimepod voor
+  dezelfde HEAD staat in `CrashLoopBackOff`; de service houdt daardoor de oude runtimepod op
+  revisie `e177301361d6db0583310980bc2c4624e38473e1` actief.
+- De HEAD-runtime stopt tijdens startup omdat Flyway voor migratie V25 een checksum mismatch
+  vindt: toegepast `-1067664231`, lokaal opgelost `-48740917`.
+- In de onbehandelde preview geven `GET /api/bugs`, `GET /api/test-sessions` en
+  `GET /api/roadmap/visions` nog steeds HTTP 404. De browser toont uitsluitend
+  `Dashboard kon niet laden: Bad state: Dashboard API gaf 404.`
+- Verwacht: de HEAD-runtime migreert/start succesvol, alle vereiste overzichtsrequests geven 200
+  en de echte handmatige start-, refresh- en detailflow is uitvoerbaar tegen dezelfde revision.
+- Omdat de nieuwe runtime niet beschikbaar komt, is geen startverzoek verstuurd en is geen
+  testdata aangemaakt.
+- Screenshot: `/work/screenshots/product-223-unintercepted-head-a3fb43d-current.png`.
+- Het volledige vangnet is conform tester-instructie niet handmatig gedupliceerd; de
+  revisiongebonden harness draait na deze tester-run onafhankelijk.
