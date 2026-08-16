@@ -191,3 +191,20 @@ Resultaat herontwikkelrun na merge:
 - `agent-image-build` is volgens `.factory/verification.yaml` niet agent-runnable en wordt door CI
   uitgevoerd. Er waren geen inhoudelijke codewijzigingen nodig na de merge; alleen dit worklog is
   voor de actuele ontwikkelrun aangevuld.
+
+Vervolgreview na merge met main 2026-08-16:
+- De volledige story-diff `main...HEAD` is beoordeeld. Sinds de vorige reviewgoedkeuring veranderde
+  de story-implementatie niet; de merge bracht alleen de afzonderlijke productcatalogusfix en
+  deploymentpin van `main` binnen en introduceert geen regressie in de handmatige startflow.
+- De drie oorspronkelijke bevindingen blijven opgelost: client en server delen dezelfde expliciete
+  Unicode-trimset, de backendprivacytest controleert response/logging/telemetrie, en de
+  concurrencytest bewijst exact één cyclusrij en één `ShadowIterationStarted`-event.
+- De latere testerbevinding blijft opgelost: `AlertDialog.semanticLabel` benoemt de dialoog als
+  `Productcyclus starten`; de zichtbare titel, gesloten focuslus, Escape en focusretour blijven
+  intact en worden gericht getest.
+- Gerichte verificatie is groen: backend 8/8 zonder failures, errors of skips en Flutter 7/7.
+  `git diff --check main...HEAD` en de conflictmarkercontrole zijn schoon.
+- Het nieuwste factorybewijs is volledig groen voor alle toepasselijke commando's en geldig voor de
+  developer-tree: `59ce6c49c912fc35a669d17105345211933754bd` kwam vóór deze toegestane
+  worklognotitie exact overeen met `HEAD^{tree}`. De Engine-runner-test is terecht niet geselecteerd
+  omdat de bijbehorende runner- en configuratiepaden niet veranderden.
