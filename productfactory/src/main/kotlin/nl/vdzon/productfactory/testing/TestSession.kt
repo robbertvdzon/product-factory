@@ -197,6 +197,12 @@ class TestSessionEngine(
             error("Testsessie mislukte: ${result.summary.take(1000)}")
         }
         val output = mapper.readTree(result.summary)
+        val summary = output.path("summary").asText().trim()
+        val testedAreas = output.path("testedAreas")
+        if (!hasExecutedBrowserChecks(testedAreas)) {
+            agentRuns.complete(product.slug, runId, "FAILED", null)
+            error("Testsessie geblokkeerd zonder uitgevoerde browsercontrole: $summary")
+        }
         var created = 0
         var updated = 0
         var resolved = 0
@@ -212,12 +218,11 @@ class TestSessionEngine(
             }
         }
         agentRuns.complete(product.slug, runId, "COMPLETED", "test-session:${session.id}")
-        val summary = output.path("summary").asText().trim()
-        val areas = output.path("testedAreas").size()
+        val areas = testedAreas.size()
         val publication = runCatching {
             workspace.publish(WorkspaceArtifact(
                 runId, product.slug, "product-memory/test-session-${session.sequenceNumber.toString().padStart(4, '0')}.md",
-                renderReport(session, summary, output.path("testedAreas"), product),
+                renderReport(session, summary, testedAreas, product),
             ))
         }.onFailure { logger.warn("Testrapport {} kon niet worden gepubliceerd: {}", session.id, it.message) }.getOrNull()
         repository.markCompleted(session.id, summary, areas, created, updated, resolved, publication?.runId, publication?.pullRequestUrl, publication?.commitSha)
@@ -266,6 +271,10 @@ class TestSessionEngine(
     }.trim()
 
     companion object { private val logger = LoggerFactory.getLogger(TestSessionEngine::class.java) }
+}
+
+internal fun hasExecutedBrowserChecks(testedAreas: JsonNode): Boolean = testedAreas.any {
+    it.path("result").asText() == "PASS" || it.path("result").asText() == "FAIL"
 }
 
 private object TestSessionSchema {

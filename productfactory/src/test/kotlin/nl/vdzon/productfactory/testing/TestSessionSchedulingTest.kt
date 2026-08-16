@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.testing
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import nl.vdzon.productfactory.contracts.WeeklyScheduleView
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -25,5 +26,13 @@ class TestSessionSchedulingTest {
     fun `empty schedule means manual testing only`() {
         val now = ZonedDateTime.of(2026, 8, 14, 12, 0, 0, 0, zone)
         assertFalse(isTestSessionDue(emptyList(), now, null))
+    }
+
+    @Test
+    fun `a session with only blocked areas has not executed browser checks`() {
+        val mapper = jacksonObjectMapper()
+        assertFalse(hasExecutedBrowserChecks(mapper.readTree("""[{"result":"BLOCKED"},{"result":"BLOCKED"}]""")))
+        assertTrue(hasExecutedBrowserChecks(mapper.readTree("""[{"result":"BLOCKED"},{"result":"PASS"}]""")))
+        assertTrue(hasExecutedBrowserChecks(mapper.readTree("""[{"result":"FAIL"}]""")))
     }
 }

@@ -12,7 +12,9 @@ import nl.vdzon.productfactory.contracts.AgentWorkerStatus
 import nl.vdzon.productfactory.contracts.AgentWorkerTaskFrame
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
@@ -22,7 +24,10 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
+@ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
 class AgentWorkerOfflineException : RuntimeException("Geen agentworker verbonden")
+
+@ResponseStatus(HttpStatus.NOT_FOUND)
 class AgentTaskNotFoundException(runId: String) : RuntimeException("Onbekende agenttaak: $runId")
 
 @Component
@@ -32,6 +37,7 @@ class AgentWorkerHub(
     private val logger = LoggerFactory.getLogger(javaClass)
     private val mapper = jacksonObjectMapper().findAndRegisterModules()
     private val writeLock = Any()
+    private val taskLock = Any()
     private val tasks = ConcurrentHashMap<String, AgentTaskStatus>()
 
     @Volatile private var session: WebSocketSession? = null
@@ -57,18 +63,25 @@ class AgentWorkerHub(
         require(task.taskType.isNotBlank() && task.prompt.isNotBlank()) { "taskType en prompt zijn verplicht" }
         require(task.timeoutSeconds in 1..MAX_TASK_TIMEOUT_SECONDS) { "timeoutSeconds moet tussen 1 en $MAX_TASK_TIMEOUT_SECONDS liggen" }
 
-        val activeSession = session?.takeIf { it.isOpen && hello != null } ?: throw AgentWorkerOfflineException()
-        val accepted = AgentTaskStatus(task.runId, AgentTaskState.RUNNING)
-        check(tasks.putIfAbsent(task.runId, accepted) == null) { "runId bestaat al" }
-        try {
-            synchronized(writeLock) {
-                activeSession.sendMessage(TextMessage(mapper.writeValueAsString(AgentWorkerTaskFrame(task = task))))
+        synchronized(taskLock) {
+            // Submit is bewust idempotent. De runtime kan na een verloren HTTP-response of een backend-rollout
+            // dezelfde taak opnieuw aanbieden. De Mac-worker dedupliceert eveneens op runId en stuurt een
+            // eventueel al voltooid resultaat opnieuw terug.
+            tasks[task.runId]?.takeUnless { it.state == AgentTaskState.DISCONNECTED }?.let { return it }
+
+            val activeSession = session?.takeIf { it.isOpen && hello != null } ?: throw AgentWorkerOfflineException()
+            val accepted = AgentTaskStatus(task.runId, AgentTaskState.RUNNING)
+            tasks[task.runId] = accepted
+            try {
+                synchronized(writeLock) {
+                    activeSession.sendMessage(TextMessage(mapper.writeValueAsString(AgentWorkerTaskFrame(task = task))))
+                }
+            } catch (exception: Exception) {
+                tasks[task.runId] = AgentTaskStatus(task.runId, AgentTaskState.DISCONNECTED)
+                throw AgentWorkerOfflineException()
             }
-        } catch (exception: Exception) {
-            tasks[task.runId] = AgentTaskStatus(task.runId, AgentTaskState.DISCONNECTED)
-            throw AgentWorkerOfflineException()
+            return accepted
         }
-        return accepted
     }
 
     fun taskStatus(runId: String): AgentTaskStatus = tasks[runId] ?: throw AgentTaskNotFoundException(runId)
