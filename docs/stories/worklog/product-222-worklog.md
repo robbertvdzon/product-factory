@@ -121,3 +121,29 @@ Resultaat herontwikkelrun:
 - `agent-image-build` is volgens de versioned verificatieconfiguratie niet agent-runnable en wordt
   door CI uitgevoerd. De story-implementatie en tests hoefden inhoudelijk niet aangepast te worden;
   alleen dit worklog is voor de nieuwe run aangevuld.
+
+Herstelrun na toegankelijkheidsbevinding 2026-08-16:
+- [x] lees taakcontext, factorydocumentatie, agent-tips en bestaande implementatie
+- [x] voeg een expliciete toegankelijke naam aan de handmatige-startdialoog toe
+- [x] voeg een gerichte semantiektest toe die de eerdere regressie afvangt
+- [x] draai gerichte tests en het volledige agent-runnable factory-vangnet
+- [x] controleer de uiteindelijke diff en leg de resultaten vast
+
+Aanleiding:
+- De previewtest bevestigde dat standaardkeuze, samenvatting, focuslus en focusherstel werken, maar
+  het element met `role="alertdialog"` kreeg vanuit alleen de titelsemantiek geen programmatische
+  naam. Deze run koppelt daarom de zichtbare titel expliciet als naam aan de dialoog zelf.
+
+Resultaat toegankelijkheidsherstel:
+- `ManualCycleStartDialog` geeft de `AlertDialog` nu expliciet het semantische label
+  `Productcyclus starten`. De losse `namesRoute`-wrapper rond de zichtbare titel is verwijderd,
+  zodat de dialoognaam niet dubbel als afzonderlijke routenaam wordt aangeboden.
+- De bestaande toetsenbord-/semantiektest controleert nu ook exact de `semanticLabel`-waarde. Deze
+  assertie faalde vóór de productiecodewijziging met `null` en is daarna samen met alle zeven
+  storygerichte Fluttertests groen.
+- Volledig vangnet groen: Maven `clean verify` met 177 tests en 0 failures/errors/skips;
+  `flutter analyze` met 0 issues; `flutter test` met 436 tests; Docker Engine-runner met 3 tests;
+  beide frontend-imagebuilds met 19/19 succesvolle stappen.
+- `agent-image-build` blijft volgens `.factory/verification.yaml` niet agent-runnable en wordt door
+  CI uitgevoerd. Eindcontrole op diff, whitespace, conflictmarkers en onverwachte bestanden is
+  schoon; alleen productiecode, regressietest en dit worklog zijn gewijzigd.

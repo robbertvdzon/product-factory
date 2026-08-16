@@ -4279,11 +4279,8 @@ class _ManualCycleStartDialogState extends State<ManualCycleStartDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-      title: Semantics(
-        namesRoute: true,
-        header: true,
-        child: const Text('Productcyclus starten'),
-      ),
+      semanticLabel: 'Productcyclus starten',
+      title: const Text('Productcyclus starten'),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(

@@ -80,6 +80,10 @@ void main() {
       await _open(tester, _harness(onStart: (_) async {}));
 
       expect(find.byType(ManualCycleStartDialog), findsOneWidget);
+      expect(
+        tester.widget<AlertDialog>(find.byType(AlertDialog)).semanticLabel,
+        'Productcyclus starten',
+      );
       expect(find.text('Actief product: actief-product'), findsNWidgets(2));
       expect(find.textContaining(autonomousDefaultFocus), findsOneWidget);
       expect(find.text('Herkomst: Autonome standaard'), findsOneWidget);
