@@ -47,3 +47,18 @@ Eigen review controleerde de volledige diff op productscope, dubbele starts/even
 trimmen, vrije tekst in fouten/logging/telemetrie, afgeleide historische herkomst, previewgrenzen,
 conflictmarkers, whitespacefouten en onverwachte lockfilewijzigingen. Er zijn geen open bevindingen.
 De niet-agent-runnable `agent-image-build` blijft conform `.factory/verification.yaml` voor CI.
+
+## Reviewer — eerste ronde
+
+- [blocker] Het destructieve Flyway-herstel controleert alleen dat `PreviewRuntimeConfig.dataset`
+  `PR_PREVIEW` is voordat `clean()` wordt uitgevoerd. Die dataset is afgeleid van `PF_DB_URL`, maar
+  `PreviewFlywayMigrationStrategy` valideert niet dat de daadwerkelijke Flyway-datasource en de te
+  schonen schema's dezelfde gevalideerde wegwerpdatabase zijn. De test maakt de target-ontkoppeling
+  concreet: `prPreviewConfig()` declareert de preview-Postgres-URL, terwijl de doorgegeven Flyway op
+  een H2-datasource draait en die H2-database toch wordt opgeschoond. Bind de vrijgave van `clean()`
+  fail-closed aan de JDBC-URL én schemas uit `flyway.configuration` en voeg een negatieve test toe
+  waarin een PR-previewmarker met een afwijkende Flyway-target nooit `clean()` uitvoert.
+
+Het agentworker-bewijs is verder geldig: de actuele HEAD-tree
+`4613209d4beb06ddf1f253b81cab6dfc56ff3418` is gelijk aan `Tested worktree tree` en alle zeven
+agent-runnable verificatiecommando's staan op `passed`.
