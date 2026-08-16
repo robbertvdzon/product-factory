@@ -83,3 +83,20 @@ Herstel na review:
   veilige defaults en expliciete metadata allebei 19/19 stappen succesvol.
 - Einddiff gecontroleerd op conflictmarkers, whitespacefouten, onbedoelde lockfilewijzigingen,
   logging van vrije tekst en wijzigingen buiten de drie reviewbevindingen; geen open punt gevonden.
+
+Vervolgreview 2026-08-16:
+- Eerdere [bug] opgelost: Flutter en Kotlin gebruiken dezelfde expliciete trimset en dezelfde
+  UTF-16-lengtesemantiek; de gerichte grensgevallen bewijzen onder meer U+0085 en U+FEFF en laten
+  U+200B bewust ongemoeid.
+- Eerdere privacy-[blocker] opgelost: de integratietest stuurt unieke vrije tekst via de echte
+  HTTP-route en controleert foutresponse, foutmelding, root request-/foutlogging en actieve
+  `http.server.requests`-telemetriemetadata; er ontstaat geen cyclus.
+- Eerdere concurrency-[blocker] opgelost: de gelijktijdigheidstest koppelt de enige opgeslagen
+  iteratie aan exact één opgenomen `ShadowIterationStarted`-event.
+- Geen door de fixes geïntroduceerde regressie gevonden; `git diff --check` en conflictmarkercontrole
+  zijn schoon. Gerichte verificatie: `ManualCycleStartIntegrationTest` 6/6 groen zonder skips en
+  `manual_cycle_start_test.dart` 7/7 groen.
+- Het nieuwste factorybewijs is geldig: tested tree
+  `b40d2a66472d3b8941c46fa504346df780aee85a` is gelijk aan de developercommit-tree; Maven, Flutter
+  analyze/tests en beide toepasselijke frontend-imagebuilds zijn groen. De Engine-runner-test is
+  volgens de versioned pathselectie niet van toepassing op deze fix.
