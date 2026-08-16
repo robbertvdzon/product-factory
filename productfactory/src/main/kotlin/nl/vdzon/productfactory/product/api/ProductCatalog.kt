@@ -85,9 +85,9 @@ data class MemoryMutation(
 
 @Service
 class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) {
-    fun list(): List<ProductView> = jdbc.query(PRODUCT_SELECT + " order by p.slug", ::mapProduct)
+    fun list(): List<ProductView> = queryProducts(PRODUCT_SELECT + " order by p.slug")
 
-    fun requireProduct(slug: String): ProductView = jdbc.query(PRODUCT_SELECT + " where p.slug = ?", ::mapProduct, normalizeSlug(slug))
+    fun requireProduct(slug: String): ProductView = queryProducts(PRODUCT_SELECT + " where p.slug = ?", normalizeSlug(slug))
         .singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Onbekend product")
 
     fun requireContext(slug: String): ProductContext {
@@ -535,7 +535,40 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         return candidate.copy(slug = slug, allowedWritePaths = paths)
     }
 
-    private fun mapProduct(row: ResultSet, ignored: Int): ProductView = ProductView(
+    /** Laad eerst alle basisrijen en pas daarna de detailtabellen, zodat de eerste verbinding al vrij is. */
+    private fun queryProducts(sql: String, vararg arguments: Any): List<ProductView> {
+        val products = jdbc.query(sql, { row, _ -> mapProduct(row) }, *arguments)
+        return products.map { product ->
+            product.copy(
+                allowedWritePaths = jdbc.queryForList(
+                    "select relative_path from product_allowed_write_path where product_slug = ? order by relative_path",
+                    String::class.java,
+                    product.slug,
+                ),
+                iterationTimes = jdbc.queryForList(
+                    "select time_of_day from product_iteration_time where product_slug = ? order by time_of_day",
+                    java.sql.Time::class.java,
+                    product.slug,
+                ).map { it.toLocalTime().toString().take(5) },
+                roadmapSchedule = jdbc.query(
+                    """select day_of_week, time_of_day from product_roadmap_schedule where product_slug = ?
+                        order by case day_of_week
+                            when 'MONDAY' then 1 when 'TUESDAY' then 2 when 'WEDNESDAY' then 3
+                            when 'THURSDAY' then 4 when 'FRIDAY' then 5 when 'SATURDAY' then 6 else 7 end,
+                            time_of_day""".trimIndent(),
+                    { scheduleRow, _ ->
+                        WeeklyScheduleView(
+                            dayOfWeek = scheduleRow.getString("day_of_week"),
+                            time = scheduleRow.getTime("time_of_day").toLocalTime().toString().take(5),
+                        )
+                    },
+                    product.slug,
+                ),
+            )
+        }
+    }
+
+    private fun mapProduct(row: ResultSet): ProductView = ProductView(
         id = row.getString("id"),
         slug = row.getString("slug"),
         name = row.getString("name"),
@@ -545,11 +578,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         softwareFactoryProjectKey = row.getString("software_factory_project_key"),
         targetRepositoryName = row.getString("target_repository_name"),
         workspaceDirectory = row.getString("workspace_directory"),
-        allowedWritePaths = jdbc.queryForList(
-            "select relative_path from product_allowed_write_path where product_slug = ? order by relative_path",
-            String::class.java,
-            row.getString("slug"),
-        ),
+        allowedWritePaths = emptyList(),
         workspaceOwnership = row.getString("workspace_ownership"),
         liveUrl = row.getString("live_url"),
         previewUrlPattern = row.getString("preview_url_pattern"),
@@ -557,25 +586,8 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         adminUrl = row.getString("admin_url"),
         status = row.getString("status"),
         developmentMode = row.getString("development_mode"),
-        iterationTimes = jdbc.queryForList(
-            "select time_of_day from product_iteration_time where product_slug = ? order by time_of_day",
-            java.sql.Time::class.java,
-            row.getString("slug"),
-        ).map { it.toLocalTime().toString().take(5) },
-        roadmapSchedule = jdbc.query(
-            """select day_of_week, time_of_day from product_roadmap_schedule where product_slug = ?
-                order by case day_of_week
-                    when 'MONDAY' then 1 when 'TUESDAY' then 2 when 'WEDNESDAY' then 3
-                    when 'THURSDAY' then 4 when 'FRIDAY' then 5 when 'SATURDAY' then 6 else 7 end,
-                    time_of_day""".trimIndent(),
-            { scheduleRow, _ ->
-                WeeklyScheduleView(
-                    dayOfWeek = scheduleRow.getString("day_of_week"),
-                    time = scheduleRow.getTime("time_of_day").toLocalTime().toString().take(5),
-                )
-            },
-            row.getString("slug"),
-        ),
+        iterationTimes = emptyList(),
+        roadmapSchedule = emptyList(),
         timezone = row.getString("timezone"),
         maxStoriesPerCycle = row.getInt("max_stories_per_cycle"),
         wipLimit = row.getInt("wip_limit"),
