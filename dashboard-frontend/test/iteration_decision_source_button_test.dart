@@ -113,8 +113,13 @@ Future<void> _withDashboard(
   final mockClient = _buildMockClient(callLog);
   await http.runWithClient(() async {
     await tester.pumpWidget(const ProductFactoryDashboard());
-    await tester.pump();
-    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 10));
+      if (find.byType(IterationEvidenceRow).evaluate().length ==
+          _iterations.length) {
+        break;
+      }
+    }
     await body();
   }, () => mockClient);
 }
