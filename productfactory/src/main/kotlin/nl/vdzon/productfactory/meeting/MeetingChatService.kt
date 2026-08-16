@@ -36,10 +36,10 @@ internal object MeetingSchemas {
         "consultedSources":{"type":"array","maxItems":30,"items":{"type":"string","minLength":1,"maxLength":500}},
         "imageAssetIds":{"type":"array","maxItems":5,"items":{"type":"string","minLength":1,"maxLength":100}},
         "generatedImages":{"type":"array","maxItems":1,"items":{"type":"object","additionalProperties":false,
-          "required":["filename","mediaType","base64Content","altText"],"properties":{
+          "required":["filename","mediaType","temporaryPath","altText"],"properties":{
             "filename":{"type":"string","minLength":1,"maxLength":255},
             "mediaType":{"enum":["image/png","image/jpeg","image/webp","image/gif"]},
-            "base64Content":{"type":"string","minLength":1,"maxLength":700000},
+            "temporaryPath":{"type":"string","minLength":1,"maxLength":1000},
             "altText":{"type":"string","minLength":1,"maxLength":1000}
           }}},
         "memoryActions":{"type":"array","maxItems":20,"items":{"type":"object","additionalProperties":false,
@@ -362,8 +362,12 @@ class MeetingChatService(
         AFBEELDINGEN: opgeslagen beelden staan in de productcontext met een media-ID en directe URL. Bekijk een
         relevante afbeelding echt voordat je er conclusies uit trekt. Met imageAssetIds kun je bestaande beelden
         uit de productbibliotheek in jouw antwoord tonen. Als je tijdens je onderzoek zelf een nuttige screenshot
-        maakt, voeg die toe aan generatedImages als base64 met een feitelijke alt-tekst; het systeem bewaart hem dan
-        productbreed. Gebruik generatedImages alleen voor één werkelijk gemaakt beeld en houd het bestand onder 512 KB.
+        maakt, sla die dan als PNG, JPEG, WebP of GIF onder 512 KB op in het tijdelijke pad dat de worker onderaan
+        deze opdracht voorschrijft. Voeg dat absolute pad als temporaryPath toe aan generatedImages, samen met de
+        bestandsnaam, het mediatype en een feitelijke alt-tekst. De worker leest en verwijdert het tijdelijke bestand
+        en het systeem bewaart het beeld daarna productbreed. Gebruik generatedImages alleen voor één werkelijk
+        gemaakt beeld. Als de eigenaar expliciet vraagt om een screenshot of mockup, maak en lever dat beeld dan ook
+        daadwerkelijk op in plaats van alleen te beschrijven hoe het eruit zou zien.
 
         READ-ONLY BRONCODE:
         - Product Factory: https://github.com/robbertvdzon/product-factory.git

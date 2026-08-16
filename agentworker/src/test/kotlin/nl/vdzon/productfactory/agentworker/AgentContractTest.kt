@@ -9,12 +9,62 @@ import nl.vdzon.productfactory.contracts.AgentWorkerTaskFrame
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AgentContractTest {
+    @Test fun `worker transports a generated image from its guarded temporary path`() {
+        val task = AgentTask(
+            "meeting-42",
+            "hkh-autopilot",
+            "meeting-chat",
+            "Maak een mockup",
+            responseSchema = """{"generatedImages":{"type":"array"}}""",
+        )
+        val bytes = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47)
+        val image = Files.createTempFile("pf-generated-meeting-42-", ".png")
+        Files.write(image, bytes)
+        val summary = jacksonObjectMapper().writeValueAsString(
+            mapOf(
+                "reply" to "Hier is de mockup.",
+                "generatedImages" to listOf(
+                    mapOf(
+                        "filename" to "mockup.png",
+                        "mediaType" to "image/png",
+                        "temporaryPath" to image.toString(),
+                        "altText" to "Mockup van het zoekscherm",
+                    ),
+                ),
+            ),
+        )
+
+        val transported = jacksonObjectMapper().readTree(materializeGeneratedImages(task, summary))
+
+        val transportedImage = transported.path("generatedImages").first()
+        assertEquals(Base64.getEncoder().encodeToString(bytes), transportedImage.path("base64Content").asText())
+        assertFalse(transportedImage.has("temporaryPath"))
+        assertFalse(Files.exists(image))
+    }
+
+    @Test fun `meeting prompt gives the agent a guarded image handoff path`() {
+        val prompt = agentPrompt(
+            AgentTask(
+                "meeting/unsafe id",
+                "hkh-autopilot",
+                "meeting-chat",
+                "Maak een mockup",
+                responseSchema = """{"generatedImages":{"type":"array"}}""",
+            ),
+        )
+
+        assertTrue(prompt.contains("generatedImages[].temporaryPath"))
+        assertTrue(prompt.contains("pf-generated-meeting-unsafe-id-"))
+        assertTrue(prompt.contains("Encodeer het beeld niet zelf als base64"))
+    }
+
     @Test fun `agent task contract round trips`() {
         val mapper = jacksonObjectMapper().findAndRegisterModules()
         val task = AgentTask("run-1", "hkh-autopilot", "research", "Onderzoek bronnen")
