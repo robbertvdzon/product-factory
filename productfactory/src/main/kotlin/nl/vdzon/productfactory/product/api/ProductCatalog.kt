@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.net.URI
 import java.sql.ResultSet
+import java.sql.Timestamp
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -302,7 +303,12 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
                     where retraction.memory_id = m.id and retraction.created_at <= ?
                 )"""
         }
-        val arguments = if (asOf == null) arrayOf(normalized) else arrayOf(normalized, asOf, asOf, asOf)
+        val arguments = if (asOf == null) {
+            arrayOf(normalized)
+        } else {
+            val timestamp = Timestamp.from(asOf)
+            arrayOf(normalized, timestamp, timestamp, timestamp)
+        }
         return jdbc.query(
             """select m.id, m.product_slug, m.title, m.content, m.created_at,
                 m.supersedes_id, m.change_reason, m.created_by
