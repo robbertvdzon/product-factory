@@ -115,6 +115,24 @@ class RoadmapCatalogTest(
     }
 
     @Test
+    fun `legacy process update preserves strategy fields`() {
+        val epic = roadmap.createEpic(
+            slug,
+            "Tijdreis door de straat",
+            "Laat bewoners hun straat door verschillende historische periodes beleven",
+            horizon = "HORIZON",
+            kind = "DISCOVERY",
+            capabilityKey = "straat-door-de-tijd",
+        )
+
+        val closed = roadmap.closeEpic(slug, epic.id)
+
+        assertEquals("HORIZON", closed.horizon)
+        assertEquals("DISCOVERY", closed.kind)
+        assertEquals("straat-door-de-tijd", closed.capabilityKey)
+    }
+
+    @Test
     fun `require on an unknown epic returns not found`() {
         assertFailsWith<ResponseStatusException> { roadmap.requireEpic(slug, "epic-$slug-9999") }
     }

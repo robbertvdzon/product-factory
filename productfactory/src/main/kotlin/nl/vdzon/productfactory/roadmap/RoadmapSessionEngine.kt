@@ -15,12 +15,15 @@ import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.roadmap.api.DeliveryVerificationRepository
 import nl.vdzon.productfactory.roadmap.api.RoadmapCatalog
 import nl.vdzon.productfactory.roadmap.api.RoadmapSessionRepository
+import nl.vdzon.productfactory.roadmap.api.RoadmapVisionCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceArtifact
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
+import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 import java.sql.Timestamp
@@ -41,10 +44,90 @@ class RoadmapSessionRunner(
     }
 }
 
+/** Applies a completely validated strategy as one transaction; a bad update can never leave a half roadmap. */
+@Component
+class RoadmapSessionApplier(
+    private val roadmap: RoadmapCatalog,
+    private val visions: RoadmapVisionCatalog,
+    private val bugs: BugCatalog,
+) {
+    @Transactional
+    fun apply(productSlug: String, sessionId: String, strategy: JsonNode, output: JsonNode) {
+        val capabilityKeys = strategy.path("capabilities").mapTo(linkedSetOf()) { it.path("key").asText() }
+        output.path("epicUpdates").forEach { update ->
+            val capabilityKey = update.path("capabilityKey").takeIf(JsonNode::isTextual)?.asText()
+            require(capabilityKey == null || capabilityKey in capabilityKeys) {
+                "Epic verwijst naar onbekende capability '$capabilityKey'"
+            }
+        }
+        visions.createVersion(
+            productSlug,
+            sessionId,
+            strategy,
+            strategy.path("visionChangeSummary").asText(),
+        )
+        output.path("epicUpdates").forEach { update ->
+            val action = update.path("action").asText()
+            val title = update.path("title").asText().trim()
+            val description = update.path("description").asText().trim()
+            val processRank = update.path("processRank").asInt(1)
+            val dependencyIds = update.path("dependencyIds").mapTo(linkedSetOf()) { it.asText() }
+            val epicId = update.path("epicId").takeIf(JsonNode::isTextual)?.asText()
+            val horizon = update.path("horizon").asText()
+            val kind = update.path("kind").asText()
+            val capabilityKey = update.path("capabilityKey").takeIf(JsonNode::isTextual)?.asText()
+            when (action) {
+                "CREATE" -> {
+                    require(epicId == null) { "CREATE mag geen epicId bevatten" }
+                    roadmap.createEpic(productSlug, title, description, processRank, dependencyIds, horizon, kind, capabilityKey)
+                }
+                "UPDATE", "CLOSE" -> {
+                    requireNotNull(epicId) { "$action vereist een bestaand epicId" }
+                    roadmap.updateEpicFromProcess(
+                        productSlug = productSlug,
+                        id = epicId,
+                        title = title,
+                        description = description,
+                        processRank = processRank,
+                        dependencyIds = dependencyIds,
+                        status = if (action == "CLOSE") "DONE" else null,
+                        horizon = horizon,
+                        kind = kind,
+                        capabilityKey = capabilityKey,
+                    )
+                }
+                else -> error("Onbekende epicactie '$action'")
+            }
+        }
+        output.path("settledQuestions").forEach { question ->
+            question.asText().trim().takeIf(String::isNotBlank)?.let { roadmap.addSettledQuestion(productSlug, it) }
+        }
+        output.path("bugUpdates").forEach { update ->
+            bugs.apply(
+                productSlug,
+                "ROADMAP_SESSION",
+                sessionId,
+                BugMutation(
+                    update.path("action").asText(),
+                    update.path("bugId").takeUnless { it.isNull || it.isMissingNode }?.asLong(),
+                    update.path("title").asText(),
+                    update.path("description").asText(),
+                    update.path("reproductionSteps").asText(),
+                    update.path("expectedResult").asText(),
+                    update.path("actualResult").asText(),
+                    update.path("priority").asText(),
+                ),
+            )
+        }
+    }
+}
+
 /**
- * Voert één sessie van de Product Manager-rol uit: bekijkt de huidige roadmap plus wat er sinds de
- * vorige sessie is gebeurd (cyclussamenvattingen, overlegresultaten), en werkt epics en afgehandelde
- * vragen bij. Eén enkele agentaanroep, geen keten van rollen zoals een shadow-iteratie.
+ * Voert een roadmap-sessie uit als een keten van drie bewust verschillende perspectieven. De
+ * visionair maakt de opzettelijk brede productmissie concreet zonder zich door de huidige techniek
+ * te laten begrenzen. De strateeg maakt daar een versieerbare eindvisie en een backcast met
+ * aannames/proeven van. De roadmapmanager vertaalt die strategie ten slotte naar uitvoer- en
+ * discovery-epics, zonder de horizon onderweg kleiner te maken.
  *
  * Leest cyclussamenvattingen rechtstreeks uit `shadow_iteration` via JdbcTemplate in plaats van via
  * een Kotlin-afhankelijkheid op de `iteration`-module: die module krijgt in een latere fase zelf een
@@ -57,6 +140,7 @@ class RoadmapSessionRunner(
 class RoadmapSessionEngine(
     private val repository: RoadmapSessionRepository,
     private val roadmap: RoadmapCatalog,
+    private val visions: RoadmapVisionCatalog,
     private val bugs: BugCatalog,
     private val products: ProductCatalog,
     private val agents: AgentDispatchPort,
@@ -65,6 +149,8 @@ class RoadmapSessionEngine(
     private val deliveryVerification: DeliveryVerificationEngine,
     private val deliveryVerificationReports: DeliveryVerificationRepository,
     private val workspace: WorkspacePublicationPort,
+    private val workspaceVision: WorkspaceVisionPort,
+    private val applier: RoadmapSessionApplier,
     private val jdbc: JdbcTemplate,
     private val mapper: ObjectMapper,
 ) {
@@ -87,99 +173,100 @@ class RoadmapSessionEngine(
         val meetingContext = meetings.recentOutcomes(product.slug)
         val verificationContext = verificationContext(product.slug)
 
-        val runId = session.id
-        agentRuns.register(runId, product.slug, "roadmap-session")
-        val result = try {
-            agents.execute(
+        val ownerVision = workspaceVision.readVision(product.slug)
+        val currentVision = visions.current(product.slug)
+        val visionary = executeStage(
+            session,
+            product,
+            "visionary",
+            RoadmapSchemas.visionary,
+            visionaryPrompt(product, ownerVision, currentVision?.content),
+        )
+        val strategy = executeStage(
+            session,
+            product,
+            "strategist",
+            RoadmapSchemas.strategy,
+            strategyPrompt(product, visionary, currentVision?.content, recentCycles, meetingContext, verificationContext),
+        )
+        validateStrategy(strategy)
+        val output = executeStage(
+            session,
+            product,
+            "manager",
+            RoadmapSchemas.session,
+            sessionPrompt(product, strategy, openEpics, closedEpics, settledQuestions, recentCycles, meetingContext, verificationContext),
+        )
+        applier.apply(product.slug, session.id, strategy, output)
+
+        val summaryText = output.path("summary").asText().trim()
+        val publication = publishMinutes(product, session, summaryText, strategy)
+        repository.markCompleted(session.id, summaryText, publication?.runId, publication?.pullRequestUrl, publication?.commitSha)
+    }
+
+    private fun executeStage(
+        session: RoadmapSessionView,
+        product: ProductView,
+        role: String,
+        schema: String,
+        prompt: String,
+    ): JsonNode {
+        val runId = "${session.id}-$role"
+        agentRuns.register(runId, product.slug, "roadmap-$role")
+        return try {
+            val result = agents.execute(
                 AgentTask(
                     runId = runId,
                     productSlug = product.slug,
-                    taskType = "roadmap-session",
-                    prompt = sessionPrompt(product, openEpics, closedEpics, settledQuestions, recentCycles, meetingContext, verificationContext),
+                    taskType = "roadmap-$role",
+                    prompt = prompt,
                     timeoutSeconds = SESSION_TIMEOUT_SECONDS,
                     model = product.aiModel.takeUnless { it == "default" },
                     provider = product.aiProvider,
-                    responseSchema = RoadmapSchemas.session,
+                    responseSchema = schema,
                 ),
             )
+            if (result.status != "COMPLETED") error("Roadmaprol $role mislukte: ${result.summary.take(1000)}")
+            mapper.readTree(result.summary).also {
+                require(it != null && it.isObject) { "Roadmaprol $role gaf geen JSON-object" }
+                agentRuns.complete(product.slug, runId, "COMPLETED", "roadmap-session:${session.id}/$role")
+            }
         } catch (exception: Exception) {
             runCatching { agentRuns.complete(product.slug, runId, "FAILED", null) }
             throw exception
         }
-        if (result.status != "COMPLETED") {
-            runCatching { agentRuns.complete(product.slug, runId, "FAILED", null) }
-            error("Roadmap-sessie mislukte: ${result.summary.take(1000)}")
-        }
-        val output = mapper.readTree(result.summary)
-        applyEpicUpdates(product.slug, output.path("epicUpdates"))
-        applySettledQuestions(product.slug, output.path("settledQuestions"))
-        applyBugUpdates(product.slug, session.id, output.path("bugUpdates"))
-        agentRuns.complete(product.slug, runId, "COMPLETED", "roadmap-session:${session.id}")
-
-        val summaryText = output.path("summary").asText().trim()
-        val publication = publishMinutes(product, session, summaryText)
-        repository.markCompleted(session.id, summaryText, publication?.runId, publication?.pullRequestUrl, publication?.commitSha)
     }
 
-    private fun applyEpicUpdates(productSlug: String, updates: JsonNode) {
-        updates.forEach { update ->
-            val action = update.path("action").asText()
-            val title = update.path("title").asText().trim()
-            val description = update.path("description").asText().trim()
-            val processRank = update.path("processRank").asInt(1)
-            val dependencyIds = update.path("dependencyIds").mapTo(linkedSetOf()) { it.asText() }
-            val epicId = update.path("epicId").takeIf { it.isTextual }?.asText()
-            when (action) {
-                "CREATE" -> runCatching { roadmap.createEpic(productSlug, title, description, processRank, dependencyIds) }
-                    .onFailure { logger.warn("Roadmap-epiccreatie overgeslagen voor {}: {}", productSlug, it.message) }
-                "UPDATE" -> epicId?.let { id ->
-                    runCatching { roadmap.updateEpicFromProcess(productSlug, id, title, description, processRank, dependencyIds) }
-                        .onFailure { logger.warn("Roadmap-epicupdate overgeslagen voor {}/{}: {}", productSlug, id, it.message) }
-                }
-                "CLOSE" -> epicId?.let { id ->
-                    runCatching { roadmap.updateEpicFromProcess(productSlug, id, title, description, processRank, dependencyIds, "DONE") }
-                        .onFailure { logger.warn("Roadmap-epicafsluiting overgeslagen voor {}/{}: {}", productSlug, id, it.message) }
-                }
+    private fun validateStrategy(strategy: JsonNode) {
+        val experienceKeys = strategy.path("experiences").map { it.path("key").asText() }
+        require(experienceKeys.size == experienceKeys.toSet().size) { "Experience-sleutels zijn niet uniek" }
+        val capabilityKeys = strategy.path("capabilities").map { it.path("key").asText() }
+        require(capabilityKeys.size == capabilityKeys.toSet().size) { "Capability-sleutels zijn niet uniek" }
+        strategy.path("capabilities").forEach { capability ->
+            require(capability.path("experienceKeys").all { it.asText() in experienceKeys }) {
+                "Capability verwijst naar een onbekende toekomstervaring"
+            }
+        }
+        strategy.path("assumptions").forEach { assumption ->
+            require(assumption.path("capabilityKeys").all { it.asText() in capabilityKeys }) {
+                "Aanname verwijst naar een onbekende capability"
             }
         }
     }
 
-    private fun applySettledQuestions(productSlug: String, questions: JsonNode) {
-        questions.forEach { question ->
-            val content = question.asText().trim()
-            if (content.isNotBlank()) roadmap.addSettledQuestion(productSlug, content)
-        }
-    }
-
-    private fun applyBugUpdates(productSlug: String, sessionId: String, updates: JsonNode) {
-        updates.forEach { update ->
-            runCatching {
-                bugs.apply(
-                    productSlug,
-                    "ROADMAP_SESSION",
-                    sessionId,
-                    BugMutation(
-                        update.path("action").asText(),
-                        update.path("bugId").takeUnless { it.isNull || it.isMissingNode }?.asLong(),
-                        update.path("title").asText(),
-                        update.path("description").asText(),
-                        update.path("reproductionSteps").asText(),
-                        update.path("expectedResult").asText(),
-                        update.path("actualResult").asText(),
-                        update.path("priority").asText(),
-                    ),
-                )
-            }.onFailure { logger.warn("Bugupdate overgeslagen in roadmap-sessie {}: {}", sessionId, it.message) }
-        }
-    }
-
-    private fun publishMinutes(product: ProductView, session: RoadmapSessionView, summary: String) = runCatching {
+    private fun publishMinutes(product: ProductView, session: RoadmapSessionView, summary: String, strategy: JsonNode) = runCatching {
         workspace.publish(
             WorkspaceArtifact(
                 runId = session.id,
                 productSlug = product.slug,
                 relativePath = "product-memory/roadmap-session-${session.sequenceNumber.toString().padStart(4, '0')}.md",
-                content = RoadmapMinutesRenderer.render(session, summary, roadmap.listEpics(product.slug), LocalDate.now(ZoneId.of(product.timezone))),
+                content = RoadmapMinutesRenderer.render(
+                    session,
+                    summary,
+                    strategy,
+                    roadmap.listEpics(product.slug),
+                    LocalDate.now(ZoneId.of(product.timezone)),
+                ),
             ),
         )
     }.onFailure {
@@ -199,7 +286,7 @@ class RoadmapSessionEngine(
 
     private fun epicsBlock(epics: List<RoadmapEpicView>): String = epics
         .joinToString("\n\n") {
-            "ID ${it.id}: ${it.title} (proces #${it.processRank}, klant #${it.customerRank}, score ${it.priorityScore}, roadmap #${it.roadmapRank}, dependencies ${it.dependencyIds})\n${it.description}"
+            "ID ${it.id}: ${it.title} (${it.horizon}, ${it.kind}, capability ${it.capabilityKey ?: "geen"}, proces #${it.processRank}, klant #${it.customerRank}, score ${it.priorityScore}, roadmap #${it.roadmapRank}, dependencies ${it.dependencyIds})\n${it.description}"
         }
         .ifBlank { "Geen." }
 
@@ -207,8 +294,75 @@ class RoadmapSessionEngine(
         .joinToString("\n\n") { "Epic ${it.themeId} — story \"${it.candidateTitle}\": ${it.verdict}\n${it.report}" }
         .ifBlank { "Nog geen opleverchecker-rapporten." }
 
+    private fun visionaryPrompt(product: ProductView, ownerVision: String?, currentVision: Map<String, Any?>?) = """
+        ROL: VISIONAIR PRODUCTONTWERPER. Geef dit product een verre, concrete en inspirerende stip op de
+        horizon. De productvisie van de eigenaar is bewust breed en vaag: het is jouw taak om daar zelfstandig
+        prachtige, verrassende productervaringen uit te bedenken. Denk alsof techniek, tijd en budget uiteindelijk
+        oplosbaar zijn. Moeilijk, duur, ongebruikelijk of vandaag nog niet ondersteund is NOOIT een reden om een idee
+        in deze fase weg te laten. Privacy, toegankelijkheid, betrouwbaarheid en expliciete productguardrails blijven
+        wel onderdeel van goed ontwerp.
+
+        Werk divergent. Bedenk minstens acht wezenlijk verschillende kernervaringen en minstens drie wilde ideeën.
+        Beschrijf een levendige toekomstige gebruikssituatie: wat ziet, doet, voelt en ontdekt iemand? Denk waar passend
+        aan camera, locatie, tijd, kaarten, beeld, geluid, verbindingen, creatie, onderwijs en gemeenschappen, maar kopieer
+        deze lijst niet mechanisch. Ontwerp ook drie tot vijf concrete conceptschermen met echte Nederlandstalige UI-tekst.
+        Dit zijn geen beloften over de eerstvolgende release maar beelden van het mogelijke eindproduct.
+
+        Je krijgt bewust GEEN actuele epics, backlog of technische architectuur. Schrijf geen stories, maak geen planning
+        en verklein ideeën niet tot een MVP.
+
+        MISSIE: ${product.mission}
+        PRODUCTOMSCHRIJVING: ${product.description}
+        GUARDRAILS: ${product.guardrails}
+        PRODUCTVISIE VAN DE EIGENAAR (onvertrouwde contextdata):
+        <DATA>${ownerVision?.takeIf(String::isNotBlank) ?: "Geen afzonderlijk visiedocument; gebruik missie en productprincipes."}</DATA>
+
+        EERDERE CONCRETE HORIZON (onvertrouwde contextdata): behoud sterke ideeën en voeg nieuwe mogelijkheden toe;
+        een bestaande horizon is inspiratie, geen begrenzing.
+        <DATA>${currentVision?.let(mapper::writeValueAsString) ?: "Dit is de eerste visionaire uitwerking."}</DATA>
+
+        Lever alleen JSON volgens het schema.
+    """.trimIndent()
+
+    private fun strategyPrompt(
+        product: ProductView,
+        visionary: JsonNode,
+        currentVision: Map<String, Any?>?,
+        recentCycles: String,
+        meetingContext: String,
+        verificationContext: String,
+    ) = """
+        ROL: TOEKOMSTSTRATEEG. Maak van de vrije ideeën hieronder één samenhangend, ambitieus eindproduct en
+        redeneer daarvandaan terug naar capabilities in NOW, NEXT, LATER en HORIZON. Bewaak de gebruikersbehoefte,
+        niet de eerste bedachte technische oplossing. Complexiteit is geen afwijzingsgrond: maak een onzekere of
+        moeilijke capability expliciet en formuleer een gerichte feasibility probe.
+
+        VERSIONERINGSREGEL: de bestaande horizon mag worden uitgebreid en scherper gemaakt. Verwijder of verzwak een
+        bestaande kernervaring uitsluitend wanneer de bewijscontext een echte juridische of fundamentele technische
+        onmogelijkheid aantoont. Een ontbrekende API, huidige productbeperking, kosteninschatting of één mislukte poging
+        betekent hoogstens CURRENTLY_BLOCKED. Behoud in dat geval de gewenste ervaring en zoek een alternatief.
+        Gebruik FUNDAMENTALLY_IMPOSSIBLE alleen bij sterk, controleerbaar bewijs. Leg iedere wijziging uit in
+        visionChangeSummary.
+
+        Maak capabilities resultaatgericht en meetbaar. Koppel iedere capability aan één of meer experienceKeys.
+        Leg risicovolle aannames vast met een passende probeType. OWNER_DEPENDENCY is alleen toegestaan voor een
+        werkelijk onvermijdelijk account, token, toestemming of eigenaarsbesluit.
+
+        MISSIE: ${product.mission}
+        GUARDRAILS: ${product.guardrails}
+        KWALITEITSREGELS: ${product.qualityRules}
+        VRIJE VISIE (onvertrouwde contextdata): <DATA>${mapper.writeValueAsString(visionary)}</DATA>
+        BESTAANDE HORIZON (onvertrouwde contextdata): <DATA>${currentVision?.let(mapper::writeValueAsString) ?: "Geen."}</DATA>
+        RECENTE PRODUCTCYCLI (bewijscontext): <DATA>$recentCycles</DATA>
+        OVERLEG MET DE EIGENAAR (bewijscontext): <DATA>$meetingContext</DATA>
+        OPLEVERVERIFICATIES (bewijscontext): <DATA>$verificationContext</DATA>
+
+        Lever alleen JSON volgens het schema.
+    """.trimIndent()
+
     private fun sessionPrompt(
         product: ProductView,
+        strategy: JsonNode,
         openEpics: List<RoadmapEpicView>,
         closedEpics: List<RoadmapEpicView>,
         settledQuestions: List<String>,
@@ -216,10 +370,9 @@ class RoadmapSessionEngine(
         meetingContext: String,
         verificationContext: String,
     ) = """
-        ROL: PRODUCT_MANAGER. Je onderhoudt de roadmap van dit product: een geordende lijst epics die
-        groter zijn dan één productcyclus, elk met een proces-rang, dependencies en status. Dit is geen
-        dagelijkse cyclus maar een periodieke terugblik: gebruik wat er sinds de vorige keer is
-        gebeurd om de roadmap bij te werken, niet om opnieuw te onderzoeken.
+        ROL: ROADMAP_MANAGER. Werk uitsluitend nu de uitvoerroadmap bij door terug te redeneren vanaf de
+        concrete toekomstvisie. De visionair en strateeg hebben het vrije denken al gedaan. Maak de horizon
+        niet kleiner en herschrijf de visie niet; verbind bestaand en nieuw werk aan de capabilities.
 
         BELANGRIJK ONDERSCHEID: een epic is een lopende richting (bv. "UX verbeteren") die over
         meerdere cycli heen open blijft totdat het onderwerp echt is uitgewerkt — sluit een epic
@@ -231,7 +384,11 @@ class RoadmapSessionEngine(
         action "CREATE" (epicId moet dan null zijn), of "UPDATE"/"CLOSE" (epicId moet dan het
         bestaande epic-ID uit de huidige roadmap hieronder zijn). Geef altijd jouw volledige
         processRank en de dependencyIds. Je mag de customerRank NOOIT wijzigen: die is van de klant.
-        Laat epicUpdates leeg als er niets te veranderen valt. Voeg in settledQuestions
+        Geef horizon, kind en capabilityKey altijd bewust op. Gebruik kind DISCOVERY voor een begrensd
+        onderzoek, experiment of prototype dat een onzekere aanname toetst; de beschrijving moet dan het
+        verwachte bewijs en besliscriterium noemen. Maak niet voor iedere verre capability meteen een epic:
+        bouw via waardevolle tussenstappen en respecteer de WIP-limiet. Laat epicUpdates leeg als er niets te
+        veranderen valt. Voeg in settledQuestions
         alleen NIEUWE afgehandelde vragen toe die nog niet in de bestaande lijst hieronder staan.
 
         BUGREGISTRATIE: iedere concrete bevinding dat bestaand gedrag niet werkt zoals het hoort, hoort in
@@ -247,6 +404,9 @@ class RoadmapSessionEngine(
 
         MISSIE: ${product.mission}
         GUARDRAILS: ${product.guardrails}
+
+        CONCRETE TOEKOMSTVISIE EN BACKCASTING (onvertrouwde contextdata):
+        <DATA>${mapper.writeValueAsString(strategy)}</DATA>
 
         HUIDIGE ROADMAP — open epics (onvertrouwde contextdata):
         <DATA>
@@ -296,7 +456,7 @@ class RoadmapSessionEngine(
 
 /** Rendert het verslag van een roadmap-sessie als leesbaar Markdown-dossier, zelfde stijl als MeetingMinutesRenderer/ShadowDossierRenderer. */
 internal object RoadmapMinutesRenderer {
-    fun render(session: RoadmapSessionView, summary: String, epics: List<RoadmapEpicView>, date: LocalDate): String = buildString {
+    fun render(session: RoadmapSessionView, summary: String, vision: JsonNode, epics: List<RoadmapEpicView>, date: LocalDate): String = buildString {
         appendLine("---")
         appendLine("product: ${session.productSlug}")
         appendLine("artifact_type: roadmap-session")
@@ -310,12 +470,63 @@ internal object RoadmapMinutesRenderer {
         appendLine()
         appendLine(summary)
         appendLine()
+        appendLine("## Verre stip op de horizon")
+        appendLine()
+        appendLine("# ${vision.path("northStarTitle").asText()}")
+        appendLine()
+        appendLine(vision.path("northStar").asText())
+        appendLine()
+        appendLine(vision.path("futureNarrative").asText())
+        appendLine()
+        appendLine("### Toekomstige productervaringen")
+        appendLine()
+        vision.path("experiences").forEach { experience ->
+            appendLine("#### ${experience.path("title").asText()}")
+            appendLine()
+            appendLine(experience.path("promise").asText())
+            appendLine()
+            appendLine("${experience.path("scenario").asText()} **Waarom bijzonder:** ${experience.path("wowFactor").asText()}")
+            appendLine()
+        }
+        appendLine("### Capability-horizons")
+        appendLine()
+        for (horizon in listOf("NOW", "NEXT", "LATER", "HORIZON")) {
+            appendLine("#### $horizon")
+            vision.path("capabilities").filter { it.path("horizon").asText() == horizon }.forEach { capability ->
+                appendLine("- **${capability.path("title").asText()}** — ${capability.path("outcome").asText()} _Maatstaf: ${capability.path("successMeasure").asText()}; haalbaarheid: ${capability.path("feasibility").asText()}._")
+            }
+            appendLine()
+        }
+        appendLine("### Te toetsen aannames")
+        appendLine()
+        vision.path("assumptions").forEach { assumption ->
+            appendLine("- **${assumption.path("probeType").asText()} · ${assumption.path("feasibility").asText()}** — ${assumption.path("statement").asText()} Proef: ${assumption.path("proposedProbe").asText()}")
+        }
+        appendLine()
+        appendLine("### Conceptschermen")
+        appendLine()
+        vision.path("conceptScreens").forEach { screen ->
+            appendLine("#### ${screen.path("title").asText()} · ${screen.path("viewport").asText()}")
+            appendLine()
+            appendLine("**${screen.path("eyebrow").asText()}**")
+            appendLine()
+            appendLine("## ${screen.path("headline").asText()}")
+            appendLine()
+            appendLine(screen.path("body").asText())
+            appendLine()
+            screen.path("highlights").forEach { appendLine("- ${it.asText()}") }
+            appendLine()
+            appendLine("[${screen.path("primaryAction").asText()}] [${screen.path("secondaryAction").asText()}]")
+            appendLine()
+            appendLine("_Beeldrichting: ${screen.path("visualDescription").asText()}_")
+            appendLine()
+        }
         appendLine("## Roadmap op dit moment")
         appendLine()
         epics.forEach { epic ->
             appendLine("### #${epic.roadmapRank} ${epic.title} — score ${epic.priorityScore} · ${epic.status}")
             appendLine()
-            appendLine("Klant-rank ${epic.customerRank}; process-rank ${epic.processRank}; dependencies: ${epic.dependencyIds.ifEmpty { listOf("geen") }.joinToString()}.")
+            appendLine("Horizon ${epic.horizon}; type ${epic.kind}; capability ${epic.capabilityKey ?: "geen"}. Klant-rank ${epic.customerRank}; process-rank ${epic.processRank}; dependencies: ${epic.dependencyIds.ifEmpty { listOf("geen") }.joinToString()}.")
             appendLine()
             appendLine(epic.description)
             appendLine()

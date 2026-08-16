@@ -24,6 +24,9 @@ Map<String, dynamic> epic({
   'priorityScore': score,
   'dependencyIds': dependencies,
   'blockedByIds': blockedBy,
+  'horizon': 'NOW',
+  'kind': 'DISCOVERY',
+  'capabilityKey': 'verbonden-bronnen',
 };
 
 void main() {
@@ -45,6 +48,9 @@ void main() {
     expect(parsed.processRank, 3);
     expect(parsed.priorityScore, 75);
     expect(parsed.dependencyIds, ['epic-museum-0001']);
+    expect(parsed.horizon, 'NOW');
+    expect(parsed.kind, 'DISCOVERY');
+    expect(parsed.capabilityKey, 'verbonden-bronnen');
   });
 
   testWidgets('shows graphical epic cards with both ranks and blocking state', (
@@ -83,6 +89,7 @@ void main() {
                 {'slug': 'museum', 'name': 'Museum'},
               ],
               epics: epics,
+              visions: const [],
               stories: const [],
               deliveries: const [],
               api: const DashboardApi('http://localhost', null),
@@ -98,5 +105,91 @@ void main() {
     expect(find.text('Klant #1  ·  Proces #2'), findsOneWidget);
     expect(find.text('Wacht op 1 epic(s)'), findsOneWidget);
     expect(find.byType(CustomPaint), findsWidgets);
+  });
+
+  testWidgets('shows the north star, concept screen and capability horizons', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final vision = {
+      'productSlug': 'museum',
+      'version': 2,
+      'changeSummary': 'De tijdreis is concreet gemaakt.',
+      'content': {
+        'northStarTitle': 'Het verleden ligt in je hand',
+        'northStar': 'Iedere plek opent een betrouwbare reis door de tijd.',
+        'futureNarrative':
+            'Je richt je camera op een gebouw en ziet de plek, haar bewoners en haar verhalen door de eeuwen heen veranderen.',
+        'experiences': [
+          {'title': 'Straat door de tijd'},
+        ],
+        'conceptScreens': [
+          {
+            'title': 'Tijdmachine',
+            'viewport': 'MOBILE',
+            'eyebrow': 'Heemskerk · 1926',
+            'headline': 'Schuif honderd jaar terug',
+            'body': 'Bekijk echte bronnen en een gemarkeerde reconstructie.',
+            'primaryAction': 'Start tijdreis',
+            'secondaryAction': 'Bronnen',
+            'visualDescription': 'Een straatbeeld met een tijdschuif.',
+            'highlights': ['Oude foto’s', 'Kaarten met bronnen'],
+          },
+        ],
+        'capabilities': [
+          {
+            'title': 'Plaats en tijd verbinden',
+            'outcome': 'Een adres ontsluit materiaal uit meerdere periodes.',
+            'horizon': 'HORIZON',
+            'feasibility': 'UNKNOWN',
+          },
+        ],
+        'assumptions': [
+          {
+            'statement': 'Bronnen hebben voldoende geo-informatie.',
+            'probeType': 'DESK_RESEARCH',
+            'proposedProbe': 'Controleer drie collecties.',
+            'feasibility': 'UNKNOWN',
+          },
+        ],
+      },
+    };
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: RoadmapBoard(
+              products: const [
+                {'slug': 'museum', 'name': 'Museum'},
+              ],
+              epics: const [],
+              visions: [vision],
+              stories: const [],
+              deliveries: const [],
+              api: const DashboardApi('http://localhost', null),
+              onChanged: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('VERRE STIP · VISIE 2'), findsOneWidget);
+    expect(find.text('Het verleden ligt in je hand'), findsOneWidget);
+    expect(find.textContaining('Je richt je camera'), findsOneWidget);
+    expect(find.text('Conceptschermen van het eindproduct'), findsOneWidget);
+    expect(find.text('Schuif honderd jaar terug'), findsOneWidget);
+    expect(find.text('Route naar de horizon'), findsOneWidget);
+
+    await tester.tap(find.text('Route naar de horizon'));
+    await tester.pumpAndSettle();
+    expect(find.text('Plaats en tijd verbinden'), findsOneWidget);
+    expect(
+      find.text('Bronnen hebben voldoende geo-informatie.'),
+      findsOneWidget,
+    );
   });
 }

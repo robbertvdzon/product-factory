@@ -7,6 +7,7 @@ import nl.vdzon.productfactory.contracts.WorkspacePublicationView
 import nl.vdzon.productfactory.product.CreateProductRequest
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspacePublicationPort
+import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -50,6 +51,7 @@ class RoadmapSessionControllerTest(
                 ).configuration(),
             )
         }
+        jdbc.update("delete from roadmap_future_vision where product_slug = ?", slug)
         jdbc.update("delete from roadmap_session where product_slug = ?", slug)
         jdbc.update("delete from roadmap_theme where product_slug = ?", slug)
         jdbc.update("delete from roadmap_settled_question where product_slug = ?", slug)
@@ -76,6 +78,13 @@ class RoadmapSessionControllerTest(
             status { isOk() }
             jsonPath("$.length()") { value(1) }
             jsonPath("$[0].title") { value("UX verbeteren") }
+            jsonPath("$[0].horizon") { value("NOW") }
+            jsonPath("$[0].capabilityKey") { value("betere-navigatie") }
+        }
+        mvc.get("/api/products/$slug/roadmap/vision").andExpect {
+            status { isOk() }
+            jsonPath("$.version") { value(1) }
+            jsonPath("$.content.northStarTitle") { value("Een vanzelfsprekende museumreis") }
         }
         mvc.get("/api/products/$slug/bugs").andExpect {
             status { isOk() }
@@ -113,7 +122,9 @@ class RoadmapSessionControllerTest(
         @Primary
         fun fakeAgentDispatch(): AgentDispatchPort = AgentDispatchPort { task ->
             val summary = when (task.taskType) {
-                "roadmap-session" -> """{"summary":"Nepsamenvatting van de roadmap-sessie.","epicUpdates":[{"action":"CREATE","epicId":null,"title":"UX verbeteren","description":"Navigatie begrijpelijker maken voor nieuwe bezoekers.","processRank":1,"dependencyIds":[]}],"settledQuestions":["Archief X is publiek benaderbaar zonder token"],"bugUpdates":[{"action":"CREATE","bugId":null,"title":"Navigatie opent niet","description":"De primaire navigatie reageert niet op activering.","reproductionSteps":"Open het menu en activeer de eerste link","expectedResult":"De doelpagina wordt geopend","actualResult":"De huidige pagina blijft zichtbaar","priority":"P1"}]}"""
+                "roadmap-visionary" -> visionaryJson()
+                "roadmap-strategist" -> strategyJson()
+                "roadmap-manager" -> managerJson()
                 else -> """{"summary":"onbekend"}"""
             }
             AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)
@@ -131,6 +142,30 @@ class RoadmapSessionControllerTest(
                 pullRequestUrl = null,
                 commitSha = "test-commit-sha",
             )
+        }
+
+        @Bean
+        @Primary
+        fun fakeWorkspaceVisionPort(): WorkspaceVisionPort = WorkspaceVisionPort { "Een breed museum voor iedereen." }
+
+        companion object {
+            private val experiences = (1..8).joinToString(",") {
+                """{"key":"ervaring-$it","title":"Ervaring $it","promise":"Een aansprekende en concrete belofte voor iedere bezoeker.","scenario":"Een bezoeker doorloopt een levendige toekomstige ervaring met verrassende ontdekkingen.","wowFactor":"Dit verbindt informatie op een manier die vandaag nog niet vanzelfsprekend is."}"""
+            }
+            private val screens = (1..3).joinToString(",") {
+                """{"key":"scherm-$it","title":"Conceptscherm $it","viewport":"DESKTOP","eyebrow":"Ontdek","headline":"Een prachtige blik op het verleden","body":"Hier ziet de bezoeker bronnen, verhalen en beelden als één begrijpelijke ervaring.","primaryAction":"Begin met ontdekken","secondaryAction":"Bekijk bronnen","visualDescription":"Een rijk gelaagd landschap met historische beelden en een heldere tijdlijn.","highlights":["Bronnen naast het verhaal","Door de tijd bewegen"]}"""
+            }
+            private val capabilities = (1..6).joinToString(",") {
+                val key = if (it == 1) "betere-navigatie" else "capability-$it"
+                val horizon = listOf("NOW", "NEXT", "LATER", "HORIZON")[(it - 1) % 4]
+                """{"key":"$key","title":"Capability $it","outcome":"Bezoekers bereiken zelfstandig een betekenisvolle historische ontdekking.","successMeasure":"Minstens één aantoonbare route werkt van begin tot bron.","horizon":"$horizon","experienceKeys":["ervaring-$it"],"feasibility":"${if (it == 1) "PROVEN" else "UNKNOWN"}"}"""
+            }
+
+            private fun visionaryJson() = """{"northStarTitle":"Een vanzelfsprekende museumreis","northStar":"Iedere bezoeker kan vanuit gewone nieuwsgierigheid een persoonlijke en betrouwbare reis door de collectie beginnen.","futureNarrative":"Een bezoeker opent de applicatie en ontdekt zonder voorkennis hoe plaatsen, mensen en gebeurtenissen door de tijd met elkaar verbonden zijn. Iedere stap toont rijke beelden, betrouwbare bronnen en verrassende nieuwe routes, zodat een vluchtige vraag uitgroeit tot een betekenisvolle ontdekkingstocht.","experiences":[$experiences],"wildIdeas":["Laat een ruimte reageren op waar de bezoeker kijkt en welke verhalen diegene eerder opende.","Maak een gezamenlijke tijdreis waarin meerdere bezoekers ontdekkingen live met elkaar verbinden.","Laat historische stemmen een plaats vanuit verschillende en soms botsende perspectieven vertellen."],"conceptScreens":[$screens]}"""
+
+            private fun strategyJson() = """{"northStarTitle":"Een vanzelfsprekende museumreis","northStar":"Iedere bezoeker kan vanuit gewone nieuwsgierigheid een persoonlijke en betrouwbare reis door de collectie beginnen.","futureNarrative":"Een bezoeker opent de applicatie en ontdekt zonder voorkennis hoe plaatsen, mensen en gebeurtenissen door de tijd met elkaar verbonden zijn. Iedere stap toont rijke beelden, betrouwbare bronnen en verrassende nieuwe routes, zodat een vluchtige vraag uitgroeit tot een betekenisvolle ontdekkingstocht.","experiences":[$experiences],"capabilities":[$capabilities],"assumptions":[{"key":"bronkwaliteit","statement":"Beschikbare bronmetadata is rijk genoeg voor betrouwbare verbindingen.","risk":"Zonder consistente metadata ontstaan misleidende verbanden.","probeType":"DESK_RESEARCH","proposedProbe":"Vergelijk een representatieve steekproef uit drie publieke collecties.","capabilityKeys":["betere-navigatie"],"feasibility":"UNKNOWN"}],"conceptScreens":[$screens],"visionChangeSummary":"De eerste concrete en ambitieuze producthorizon is vastgesteld."}"""
+
+            private fun managerJson() = """{"summary":"Nepsamenvatting van de roadmap-sessie.","epicUpdates":[{"action":"CREATE","epicId":null,"title":"UX verbeteren","description":"Navigatie begrijpelijker maken voor nieuwe bezoekers.","processRank":1,"dependencyIds":[],"horizon":"NOW","kind":"DELIVERY","capabilityKey":"betere-navigatie"}],"settledQuestions":["Archief X is publiek benaderbaar zonder token"],"bugUpdates":[{"action":"CREATE","bugId":null,"title":"Navigatie opent niet","description":"De primaire navigatie reageert niet op activering.","reproductionSteps":"Open het menu en activeer de eerste link","expectedResult":"De doelpagina wordt geopend","actualResult":"De huidige pagina blijft zichtbaar","priority":"P1"}]}"""
         }
     }
 }

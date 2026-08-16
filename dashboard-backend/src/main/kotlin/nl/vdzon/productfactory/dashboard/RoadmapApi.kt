@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/products/{slug}/roadmap")
 class RoadmapApi(private val runtime: ProductFactoryRuntimeClient) {
+    @GetMapping("/vision")
+    fun vision(@PathVariable slug: String): Any? = runtime.roadmapVision(slug)
+
     @GetMapping("/epics", "/themes")
     fun epics(@PathVariable slug: String): Any = runtime.roadmapEpics(slug)
 

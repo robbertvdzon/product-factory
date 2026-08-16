@@ -257,9 +257,22 @@ data class RoadmapEpicView(
     val dependencyIds: List<String>,
     val blockedByIds: List<String>,
     val blocksIds: List<String>,
+    val horizon: String = "UNPLACED",
+    val kind: String = "DELIVERY",
+    val capabilityKey: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     val closedAt: Instant?,
+)
+
+data class RoadmapFutureVisionView(
+    val id: String,
+    val productSlug: String,
+    val version: Int,
+    val content: Map<String, Any?>,
+    val changeSummary: String,
+    val createdBySessionId: String,
+    val createdAt: Instant,
 )
 
 data class RoadmapSettledQuestionView(

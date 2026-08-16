@@ -5,6 +5,7 @@ import nl.vdzon.productfactory.contracts.RoadmapEpicView
 import nl.vdzon.productfactory.contracts.RoadmapSettledQuestionView
 import nl.vdzon.productfactory.roadmap.api.DeliveryVerificationRepository
 import nl.vdzon.productfactory.roadmap.api.RoadmapCatalog
+import nl.vdzon.productfactory.roadmap.api.RoadmapVisionCatalog
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -29,8 +30,15 @@ data class AddSettledQuestionRequest(val content: String)
 @RequestMapping("/api/products")
 class RoadmapController(
     private val catalog: RoadmapCatalog,
+    private val visions: RoadmapVisionCatalog,
     private val deliveryVerifications: DeliveryVerificationRepository,
 ) {
+    @GetMapping("/{slug}/roadmap/vision")
+    fun vision(@PathVariable slug: String) = visions.current(slug)
+
+    @GetMapping("/{slug}/roadmap/vision/history")
+    fun visionHistory(@PathVariable slug: String) = visions.history(slug)
+
     @GetMapping("/{slug}/roadmap/epics", "/{slug}/roadmap/themes")
     fun epics(@PathVariable slug: String): List<RoadmapEpicView> = catalog.listEpics(slug)
 

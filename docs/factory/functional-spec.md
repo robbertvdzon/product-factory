@@ -253,10 +253,18 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    alleen-lezen tekst, de overige velden — inclusief de doelrepository — bewerkbaar en opslaanbaar.
    Het scherm opent met focus binnen de dialoog, houdt de tab-focus binnen de dialoog en sluit met
    Escape waarbij de focus terugkeert naar de Instellingen-knop.
-7. **Epic-roadmap (Epics)** — de berekende epicvolgorde per product, met de bestaande detail- en
-   beheeracties. Eventuele afgehandelde onderzoeksvragen staan direct onder de roadmap.
-8. **Roadmap-sessies (Roadmap)** — de sessiestatus, samenvatting en, indien aanwezig, een actie om het verslag
-   te bekijken.
+7. **Toekomstvisie en epic-roadmap (Epics)** — boven de berekende epicvolgorde staat de nieuwste,
+   versieerbare eindproductvisie. Die toont de north star, toekomstige gebruikerservaringen,
+   screenshotachtige conceptschermen en de teruggeredeneerde route `Nu`, `Hierna`, `Later` en
+   `Horizon`. Onzekere maar aantrekkelijke mogelijkheden blijven in de visie staan en krijgen een
+   expliciete aanname of haalbaarheidsproef. De epic-roadmap behoudt de bestaande detail- en
+   beheeracties en labelt uitvoerepics en discovery-epics met hun horizon en capability. Eventuele
+   afgehandelde onderzoeksvragen staan direct onder de roadmap.
+8. **Roadmap-sessies (Roadmap)** — een sessie laat achtereenvolgens een visionair vrij ideeën
+   ontwikkelen vanuit de productmissie, een strateeg de eindvisie en backcast vastleggen en een
+   roadmapmanager de eerstvolgende uitvoer- en onderzoeksepics plannen. De sessiestatus,
+   samenvatting en, indien aanwezig, een actie om het volledige verslag te bekijken blijven
+   zichtbaar.
 9. **Overleggen** — de overlegstatus en uitkomst, met de bestaande detail- en notulenacties.
 10. **Bugs** — de geprioriteerde buglijst van het actieve product. Een kaart toont reproductiestappen,
     verwacht/werkelijk gedrag, aantal waarnemingen, gekoppelde story en status. Prioriteit en status

@@ -134,6 +134,10 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/products/{slug}/roadmap/epics", slug)
         .retrieve().body(listType).orEmpty()
 
+    fun roadmapVision(slug: String): Map<String, Any?>? = runtime.get()
+        .uri("/api/products/{slug}/roadmap/vision", slug)
+        .retrieve().body(object : ParameterizedTypeReference<Map<String, Any?>>() {})
+
     fun roadmapEpic(slug: String, id: String): Map<String, Any?> = runtime.get()
         .uri("/api/products/{slug}/roadmap/epics/{id}", slug, id)
         .retrieve().body(object : ParameterizedTypeReference<Map<String, Any?>>() {})

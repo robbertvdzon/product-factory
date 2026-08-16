@@ -12,7 +12,11 @@ import java.sql.ResultSet
 
 /** Eigenaar van de langlevende roadmap-epics, hun twee rangordes en harde dependencies. */
 @Service
-class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: ProductCatalog) {
+class RoadmapCatalog(
+    private val jdbc: JdbcTemplate,
+    private val products: ProductCatalog,
+    private val visions: RoadmapVisionCatalog,
+) {
     fun listEpics(productSlug: String): List<RoadmapEpicView> {
         val product = products.requireContext(productSlug)
         return views(product.slug)
@@ -35,9 +39,13 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         description: String,
         processRank: Int? = null,
         dependencyIds: Set<String> = emptySet(),
+        horizon: String = "UNPLACED",
+        kind: String = "DELIVERY",
+        capabilityKey: String? = null,
     ): RoadmapEpicView {
         val product = products.requireActive(productSlug)
         validateText(title, description)
+        validateStrategyFields(horizon, kind, capabilityKey)
         lock(product.slug)
         val current = records(product.slug)
         requireDependencies(product.slug, null, dependencyIds, current)
@@ -46,8 +54,9 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         val appendRank = current.size + 1
         jdbc.update(
             """insert into roadmap_theme(
-                id, product_slug, sequence_number, title, description, priority, status, customer_rank, process_rank
-            ) values (?, ?, ?, ?, ?, 'MEDIUM', 'OPEN', ?, ?)""".trimIndent(),
+                id, product_slug, sequence_number, title, description, priority, status, customer_rank, process_rank,
+                horizon, kind, capability_key
+            ) values (?, ?, ?, ?, ?, 'MEDIUM', 'OPEN', ?, ?, ?, ?, ?)""".trimIndent(),
             id,
             product.slug,
             sequence,
@@ -55,6 +64,9 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
             description.trim(),
             appendRank,
             appendRank,
+            horizon,
+            kind,
+            capabilityKey?.trim()?.ifBlank { null },
         )
         replaceDependencies(id, dependencyIds)
         processRank?.let { reorder(product.slug, id, it, "process_rank") }
@@ -97,6 +109,9 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         processRank: Int? = null,
         dependencyIds: Set<String>? = null,
         status: String? = null,
+        horizon: String? = null,
+        kind: String? = null,
+        capabilityKey: String? = null,
     ): RoadmapEpicView = updateEpic(
         productSlug = productSlug,
         id = id,
@@ -105,6 +120,10 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         processRank = processRank,
         dependencyIds = dependencyIds,
         status = status,
+        horizon = horizon,
+        kind = kind,
+        capabilityKey = capabilityKey,
+        updateStrategyFields = horizon != null || kind != null || capabilityKey != null,
     )
 
     /** Compatibiliteitsvorm voor bestaande interne code; priority wordt niet meer gebruikt. */
@@ -137,6 +156,10 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         processRank: Int? = null,
         dependencyIds: Set<String>? = null,
         status: String? = null,
+        horizon: String? = null,
+        kind: String? = null,
+        capabilityKey: String? = null,
+        updateStrategyFields: Boolean = false,
     ): RoadmapEpicView {
         val product = products.requireActive(productSlug)
         lock(product.slug)
@@ -144,18 +167,25 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         val newTitle = (title ?: current.title).trim()
         val newDescription = (description ?: current.description).trim()
         val newStatus = status ?: current.status
+        val newHorizon = horizon ?: current.horizon
+        val newKind = kind ?: current.kind
+        val newCapabilityKey = if (updateStrategyFields) capabilityKey?.trim()?.ifBlank { null } else current.capabilityKey
         validateText(newTitle, newDescription)
         require(newStatus in STATUSES) { "Ongeldige status" }
+        validateStrategyFields(newHorizon, newKind, newCapabilityKey)
         val closingNow = newStatus == "DONE" && current.status != "DONE"
         val reopening = newStatus != "DONE" && current.status == "DONE"
         jdbc.update(
             """update roadmap_theme
-                set title = ?, description = ?, status = ?, updated_at = current_timestamp,
+                set title = ?, description = ?, status = ?, horizon = ?, kind = ?, capability_key = ?, updated_at = current_timestamp,
                     closed_at = case when ? then current_timestamp when ? then null else closed_at end
                 where product_slug = ? and id = ?""".trimIndent(),
             newTitle,
             newDescription,
             newStatus,
+            newHorizon,
+            newKind,
+            newCapabilityKey,
             closingNow,
             reopening,
             product.slug,
@@ -188,11 +218,11 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
             "Er zijn nog geen roadmap-epics vastgesteld."
         } else {
             openEpics.joinToString("\n") {
-                "epicId=${it.id} [roadmap #${it.roadmapRank}, klant #${it.customerRank}, proces #${it.processRank}, score ${it.priorityScore}, ${it.status}] ${it.title}: ${it.description} dependencies=${it.dependencyIds}"
+                "epicId=${it.id} [${it.horizon}, ${it.kind}, capability=${it.capabilityKey ?: "geen"}, roadmap #${it.roadmapRank}, klant #${it.customerRank}, proces #${it.processRank}, score ${it.priorityScore}, ${it.status}] ${it.title}: ${it.description} dependencies=${it.dependencyIds}"
             }
         }
         val settledBlock = if (settled.isEmpty()) "Geen afgehandelde onderzoeksvragen." else settled.joinToString("\n") { "- ${it.content}" }
-        return "OPEN ROADMAP-EPICS:\n$epicsBlock\n\nAFGEHANDELDE ONDERZOEKSVRAGEN (niet opnieuw onderzoeken):\n$settledBlock"
+        return "${visions.contextForCycle(productSlug)}\n\nOPEN ROADMAP-EPICS:\n$epicsBlock\n\nAFGEHANDELDE ONDERZOEKSVRAGEN (niet opnieuw onderzoeken):\n$settledBlock"
     }
 
     fun addSettledQuestion(productSlug: String, content: String): RoadmapSettledQuestionView {
@@ -230,6 +260,9 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
                 dependencyIds = row.record.dependencyIds.sorted(),
                 blockedByIds = row.record.dependencyIds.filter { statusById[it] != "DONE" }.sorted(),
                 blocksIds = blocks[row.record.id].orEmpty().sorted(),
+                horizon = row.horizon,
+                kind = row.kind,
+                capabilityKey = row.capabilityKey,
                 createdAt = row.createdAt,
                 updatedAt = row.updatedAt,
                 closedAt = row.closedAt,
@@ -315,6 +348,9 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         ),
         title = row.getString("title"),
         description = row.getString("description"),
+        horizon = row.getString("horizon"),
+        kind = row.getString("kind"),
+        capabilityKey = row.getString("capability_key"),
         createdAt = row.getTimestamp("created_at").toInstant(),
         updatedAt = row.getTimestamp("updated_at").toInstant(),
         closedAt = row.getTimestamp("closed_at")?.toInstant(),
@@ -337,6 +373,9 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
         val record: RoadmapEpicRecord,
         val title: String,
         val description: String,
+        val horizon: String,
+        val kind: String,
+        val capabilityKey: String?,
         val createdAt: java.time.Instant,
         val updatedAt: java.time.Instant,
         val closedAt: java.time.Instant?,
@@ -345,5 +384,15 @@ class RoadmapCatalog(private val jdbc: JdbcTemplate, private val products: Produ
     companion object {
         private val LEGACY_PRIORITIES = setOf("HIGH", "MEDIUM", "LOW")
         private val STATUSES = setOf("OPEN", "IN_PROGRESS", "DONE")
+        private val HORIZONS = setOf("UNPLACED", "NOW", "NEXT", "LATER", "HORIZON")
+        private val KINDS = setOf("DELIVERY", "DISCOVERY")
+    }
+
+    private fun validateStrategyFields(horizon: String, kind: String, capabilityKey: String?) {
+        require(horizon in HORIZONS) { "Ongeldige roadmaphorizon" }
+        require(kind in KINDS) { "Ongeldig epictype" }
+        require(capabilityKey == null || capabilityKey.matches(Regex("^[a-z0-9]+(-[a-z0-9]+)*$"))) {
+            "Capability-sleutel moet kebab-case zijn"
+        }
     }
 }

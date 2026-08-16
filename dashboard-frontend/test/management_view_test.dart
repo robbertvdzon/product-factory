@@ -267,6 +267,7 @@ void main() {
         '/api/ai-catalog',
         '/api/meetings',
         '/api/roadmap/epics',
+        '/api/roadmap/visions',
         '/api/roadmap/settled-questions',
         '/api/roadmap/sessions',
         '/api/shadow-iterations',

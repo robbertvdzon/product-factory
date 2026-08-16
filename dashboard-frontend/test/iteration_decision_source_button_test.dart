@@ -113,7 +113,11 @@ Future<void> _withDashboard(
   final mockClient = _buildMockClient(callLog);
   await http.runWithClient(() async {
     await tester.pumpWidget(const ProductFactoryDashboard());
-    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 10));
+      if (find.text('Productsessies').evaluate().isNotEmpty) break;
+    }
+    await tester.tap(find.text('Productsessies'));
     await tester.pump();
     final productSessions = find.text('Productsessies');
     await tester.ensureVisible(productSessions);

@@ -82,6 +82,17 @@
 
 ## Epic-roadmap, ranking en dependencies
 
+- Flyway-migratie `V26__roadmap_future_vision.sql` voegt de append-only tabel
+  `roadmap_future_vision` toe en verrijkt `roadmap_theme` met `horizon`, `kind` en
+  `capability_key`. Iedere geslaagde roadmap-sessie schrijft één nieuwe JSON-visieversie; oude
+  versies blijven beschikbaar via `/api/products/{slug}/roadmap/vision/history`, terwijl
+  `/vision` de actuele versie levert.
+- `RoadmapSessionEngine` voert drie afzonderlijk geregistreerde agenttaken uit. `roadmap-visionary`
+  ontvangt bewust geen backlog- of architectuurbeperkingen en levert ervaringen, wilde ideeën en
+  conceptschermen. `roadmap-strategist` maakt de north star, capabilities, vier horizons en
+  toetsbare aannames. `roadmap-manager` vertaalt dit naar maximaal vijftien delivery- of
+  discovery-epicmutaties. `RoadmapSessionApplier` bewaart visie, epics, vragen en bugmutaties in één
+  transactie, zodat een ongeldige koppeling geen halve roadmap achterlaat.
 - Flyway-migratie `V21__roadmap_epic_ranking.sql` voegt `customer_rank` en `process_rank` toe aan
   de bestaande `roadmap_theme`-tabel. De tabelnaam en bestaande epic-ID's blijven bewust behouden
   zodat historische storykoppelingen geldig blijven; in contracten, API en UI heet het object een
@@ -167,9 +178,10 @@
   `(Afgeleid)`, of anders uitsluitend `Onbekend`.
   De dialoogtitel gebruikt het user-facing `sequenceNumber`, met het iteratie-id als fallback als
   dat nummer ontbreekt. Openen en sluiten gebruikt uitsluitend de bestaande GET-calls.
-  `roadmap.dart` bevat het epic-contract voor de UI, de horizontale dependencygrafiek, kaartjes en
-  de maak-/detaildialogen. De process-rank en score zijn daar alleen-lezen; klant-rank,
-  dependencies, titel, beschrijving en status worden via de epic-routes opgeslagen.
+  `roadmap.dart` bevat het epic-contract voor de UI, het toekomstvisiepaneel met conceptschermen en
+  horizonkolommen, de horizontale dependencygrafiek, kaartjes en de maak-/detaildialogen. De
+  process-rank en score zijn daar alleen-lezen; klant-rank, dependencies, titel, beschrijving en
+  status worden via de epic-routes opgeslagen.
 - `StartAvailability.fromProduct` leest uitsluitend de sleutels `status` en `workspaceOwnership`.
   Het model vergelijkt bekende waarden exact en hoofdlettergevoelig, zonder trimmen of normaliseren,
   en levert uit één instantie `canStart`, de geprioriteerde primaire reden, de aanvullende telling,
