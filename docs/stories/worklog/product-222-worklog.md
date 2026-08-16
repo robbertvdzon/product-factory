@@ -293,3 +293,23 @@ Resultaat browser-DOM-herstel:
 - `agent-image-build` blijft volgens `.factory/verification.yaml` niet agent-runnable en wordt door
   CI uitgevoerd. Eindcontrole op conflictmarkers, whitespace en onverwachte lockfilewijzigingen is
   schoon.
+
+Vervolgreview browser-DOM-herstel 2026-08-16:
+- De volledige story-diff `git diff main...HEAD` en de laatste fixdiff zijn beoordeeld volgens de
+  vervolgreviewregels. De oorspronkelijke trim-, privacy- en concurrencybevindingen blijven
+  opgelost; de nieuwe fix raakt die implementatie niet.
+- De testerbevinding over de naamloze echte Flutter-Webdialoog is opgelost: één expliciete
+  semantieknode draagt rol, route-eigenschappen en label, terwijl de onderliggende `Dialog` geen
+  tweede alertdialogrol maakt. De productie-widget wordt door de webharness gebouwd en de exacte
+  Playwright-query vindt één `alertdialog` met eigen `aria-label` `Productcyclus starten`.
+- De gerichte browser-DOM-test is tijdens de review opnieuw groen uitgevoerd. De custom
+  dialoogwrapper behoudt de bestaande inhoud, acties, gesloten focusroute en fout-/invoertoestand;
+  in de fixdiff is geen nieuwe functionele regressie gevonden.
+- De twee door de tester gemelde preview-404-paden zijn in zowel de destijds geteste commit als de
+  actuele checkout aanwezig als `GET /api/bugs` en `GET /api/test-sessions`; de frontend gebruikt
+  exact die paden. Er ontbreekt daarom geen backendroute in de actuele storytree en een speculatieve
+  frontendfallback zou het omgevingsprobleem alleen maskeren.
+- Het nieuwste factorybewijs is volledig groen en revisiongebonden: tested tree
+  `4d83cba081d7571808cba2605dd2acc060b572d8` is exact gelijk aan `HEAD^{tree}`. Maven, Flutter
+  analyze/tests, de nieuwe browser-DOM-test, Engine-runner en beide frontend-imagebuilds zijn
+  geslaagd. `git diff --check main...HEAD` is schoon.
