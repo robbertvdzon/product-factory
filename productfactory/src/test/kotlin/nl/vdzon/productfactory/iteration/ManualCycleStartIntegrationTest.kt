@@ -1,14 +1,22 @@
 package nl.vdzon.productfactory.iteration
 
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.classic.spi.ThrowableProxyUtil
+import ch.qos.logback.core.read.ListAppender
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
 import nl.vdzon.productfactory.contracts.ManualStartOrigin
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.event.ApplicationEvents
+import org.springframework.test.context.event.RecordApplicationEvents
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
@@ -17,17 +25,21 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@RecordApplicationEvents
 class ManualCycleStartIntegrationTest(
     @Autowired private val service: ShadowIterationService,
     @Autowired private val repository: ShadowIterationRepository,
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val mvc: MockMvc,
     @Autowired private val objectMapper: ObjectMapper,
+    @Autowired private val meterRegistry: MeterRegistry,
 ) {
     @BeforeEach
     fun createProducts() {
@@ -35,6 +47,7 @@ class ManualCycleStartIntegrationTest(
             VALIDATION_PRODUCT_SLUG,
             HTTP_PRODUCT_SLUG,
             HTTP_SUCCESS_PRODUCT_SLUG,
+            PRIVACY_PRODUCT_SLUG,
             CONCURRENT_PRODUCT_SLUG,
             AUTOMATIC_PRODUCT_SLUG,
         ).forEach { slug ->
@@ -64,6 +77,13 @@ class ManualCycleStartIntegrationTest(
         assertFailsWith<ResponseStatusException> {
             service.startManualCycle(VALIDATION_PRODUCT_SLUG, "x".repeat(301), ManualStartOrigin.OWNER_INPUT)
         }
+        MANUAL_START_EDGE_WHITESPACE.forEach { whitespace ->
+            assertFailsWith<ResponseStatusException> {
+                service.startManualCycle(VALIDATION_PRODUCT_SLUG, whitespace, ManualStartOrigin.OWNER_INPUT)
+            }
+            assertEquals("Vraag", trimManualStartFocus("${whitespace}Vraag$whitespace"))
+        }
+        assertEquals("\u200BVraag\u200B", trimManualStartFocus("\u200BVraag\u200B"))
         assertEquals(0, repository.list(VALIDATION_PRODUCT_SLUG).size)
 
         val owner = service.startManualCycle(VALIDATION_PRODUCT_SLUG, "  Vraag  met  binnenruimte  ", ManualStartOrigin.OWNER_INPUT)
@@ -104,7 +124,47 @@ class ManualCycleStartIntegrationTest(
     }
 
     @Test
-    fun `concurrent confirmations create at most one cycle and second request leaves no extra row`() {
+    fun `rejected owner input stays out of backend responses logs and telemetry`() {
+        val privateFocus = "PRIVACY_SENTINEL_${"x".repeat(301)}"
+        val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as Logger
+        val capturedLogs = ListAppender<ILoggingEvent>().also {
+            it.start()
+            rootLogger.addAppender(it)
+        }
+
+        val response = try {
+            mvc.post("/api/products/$PRIVACY_PRODUCT_SLUG/cycles") {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(
+                    mapOf("focus" to privateFocus, "manualStartOrigin" to "OWNER_INPUT"),
+                )
+            }.andExpect { status { isBadRequest() } }.andReturn().response
+        } finally {
+            rootLogger.detachAppender(capturedLogs)
+            capturedLogs.stop()
+        }
+
+        assertFalse(response.contentAsString.contains(privateFocus))
+        assertFalse(response.errorMessage.orEmpty().contains(privateFocus))
+        val logOutput = capturedLogs.list.joinToString("\n") { event ->
+            buildString {
+                append(event.formattedMessage)
+                event.throwableProxy?.let { append(ThrowableProxyUtil.asString(it)) }
+            }
+        }
+        assertFalse(logOutput.contains(privateFocus))
+
+        val requestMeters = meterRegistry.find("http.server.requests").meters()
+        assertTrue(requestMeters.isNotEmpty(), "De HTTP-requesttelemetry moet actief zijn voor dit bewijs")
+        val telemetryMetadata = meterRegistry.meters.joinToString("\n") { it.id.toString() }
+        assertFalse(telemetryMetadata.contains(privateFocus))
+        assertEquals(0, repository.list(PRIVACY_PRODUCT_SLUG).size)
+    }
+
+    @Test
+    fun `concurrent confirmations create at most one cycle and second request leaves no extra row`(
+        applicationEvents: ApplicationEvents,
+    ) {
         val pool = Executors.newFixedThreadPool(2)
         val ready = CountDownLatch(2)
         val start = CountDownLatch(1)
@@ -128,7 +188,14 @@ class ManualCycleStartIntegrationTest(
 
             assertEquals(1, results.count { it.isSuccess })
             assertEquals(1, results.count { it.exceptionOrNull() is ResponseStatusException })
-            assertEquals(1, repository.list(CONCURRENT_PRODUCT_SLUG).size)
+            val iterations = repository.list(CONCURRENT_PRODUCT_SLUG)
+            assertEquals(1, iterations.size)
+            assertEquals(
+                1,
+                applicationEvents.stream(ShadowIterationStarted::class.java)
+                    .filter { it.iterationId == iterations.single().id }
+                    .count(),
+            )
         } finally {
             pool.shutdownNow()
         }
@@ -149,7 +216,12 @@ class ManualCycleStartIntegrationTest(
         const val VALIDATION_PRODUCT_SLUG = "manual-cycle-validation-test"
         const val HTTP_PRODUCT_SLUG = "manual-cycle-http-test"
         const val HTTP_SUCCESS_PRODUCT_SLUG = "manual-cycle-http-success-test"
+        const val PRIVACY_PRODUCT_SLUG = "manual-cycle-privacy-test"
         const val CONCURRENT_PRODUCT_SLUG = "manual-cycle-concurrent-test"
         const val AUTOMATIC_PRODUCT_SLUG = "automatic-cycle-start-test"
+        val MANUAL_START_EDGE_WHITESPACE = listOf(
+            "\u0009", "\u000A", "\u000B", "\u000C", "\u000D", "\u0020", "\u0085", "\u00A0", "\u1680",
+            "\u2000", "\u200A", "\u2028", "\u2029", "\u202F", "\u205F", "\u3000", "\uFEFF",
+        )
     }
 }

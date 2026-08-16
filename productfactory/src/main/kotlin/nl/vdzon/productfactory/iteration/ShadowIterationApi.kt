@@ -45,6 +45,32 @@ data class ResumeIterationContext(
     val critic: String,
 )
 
+private fun Char.isManualStartTrimCharacter(): Boolean =
+    this in '\u0009'..'\u000D' ||
+        this == '\u0020' ||
+        this == '\u0085' ||
+        this == '\u00A0' ||
+        this == '\u1680' ||
+        this in '\u2000'..'\u200A' ||
+        this == '\u2028' ||
+        this == '\u2029' ||
+        this == '\u202F' ||
+        this == '\u205F' ||
+        this == '\u3000' ||
+        this == '\uFEFF'
+
+/**
+ * Expliciet gedeeld whitespacecontract voor eigenaarinput. JVM en Dart verschillen in hun
+ * ingebouwde trimdefinitie; de Flutter-client bevat daarom letterlijk dezelfde Unicode-set.
+ */
+internal fun trimManualStartFocus(value: String): String {
+    var start = 0
+    var end = value.length
+    while (start < end && value[start].isManualStartTrimCharacter()) start++
+    while (end > start && value[end - 1].isManualStartTrimCharacter()) end--
+    return value.substring(start, end)
+}
+
 @RestController
 class ShadowIterationController(private val service: ShadowIterationService) {
     /**
@@ -119,7 +145,7 @@ class ShadowIterationService(
                 AUTONOMOUS_DEFAULT_FOCUS
             }
             ManualStartOrigin.OWNER_INPUT -> {
-                val trimmed = requestedFocus?.trim().orEmpty()
+                val trimmed = requestedFocus?.let(::trimManualStartFocus).orEmpty()
                 if (trimmed.length !in 1..MAX_OWNER_FOCUS_LENGTH) {
                     throw ResponseStatusException(
                         HttpStatus.BAD_REQUEST,

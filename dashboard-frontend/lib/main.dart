@@ -4207,7 +4207,7 @@ class _ManualCycleStartDialogState extends State<ManualCycleStartDialog> {
 
   String get _effectiveFocus => _origin == ManualStartOrigin.autonomousDefault
       ? autonomousDefaultFocus
-      : _ownerFocusController.text.trim();
+      : trimManualStartFocus(_ownerFocusController.text);
 
   @override
   void dispose() {

@@ -60,3 +60,26 @@ Reviewer-run 2026-08-16:
   `cac505c0849ecd5a0f5929f7cc9ff2923c4ce44e` is gelijk aan `HEAD^{tree}`; Maven, Flutter analyze,
   Flutter tests en beide frontend-imagebuilds zijn groen. De Engine-runner-test is terecht door de
   pathselectie overgeslagen omdat geen runner/configbestand is gewijzigd.
+
+Herstelplan na review:
+[x]: align Unicode-trimsemantiek tussen Flutter en Kotlin en voeg grensgevallen toe
+[x]: bewijs privacy voor backend-foutresponses, logging en telemetry
+[x]: tel gepubliceerde ShadowIterationStarted-events in de concurrency-integratietest
+[x]: draai gerichte tests en het volledige factory-vangnet
+[x]: controleer de uiteindelijke diff en werk dit log bij
+
+Herstel na review:
+- Flutter en Kotlin gebruiken nu dezelfde expliciete trimset (Unicode White_Space plus U+FEFF),
+  zodat onder meer U+0085 en U+FEFF aan beide kanten als randwitruimte gelden. Beide testsets
+  bewijzen alle opgenomen grenscodepunten en één bewust niet-getrimd codepunt.
+- De runtime-integratietest stuurt unieke vrije eigenaarinput via de echte HTTP-route en bewijst dat
+  een afwijzing geen cyclus maakt en de invoer niet voorkomt in response/error, root request- en
+  foutlogging of metadata van de actieve `http.server.requests`-telemetry.
+- De gelijktijdigheidstest registreert Spring-applicatie-events en koppelt de enige overgebleven
+  cyclusrij expliciet aan exact één `ShadowIterationStarted`-event.
+- Gerichte backendtest: 6 tests, 0 failures/errors. Gerichte Fluttertest: 7 tests, alles groen.
+- Volledig vangnet groen: Maven `clean verify` met 175 tests en 0 failures/errors; `flutter analyze`
+  met 0 issues; `flutter test` met 435 tests; Docker Engine-runner 3 tests; frontend-imagebuilds met
+  veilige defaults en expliciete metadata allebei 19/19 stappen succesvol.
+- Einddiff gecontroleerd op conflictmarkers, whitespacefouten, onbedoelde lockfilewijzigingen,
+  logging van vrije tekst en wijzigingen buiten de drie reviewbevindingen; geen open punt gevonden.

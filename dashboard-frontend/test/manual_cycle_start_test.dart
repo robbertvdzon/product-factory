@@ -249,6 +249,37 @@ void main() {
     },
   );
 
+  test(
+    'eigenaarinput gebruikt dezelfde expliciete Unicode-trimset als de runtime',
+    () {
+      const edgeWhitespace = <String>[
+        '\u0009',
+        '\u000A',
+        '\u000B',
+        '\u000C',
+        '\u000D',
+        '\u0020',
+        '\u0085',
+        '\u00A0',
+        '\u1680',
+        '\u2000',
+        '\u200A',
+        '\u2028',
+        '\u2029',
+        '\u202F',
+        '\u205F',
+        '\u3000',
+        '\uFEFF',
+      ];
+
+      for (final whitespace in edgeWhitespace) {
+        expect(trimManualStartFocus('${whitespace}Vraag$whitespace'), 'Vraag');
+        expect(validateOwnerFocus(whitespace), isNotNull);
+      }
+      expect(trimManualStartFocus('\u200BVraag\u200B'), '\u200BVraag\u200B');
+    },
+  );
+
   testWidgets(
     'bestaand cyclusdetail toont opgeslagen opdracht en alleen bekende handmatige herkomst',
     (tester) async {
