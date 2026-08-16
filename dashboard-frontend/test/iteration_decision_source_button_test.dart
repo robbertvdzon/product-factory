@@ -115,11 +115,10 @@ Future<void> _withDashboard(
     await tester.pumpWidget(const ProductFactoryDashboard());
     for (var attempt = 0; attempt < 20; attempt++) {
       await tester.pump(const Duration(milliseconds: 10));
-      if (find.byType(IterationEvidenceRow).evaluate().length ==
-          _iterations.length) {
-        break;
-      }
+      if (find.text('Productsessies').evaluate().isNotEmpty) break;
     }
+    await tester.tap(find.text('Productsessies'));
+    await tester.pump();
     await body();
   }, () => mockClient);
 }
