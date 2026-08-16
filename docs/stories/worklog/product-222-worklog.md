@@ -147,3 +147,20 @@ Resultaat toegankelijkheidsherstel:
 - `agent-image-build` blijft volgens `.factory/verification.yaml` niet agent-runnable en wordt door
   CI uitgevoerd. Eindcontrole op diff, whitespace, conflictmarkers en onverwachte bestanden is
   schoon; alleen productiecode, regressietest en dit worklog zijn gewijzigd.
+
+Vervolgreview toegankelijkheidsherstel 2026-08-16:
+- De volledige story-diff `main...HEAD` is opnieuw gecontroleerd. De drie eerdere reviewbevindingen
+  blijven opgelost; conform de vervolgreviewregels zijn daarnaast de nieuwe dialoognaamfix en haar
+  regressierisico beoordeeld.
+- De testerbevinding is opgelost: `AlertDialog.semanticLabel` levert in Flutter een route-node met
+  `scopesRoute` en `namesRoute`; de Flutter Web-engine zet de labelwaarde daardoor als `aria-label`
+  op het element met `role="alertdialog"`. De zichtbare titel blijft ongewijzigd aanwezig.
+- Het verwijderen van de losse `namesRoute`-wrapper om de titel introduceert geen regressie: de
+  dialoog benoemt nu zichzelf en Flutter voorkomt daarmee juist een dubbele routeaankondiging.
+- Gerichte verificatie: `flutter test test/manual_cycle_start_test.dart --reporter expanded` is
+  groen met 8/8 tests. `git diff --check main...HEAD`, conflictmarkercontrole en worktreestatus waren
+  vóór deze toegestane worklognotitie schoon.
+- Het nieuwste factorybewijs is geldig: tested tree
+  `153589e03c45a6aad2b6639feea95cfb7ba98f9b` is exact gelijk aan de developercommit-tree. Maven,
+  Flutter analyze/tests en beide toepasselijke frontend-imagebuilds zijn groen; de Engine-runner-test
+  is volgens de versievaste pathselectie niet van toepassing op deze frontendfix.
