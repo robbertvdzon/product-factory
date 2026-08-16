@@ -100,3 +100,24 @@ Vervolgreview 2026-08-16:
   `b40d2a66472d3b8941c46fa504346df780aee85a` is gelijk aan de developercommit-tree; Maven, Flutter
   analyze/tests en beide toepasselijke frontend-imagebuilds zijn groen. De Engine-runner-test is
   volgens de versioned pathselectie niet van toepassing op deze fix.
+
+Herontwikkelrun na testafwijzing 2026-08-16:
+- [x] controleer taakcontext, factorydocumentatie, branchstatus en eerdere reviewbevindingen
+- [x] draai de storygerichte backend- en Flutter-tests opnieuw
+- [x] draai het volledige agent-runnable factory-vangnet opnieuw
+- [x] controleer de uiteindelijke worktree en leg de resultaten vast
+
+Aanleiding:
+- De storygerichte testfase was inhoudelijk groen, maar werd afgewezen doordat de previewruntime
+  instabiel was. De eerder gereviewde implementatie staat ongewijzigd op de huidige branch; deze run
+  herbevestigt daarom de ontwikkeltests en het volledige lokale vangnet na de laatste merge met main.
+
+Resultaat herontwikkelrun:
+- Storygerichte backendtests: 8 tests, 0 failures/errors/skips; storygerichte Fluttertests: 7 tests,
+  alles groen.
+- Volledig vangnet: Maven `clean verify` met 175 tests en 0 failures/errors/skips; `flutter analyze`
+  met 0 issues; `flutter test` met 435 tests; Docker Engine-runner met 3 geslaagde tests; beide
+  frontend-imagebuilds met 19/19 succesvolle stappen.
+- `agent-image-build` is volgens de versioned verificatieconfiguratie niet agent-runnable en wordt
+  door CI uitgevoerd. De story-implementatie en tests hoefden inhoudelijk niet aangepast te worden;
+  alleen dit worklog is voor de nieuwe run aangevuld.
