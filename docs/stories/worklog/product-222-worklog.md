@@ -1,5 +1,38 @@
 # product-222 - Worklog
 
+Herstelrun na Flyway-checksummismatch 2026-08-16:
+- [x] lees taakcontext, factorydocumentatie, agent-tips en bestaand testerbewijs
+- [x] herleid de botsende migratiegeschiedenis van PR-preview en main
+- [x] implementeer veilig herstel uitsluitend voor de wegwerpbare per-PR-previewdatabase
+- [x] voeg regressietests toe voor herstel en fail-closed gedrag buiten PR-preview
+- [x] draai gerichte tests en het volledige agent-runnable factory-vangnet
+- [x] controleer de uiteindelijke diff en leg de resultaten vast
+
+Aanleiding:
+- De actuele HEAD-runtime faalt vóór startup omdat de persistente wegwerp-previewdatabase de
+  vroegere storymigratie als V25 heeft toegepast, terwijl de na integratie vereiste en al op main
+  vastgelegde V25 de bugs- en testsessiemigratie is. De productievaste V25 mag niet worden
+  herschreven; de per-PR-preview moet bij precies deze validatiefout veilig opnieuw opgebouwd
+  kunnen worden.
+
+Resultaat Flyway-herstel:
+- Een eigen `FlywayMigrationStrategy` laat de normale migratie eerst ongewijzigd uitvoeren. Alleen
+  bij een `FlywayValidateException` én de reeds fail-closed gevalideerde dataset `PR_PREVIEW` maakt
+  hij het wegwerpschema schoon en migreert hij opnieuw. Andere migratiefouten worden niet gevangen.
+- Productie (`NONE`) en de vaste acceptatieomgeving (`ACCEPTANCE`) geven dezelfde validatiefout
+  ongewijzigd door en behouden hun bestaande schema/data. De herstelmelding bevat uitsluitend het
+  niet-gevoelige PR-nummer en geen databaseverbinding of exceptiondetails.
+- Drie nieuwe regressietests creëren een echte Flyway-checksummismatch. Zij bewijzen respectievelijk
+  schoon herstel naar de actuele migratie voor PR-preview en fail-closed databehoud voor acceptance
+  en niet-preview. De bestaande storymigratietest bewijst aanvullend dat V25, V26 en V27 op een
+  schoon schema in de vereiste volgorde toepassen. Gerichte set: 13 tests, 0 failures/errors/skips.
+- `docs/factory/deployment.md` beschrijft de begrenzing tot de per-PR-wegwerpdatabase en het
+  ongewijzigde gedrag van productie en de vaste acceptatieomgeving.
+- Volledig vangnet groen: Maven `clean verify` met 196 tests en 0 failures/errors/skips; `flutter
+  analyze` met 0 issues; `flutter test` met 441 tests; de Flutter-Web-DOM-test; Docker
+  Engine-runner met 3 tests; en beide frontend-imagebuilds met 19/19 succesvolle stappen.
+  `agent-image-build` blijft volgens `.factory/verification.yaml` uitsluitend CI-runnable.
+
 Story-context bij eerste pickup:
 Implementeer controleerbare handmatige cyclusstart
 
