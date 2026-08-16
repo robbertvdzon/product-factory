@@ -2,9 +2,10 @@ package nl.vdzon.productfactory.product.api
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import nl.vdzon.productfactory.contracts.MemoryChangeView
+import nl.vdzon.productfactory.contracts.MemoryVersionView
 import nl.vdzon.productfactory.contracts.ProductRecordView
 import nl.vdzon.productfactory.contracts.ProductView
-import nl.vdzon.productfactory.contracts.MemoryChangeView
 import nl.vdzon.productfactory.contracts.WeeklyScheduleView
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
@@ -16,6 +17,8 @@ import org.springframework.web.server.ResponseStatusException
 import java.net.URI
 import java.sql.ResultSet
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
 
 data class ProductConfiguration(
@@ -269,34 +272,136 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         requireProduct(slug)
         val table = recordTable(kind)
         if (kind == "memory") {
-            return jdbc.query(
-                """select m.id, m.product_slug, m.title, m.content, m.created_at,
-                    m.supersedes_id, m.change_reason, m.created_by
-                    from product_memory m
-                    where m.product_slug = ?
-                      and not exists (select 1 from product_memory successor where successor.supersedes_id = m.id)
-                      and not exists (select 1 from product_memory_retraction retraction where retraction.memory_id = m.id)
-                    order by m.id""".trimIndent(),
-                { row, _ ->
-                    ProductRecordView(
-                        id = row.getLong("id"),
-                        productSlug = row.getString("product_slug"),
-                        title = row.getString("title"),
-                        content = row.getString("content"),
-                        createdAt = row.getTimestamp("created_at").toInstant(),
-                        supersedesId = row.getLong("supersedes_id").takeUnless { row.wasNull() },
-                        changeReason = row.getString("change_reason"),
-                        createdBy = row.getString("created_by"),
-                    )
-                },
-                normalizeSlug(slug),
-            )
+            return memoryAt(slug, null)
         }
         val sourceColumn = if (kind == "research") ", source_url" else ""
         return jdbc.query(
             "select id, product_slug, title, content$sourceColumn, created_at from $table where product_slug = ? order by id",
             { row, _ -> mapRecord(row, kind == "research") }, normalizeSlug(slug),
         )
+    }
+
+    /**
+     * Reconstrueert de actieve geheugenprojectie op [asOf]. Zonder peildatum is dit de actuele
+     * projectie. Een opvolger of tombstone telt pas mee vanaf zijn eigen created_at.
+     */
+    fun memoryAt(slug: String, asOf: Instant?): List<ProductRecordView> {
+        requireProduct(slug)
+        val normalized = normalizeSlug(slug)
+        val timeClause = if (asOf == null) {
+            """and not exists (select 1 from product_memory successor where successor.supersedes_id = m.id)
+                and not exists (select 1 from product_memory_retraction retraction where retraction.memory_id = m.id)"""
+        } else {
+            """and m.created_at <= ?
+                and not exists (
+                    select 1 from product_memory successor
+                    where successor.supersedes_id = m.id and successor.created_at <= ?
+                )
+                and not exists (
+                    select 1 from product_memory_retraction retraction
+                    where retraction.memory_id = m.id and retraction.created_at <= ?
+                )"""
+        }
+        val arguments = if (asOf == null) arrayOf(normalized) else arrayOf(normalized, asOf, asOf, asOf)
+        return jdbc.query(
+            """select m.id, m.product_slug, m.title, m.content, m.created_at,
+                m.supersedes_id, m.change_reason, m.created_by
+                from product_memory m
+                where m.product_slug = ?
+                  $timeClause
+                order by m.id""".trimIndent(),
+            { row, _ -> mapMemoryRecord(row) },
+            *arguments,
+        )
+    }
+
+    /** Accepteert een ISO-instant of een lokale datum, waarbij een datum het einde van de productdag betekent. */
+    fun memoryAt(slug: String, asOf: String): List<ProductRecordView> {
+        val product = requireProduct(slug)
+        val trimmed = asOf.trim()
+        require(trimmed.isNotEmpty()) { "Peildatum mag niet leeg zijn" }
+        val instant = runCatching { Instant.parse(trimmed) }.getOrElse {
+            runCatching {
+                LocalDate.parse(trimmed).plusDays(1).atStartOfDay(ZoneId.of(product.timezone)).toInstant().minusNanos(1)
+            }.getOrElse { throw IllegalArgumentException("Ongeldige peildatum; gebruik YYYY-MM-DD of een ISO-8601-instant") }
+        }
+        return memoryAt(slug, instant)
+    }
+
+    /** Volledige read-only auditlijn; deze methode wordt nooit voor normale agentcontext gebruikt. */
+    fun memoryHistory(slug: String): List<MemoryVersionView> {
+        requireProduct(slug)
+        data class StoredVersion(
+            val record: ProductRecordView,
+            val supersededById: Long?,
+            val supersededAt: Instant?,
+            val retractedAt: Instant?,
+            val retirementReason: String?,
+            val retiredBy: String?,
+        )
+
+        val stored = jdbc.query(
+            """select m.id, m.product_slug, m.title, m.content, m.created_at,
+                m.supersedes_id, m.change_reason, m.created_by,
+                successor.id as superseded_by_id, successor.created_at as superseded_at,
+                retraction.created_at as retracted_at,
+                coalesce(retraction.reason, successor.change_reason) as retirement_reason,
+                coalesce(retraction.created_by, successor.created_by) as retired_by
+                from product_memory m
+                left join product_memory successor on successor.supersedes_id = m.id
+                left join product_memory_retraction retraction on retraction.memory_id = m.id
+                where m.product_slug = ?
+                order by m.created_at, m.id""".trimIndent(),
+            { row, _ ->
+                StoredVersion(
+                    record = mapMemoryRecord(row),
+                    supersededById = row.getLong("superseded_by_id").takeUnless { row.wasNull() },
+                    supersededAt = row.getTimestamp("superseded_at")?.toInstant(),
+                    retractedAt = row.getTimestamp("retracted_at")?.toInstant(),
+                    retirementReason = row.getString("retirement_reason"),
+                    retiredBy = row.getString("retired_by"),
+                )
+            },
+            normalizeSlug(slug),
+        )
+        val byId = stored.associateBy { it.record.id }
+        fun lineage(record: ProductRecordView): List<ProductRecordView> {
+            val chain = mutableListOf<ProductRecordView>()
+            val visited = mutableSetOf<Long>()
+            var current: ProductRecordView? = record
+            while (current != null) {
+                check(visited.add(current.id)) { "Cyclische memoryversielijn voor '$slug'" }
+                chain += current
+                current = current.supersedesId?.let { byId[it]?.record }
+            }
+            return chain.asReversed()
+        }
+
+        return stored.map { version ->
+            val chain = lineage(version.record)
+            val retracted = version.retractedAt != null
+            MemoryVersionView(
+                id = version.record.id,
+                productSlug = version.record.productSlug,
+                rootMemoryId = chain.first().id,
+                versionNumber = chain.size,
+                title = version.record.title,
+                content = version.record.content,
+                status = when {
+                    retracted -> "RETRACTED"
+                    version.supersededById != null -> "SUPERSEDED"
+                    else -> "ACTIVE"
+                },
+                createdAt = version.record.createdAt,
+                effectiveUntil = version.retractedAt ?: version.supersededAt,
+                supersedesId = version.record.supersedesId,
+                supersededById = version.supersededById,
+                changeReason = version.record.changeReason,
+                createdBy = version.record.createdBy,
+                retirementReason = version.retirementReason,
+                retiredBy = version.retiredBy,
+            )
+        }.sortedWith(compareByDescending<MemoryVersionView> { it.createdAt }.thenByDescending { it.id })
     }
 
     fun addRecord(slug: String, kind: String, title: String, content: String, sourceUrl: String? = null): ProductRecordView {
@@ -495,6 +600,17 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             createdAt = row.getTimestamp(createdAtIndex).toInstant(),
         )
     }
+
+    private fun mapMemoryRecord(row: ResultSet) = ProductRecordView(
+        id = row.getLong("id"),
+        productSlug = row.getString("product_slug"),
+        title = row.getString("title"),
+        content = row.getString("content"),
+        createdAt = row.getTimestamp("created_at").toInstant(),
+        supersedesId = row.getLong("supersedes_id").takeUnless { row.wasNull() },
+        changeReason = row.getString("change_reason"),
+        createdBy = row.getString("created_by"),
+    )
 
     private fun recordTable(kind: String) = when (kind) {
         "research" -> "product_research"

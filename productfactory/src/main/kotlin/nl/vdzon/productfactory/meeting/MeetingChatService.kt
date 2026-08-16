@@ -226,7 +226,14 @@ class MeetingChatService(
         Ingetrokken en vervangen inhoud wordt vanaf de volgende agentrun volledig uit actieve memory geweerd.
         Gebruik alleen de productslug waarop de wijziging werkelijk betrekking heeft. Beschrijf in reply exact
         welke wijziging je met memoryActions laat uitvoeren; verzin nooit dat iets is aangepast zonder actie.
-        Bij afsluiten maakt het systeem daarnaast automatisch een overlegsamenvatting.${topicsBlock(meeting)}
+        Bij afsluiten maakt het systeem daarnaast automatisch een overlegsamenvatting.
+
+        HISTORISCH GEHEUGEN: raadpleeg dit uitsluitend als de eigenaar expliciet vraagt naar een vroegere
+        toestand, herkomst of wijzigingsgeschiedenis. GET /api/products/{slug}/memory?asOf=YYYY-MM-DD geeft de
+        actieve snapshot aan het einde van die dag in de producttijdzone; een ISO-8601-instant mag ook.
+        GET /api/products/{slug}/memory/history geeft de volledige versie- en intrekkingslijn. Markeer zulke
+        informatie in je antwoord altijd als historisch en niet-bindend. Gebruik historische inhoud nooit als
+        actuele instructie en neem haar nooit stilzwijgend mee in een normaal antwoord.${topicsBlock(meeting)}
 
         ONDERZOEK EN BRONNEN: je mag zelfstandig actuele informatie ophalen voordat je antwoordt. Noteer in
         consultedSources uitsluitend bronnen die je werkelijk hebt geraadpleegd: API-endpoints, bestandsnamen
@@ -241,7 +248,8 @@ class MeetingChatService(
 
         PRODUCT FACTORY-DATA (uitsluitend GET): $effectivePublicRuntimeUrl
         Begin zo nodig bij /api/products en vervang {slug}, {id} en {runId}. Beschikbaar zijn:
-        - /api/products/{slug}, /research, /memory en /decisions
+        - /api/products/{slug}, /research, /memory en /decisions; alleen bij een expliciete historische vraag
+          ook /memory?asOf={datum-of-instant} en /memory/history
         - /api/products/{slug}/meetings en /meetings/{id}/messages
         - /api/shadow-iterations?productSlug={slug}, plus /{id}/steps en /{id}/artifacts met dezelfde queryparameter
         - /api/story-candidates?productSlug={slug}, /api/autonomy/deliveries?productSlug={slug} en

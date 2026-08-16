@@ -102,6 +102,24 @@
   `customerRank`, `processRank`, `priorityScore`, `roadmapRank`, `dependencyIds`, `blockedByIds`
   en `blocksIds`.
 
+## Versiebeheerd productgeheugen
+
+- `product_memory` is append-only: een vervanging is een nieuwe rij met `supersedes_id`; een
+  intrekking is een afzonderlijke tombstone in `product_memory_retraction`. Normale reads via
+  `GET /api/products/{slug}/memory` sluiten iedere vervangen of ingetrokken versie volledig uit.
+- Een expliciete historische read kan `asOf=YYYY-MM-DD` of een ISO-8601-instant meegeven. Een datum
+  betekent het einde van die kalenderdag in de geconfigureerde producttijdzone. De runtime
+  reconstrueert de actieve set uit de aanmaak-, opvolgings- en intrekkingstijdstippen; er wordt geen
+  mutable snapshot opgeslagen.
+- `GET /api/products/{slug}/memory/history` levert de volledige auditlijn als
+  `MemoryVersionView`: lijn/root, versienummer, status (`ACTIVE`, `SUPERSEDED` of `RETRACTED`),
+  geldigheidsinterval, actoren en wijzigings-/intrekkingsreden. De dashboard-backend proxyt beide
+  read-only routes en het productscherm toont actuele memory, een bewuste peildatumselectie en de
+  volledige versiegeschiedenis.
+- De overlegagent krijgt standaard nog steeds uitsluitend de actuele projectie. Alleen bij een
+  expliciete vraag naar een vroegere toestand, herkomst of besluitgeschiedenis mag hij de
+  historische routes raadplegen; historische inhoud moet als niet-bindend worden aangeduid.
+
 ## Frontend-conventies (`dashboard-frontend/lib`)
 
 - `main.dart` — widgets en pagina's; `api.dart` — HTTP-client; `config.dart` — build-time config;

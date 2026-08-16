@@ -14,6 +14,7 @@ import 'iteration_evidence.dart';
 import 'iteration_results.dart';
 import 'limited_list.dart';
 import 'meeting_dialog.dart';
+import 'memory_history_dialog.dart';
 import 'product_scope.dart';
 import 'roadmap.dart';
 import 'session.dart';
@@ -485,6 +486,17 @@ class _OverviewPageState extends State<OverviewPage> {
       ),
     );
     if (mounted) setState(_reload);
+  }
+
+  Future<void> _showMemory(String productSlug, String productName) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => MemoryHistoryDialog(
+        api: api,
+        productSlug: productSlug,
+        productName: productName,
+      ),
+    );
   }
 
   Future<void> _showMeetingMinutes(String productSlug, String runId) async {
@@ -1141,6 +1153,14 @@ class _OverviewPageState extends State<OverviewPage> {
                   SettingsButton(
                     onPressed: () =>
                         _editProductSettings(activeProduct, aiCatalog),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _showMemory(
+                      activeProduct['slug'] as String,
+                      _productDisplayName(activeProduct),
+                    ),
+                    icon: const Icon(Icons.history_outlined),
+                    label: const Text('Geheugen'),
                   ),
                   OutlinedButton.icon(
                     onPressed: activeProduct['status'] == 'active'

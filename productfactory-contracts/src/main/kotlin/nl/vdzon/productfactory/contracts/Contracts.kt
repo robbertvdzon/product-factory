@@ -137,6 +137,25 @@ data class MemoryChangeView(
     val reason: String,
 )
 
+/** Eén onveranderlijke versie uit de volledige geheugenlijn van een product. */
+data class MemoryVersionView(
+    val id: Long,
+    val productSlug: String,
+    val rootMemoryId: Long,
+    val versionNumber: Int,
+    val title: String,
+    val content: String,
+    val status: String,
+    val createdAt: Instant,
+    val effectiveUntil: Instant? = null,
+    val supersedesId: Long? = null,
+    val supersededById: Long? = null,
+    val changeReason: String? = null,
+    val createdBy: String = "system",
+    val retirementReason: String? = null,
+    val retiredBy: String? = null,
+)
+
 data class ShadowIterationDecisionView(
     val iterationId: String,
     val actorType: String,

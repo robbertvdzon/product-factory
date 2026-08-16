@@ -22,6 +22,18 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
     fun product(slug: String): Map<String, Any?> = runtime.get().uri("/api/products/{slug}", slug).retrieve()
         .body(object : ParameterizedTypeReference<Map<String, Any?>>() {}) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
+    fun memory(slug: String, asOf: String?): List<Map<String, Any?>> = runtime.get()
+        .uri { builder ->
+            builder.path("/api/products/{slug}/memory").also {
+                if (!asOf.isNullOrBlank()) it.queryParam("asOf", asOf)
+            }.build(slug)
+        }
+        .retrieve().body(listType).orEmpty()
+
+    fun memoryHistory(slug: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/memory/history", slug)
+        .retrieve().body(listType).orEmpty()
+
     fun stories(slug: String): List<Map<String, Any?>> = runtime.get()
         .uri { it.path("/api/story-candidates").queryParam("productSlug", slug).build() }
         .retrieve().body(listType).orEmpty()
