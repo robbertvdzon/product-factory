@@ -7,6 +7,10 @@ spring:
     password: ${PF_DB_PASSWORD}
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 management:
   endpoints:
     web:

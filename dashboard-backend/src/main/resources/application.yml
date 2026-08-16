@@ -1,6 +1,10 @@
 spring:
   application:
     name: product-factory-dashboard
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 server:
   port: ${PF_DASHBOARD_BACKEND_PORT:8081}
 management:

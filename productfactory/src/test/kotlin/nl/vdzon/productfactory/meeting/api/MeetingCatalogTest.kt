@@ -39,6 +39,7 @@ class MeetingCatalogTest(
         }
         products.clearMeetingRequested(slug)
         jdbc.update("delete from meeting_message where product_slug = ?", slug)
+        jdbc.update("delete from product_media where product_slug = ?", slug)
         jdbc.update("delete from meeting where product_slug = ?", slug)
     }
 

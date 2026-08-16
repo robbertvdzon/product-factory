@@ -22,6 +22,8 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.web.servlet.multipart
 
 /**
  * Dekt de overleg-REST-endpoints end-to-end via MockMvc, met een nep-AI-antwoord (net als
@@ -53,6 +55,7 @@ class MeetingControllerTest(
             )
         }
         jdbc.update("delete from meeting_message where product_slug = ?", slug)
+        jdbc.update("delete from product_media where product_slug = ?", slug)
         jdbc.update("delete from meeting where product_slug = ?", slug)
         jdbc.update("delete from product_memory_retraction where product_slug = ?", slug)
         jdbc.update("delete from product_memory where product_slug = ?", slug)
@@ -71,15 +74,26 @@ class MeetingControllerTest(
         }.andReturn()
         val meetingId = mapper.readTree(started.response.contentAsString).path("id").asText()
 
+        val uploaded = mvc.multipart("/api/products/$slug/media") {
+            file(MockMultipartFile("file", "huidige-home.png", "image/png", ONE_PIXEL_PNG))
+            param("altText", "Huidige homepagina met te drukke navigatie")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.source") { value("owner") }
+            jsonPath("$.filename") { value("huidige-home.png") }
+        }.andReturn()
+        val imageId = mapper.readTree(uploaded.response.contentAsString).path("id").asText()
+
         mvc.post("/api/products/$slug/meetings/$meetingId/messages") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"content":"Wat vind je van de huidige richting?"}"""
+            content = """{"content":"Wat vind je van deze huidige richting?","imageAssetIds":["$imageId"]}"""
         }.andExpect {
             status { isOk() }
             jsonPath("$.sender") { value("ai") }
             jsonPath("$.content") { value("Nepantwoord van de AI.") }
             jsonPath("$.consultedSources[0]") { value("product-factory://testbron") }
             jsonPath("$.memoryChanges[0].action") { value("ADD") }
+            jsonPath("$.images[0].source") { value("ai") }
         }
         val prompt = fakeAgent.tasks.single { it.taskType == "meeting-chat" }.prompt
         kotlin.test.assertTrue(prompt.contains("/memory?asOf=YYYY-MM-DD"))
@@ -87,14 +101,24 @@ class MeetingControllerTest(
         kotlin.test.assertTrue(prompt.contains("/memory/history"))
         kotlin.test.assertTrue(prompt.contains("historische inhoud nooit als"))
         kotlin.test.assertTrue(prompt.contains("actuele instructie"))
+        kotlin.test.assertTrue(prompt.contains(imageId))
+        kotlin.test.assertTrue(prompt.contains("/media/$imageId/content"))
 
         mvc.get("/api/products/$slug/meetings/$meetingId/messages").andExpect {
             status { isOk() }
             jsonPath("$.length()") { value(2) }
             jsonPath("$[0].sender") { value("owner") }
+            jsonPath("$[0].images[0].id") { value(imageId) }
             jsonPath("$[1].sender") { value("ai") }
+            jsonPath("$[1].images[0].source") { value("ai") }
             jsonPath("$[1].consultedSources[0]") { value("product-factory://testbron") }
             jsonPath("$[1].memoryChanges[0].title") { value("Besluit uit overleg") }
+        }
+
+        mvc.get("/api/products/$slug/media/$imageId/content").andExpect {
+            status { isOk() }
+            header { string("Content-Type", "image/png") }
+            content { bytes(ONE_PIXEL_PNG) }
         }
 
         mvc.get("/api/products/$slug/memory").andExpect {
@@ -166,6 +190,12 @@ class MeetingControllerTest(
                 "meeting-chat" -> """{
                     "reply":"Nepantwoord van de AI.",
                     "consultedSources":["product-factory://testbron"],
+                    "imageAssetIds":[],
+                    "generatedImages":[{
+                      "filename":"ai-voorstel.png","mediaType":"image/png",
+                      "base64Content":"${java.util.Base64.getEncoder().encodeToString(ONE_PIXEL_PNG)}",
+                      "altText":"Door de AI gemaakt visueel voorstel"
+                    }],
                     "memoryActions":[{
                       "action":"ADD","productSlug":"meeting-controller-test","targetMemoryId":null,
                       "title":"Besluit uit overleg","content":"Dit blijft actief beschikbaar voor volgende agents.",
@@ -177,5 +207,12 @@ class MeetingControllerTest(
             }
             return AgentResult(runId = task.runId, status = "COMPLETED", summary = summary)
         }
+    }
+
+
+    companion object {
+        private val ONE_PIXEL_PNG = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        )
     }
 }

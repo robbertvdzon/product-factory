@@ -233,6 +233,19 @@ data class MeetingMessageView(
     val createdAt: Instant,
     val consultedSources: List<String> = emptyList(),
     val memoryChanges: List<MemoryChangeView> = emptyList(),
+    val images: List<ProductMediaView> = emptyList(),
+)
+
+data class ProductMediaView(
+    val id: String,
+    val productSlug: String,
+    val filename: String,
+    val mediaType: String,
+    val sizeBytes: Long,
+    val altText: String?,
+    val source: String,
+    val sourceReference: String?,
+    val createdAt: Instant,
 )
 
 data class RoadmapEpicView(
