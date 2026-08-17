@@ -11,3 +11,5 @@ en welke documenten agents eerst moeten lezen.
 - `deployment.md`: deploy-flow en machine-leesbare factory-config.
 - `secrets-local.md`: lokale secrets en waar die vandaan komen.
 - `agents/`: rol-specifieke instructies voor factory-agents.
+- `../architecture/plan-levende-productvisie-roadmapproces.md`: gefaseerd implementatieplan voor het
+  productagnostische levende-visie- en roadmapproces.
