@@ -105,3 +105,17 @@
 - Eigen review: uitsluitend Flutter-presentatie, regressietests en worklog gewijzigd; geen API-,
   contract-, opslag-, request-, dependency- of lockfilewijzigingen, geen mergeconflictmarkers,
   geen whitespacefouten en geen secrets toegevoegd.
+
+## Reviewer — vervolgronde
+
+- [info] De eerdere bug is opgelost: op maximaal 320 px blijft bij een lege productscope de
+  standaard ingeklapte `OperationalSummary` beschikbaar met na uitklappen exact de vijf bestaande
+  metriekkaarten; de acceptatievariant behoudt daarnaast haar datasetmelding.
+- [info] De eerdere focuscontrastblocker is opgelost: de cyclusstartactie krijgt bij focus de
+  gedeelde drie pixels brede focusrand en gerichte tests controleren op 320×900 en breed de
+  gerenderde focuspresentatie van start-, story- en samenvattingsacties met minimaal 3:1 contrast.
+- [info] De herstelpatch introduceert geen nieuwe regressie. Gerichte herhaling van de drie
+  regressiescenario's is groen. Het nieuwste factorybewijs is geldig voor developer-tree
+  `df92da0edaaffeaf1a62d4efe97c0314d0381425`; alle voor de frontenddiff toepasselijke opdrachten,
+  inclusief beide imagebuilds, zijn groen. De overgeslagen Engine-runner-test valt volgens de
+  ongewijzigde `pathPrefixes` buiten deze diff.
