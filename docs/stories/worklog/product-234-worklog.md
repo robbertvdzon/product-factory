@@ -67,3 +67,41 @@
   `OperationalSummary` alleen randbreedte en voor `LinkedStoryTile` helemaal geen werkelijk
   gerenderd focuscontrast. Er ontbreekt daarmee het geëiste bewijs op 320x900 én een brede viewport
   voor ten minste cyclusstartactie, storyactie en operationele samenvatting.
+
+## Herstelronde na review
+
+- [x] Leidende reviewbevindingen en actuele factory-instructies opnieuw beoordelen.
+- [x] Mobiele operationele samenvatting en acceptatiemelding ook zonder actief product behouden.
+- [x] Focusafhankelijke 3:1-indicator voor cyclusstart, storyactie en operationele samenvatting toevoegen.
+- [x] Gerichte 320x900- en brede viewporttests voor beide bevindingen toevoegen en draaien.
+- [x] Volledig vangnet uit `docs/factory/development.md` zonder timeout uitvoeren.
+- [x] Eigen review uitvoeren en herstelresultaten vastleggen.
+
+### Uitvoering en rationale
+
+- De lege-producttak rendert op maximaal 320 px nu dezelfde standaard ingeklapte operationele
+  samenvatting en, in de acceptancevariant, dezelfde synthetische-datasetmelding. De vijf bestaande
+  metriekwidgets en hun bronstatussen worden hergebruikt; bredere viewports blijven ongewijzigd.
+- De cyclusstartactie wisselt bij focus van de bestaande witte rand naar de gedeelde blauwe
+  focusrand van drie pixels. Storyacties en de operationele samenvatting behielden die kleur en
+  breedte; nieuwe tests bewijzen nu voor alle drie de werkelijk gerenderde focustoestand en minimaal
+  3:1 contrast op 320x900 en in een brede viewportcontext.
+- Nieuwe regressiedekking bewijst daarnaast dat een lege mobiele productscope de acceptatiemelding
+  toont, de metriekkaarten standaard buiten beeld houdt en na uitklappen exact alle vijf kaarten
+  beschikbaar maakt.
+
+### Verificatie herstelronde
+
+- `mvn -B --no-transfer-progress clean verify`: groen; alle zes reactormodules `SUCCESS`,
+  0 failures en 0 errors.
+- `flutter analyze`: groen; geen issues.
+- `flutter test`: groen; 450 tests, 0 failures en 0 errors.
+- `node test_web/manual_cycle_start_dom_test.mjs`: groen; Flutter-Web-dialog-, sectiekeuze- en
+  samenvattingssemantiek correct.
+- `python3 -B .factory/test_docker_engine_build.py`: groen; 3 tests.
+- Frontend-image met veilige defaults en frontend-image met previewmetadata: beide groen.
+- `.factory/verification.yaml` bleef volledig en ongewijzigd; `agent-image-build` is conform de
+  configuratie niet agent-runnable en blijft aan CI voorbehouden.
+- Eigen review: uitsluitend Flutter-presentatie, regressietests en worklog gewijzigd; geen API-,
+  contract-, opslag-, request-, dependency- of lockfilewijzigingen, geen mergeconflictmarkers,
+  geen whitespacefouten en geen secrets toegevoegd.

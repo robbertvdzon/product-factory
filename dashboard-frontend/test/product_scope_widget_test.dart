@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:product_factory_dashboard/bugs.dart';
+import 'package:product_factory_dashboard/classification.dart';
 import 'package:product_factory_dashboard/main.dart';
 import 'package:product_factory_dashboard/product_scope.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -485,6 +486,108 @@ void main() {
       expect(find.text('Beta gekoppeld'), findsOneWidget);
       expect(find.text('Alpha gekoppeld'), findsNothing);
       expect(calls, isNotEmpty);
+    },
+  );
+
+  testWidgets(
+    'start- en storyacties tonen op 320x900 en breed een gerenderde 3:1-focusindicator',
+    (tester) async {
+      for (final size in [const Size(320, 900), const Size(1200, 900)]) {
+        SharedPreferences.setMockInitialValues({});
+        await _pumpDashboard(
+          tester,
+          _client(_Fixture(), <String>[]),
+          size: size,
+        );
+
+        final startButton = tester.widget<FilledButton>(
+          find.descendant(
+            of: find.byType(StartCycleButton),
+            matching: find.byType(FilledButton),
+          ),
+        );
+        startButton.focusNode!.requestFocus();
+        await tester.pump();
+        final focusedStartSide = tester
+            .widget<FilledButton>(
+              find.descendant(
+                of: find.byType(StartCycleButton),
+                matching: find.byType(FilledButton),
+              ),
+            )
+            .style!
+            .side!
+            .resolve({WidgetState.focused})!;
+        expect(focusedStartSide.width, 3);
+        expect(focusedStartSide.color, kCycleToggleFocus);
+        expect(
+          contrastRatio(focusedStartSide.color, kCycleCardBackground),
+          greaterThanOrEqualTo(3),
+        );
+
+        await _openSection(tester, 'Stories');
+        final storyTile = find.byType(LinkedStoryTile).first;
+        await tester.ensureVisible(storyTile);
+        final listTileFinder = find.descendant(
+          of: storyTile,
+          matching: find.byType(ListTile),
+        );
+        tester.widget<ListTile>(listTileFinder).focusNode!.requestFocus();
+        await tester.pumpAndSettle();
+        final focusedStorySide =
+            (tester.widget<ListTile>(listTileFinder).shape!
+                    as RoundedRectangleBorder)
+                .side;
+        expect(focusedStorySide.width, 3);
+        expect(focusedStorySide.color, kCycleToggleFocus);
+        expect(
+          contrastRatio(focusedStorySide.color, kCycleCardBackground),
+          greaterThanOrEqualTo(3),
+        );
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    },
+  );
+
+  testWidgets(
+    'operationele samenvatting toont op 320x900 en in brede widgetcontext een 3:1-focusindicator',
+    (tester) async {
+      for (final size in [const Size(320, 900), const Size(1200, 900)]) {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(body: OperationalSummary(children: <Widget>[])),
+          ),
+        );
+
+        final summaryButtonFinder = find.descendant(
+          of: find.byType(OperationalSummary),
+          matching: find.byType(OutlinedButton),
+        );
+        tester
+            .widget<OutlinedButton>(summaryButtonFinder)
+            .focusNode!
+            .requestFocus();
+        await tester.pump();
+        final focusedSummarySide = tester
+            .widget<OutlinedButton>(summaryButtonFinder)
+            .style!
+            .side!
+            .resolve({WidgetState.focused})!;
+        expect(focusedSummarySide.width, 3);
+        expect(focusedSummarySide.color, kCycleToggleFocus);
+        expect(
+          contrastRatio(focusedSummarySide.color, kCycleCardBackground),
+          greaterThanOrEqualTo(3),
+        );
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+      tester.view.reset();
     },
   );
 

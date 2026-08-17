@@ -1191,14 +1191,22 @@ class _OverviewPageState extends State<OverviewPage> {
                         ),
                         const SizedBox(height: 32),
                       ],
-                      if (activeProduct == null)
+                      if (activeProduct == null) ...[
                         const SourceNotice(
                           key: ValueKey('empty-product-scope'),
                           icon: Icons.inventory_2_outlined,
                           text:
                               'Geen producten beschikbaar. Voeg een product toe om een productscope te openen.',
-                        )
-                      else ...[
+                        ),
+                        if (compactOverview) ...[
+                          const SizedBox(height: 24),
+                          OperationalSummary(children: metricCards),
+                          if (widget.acceptanceDataset) ...[
+                            const SizedBox(height: 24),
+                            const AcceptanceDatasetNotice(),
+                          ],
+                        ],
+                      ] else ...[
                         Column(
                           key: const ValueKey('product-scope-block'),
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -5160,12 +5168,23 @@ class _StartCycleButtonState extends State<StartCycleButton> {
               if (mounted) _focusNode.requestFocus();
             }
           },
-    style: FilledButton.styleFrom(
-      backgroundColor: kStartCycleButtonBackground,
-      foregroundColor: kStartCycleButtonForeground,
-      side: const BorderSide(color: kStartCycleButtonForeground, width: 2),
-      textStyle: const TextStyle(fontWeight: FontWeight.bold),
-    ),
+    style:
+        FilledButton.styleFrom(
+          backgroundColor: kStartCycleButtonBackground,
+          foregroundColor: kStartCycleButtonForeground,
+          side: const BorderSide(color: kStartCycleButtonForeground, width: 2),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold),
+        ).copyWith(
+          side: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.focused)) {
+              return const BorderSide(color: kCycleToggleFocus, width: 3);
+            }
+            return const BorderSide(
+              color: kStartCycleButtonForeground,
+              width: 2,
+            );
+          }),
+        ),
     icon: const Icon(Icons.auto_awesome),
     label: const Text('Start productcyclus nu'),
   );

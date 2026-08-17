@@ -20,8 +20,9 @@ MockClient _emptyDashboardClient() => MockClient((request) async {
 Future<void> _pumpOverview(
   WidgetTester tester, {
   required bool acceptanceDataset,
+  Size size = const Size(1200, 2400),
 }) async {
-  tester.view.physicalSize = const Size(1200, 2400);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
@@ -81,6 +82,40 @@ void main() {
       expect(find.text('Synthetische acceptatiedata'), findsNothing);
     }, _emptyDashboardClient);
   });
+
+  testWidgets(
+    'mobiel zonder producten behoudt acceptatiemelding en vijf ingeklapte metrieken',
+    (tester) async {
+      await http.runWithClient(() async {
+        await _pumpOverview(
+          tester,
+          acceptanceDataset: true,
+          size: const Size(320, 900),
+        );
+
+        expect(
+          find.byKey(const ValueKey('empty-product-scope')),
+          findsOneWidget,
+        );
+        expect(find.byType(OperationalSummary), findsOneWidget);
+        expect(find.byType(AcceptanceDatasetNotice), findsOneWidget);
+        expect(find.byType(MetricCard), findsNothing);
+
+        await tester.tap(find.text('Operationele samenvatting'));
+        await tester.pump();
+        expect(find.byType(MetricCard), findsNWidgets(5));
+        for (final label in [
+          'Producten',
+          'Interne storykandidaten',
+          'Workspace-publicaties',
+          'Shadow-iteraties',
+          'Software Factory-stories',
+        ]) {
+          expect(find.text(label), findsOneWidget);
+        }
+      }, _emptyDashboardClient);
+    },
+  );
 
   testWidgets(
     'melding blijft bruikbaar op 320 CSS-pixels en 200 procent tekst',
