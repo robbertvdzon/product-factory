@@ -12,6 +12,7 @@ import nl.vdzon.productfactory.roadmap.api.ConceptVersionMutation
 import nl.vdzon.productfactory.roadmap.api.IdeaMutation
 import nl.vdzon.productfactory.roadmap.api.LivingVisionCatalog
 import nl.vdzon.productfactory.roadmap.api.ResearchMutation
+import nl.vdzon.productfactory.roadmap.api.RoadmapCatalog
 import nl.vdzon.productfactory.roadmap.api.RoadmapSessionRepository
 import nl.vdzon.productfactory.roadmap.api.RoadmapVisionCatalog
 import nl.vdzon.productfactory.roadmap.api.StepDefinition
@@ -38,6 +39,7 @@ class LivingVisionFoundationTest(
     @Autowired private val migration: LegacyVisionMigrationService,
     @Autowired private val visions: RoadmapVisionCatalog,
     @Autowired private val recovery: RoadmapProcessRecovery,
+    @Autowired private val roadmap: RoadmapCatalog,
 ) {
     private lateinit var productA: String
     private lateinit var productB: String
@@ -156,6 +158,27 @@ class LivingVisionFoundationTest(
         val appendix = LivingVisionRoleCatalog.byKey.getValue("roadmap-manager").appendix.lowercase()
         assertTrue("bewijsdoel" in appendix, "Rolbijlage moet het bewijsdoel-vereiste voor discovery-epics benoemen")
         assertTrue("besliscriterium" in appendix, "Rolbijlage moet het besliscriterium-vereiste voor discovery-epics benoemen")
+    }
+
+    @Test
+    fun `roadmap manager appendix instructs agents to only reuse an epicId from the supplied open epics`() {
+        val appendix = LivingVisionRoleCatalog.byKey.getValue("roadmap-manager").appendix.lowercase()
+        assertTrue("openepics" in appendix, "Rolbijlage moet verwijzen naar productcontext.openepics")
+        assertTrue("verzin nooit een eigen epicid" in appendix, "Rolbijlage moet verzonnen epicId's expliciet verbieden")
+    }
+
+    @Test
+    fun `product context exposes only the requesting product's open epics for the roadmap manager to reuse`() {
+        val openEpic = roadmap.createEpic(productA, "Bestaande epic", "Een bestaande, nog open epic uit een eerdere sessie.")
+        val closedEpic = roadmap.createEpic(productA, "Afgeronde epic", "Een epic die al is afgesloten.")
+        roadmap.closeEpic(productA, closedEpic.id)
+        roadmap.createEpic(productB, "Epic van een ander product", "Mag nooit in productA context verschijnen.")
+
+        val context = contexts.build(productA)
+
+        assertEquals(listOf(openEpic.id), context.openEpics.map { it.id })
+        assertTrue(context.openEpics.single().title == "Bestaande epic")
+        assertFalse(context.openEpics.any { it.id == closedEpic.id })
     }
 
     @Test

@@ -5,6 +5,7 @@ import nl.vdzon.productfactory.contracts.RoadmapContextItemView
 import nl.vdzon.productfactory.contracts.RoadmapHandoffView
 import nl.vdzon.productfactory.contracts.RoadmapProductContextView
 import nl.vdzon.productfactory.product.api.ProductCatalog
+import nl.vdzon.productfactory.roadmap.api.RoadmapCatalog
 import nl.vdzon.productfactory.roadmap.api.RoadmapSessionRepository
 import nl.vdzon.productfactory.roadmap.api.RoadmapVisionCatalog
 import nl.vdzon.productfactory.workspace.api.WorkspaceVisionPort
@@ -46,7 +47,7 @@ object LivingVisionRoleCatalog {
         RoadmapRoleDefinition("ux-director", "UX-director", RoadmapDecisionAuthority.CURATE_UX, true, "future-strategist", "Bewaak flowsamenhang. Lever maximaal één gerichte conceptRevision volledig uit; alleen een afwijzing zonder uitvoerbare revisie blokkeert."),
         RoadmapRoleDefinition("future-strategist", "Toekomststrateeg", RoadmapDecisionAuthority.SYNTHESIZE_VISION, true, "vision-critic", "Synthetiseer alleen gecureerde versies tot north star, capabilities en horizons."),
         RoadmapRoleDefinition("vision-critic", "Visiecriticus", RoadmapDecisionAuthority.BLOCK_OR_APPROVE, true, "roadmap-manager", "Blokkeer verlies, claims zonder bewijs, schijnflows en te snelle onmogelijkheidsoordelen."),
-        RoadmapRoleDefinition("roadmap-manager", "Roadmapmanager", RoadmapDecisionAuthority.PLAN_ROADMAP, true, "activation", "Plan capabilities, discovery en delivery; wijzig de visie niet. Noem in de beschrijving van iedere DISCOVERY-epic expliciet het bewijsdoel en het besliscriterium waarmee je bepaalt of de proef slaagt of niet."),
+        RoadmapRoleDefinition("roadmap-manager", "Roadmapmanager", RoadmapDecisionAuthority.PLAN_ROADMAP, true, "activation", "Plan capabilities, discovery en delivery; wijzig de visie niet. Noem in de beschrijving van iedere DISCOVERY-epic expliciet het bewijsdoel en het besliscriterium waarmee je bepaalt of de proef slaagt of niet. Gebruik voor UPDATE of CLOSE uitsluitend een epicId die letterlijk voorkomt in PRODUCTCONTEXT.openEpics; verzin nooit een eigen epicId. Gebruik CREATE met epicId=null voor een epic die niet in openEpics staat."),
         RoadmapRoleDefinition("activation", "Atomaire activatie", RoadmapDecisionAuthority.ACTIVATE, true, "dashboard/product-cycles", "Activeer uitsluitend een volledig gevalideerd sessiedossier."),
     )
     val byKey = roles.associateBy { it.key }
@@ -94,6 +95,7 @@ class RoadmapProductContextBuilder(
     private val visions: RoadmapVisionCatalog,
     private val sessions: RoadmapSessionRepository,
     private val workspaceVision: WorkspaceVisionPort,
+    private val roadmap: RoadmapCatalog,
 ) {
     fun build(productSlug: String): RoadmapProductContextView {
         val product = products.requireProduct(productSlug)
@@ -102,6 +104,13 @@ class RoadmapProductContextBuilder(
         }
         val history = sessions.list(product.slug).filter { it.summary != null }.take(MAX_HISTORY_ITEMS).map {
             RoadmapContextItemView("session:${it.id}", "Roadmapsessie ${it.sequenceNumber}", limit(it.summary.orEmpty(), MAX_ITEM_CHARS))
+        }
+        val openEpics = roadmap.listEpics(product.slug).filter { it.status != "DONE" }.take(MAX_COLLECTION_ITEMS).map {
+            RoadmapContextItemView(
+                it.id,
+                limit(it.title, 240),
+                limit("status=${it.status} horizon=${it.horizon} kind=${it.kind} capabilityKey=${it.capabilityKey}: ${it.description}", MAX_ITEM_CHARS),
+            )
         }
         return RoadmapProductContextView(
             productSlug = product.slug,
@@ -123,6 +132,7 @@ class RoadmapProductContextBuilder(
             currentVision = visions.current(product.slug)?.content?.entries?.take(MAX_COLLECTION_ITEMS)
                 ?.associate { (key, value) -> key.take(120) to bound(value) },
             relevantHistory = history,
+            openEpics = openEpics,
         )
     }
 

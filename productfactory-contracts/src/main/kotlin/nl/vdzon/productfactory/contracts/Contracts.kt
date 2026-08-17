@@ -337,6 +337,7 @@ data class RoadmapProductContextView(
     val memory: List<RoadmapContextItemView>,
     val currentVision: Map<String, Any?>?,
     val relevantHistory: List<RoadmapContextItemView>,
+    val openEpics: List<RoadmapContextItemView> = emptyList(),
 )
 
 data class RoadmapContextItemView(val id: String, val title: String, val content: String)

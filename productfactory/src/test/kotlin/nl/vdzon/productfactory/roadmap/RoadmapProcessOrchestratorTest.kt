@@ -6,6 +6,7 @@ import nl.vdzon.productfactory.contracts.AgentTask
 import nl.vdzon.productfactory.product.CreateProductRequest
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.roadmap.api.LivingVisionCatalog
+import nl.vdzon.productfactory.roadmap.api.RoadmapCatalog
 import nl.vdzon.productfactory.roadmap.api.RoadmapSessionRepository
 import nl.vdzon.productfactory.roadmap.api.RoadmapVisionCatalog
 import org.junit.jupiter.api.BeforeEach
@@ -36,6 +37,7 @@ class RoadmapProcessOrchestratorTest(
     @Autowired private val orchestrator: RoadmapProcessOrchestrator,
     @Autowired private val visions: RoadmapVisionCatalog,
     @Autowired private val catalog: LivingVisionCatalog,
+    @Autowired private val roadmap: RoadmapCatalog,
     @Autowired private val dispatch: TrackingDispatch,
 ) {
     private lateinit var slug: String
@@ -178,6 +180,19 @@ class RoadmapProcessOrchestratorTest(
         assertNotNull(visions.current(slug))
     }
 
+    @Test
+    fun `roadmap manager reuses an existing epic id supplied via product context instead of guessing one`() {
+        val existing = roadmap.createEpic(slug, "Bestaande epic uit een eerdere sessie", "Oorspronkelijke beschrijving.")
+        dispatch.managerUpdateEpicId.set(existing.id)
+        val session = sessions.create(slug)
+
+        orchestrator.run(session.id)
+
+        assertEquals("COMPLETED", sessions.require(slug, session.id).status)
+        val updated = roadmap.listEpics(slug).single { it.id == existing.id }
+        assertEquals("Complete kernflow", updated.title)
+    }
+
     @TestConfiguration
     class Fakes {
         @Bean
@@ -194,6 +209,7 @@ class RoadmapProcessOrchestratorTest(
         val failRole = AtomicReference<String?>(null)
         val managerEpicKind = AtomicReference("DELIVERY")
         val managerEpicDescription = AtomicReference("Lever de gevalideerde end-to-end gebruikersflow met toegankelijke toestanden.")
+        val managerUpdateEpicId = AtomicReference<String?>(null)
         val started = ConcurrentHashMap<String, Long>()
         val ended = ConcurrentHashMap<String, Long>()
         val tasks = ConcurrentLinkedQueue<AgentTask>()
@@ -207,6 +223,7 @@ class RoadmapProcessOrchestratorTest(
             failRole.set(null)
             managerEpicKind.set("DELIVERY")
             managerEpicDescription.set("Lever de gevalideerde end-to-end gebruikersflow met toegankelijke toestanden.")
+            managerUpdateEpicId.set(null)
             started.clear()
             ended.clear()
             tasks.clear()
@@ -275,7 +292,15 @@ class RoadmapProcessOrchestratorTest(
             return """{"northStarTitle":"Een levende en concrete producthorizon","northStar":"Iedere gebruiker kan vanuit een herkenbare behoefte een betrouwbare en betekenisvolle productervaring voltooien.","futureNarrative":"De toekomstige ervaring begint bij een helder doel en bouwt stap voor stap vertrouwen op. Inhoud, interactie en bewijs blijven zichtbaar verbonden, onzekerheid wordt eerlijk getoond en iedere route biedt begrijpelijk herstel. Zo groeit het product zonder zijn kernbelofte of eerder geleerde lessen te verliezen.","experiences":[$experiences],"capabilities":[$capabilities],"assumptions":[{"key":"begrijpelijke-flow","statement":"De gekozen flow en terminologie zijn begrijpelijk voor de primaire gebruikersgroep.","risk":"Onduidelijkheid verhindert dat gebruikers zelfstandig het resultaat bereiken.","probeType":"UX_PROTOTYPE","proposedProbe":"Test de volledige mobiele en desktopflow met representatieve gebruikers en leg uitval vast.","capabilityKeys":["capability-1"],"feasibility":"TESTING"}],"conceptScreens":[$screens],"visionChangeSummary":"Twee gecureerde ideeën zijn met UX en onderzoek tot één bewijsbare horizon samengebracht."}"""
         }
 
-        private fun manager() = """{"summary":"De gevalideerde capability is atomair vertaald naar de roadmap.","epicUpdates":[{"action":"CREATE","epicId":null,"title":"Complete kernflow","description":"${managerEpicDescription.get()}","processRank":1,"dependencyIds":[],"horizon":"NOW","kind":"${managerEpicKind.get()}","capabilityKey":"capability-1"}],"settledQuestions":[],"bugUpdates":[]}"""
+        private fun manager(): String {
+            val updateId = managerUpdateEpicId.get()
+            val epic = if (updateId != null) {
+                """{"action":"UPDATE","epicId":"$updateId","title":"Complete kernflow","description":"${managerEpicDescription.get()}","processRank":1,"dependencyIds":[],"horizon":"NOW","kind":"${managerEpicKind.get()}","capabilityKey":"capability-1"}"""
+            } else {
+                """{"action":"CREATE","epicId":null,"title":"Complete kernflow","description":"${managerEpicDescription.get()}","processRank":1,"dependencyIds":[],"horizon":"NOW","kind":"${managerEpicKind.get()}","capabilityKey":"capability-1"}"""
+            }
+            return """{"summary":"De gevalideerde capability is atomair vertaald naar de roadmap.","epicUpdates":[$epic],"settledQuestions":[],"bugUpdates":[]}"""
+        }
     }
 
     companion object {
