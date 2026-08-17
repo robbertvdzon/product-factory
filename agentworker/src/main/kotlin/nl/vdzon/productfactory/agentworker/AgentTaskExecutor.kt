@@ -114,6 +114,11 @@ private fun browserInstruction(task: AgentTask): String {
         Voor navigatie, klikken en formulieren maak je een tijdelijk Playwright-testbestand onder de systeem-tempmap
         met `require('playwright/test')` en voer je het uit met
         `NODE_PATH="${'$'}(npm root -g)" npx --no-install playwright test BESTAND --reporter=line --workers=1`.
+        Let bij Flutter Web op: een leeg `body.innerText`, een leeg DOM of ontbrekende semantics vóór activering
+        bewijst niet dat het scherm wit of defect is; Flutter rendert standaard in een canvas. Als
+        `flt-semantics-placeholder` bestaat, activeer die dan via `evaluate(el => el.click())`, wacht opnieuw en
+        gebruik daarna rol-/label-locators. Maak daarnaast een screenshot en bekijk het beeld werkelijk voordat je
+        een renderprobleem rapporteert. Rapporteer nooit een lege-pagina-bug op alleen DOM- of semanticsevidence.
         Een ontbrekende Browser-plugin is nooit een geldige BLOCKED-uitkomst. Meld alleen BLOCKED wanneer de
         doelomgeving zelf na een echte Playwright-poging niet bereikbaar of niet toegankelijk blijkt. WebSearch,
         WebFetch en curl gelden niet als browsertest. Verwijder tijdelijke scripts en screenshots na gebruik, behalve

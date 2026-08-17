@@ -268,6 +268,14 @@ class TestSessionEngine(
         ${media.context(product.slug, publicRuntimeUrl)}
         </DATA>
 
+        TESTVOLGORDE EN BEWIJS:
+        - Verifieer eerst iedere bestaande bug met status READY_FOR_VERIFICATION aan de hand van de vastgelegde
+          reproductiestappen; gebruik RESOLVE als de fix aantoonbaar werkt en UPDATE als de fout nog bestaat.
+        - Een Flutter-canvas kan volledig zichtbaar zijn terwijl body.innerText en het gewone DOM leeg zijn. Activeer
+          aanwezige flt-semantics-placeholder, wacht op de semantics-tree en inspecteer ook een echte screenshot.
+          Maak of update nooit een lege-pagina-bug op alleen leeg DOM, lege bodytekst of ontbrekende semantics.
+        - Evidence noemt de werkelijk gebruikte omgeving, zichtbare labels en uitgevoerde interactie.
+
         Lever alleen JSON volgens het schema. Zet iedere geteste flow in testedAreas, ook als hij slaagt.
     """.trimIndent()
 

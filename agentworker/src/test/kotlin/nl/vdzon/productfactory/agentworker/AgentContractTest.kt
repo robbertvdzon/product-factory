@@ -193,6 +193,7 @@ class AgentContractTest {
 
         assertTrue(command.contains("--ignore-user-config"))
         assertTrue(command.last().contains("npx --no-install playwright"))
+        assertTrue(command.last().contains("Rapporteer nooit een lege-pagina-bug op alleen DOM- of semanticsevidence"))
         assertTrue(command.last().contains("Een ontbrekende Browser-plugin is nooit een geldige BLOCKED-uitkomst"))
         assertTrue(command.last().contains("curl gelden niet als browsertest"))
     }

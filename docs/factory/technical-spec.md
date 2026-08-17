@@ -164,6 +164,9 @@
   Chromium-preflight via de lokaal geïnstalleerde Playwright-CLI. Alleen na een echte screenshot start
   de AI-taak, met de geïsoleerde Playwright-route en een expliciet commando voor meerstapsnavigatie.
   Een ontbrekende desktopbrowser kan daardoor niet meer als inhoudelijke `BLOCKED`-test worden verwerkt.
+  De browserinstructie activeert bij Flutter Web eerst `flt-semantics-placeholder` en vereist daarnaast
+  visuele screenshotinspectie; een leeg DOM of lege `body.innerText` geldt bij canvasrendering niet als
+  bewijs voor een lege pagina. Testsessies behandelen `READY_FOR_VERIFICATION`-bugs als eerste.
 
 ## Versiebeheerd productgeheugen
 
