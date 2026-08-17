@@ -20,6 +20,11 @@ class AgentWorkerWebSocketConfiguration(private val hub: AgentWorkerHub) : WebSo
     }
 
     companion object {
-        const val MAX_MESSAGE_BYTES = 2 * 1024 * 1024
+        /**
+         * Een resultaat kan maximaal zes gegenereerde beelden van 5 MiB bevatten. Base64 vergroot die bytes met
+         * ongeveer een derde; de resterende marge is voor de omringende JSON. Zonder deze expliciete transportgrens
+         * sluit Tomcat een verder geldig beeldresultaat met WebSocket-code 1009.
+         */
+        const val MAX_MESSAGE_BYTES = 48 * 1024 * 1024
     }
 }

@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.writeBytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -94,6 +95,34 @@ class AgentContractTest {
         assertTrue(prompt.contains("generatedImages[].temporaryPath"))
         assertTrue(prompt.contains("pf-generated-meeting-unsafe-id-"))
         assertTrue(prompt.contains("Encodeer het beeld niet zelf als base64"))
+        assertTrue(prompt.contains("aparte") && prompt.contains("ImageGen-aanroep"))
+        assertTrue(prompt.contains("test -s PAD"))
+        assertTrue(prompt.contains("nooit een bedacht"))
+    }
+
+    @Test fun `worker validates every image before deleting any generated file`() {
+        val task = AgentTask(
+            "atomic-images",
+            "generic-product",
+            "roadmap-ux-concept",
+            "Maak twee conceptbeelden",
+            responseSchema = """{"generatedImages":{"type":"array"}}""",
+        )
+        val existing = Files.createTempFile("pf-generated-atomic-images-", ".png")
+        Files.write(existing, byteArrayOf(1, 2, 3))
+        val missing = existing.resolveSibling("pf-generated-atomic-images-missing.png")
+        val summary = jacksonObjectMapper().writeValueAsString(
+            mapOf(
+                "generatedImages" to listOf(
+                    mapOf("temporaryPath" to existing.toString(), "mediaType" to "image/png"),
+                    mapOf("temporaryPath" to missing.toString(), "mediaType" to "image/png"),
+                ),
+            ),
+        )
+
+        assertFailsWith<Exception> { materializeGeneratedImages(task, summary) }
+        assertTrue(Files.exists(existing))
+        Files.deleteIfExists(existing)
     }
 
     @Test fun `agent task contract round trips`() {

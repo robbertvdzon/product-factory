@@ -179,7 +179,10 @@ private fun generatedImageInstruction(task: AgentTask): String {
         AFBEELDINGSOVERDRACHT: schrijf ieder werkelijk gegenereerd beeld naar een absoluut bestandspad direct
         onder '${agentTemporaryRoot()}', met een bestandsnaam die begint met '$prefix'. Zet exact dat pad in
         generatedImages[].temporaryPath. Encodeer het beeld niet zelf als base64 en verwijder dit ene bestand niet;
-        de agentworker leest, valideert en verwijdert het na jouw antwoord. Andere tijdelijke bestanden ruim je wel op.
+        de agentworker leest, valideert en verwijdert het na jouw antwoord. Maak elk gevraagd beeld met een aparte
+        ImageGen-aanroep en gebruik per item een uniek bestand. Controleer na iedere aanroep via Bash `test -s PAD`
+        dat het opgegeven bestand werkelijk bestaat en niet leeg is. Geef nooit een bedacht of alleen voorgenomen pad
+        terug. Andere tijdelijke bestanden ruim je wel op.
     """.trimIndent()
 }
 
@@ -189,7 +192,7 @@ internal fun materializeGeneratedImages(task: AgentTask, summary: String): Strin
     val images = document.path("generatedImages")
     if (!images.isArray || images.isEmpty) return summary
     val temporaryRoot = agentTemporaryRoot().toRealPath()
-    images.forEach { rawImage ->
+    val preparedImages = images.map { rawImage ->
         val image = rawImage as? ObjectNode ?: error("generatedImages bevat geen object")
         val temporaryPath = image.path("temporaryPath").asText().trim()
         require(temporaryPath.isNotBlank()) { "temporaryPath ontbreekt voor gegenereerd beeld" }
@@ -203,9 +206,16 @@ internal fun materializeGeneratedImages(task: AgentTask, summary: String): Strin
         val size = Files.size(realPath)
         require(size in 1..MAX_GENERATED_IMAGE_BYTES) { "Gegenereerd beeld moet tussen 1 byte en 5 MB zijn" }
         require(image.path("mediaType").asText() in GENERATED_IMAGE_MEDIA_TYPES) { "Ongeldig mediatype voor gegenereerd beeld" }
-        val bytes = Files.readAllBytes(realPath)
+        Triple(image, realPath, Files.readAllBytes(realPath))
+    }
+    require(preparedImages.map { it.second }.distinct().size == preparedImages.size) {
+        "Ieder gegenereerd beeld moet een uniek tijdelijk bestand gebruiken"
+    }
+    preparedImages.forEach { (image, _, bytes) ->
         image.remove("temporaryPath")
         image.put("base64Content", Base64.getEncoder().encodeToString(bytes))
+    }
+    preparedImages.forEach { (_, realPath, _) ->
         Files.deleteIfExists(realPath)
     }
     return jacksonObjectMapper().writeValueAsString(document)
