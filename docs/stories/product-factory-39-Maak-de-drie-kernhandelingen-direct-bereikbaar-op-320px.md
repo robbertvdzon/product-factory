@@ -70,7 +70,7 @@ Keuzes: bestaande gegevens, filters, sortering, lijstlimieten en acties worden h
 
 Getest: het volledige toepasselijke vangnet was groen, waaronder Maven, frontendanalyse, 450 Flutter-tests, browser-DOM-tests, Docker Engine-tests en beide frontend-imagebuilds. Daarnaast slaagden 40 gerichte tests en controles in een echte preview op mobiel en desktop voor volgorde, toetsenbordbediening, focusherstel, contrast, productscope en verversing.
 
-Bewust niet uitgevoerd: de agent-imagebuild blijft conform de factoryconfig aan CI voorbehouden. Documentatie, merge en productie-uitrol horen bij de volgende subtaken en zijn nog niet uitgevoerd.
+Bewust niet uitgevoerd: de agent-imagebuild blijft conform de factoryconfig aan CI voorbehouden. De functionele en technische dashboarddocumentatie is bijgewerkt; merge en productie-uitrol horen bij de volgende subtaken en zijn nog niet uitgevoerd.
 
 <!-- deploy-summary:start -->
 Op zeer smalle schermen staan de productkeuze, de knop om een cyclus te starten, recente cycli en gekoppelde stories voortaan direct bij elkaar. De overige onderdelen blijven bereikbaar via een duidelijke keuzelijst en de operationele cijfers kunnen naar behoefte worden uitgeklapt.
