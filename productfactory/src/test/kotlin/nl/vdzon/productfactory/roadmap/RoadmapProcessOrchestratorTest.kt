@@ -78,6 +78,8 @@ class RoadmapProcessOrchestratorTest(
         assertTrue(uxHandoffs.all { "base64Content" !in it.payload.toString() })
         val directorPrompt = dispatch.tasks.single { it.taskType == "roadmap-ux-director" }.prompt
         assertTrue(ONE_PIXEL_PNG !in directorPrompt, "Downstream prompts mogen geen opgeslagen beeldbytes bevatten")
+        val feasibilityPrompts = dispatch.tasks.filter { it.taskType == "roadmap-feasibility" }.map { it.prompt }
+        assertTrue(feasibilityPrompts.all { "gebruik daarom altijd conceptKey=null" in it })
 
         val callsAfterFirstRun = dispatch.calls.get()
         orchestrator.run(session.id)
