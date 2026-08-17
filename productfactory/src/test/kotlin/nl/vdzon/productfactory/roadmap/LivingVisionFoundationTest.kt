@@ -120,6 +120,24 @@ class LivingVisionFoundationTest(
             val schema = mapper.readTree(LivingVisionSchemas.forRole(role.key))
             assertEquals(false, schema.path("additionalProperties").asBoolean())
             assertTrue(schema.path("required").isArray)
+            assertProviderStrictSchema(schema)
+        }
+    }
+
+    private fun assertProviderStrictSchema(node: com.fasterxml.jackson.databind.JsonNode) {
+        if (node.isObject) {
+            if (node.has("properties")) {
+                assertEquals(false, node.path("additionalProperties").asBoolean(), "Ieder object moet gesloten zijn: $node")
+                val properties = node.path("properties").fieldNames().asSequence().toSet()
+                val required = node.path("required").map { it.asText() }.toSet()
+                assertEquals(properties, required, "Structured output vereist ieder propertyveld in required")
+            }
+            node.fields().forEachRemaining { (_, child) -> assertProviderStrictSchema(child) }
+        } else if (node.isArray) {
+            node.forEach(::assertProviderStrictSchema)
+        }
+        if (node.path("format").isTextual) {
+            assertTrue(node.path("format").asText() in PROVIDER_SUPPORTED_FORMATS)
         }
     }
 
@@ -251,6 +269,9 @@ class LivingVisionFoundationTest(
     private var applicationContextMedia: nl.vdzon.productfactory.media.api.ProductMediaCatalog? = null
 
     companion object {
+        private val PROVIDER_SUPPORTED_FORMATS = setOf(
+            "date-time", "time", "date", "duration", "email", "hostname", "ipv4", "ipv6", "uuid",
+        )
         private const val ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
     }
 }
