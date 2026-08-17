@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.context.event.ApplicationEvents
 import org.springframework.test.context.event.RecordApplicationEvents
 import org.springframework.test.web.servlet.MockMvc
@@ -41,6 +42,14 @@ class ManualCycleStartIntegrationTest(
     @Autowired private val objectMapper: ObjectMapper,
     @Autowired private val meterRegistry: MeterRegistry,
 ) {
+    /**
+     * Deze suite bewijst de starttransactie. Laat de asynchrone engine de zojuist aangemaakte QUEUED-rij niet al
+     * volledig afhandelen voordat de tweede gelijktijdige bevestiging de product-lock krijgt; dat zou de productie-
+     * invariant die hier wordt getest vervangen door een timingtest van de snelle mock-agent.
+     */
+    @MockitoBean
+    private lateinit var iterationRunner: ShadowIterationRunner
+
     @BeforeEach
     fun createProducts() {
         listOf(
