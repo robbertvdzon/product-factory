@@ -473,6 +473,123 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+  Widget _cycleHistorySection({
+    required Map<String, dynamic> activeProduct,
+    required DashboardSource<List<dynamic>> iterationSource,
+    required DashboardSource<List<dynamic>> deliverySource,
+    required List<Map<String, dynamic>> scopedIterations,
+    required IterationResultsGrouping? grouping,
+  }) => Column(
+    key: const ValueKey('recent-cycles-block'),
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Eerdere cycli', style: Theme.of(context).textTheme.titleLarge),
+      if (iterationSource.loading)
+        const SourceNotice(
+          icon: Icons.hourglass_top,
+          text: 'Cycli voor het actieve product worden geladen.',
+        )
+      else if (iterationSource.failed)
+        const SourceNotice(
+          icon: Icons.error_outline,
+          text: 'Cycli voor het actieve product zijn niet beschikbaar.',
+          error: true,
+        )
+      else if (scopedIterations.isEmpty)
+        const ListTile(
+          leading: Icon(Icons.hourglass_empty),
+          title: Text('Nog geen cycli voor dit product'),
+        ),
+      if (iterationSource.loaded)
+        Semantics(
+          container: true,
+          explicitChildNodes: true,
+          label:
+              'Cyclusgeschiedenis voor product ${activeProduct['slug']}',
+          child: _limitedSection(
+            'iterations-${activeProduct['slug']}',
+            scopedIterations,
+            (iteration) {
+              final linked = grouping!.resultsFor(iteration);
+              final cardKey = ValueKey(
+                _iterationCardIdentity(scopedIterations, iteration),
+              );
+              if (shouldShowIterationEvidence(iteration)) {
+                return IterationEvidenceRow(
+                  key: cardKey,
+                  iteration: iteration,
+                  environmentIdentity: environmentIdentity,
+                  deliveries: deliverySource.loaded
+                      ? linked.deliveries
+                      : null,
+                  deliveriesLoading: deliverySource.loading,
+                  onOpenDetails: () => _showIteration(iteration),
+                );
+              }
+              return IterationProgressCard(
+                key: cardKey,
+                iteration: iteration,
+                onOpenDetails: () => _showIteration(iteration),
+              );
+            },
+          ),
+        ),
+    ],
+  );
+
+  Widget _linkedStoriesSection({
+    required Map<String, dynamic> activeProduct,
+    required DashboardSource<List<dynamic>> iterationSource,
+    required DashboardSource<List<dynamic>> candidateSource,
+    required List<Map<String, dynamic>> linkedStories,
+    required List<Map<String, dynamic>> scopedDeliveries,
+  }) => Column(
+    key: const ValueKey('linked-stories-block'),
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Gekoppelde stories', style: Theme.of(context).textTheme.titleLarge),
+      if (candidateSource.loading || iterationSource.loading)
+        const SourceNotice(
+          icon: Icons.hourglass_top,
+          text: 'Gekoppelde stories worden geladen.',
+        )
+      else if (candidateSource.failed || iterationSource.failed)
+        const SourceNotice(
+          icon: Icons.error_outline,
+          text: 'Gekoppelde stories zijn niet beschikbaar.',
+          error: true,
+        )
+      else if (linkedStories.isEmpty)
+        const ListTile(
+          leading: Icon(Icons.hourglass_empty),
+          title: Text('Nog geen eenduidig gekoppelde stories'),
+        )
+      else
+        _limitedSection(
+          'linked-stories-${activeProduct['slug']}',
+          linkedStories,
+          (story) {
+            final matchingDeliveries = scopedDeliveries
+                .where((delivery) => delivery['candidateId'] == story['id'])
+                .toList(growable: false);
+            return LinkedStoryTile(
+              key: ValueKey(
+                'linked-story-${activeProduct['slug']}-${story['id']}',
+              ),
+              story: story,
+              onOpenDetails: () => _showStoryCandidateDetails(
+                context,
+                story,
+                matchingDeliveries.length == 1
+                    ? matchingDeliveries.single
+                    : null,
+              ),
+            );
+          },
+        ),
+    ],
+  );
+
   Future<void> _showIteration(Map<String, dynamic> iteration) async {
     await showDialog<void>(
       context: context,
@@ -825,6 +942,8 @@ class _OverviewPageState extends State<OverviewPage> {
                   child: Text('Dashboard kon niet laden: ${snapshot.error}'),
                 );
               }
+              final compactOverview =
+                  MediaQuery.sizeOf(context).width <= 320;
               final products = availableProducts;
               final activeProduct = activeProductSlug == null
                   ? null
@@ -971,8 +1090,44 @@ class _OverviewPageState extends State<OverviewPage> {
                                   item['productSlug'] == activeProduct['slug'],
                             )
                             .toList(growable: false);
+                  final metricCards = <Widget>[
+                    MetricCard(
+                      label: 'Producten',
+                      value: '${products.length}',
+                      icon: Icons.apps,
+                    ),
+                    MetricCard(
+                      label: 'Interne storykandidaten',
+                      value: _derivedSourceCount([
+                        candidateSource,
+                        iterationSource,
+                      ], linkedStories.length),
+                      icon: Icons.lightbulb_outline,
+                    ),
+                    MetricCard(
+                      label: 'Workspace-publicaties',
+                      value: '${publications.length}',
+                      icon: Icons.folder_open,
+                    ),
+                    MetricCard(
+                      label: 'Shadow-iteraties',
+                      value: _sourceCount(
+                        iterationSource,
+                        scopedIterations.length,
+                      ),
+                      icon: Icons.science_outlined,
+                    ),
+                    MetricCard(
+                      label: 'Software Factory-stories',
+                      value: _derivedSourceCount([
+                        candidateSource,
+                        deliverySource,
+                      ], scopedDeliveries.length),
+                      icon: Icons.precision_manufacturing_outlined,
+                    ),
+                  ];
                   return ListView(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(compactOverview ? 12 : 24),
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -981,82 +1136,58 @@ class _OverviewPageState extends State<OverviewPage> {
                             'Productoverzicht',
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
-                          if (widget.acceptanceDataset) ...[
+                          if (!compactOverview &&
+                              widget.acceptanceDataset) ...[
                             const SizedBox(height: 16),
                             const AcceptanceDatasetNotice(),
                           ],
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                DashboardNavigationLink(
-                                  label: 'Beheer',
-                                  onPressed: () => setState(() {
-                                    managementProductSlug = activeProductSlug;
-                                    managementProductScopeAnnouncement = null;
-                                    managementView = true;
-                                  }),
-                                ),
-                                FilledButton.icon(
-                                  onPressed: () => _addProduct(aiCatalog),
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Product toevoegen'),
-                                ),
-                                IconButton(
-                                  onPressed: () => setState(_reload),
-                                  tooltip: 'Vernieuwen',
-                                  icon: const Icon(Icons.refresh),
-                                ),
-                              ],
+                          if (compactOverview) ...[
+                            const SizedBox(height: 8),
+                            CompactEnvironmentIdentity(
+                              identity: environmentIdentity,
                             ),
-                          ),
+                          ] else ...[
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  DashboardNavigationLink(
+                                    label: 'Beheer',
+                                    onPressed: () => setState(() {
+                                      managementProductSlug =
+                                          activeProductSlug;
+                                      managementProductScopeAnnouncement =
+                                          null;
+                                      managementView = true;
+                                    }),
+                                  ),
+                                  FilledButton.icon(
+                                    onPressed: () => _addProduct(aiCatalog),
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Product toevoegen'),
+                                  ),
+                                  IconButton(
+                                    onPressed: () => setState(_reload),
+                                    tooltip: 'Vernieuwen',
+                                    icon: const Icon(Icons.refresh),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
-                      if (dashboardSection == DashboardSection.overview) ...[
+                      if (!compactOverview &&
+                          dashboardSection == DashboardSection.overview) ...[
                         const SizedBox(height: 16),
                         Wrap(
                           spacing: 16,
                           runSpacing: 16,
-                          children: [
-                            MetricCard(
-                              label: 'Producten',
-                              value: '${products.length}',
-                              icon: Icons.apps,
-                            ),
-                            MetricCard(
-                              label: 'Interne storykandidaten',
-                              value: _derivedSourceCount([
-                                candidateSource,
-                                iterationSource,
-                              ], linkedStories.length),
-                              icon: Icons.lightbulb_outline,
-                            ),
-                            MetricCard(
-                              label: 'Workspace-publicaties',
-                              value: '${publications.length}',
-                              icon: Icons.folder_open,
-                            ),
-                            MetricCard(
-                              label: 'Shadow-iteraties',
-                              value: _sourceCount(
-                                iterationSource,
-                                scopedIterations.length,
-                              ),
-                              icon: Icons.science_outlined,
-                            ),
-                            MetricCard(
-                              label: 'Software Factory-stories',
-                              value: _derivedSourceCount([
-                                candidateSource,
-                                deliverySource,
-                              ], scopedDeliveries.length),
-                              icon: Icons.precision_manufacturing_outlined,
-                            ),
-                          ],
+                          children: metricCards,
                         ),
                         const SizedBox(height: 32),
                       ],
@@ -1068,46 +1199,61 @@ class _OverviewPageState extends State<OverviewPage> {
                               'Geen producten beschikbaar. Voeg een product toe om een productscope te openen.',
                         )
                       else ...[
-                        ProductScopePicker(
-                          products: products,
-                          value: activeProduct['slug'] as String,
-                          label: 'Actief product',
-                          onChanged: (slug) async {
-                            if (slug == null) return;
-                            final product = products.firstWhere(
-                              (candidate) => candidate['slug'] == slug,
-                            );
-                            final nextIterations = iterationsInProductScope(
-                              iterations,
-                              slug,
-                            );
-                            final nextStories = linkedStoriesInProductScope(
-                              candidates: stories,
-                              iterations: iterations,
-                              productSlug: slug,
-                            );
-                            await _selectProduct(
-                              slug,
-                              announcement:
-                                  'Gekozen product ${_productDisplayName(product)}. '
-                                  '${_sourceCount(iterationSource, nextIterations.length)} '
-                                  'eerdere cycli en '
-                                  '${_derivedSourceCount([candidateSource, iterationSource], nextStories.length)} gekoppelde stories.',
-                            );
-                          },
+                        Column(
+                          key: const ValueKey('product-scope-block'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ProductScopePicker(
+                              products: products,
+                              value: activeProduct['slug'] as String,
+                              label: 'Actief product',
+                              onChanged: (slug) async {
+                                if (slug == null) return;
+                                final product = products.firstWhere(
+                                  (candidate) => candidate['slug'] == slug,
+                                );
+                                final nextIterations =
+                                    iterationsInProductScope(
+                                      iterations,
+                                      slug,
+                                    );
+                                final nextStories =
+                                    linkedStoriesInProductScope(
+                                      candidates: stories,
+                                      iterations: iterations,
+                                      productSlug: slug,
+                                    );
+                                await _selectProduct(
+                                  slug,
+                                  announcement:
+                                      'Gekozen product ${_productDisplayName(product)}. '
+                                      '${_sourceCount(iterationSource, nextIterations.length)} '
+                                      'eerdere cycli en '
+                                      '${_derivedSourceCount([candidateSource, iterationSource], nextStories.length)} gekoppelde stories.',
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _productDisplayName(activeProduct),
+                              key: const ValueKey('active-product-name'),
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          _productDisplayName(activeProduct),
-                          key: const ValueKey('active-product-name'),
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 16),
-                        DashboardSectionNavigation(
-                          value: dashboardSection,
-                          onChanged: (section) =>
-                              setState(() => dashboardSection = section),
-                        ),
+                        if (compactOverview)
+                          MobileDashboardSectionNavigation(
+                            value: dashboardSection,
+                            onChanged: (section) =>
+                                setState(() => dashboardSection = section),
+                          )
+                        else
+                          DashboardSectionNavigation(
+                            value: dashboardSection,
+                            onChanged: (section) =>
+                                setState(() => dashboardSection = section),
+                          ),
                         if (overviewProductScopeAnnouncement != null)
                           ProductScopeStatus(
                             key: const ValueKey('product-scope-status'),
@@ -1115,133 +1261,69 @@ class _OverviewPageState extends State<OverviewPage> {
                           ),
                         if (dashboardSection == DashboardSection.overview) ...[
                           const SizedBox(height: 24),
-                          ImportantBugSummary(bugs: scopedBugs),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Cyclus starten',
-                            style: Theme.of(context).textTheme.titleLarge,
+                          if (!compactOverview) ...[
+                            ImportantBugSummary(bugs: scopedBugs),
+                            const SizedBox(height: 16),
+                          ],
+                          Column(
+                            key: const ValueKey('cycle-start-block'),
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cyclus starten',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              _startCycleSection(activeProduct),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          _startCycleSection(activeProduct),
+                          if (compactOverview) ...[
+                            const SizedBox(height: 24),
+                            _cycleHistorySection(
+                              activeProduct: activeProduct,
+                              iterationSource: iterationSource,
+                              deliverySource: deliverySource,
+                              scopedIterations: scopedIterations,
+                              grouping: grouping,
+                            ),
+                            const SizedBox(height: 24),
+                            _linkedStoriesSection(
+                              activeProduct: activeProduct,
+                              iterationSource: iterationSource,
+                              candidateSource: candidateSource,
+                              linkedStories: linkedStories,
+                              scopedDeliveries: scopedDeliveries,
+                            ),
+                            const SizedBox(height: 24),
+                            OperationalSummary(children: metricCards),
+                            if (widget.acceptanceDataset) ...[
+                              const SizedBox(height: 24),
+                              const AcceptanceDatasetNotice(),
+                            ],
+                            const SizedBox(height: 24),
+                            ImportantBugSummary(bugs: scopedBugs),
+                          ],
                         ],
                         if (dashboardSection ==
                             DashboardSection.productSessions) ...[
                           const SizedBox(height: 24),
-                          Text(
-                            'Eerdere cycli',
-                            style: Theme.of(context).textTheme.titleLarge,
+                          _cycleHistorySection(
+                            activeProduct: activeProduct,
+                            iterationSource: iterationSource,
+                            deliverySource: deliverySource,
+                            scopedIterations: scopedIterations,
+                            grouping: grouping,
                           ),
-                          if (iterationSource.loading)
-                            const SourceNotice(
-                              icon: Icons.hourglass_top,
-                              text:
-                                  'Cycli voor het actieve product worden geladen.',
-                            )
-                          else if (iterationSource.failed)
-                            const SourceNotice(
-                              icon: Icons.error_outline,
-                              text:
-                                  'Cycli voor het actieve product zijn niet beschikbaar.',
-                              error: true,
-                            )
-                          else if (scopedIterations.isEmpty)
-                            const ListTile(
-                              leading: Icon(Icons.hourglass_empty),
-                              title: Text('Nog geen cycli voor dit product'),
-                            ),
-                          if (iterationSource.loaded)
-                            Semantics(
-                              container: true,
-                              explicitChildNodes: true,
-                              label:
-                                  'Cyclusgeschiedenis voor product ${activeProduct['slug']}',
-                              child: _limitedSection(
-                                'iterations-${activeProduct['slug']}',
-                                scopedIterations,
-                                (iteration) {
-                                  final linked = grouping!.resultsFor(
-                                    iteration,
-                                  );
-                                  final cardKey = ValueKey(
-                                    _iterationCardIdentity(
-                                      scopedIterations,
-                                      iteration,
-                                    ),
-                                  );
-                                  if (shouldShowIterationEvidence(iteration)) {
-                                    return IterationEvidenceRow(
-                                      key: cardKey,
-                                      iteration: iteration,
-                                      environmentIdentity: environmentIdentity,
-                                      deliveries: deliverySource.loaded
-                                          ? linked.deliveries
-                                          : null,
-                                      deliveriesLoading: deliverySource.loading,
-                                      onOpenDetails: () =>
-                                          _showIteration(iteration),
-                                    );
-                                  }
-                                  return IterationProgressCard(
-                                    key: cardKey,
-                                    iteration: iteration,
-                                    onOpenDetails: () =>
-                                        _showIteration(iteration),
-                                  );
-                                },
-                              ),
-                            ),
                         ],
                         if (dashboardSection == DashboardSection.stories) ...[
                           const SizedBox(height: 24),
-                          Text(
-                            'Gekoppelde stories',
-                            style: Theme.of(context).textTheme.titleLarge,
+                          _linkedStoriesSection(
+                            activeProduct: activeProduct,
+                            iterationSource: iterationSource,
+                            candidateSource: candidateSource,
+                            linkedStories: linkedStories,
+                            scopedDeliveries: scopedDeliveries,
                           ),
-                          if (candidateSource.loading ||
-                              iterationSource.loading)
-                            const SourceNotice(
-                              icon: Icons.hourglass_top,
-                              text: 'Gekoppelde stories worden geladen.',
-                            )
-                          else if (candidateSource.failed ||
-                              iterationSource.failed)
-                            const SourceNotice(
-                              icon: Icons.error_outline,
-                              text: 'Gekoppelde stories zijn niet beschikbaar.',
-                              error: true,
-                            )
-                          else if (linkedStories.isEmpty)
-                            const ListTile(
-                              leading: Icon(Icons.hourglass_empty),
-                              title: Text(
-                                'Nog geen eenduidig gekoppelde stories',
-                              ),
-                            )
-                          else
-                            _limitedSection(
-                              'linked-stories-${activeProduct['slug']}',
-                              linkedStories,
-                              (story) {
-                                final matchingDeliveries = scopedDeliveries
-                                    .where(
-                                      (delivery) =>
-                                          delivery['candidateId'] ==
-                                          story['id'],
-                                    )
-                                    .toList(growable: false);
-                                return LinkedStoryTile(
-                                  story: story,
-                                  onOpenDetails: () =>
-                                      _showStoryCandidateDetails(
-                                        context,
-                                        story,
-                                        matchingDeliveries.length == 1
-                                            ? matchingDeliveries.single
-                                            : null,
-                                      ),
-                                );
-                              },
-                            ),
                         ],
                         if (dashboardSection == DashboardSection.overview) ...[
                           const SizedBox(height: 24),
@@ -1636,6 +1718,39 @@ class _OverviewPageState extends State<OverviewPage> {
                           );
                         }),
                       ],
+                      if (compactOverview) ...[
+                        const SizedBox(height: 24),
+                        Text(
+                          'Dashboardacties',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            DashboardNavigationLink(
+                              label: 'Beheer',
+                              onPressed: () => setState(() {
+                                managementProductSlug = activeProductSlug;
+                                managementProductScopeAnnouncement = null;
+                                managementView = true;
+                              }),
+                            ),
+                            FilledButton.icon(
+                              onPressed: () => _addProduct(aiCatalog),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Product toevoegen'),
+                            ),
+                            IconButton(
+                              onPressed: () => setState(_reload),
+                              tooltip: 'Vernieuwen',
+                              icon: const Icon(Icons.refresh),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   );
                 },
@@ -1913,7 +2028,7 @@ class _ProductScopePickerState extends State<ProductScopePicker> {
   }
 }
 
-class LinkedStoryTile extends StatelessWidget {
+class LinkedStoryTile extends StatefulWidget {
   const LinkedStoryTile({
     required this.story,
     required this.onOpenDetails,
@@ -1921,16 +2036,48 @@ class LinkedStoryTile extends StatelessWidget {
   });
 
   final Map<String, dynamic> story;
-  final VoidCallback onOpenDetails;
+  final Future<void> Function() onOpenDetails;
+
+  @override
+  State<LinkedStoryTile> createState() => _LinkedStoryTileState();
+}
+
+class _LinkedStoryTileState extends State<LinkedStoryTile> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'linked-story-details');
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openDetails() async {
+    try {
+      await widget.onOpenDetails();
+    } finally {
+      if (mounted) _focusNode.requestFocus();
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Card(
     child: ListTile(
+      focusNode: _focusNode,
       leading: const Icon(Icons.lightbulb_outline),
-      title: Text('${story['title']}'),
-      subtitle: Text('Cyclus ${story['iterationSequenceNumber']}'),
+      title: Text('${widget.story['title']}'),
+      subtitle: Text('Cyclus ${widget.story['iterationSequenceNumber']}'),
       trailing: const Icon(Icons.chevron_right),
-      onTap: onOpenDetails,
+      onTap: _openDetails,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
+          color: _focusNode.hasFocus
+              ? kCycleToggleFocus
+              : Colors.transparent,
+          width: 3,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      onFocusChange: (_) => setState(() {}),
     ),
   );
 }
@@ -2233,6 +2380,95 @@ class EnvironmentIdentityReference extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Compacte buildidentiteit bovenaan het 320px-overzicht. De uitroltijd blijft
+/// bewust buiten deze variant zodat de kernhandeling in de eerste viewport past.
+class CompactEnvironmentIdentity extends StatelessWidget {
+  const CompactEnvironmentIdentity({required this.identity, super.key});
+
+  final EnvironmentIdentityPresentation identity;
+
+  @override
+  Widget build(BuildContext context) {
+    final label =
+        'Omgeving: ${identity.environment} · Revisie/build-ID: ${identity.revision}';
+    return Semantics(
+      key: const ValueKey('compact-environment-identity'),
+      container: true,
+      label: label,
+      excludeSemantics: true,
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: kCycleCardSecondaryText,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// De vijf bestaande metriekkaarten, mobiel standaard volledig buiten de
+/// semantics- en focusvolgorde en pas na een expliciete native knopactie zichtbaar.
+class OperationalSummary extends StatefulWidget {
+  const OperationalSummary({required this.children, super.key});
+
+  final List<Widget> children;
+
+  @override
+  State<OperationalSummary> createState() => _OperationalSummaryState();
+}
+
+class _OperationalSummaryState extends State<OperationalSummary> {
+  bool _expanded = false;
+  final FocusNode _focusNode = FocusNode(debugLabel: 'operational-summary');
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _toggle() => setState(() => _expanded = !_expanded);
+
+  @override
+  Widget build(BuildContext context) => Column(
+    key: const ValueKey('operational-summary-block'),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      MergeSemantics(
+        child: Semantics(
+          key: const ValueKey('operational-summary-toggle'),
+          button: true,
+          expanded: _expanded,
+          label: 'Operationele samenvatting',
+          child: OutlinedButton.icon(
+            focusNode: _focusNode,
+            onPressed: _toggle,
+            style: ButtonStyle(
+              foregroundColor: const WidgetStatePropertyAll(kCycleToggleText),
+              side: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.focused)) {
+                  return const BorderSide(
+                    color: kCycleToggleFocus,
+                    width: 3,
+                  );
+                }
+                return const BorderSide(color: kCycleToggleText);
+              }),
+            ),
+            icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+            label: const Text('Operationele samenvatting'),
+          ),
+        ),
+      ),
+      if (_expanded) ...[
+        const SizedBox(height: 8),
+        Wrap(spacing: 16, runSpacing: 16, children: widget.children),
+      ],
+    ],
+  );
 }
 
 class _EvidenceValue extends StatelessWidget {
@@ -4227,13 +4463,14 @@ List<Widget> _buildStoryQueueSections(
   ];
 }
 
-void _showStoryCandidateDetails(
+Future<void> _showStoryCandidateDetails(
   BuildContext context,
   Map<String, dynamic> story,
   Map<String, dynamic>? delivery,
-) {
-  showDialog<void>(
+) =>
+    showDialog<void>(
     context: context,
+    traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
     builder: (context) => AlertDialog(
       title: Text('${story['title']}'),
       content: SizedBox(
@@ -4297,7 +4534,6 @@ void _showStoryCandidateDetails(
       ],
     ),
   );
-}
 
 class AddProductDialog extends StatefulWidget {
   const AddProductDialog({required this.aiCatalog, super.key});

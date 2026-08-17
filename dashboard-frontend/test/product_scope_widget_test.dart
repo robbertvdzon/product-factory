@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'dart:ui' show SemanticsAction;
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:product_factory_dashboard/bugs.dart';
 import 'package:product_factory_dashboard/main.dart';
 import 'package:product_factory_dashboard/product_scope.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -137,6 +138,16 @@ Future<void> _chooseScope(WidgetTester tester, String label) async {
 }
 
 Future<void> _openSection(WidgetTester tester, String label) async {
+  final mobileNavigation = find.byType(MobileDashboardSectionNavigation);
+  if (mobileNavigation.evaluate().isNotEmpty) {
+    await tester.ensureVisible(mobileNavigation);
+    await tester.pump();
+    await tester.tap(mobileNavigation);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(label).last);
+    await tester.pumpAndSettle();
+    return;
+  }
   final target = find.text(label);
   await tester.ensureVisible(target);
   await tester.pump();
@@ -297,7 +308,7 @@ void main() {
           .dy;
       final startY = tester.getTopLeft(find.text('Cyclus starten')).dy;
       expect(activeY, lessThan(startY));
-      await _openSection(tester, 'Productsessies');
+      await _openSection(tester, 'Productcycli');
       expect(find.text('Eerdere cycli'), findsOneWidget);
       await _openSection(tester, 'Stories');
       expect(find.text('Gekoppelde stories'), findsOneWidget);
@@ -308,6 +319,172 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Details van Alpha gekoppeld'), findsOneWidget);
       expect(find.text('Details van Beta gekoppeld'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    '320x900 toont omgeving, actieve productnaam en cyclusstart in de eerste viewport',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await _pumpDashboard(
+        tester,
+        _client(_Fixture(), <String>[]),
+        size: const Size(320, 900),
+      );
+
+      expect(find.byType(CompactEnvironmentIdentity), findsOneWidget);
+      expect(find.byType(MobileDashboardSectionNavigation), findsOneWidget);
+      expect(find.byType(DashboardSectionNavigation), findsNothing);
+      for (final finder in [
+        find.byType(CompactEnvironmentIdentity),
+        find.byKey(const ValueKey('active-product-name')),
+        find.byType(StartCycleButton),
+      ]) {
+        expect(finder, findsOneWidget);
+        expect(tester.getRect(finder).bottom, lessThanOrEqualTo(900));
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '320x900 koppelt de bestaande blokkadereden en detailactie aan een onbeschikbare start',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final fixture = _Fixture();
+      fixture.products.first['status'] = 'paused';
+      fixture.products.first['workspaceOwnership'] = 'owner';
+      final semanticsHandle = tester.ensureSemantics();
+      await _pumpDashboard(
+        tester,
+        _client(fixture, <String>[]),
+        size: const Size(320, 900),
+      );
+
+      final blocked = find.byKey(
+        const ValueKey('start-availability-blocked-group'),
+      );
+      expect(blocked, findsOneWidget);
+      expect(
+        tester.getSemantics(blocked).getSemanticsData().label,
+        contains(
+          'Starten is niet beschikbaar omdat dit product niet actief is.',
+        ),
+      );
+      expect(find.text('Bekijk productdetails'), findsOneWidget);
+      expect(tester.getRect(blocked).bottom, lessThanOrEqualTo(900));
+      semanticsHandle.dispose();
+    },
+  );
+
+  testWidgets(
+    'mobiel Overzicht bouwt de vijf kernblokken in DOM-volgorde en houdt metrieken ingeklapt',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final calls = <String>[];
+      await _pumpDashboard(
+        tester,
+        _client(_Fixture(), calls),
+        size: const Size(320, 7000),
+      );
+      final callsBeforeSectionChanges = List<String>.of(calls);
+      final semanticsHandle = tester.ensureSemantics();
+
+      final blockFinders = [
+        find.byKey(const ValueKey('product-scope-block')),
+        find.byKey(const ValueKey('cycle-start-block')),
+        find.byKey(const ValueKey('recent-cycles-block')),
+        find.byKey(const ValueKey('linked-stories-block')),
+        find.byKey(const ValueKey('operational-summary-block')),
+      ];
+      final yPositions = blockFinders
+          .map((finder) => tester.getTopLeft(finder).dy)
+          .toList(growable: false);
+      expect(yPositions, orderedEquals(yPositions.toList()..sort()));
+      expect(find.text('Alpha · iteratie 1'), findsOneWidget);
+      expect(find.text('Alpha gekoppeld'), findsOneWidget);
+      expect(find.byType(MetricCard), findsNothing);
+
+      final toggle = find.byKey(const ValueKey('operational-summary-toggle'));
+      expect(
+        tester.getSemantics(toggle).flagsCollection.isExpanded,
+        Tristate.isFalse,
+      );
+      final summaryButton = tester.widget<OutlinedButton>(
+        find.descendant(of: toggle, matching: find.byType(OutlinedButton)),
+      );
+      summaryButton.focusNode!.requestFocus();
+      await tester.pump();
+      final focusedSide = summaryButton.style!.side!.resolve({
+        WidgetState.focused,
+      });
+      expect(focusedSide?.width, 3);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(find.byType(MetricCard), findsNWidgets(5));
+      expect(
+        tester.getSemantics(toggle).flagsCollection.isExpanded,
+        Tristate.isTrue,
+      );
+
+      final overviewCycles = find
+          .byType(IterationProgressCard)
+          .evaluate()
+          .length;
+      final overviewStories = find.byType(LinkedStoryTile).evaluate().length;
+      await _openSection(tester, 'Productcycli');
+      expect(find.byType(IterationProgressCard), findsNWidgets(overviewCycles));
+      await _openSection(tester, 'Stories');
+      expect(find.byType(LinkedStoryTile), findsNWidgets(overviewStories));
+      expect(calls, callsBeforeSectionChanges);
+      semanticsHandle.dispose();
+    },
+  );
+
+  testWidgets(
+    'mobiele storydetail behoudt scope en sectie tijdens Escape en automatische verversing',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final calls = <String>[];
+      await _pumpDashboard(
+        tester,
+        _client(_Fixture(), calls),
+        size: const Size(320, 7000),
+      );
+
+      await _chooseScope(tester, 'Beta product');
+      await _openSection(tester, 'Stories');
+      await tester.tap(find.text('Beta gekoppeld'));
+      await tester.pumpAndSettle();
+      expect(find.text('Details van Beta gekoppeld'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(
+        FocusManager.instance.primaryFocus?.debugLabel,
+        'linked-story-details',
+      );
+
+      await tester.pump(const Duration(seconds: 5));
+      for (var pump = 0; pump < 6; pump++) {
+        await tester.pump();
+      }
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('active-product-name')))
+            .data,
+        'Beta product',
+      );
+      expect(
+        tester
+            .widget<MobileDashboardSectionNavigation>(
+              find.byType(MobileDashboardSectionNavigation),
+            )
+            .value,
+        DashboardSection.stories,
+      );
+      expect(find.text('Beta gekoppeld'), findsOneWidget);
+      expect(find.text('Alpha gekoppeld'), findsNothing);
+      expect(calls, isNotEmpty);
     },
   );
 
@@ -324,6 +501,10 @@ void main() {
       activeY,
       lessThan(tester.getTopLeft(find.text('Cyclus starten')).dy),
     );
+    expect(find.byType(DashboardSectionNavigation), findsOneWidget);
+    expect(find.byType(MobileDashboardSectionNavigation), findsNothing);
+    expect(find.byType(MetricCard), findsNWidgets(5));
+    expect(find.byType(OperationalSummary), findsNothing);
     await _openSection(tester, 'Productsessies');
     expect(find.text('Eerdere cycli'), findsOneWidget);
     await _openSection(tester, 'Stories');

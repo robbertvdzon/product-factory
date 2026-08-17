@@ -104,7 +104,7 @@ try {
     headless: true,
     executablePath: chromiumExecutable(),
   });
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: 320, height: 900 } });
   await page.goto(`http://127.0.0.1:${address.port}`, {
     waitUntil: 'networkidle',
   });
@@ -129,7 +129,35 @@ try {
   if ((await dialog.getAttribute('aria-label')) !== 'Productcyclus starten') {
     throw new Error('De alertdialog draagt niet zelf het vereiste aria-label.');
   }
-  console.log('Flutter-Web alertdialog heeft de vereiste rol en toegankelijke naam.');
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+
+  const sectionChoice = page.getByRole('button', {
+    name: /Sectie kiezen.*Overzicht/,
+  });
+  if ((await sectionChoice.count()) !== 1) {
+    throw new Error('De mobiele sectiekeuze heeft geen unieke toegankelijke naam en waarde.');
+  }
+
+  const summary = page.getByRole('button', {
+    name: /Operationele samenvatting/,
+  });
+  if ((await summary.count()) !== 1) {
+    throw new Error('De operationele samenvatting heeft geen unieke knopsemantiek.');
+  }
+  if ((await summary.getAttribute('aria-expanded')) !== 'false') {
+    throw new Error('De operationele samenvatting is niet standaard ingeklapt.');
+  }
+  if ((await page.getByText(/Producten/).count()) !== 0) {
+    throw new Error('Ingeklapte metriekinhoud staat nog in de Flutter-Web DOM.');
+  }
+  await summary.click();
+  await page.waitForTimeout(250);
+  if ((await summary.getAttribute('aria-expanded')) !== 'true') {
+    throw new Error('De operationele samenvatting communiceert uitklappen niet via aria-expanded.');
+  }
+  await page.getByText(/Producten/).waitFor({ state: 'visible' });
+  console.log('Flutter-Web dialog-, sectiekeuze- en samenvattingssemantiek zijn correct.');
 } finally {
   await browser?.close();
   await new Promise((resolveClose, reject) =>
