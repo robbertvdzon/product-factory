@@ -20,6 +20,8 @@ product-factory:
   autonomy:
     enabled: false
     poll-delay: PT1H
+  roadmap:
+    recovery-enabled: false
   testing:
     enabled: false
     poll-delay: PT1H

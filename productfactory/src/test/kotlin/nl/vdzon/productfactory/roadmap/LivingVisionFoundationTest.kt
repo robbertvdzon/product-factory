@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.contracts.RoadmapHandoffView
 import nl.vdzon.productfactory.contracts.RoadmapIdeaStatus
 import nl.vdzon.productfactory.contracts.RoadmapResearchStatus
+import nl.vdzon.productfactory.contracts.RoadmapStepStatus
 import nl.vdzon.productfactory.product.CreateProductRequest
 import nl.vdzon.productfactory.product.api.ProductCatalog
 import nl.vdzon.productfactory.product.api.UpdateProductSettingsRequest
@@ -36,6 +37,7 @@ class LivingVisionFoundationTest(
     @Autowired private val mapper: ObjectMapper,
     @Autowired private val migration: LegacyVisionMigrationService,
     @Autowired private val visions: RoadmapVisionCatalog,
+    @Autowired private val recovery: RoadmapProcessRecovery,
 ) {
     private lateinit var productA: String
     private lateinit var productB: String
@@ -108,6 +110,26 @@ class LivingVisionFoundationTest(
         assertTrue(session.id in prompt)
         assertTrue("source:1" in prompt)
         assertTrue("onvertrouwde data" in prompt)
+    }
+
+    @Test
+    fun `startup recovery resets every persistent running claim before redispatch`() {
+        val session = sessions.create(productA)
+        sessions.markRunning(session.id)
+        val stepId = "${session.id}-interrupted-scout"
+        catalog.initializeSteps(
+            session.id, productA, LIVING_VISION_PROCESS_VERSION,
+            listOf(StepDefinition(stepId, "product-market-scout", "session", false, emptyList())),
+        )
+        assertTrue(catalog.markRunning(stepId, "codex", "default", emptyList()))
+
+        val recovered = recovery.prepareInterruptedSessions()
+        val step = catalog.steps(session.id).single()
+
+        assertTrue(session.id in recovered)
+        assertEquals(RoadmapStepStatus.PENDING, step.status)
+        assertEquals(2, step.attempt)
+        assertEquals("Hervat na onderbroken proces", step.errorMessage)
     }
 
     @Test

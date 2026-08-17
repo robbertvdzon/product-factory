@@ -22,13 +22,14 @@ import nl.vdzon.productfactory.roadmap.api.LivingVisionCatalog
 import nl.vdzon.productfactory.roadmap.api.ResearchMutation
 import nl.vdzon.productfactory.roadmap.api.RoadmapSessionRepository
 import nl.vdzon.productfactory.roadmap.api.StepDefinition
+import jakarta.annotation.PreDestroy
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.ApplicationArguments
+import org.springframework.boot.ApplicationRunner
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.boot.context.event.ApplicationReadyEvent
-import org.springframework.context.event.EventListener
-import org.springframework.scheduling.annotation.Async
 import java.time.Instant
 import java.util.Base64
 import java.util.concurrent.Callable
@@ -59,14 +60,32 @@ class LivingVisionActivator(
 @Component
 class RoadmapProcessRecovery(
     private val sessions: RoadmapSessionRepository,
+    private val catalog: LivingVisionCatalog,
     private val orchestrator: RoadmapProcessOrchestrator,
-) {
-    @Async
-    @EventListener(ApplicationReadyEvent::class)
-    fun resumeAfterRestart() {
-        sessions.incompleteLivingVisionSessionIds().forEach { sessionId ->
-            runCatching { orchestrator.run(sessionId) }
+    @Value("\${product-factory.roadmap.recovery-enabled:true}") private val enabled: Boolean,
+) : ApplicationRunner {
+    private val logger = LoggerFactory.getLogger(javaClass)
+    private val executor = Executors.newFixedThreadPool(RECOVERY_CONCURRENCY)
+
+    override fun run(arguments: ApplicationArguments) {
+        if (!enabled) return
+        prepareInterruptedSessions().forEach { sessionId ->
+            executor.submit {
+                runCatching { orchestrator.run(sessionId) }
+                    .onFailure { logger.error("Hervatten van roadmap-sessie {} mislukte", sessionId, it) }
+            }
         }
+    }
+
+    internal fun prepareInterruptedSessions(): List<String> = sessions.incompleteLivingVisionSessionIds().also { sessionIds ->
+        sessionIds.forEach(catalog::resetInterrupted)
+    }
+
+    @PreDestroy
+    fun stop() = executor.shutdownNow()
+
+    companion object {
+        private const val RECOVERY_CONCURRENCY = 4
     }
 }
 
