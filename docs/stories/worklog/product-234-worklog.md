@@ -49,3 +49,21 @@
   agent-image blijft conform de versiebeheerconfig aan CI voorbehouden.
 - Eigen review: geen mergeconflictmarkers, geen whitespacefouten, geen lockfile-, API-, backend-,
   opslag-, telemetrie- of dependencywijzigingen en geen secrets in output/bestanden.
+
+## Reviewer — eerste ronde
+
+- Het revisiongebonden factorybewijs hoort bij de actuele developer-tree
+  `a4b0a9a76b07b73c3222ef8312370892b46121d3`. Alle voor deze diff toepasselijke opdrachten zijn
+  groen; de overgeslagen Docker Engine runner-test valt buiten de gewijzigde `pathPrefixes`.
+- [bug] Op maximaal 320 px worden `OperationalSummary` en de mobiele
+  `AcceptanceDatasetNotice` alleen binnen de tak met een actief product gebouwd. Bij een lege
+  productlijst toont de brede viewport de bestaande metriekwaarden en acceptatiemelding nog wel,
+  maar de mobiele viewport geen van beide. Daarmee verdwijnen bestaande overzichtsinformatie en
+  alle vijf metriekwaarden in plaats van dat die waarden in de vereiste ingeklapte samenvatting
+  beschikbaar blijven.
+- [blocker] De vereiste focuscontrastcontrole is niet compleet geïmplementeerd of geautomatiseerd.
+  `StartCycleButton` heeft geen focusafhankelijke rand of andere expliciet op minimaal 3:1 getoetste
+  indicator; de vaste witte rand is in rust en focus gelijk. De nieuwe tests meten daarnaast voor
+  `OperationalSummary` alleen randbreedte en voor `LinkedStoryTile` helemaal geen werkelijk
+  gerenderd focuscontrast. Er ontbreekt daarmee het geëiste bewijs op 320x900 én een brede viewport
+  voor ten minste cyclusstartactie, storyactie en operationele samenvatting.
