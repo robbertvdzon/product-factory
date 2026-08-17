@@ -212,6 +212,26 @@ class ProductFactoryRuntimeClient(@Value("\${product-factory.runtime-base-url}")
         .uri("/api/products/{slug}/roadmap/sessions", slug)
         .retrieve().body(Any::class.java)!!
 
+    fun livingVisionPortfolio(slug: String): Map<String, Any?> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/living-vision/portfolio", slug)
+        .retrieve().body(object : ParameterizedTypeReference<Map<String, Any?>>() {}).orEmpty()
+
+    fun livingVisionIdeaHistory(slug: String, ideaKey: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/living-vision/ideas/{ideaKey}/history", slug, ideaKey)
+        .retrieve().body(listType).orEmpty()
+
+    fun livingVisionConceptHistory(slug: String, conceptKey: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/living-vision/concepts/{conceptKey}/history", slug, conceptKey)
+        .retrieve().body(listType).orEmpty()
+
+    fun livingVisionSessionSteps(slug: String, sessionId: String): List<Map<String, Any?>> = runtime.get()
+        .uri("/api/products/{slug}/roadmap/living-vision/sessions/{sessionId}/steps", slug, sessionId)
+        .retrieve().body(listType).orEmpty()
+
+    fun migrateLegacyVision(slug: String): Any = runtime.post()
+        .uri("/api/products/{slug}/roadmap/living-vision/migrate-legacy", slug)
+        .retrieve().body(Any::class.java)!!
+
     fun bugs(slug: String): List<Map<String, Any?>> = runtime.get()
         .uri("/api/products/{slug}/bugs", slug)
         .retrieve().body(listType).orEmpty()

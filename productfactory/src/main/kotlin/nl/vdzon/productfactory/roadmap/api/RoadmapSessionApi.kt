@@ -17,6 +17,11 @@ import java.time.Instant
  */
 @Service
 class RoadmapSessionRepository(private val jdbc: JdbcTemplate, private val products: ProductCatalog) {
+    fun incompleteLivingVisionSessionIds(): List<String> = jdbc.queryForList(
+        """select id from roadmap_session where process_version = 'living-vision-v2'
+            and status in ('QUEUED', 'RUNNING') order by created_at""".trimIndent(),
+        String::class.java,
+    )
     fun hasActive(productSlug: String): Boolean = (jdbc.queryForObject(
         "select count(*) from roadmap_session where product_slug = ? and status in ('QUEUED', 'RUNNING')",
         Long::class.java,
@@ -38,14 +43,16 @@ class RoadmapSessionRepository(private val jdbc: JdbcTemplate, private val produ
     )?.toInstant()
 
     fun create(productSlug: String): RoadmapSessionView {
-        val product = products.requireContext(productSlug)
+        val selectedProduct = products.requireProduct(productSlug)
+        val product = products.requireContext(selectedProduct.slug)
         val sequence = jdbc.queryForObject("select coalesce(max(sequence_number), 0) + 1 from roadmap_session where product_slug = ?", Int::class.java, product.slug) ?: 1
         val id = "roadmap-session-${product.slug}-${sequence.toString().padStart(4, '0')}"
         jdbc.update(
-            "insert into roadmap_session(id, product_slug, sequence_number, status) values (?, ?, ?, 'QUEUED')",
+            "insert into roadmap_session(id, product_slug, sequence_number, status, process_version) values (?, ?, ?, 'QUEUED', ?)",
             id,
             product.slug,
             sequence,
+            selectedProduct.roadmapProcessVersion,
         )
         return require(product.slug, id)
     }
@@ -104,6 +111,7 @@ class RoadmapSessionRepository(private val jdbc: JdbcTemplate, private val produ
         workspaceRunId = row.getString("workspace_run_id"),
         workspacePullRequestUrl = row.getString("workspace_pull_request_url"),
         workspaceCommitSha = row.getString("workspace_commit_sha"),
+        processVersion = row.getString("process_version"),
     )
 
     companion object {

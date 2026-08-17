@@ -52,6 +52,7 @@ data class ProductConfiguration(
     val privacyRules: String,
     val accessibilityRules: String,
     val qualityRules: String,
+    val roadmapProcessVersion: String = "legacy-v1",
 )
 
 data class UpdateProductSettingsRequest(
@@ -65,6 +66,7 @@ data class UpdateProductSettingsRequest(
     val aiModel: String? = null,
     val targetRepositoryName: String? = null,
     val acceptanceUrl: String? = null,
+    val roadmapProcessVersion: String? = null,
 )
 
 data class ProductContext(
@@ -137,8 +139,8 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
                     preview_url_pattern, acceptance_url, admin_url, status, development_mode, timezone,
                     max_stories_per_cycle, wip_limit, ai_provider, ai_model, daily_budget_cents,
                     monthly_budget_cents, escalation_policy, privacy_rules,
-                    accessibility_rules, quality_rules
-                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                    accessibility_rules, quality_rules, roadmap_process_version
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
                 "pf-${UUID.randomUUID()}", product.slug, product.name.trim(), product.mission.trim(),
                 product.description.trim(), product.guardrails.trim(), product.softwareFactoryProjectKey.trim(),
                 product.targetRepositoryName.trim(), "products/${product.slug}", product.workspaceOwnership,
@@ -148,6 +150,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
                 product.maxStoriesPerCycle, product.wipLimit, product.aiProvider.trim(), product.aiModel.trim(),
                 product.dailyBudgetCents, product.monthlyBudgetCents, product.escalationPolicy.trim(),
                 product.privacyRules.trim(), product.accessibilityRules.trim(), product.qualityRules.trim(),
+                product.roadmapProcessVersion,
             )
         } catch (_: DuplicateKeyException) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Productslug bestaat al")
@@ -175,6 +178,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         val testSchedule = request.testSchedule ?: current.testSchedule
         val targetRepositoryName = (request.targetRepositoryName ?: current.targetRepositoryName).trim()
         val acceptanceUrl = request.acceptanceUrl?.trim()?.ifBlank { null } ?: current.acceptanceUrl
+        val roadmapProcessVersion = request.roadmapProcessVersion ?: current.roadmapProcessVersion
 
         require(developmentMode in DEVELOPMENT_MODES) { "Ongeldige ontwikkelmodus" }
         require(maxStoriesPerCycle in 1..20) { "Maximaal aantal stories per cyclus moet tussen 1 en 20 liggen" }
@@ -186,12 +190,15 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         validateWeeklySchedule(testSchedule, "test")
         require(targetRepositoryName.matches(REPOSITORY)) { "Ongeldige repositorynaam" }
         validateUrl(acceptanceUrl)
+        require(roadmapProcessVersion in ROADMAP_PROCESS_VERSIONS) { "Ongeldige roadmapprocesversie" }
 
         jdbc.update(
             """update product_definition set development_mode = ?, max_stories_per_cycle = ?, wip_limit = ?,
-                ai_provider = ?, ai_model = ?, target_repository_name = ?, acceptance_url = ?, updated_at = current_timestamp
+                ai_provider = ?, ai_model = ?, target_repository_name = ?, acceptance_url = ?,
+                roadmap_process_version = ?, updated_at = current_timestamp
                 where slug = ?""".trimIndent(),
-            developmentMode, maxStoriesPerCycle, wipLimit, aiProvider, aiModel, targetRepositoryName, acceptanceUrl, normalized,
+            developmentMode, maxStoriesPerCycle, wipLimit, aiProvider, aiModel, targetRepositoryName, acceptanceUrl,
+            roadmapProcessVersion, normalized,
         )
         replaceIterationTimes(normalized, iterationTimes)
         replaceRoadmapSchedule(normalized, roadmapSchedule)
@@ -534,6 +541,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         require(candidate.workspaceOwnership in OWNERSHIPS) { "Ongeldig workspace-eigenaarschap" }
         require(candidate.status in STATUSES) { "Ongeldige productstatus" }
         require(candidate.developmentMode in DEVELOPMENT_MODES) { "Ongeldige ontwikkelmodus" }
+        require(candidate.roadmapProcessVersion in ROADMAP_PROCESS_VERSIONS) { "Ongeldige roadmapprocesversie" }
         require(candidate.maxStoriesPerCycle in 1..20) { "Maximaal aantal stories per cyclus moet tussen 1 en 20 liggen" }
         require(candidate.wipLimit in 1..20) { "WIP-limiet moet tussen 1 en 20 liggen" }
         require(candidate.dailyBudgetCents >= 0 && candidate.monthlyBudgetCents >= 0) { "AI-budgetten mogen niet negatief zijn" }
@@ -630,6 +638,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         privacyRules = row.getString("privacy_rules"),
         accessibilityRules = row.getString("accessibility_rules"),
         qualityRules = row.getString("quality_rules"),
+        roadmapProcessVersion = row.getString("roadmap_process_version"),
         createdAt = row.getTimestamp("created_at").toInstant(),
         updatedAt = row.getTimestamp("updated_at").toInstant(),
         meetingRequestedAt = row.getTimestamp("meeting_requested_at")?.toInstant(),
@@ -705,6 +714,7 @@ class ProductCatalog(private val jdbc: JdbcTemplate, private val mapper: ObjectM
         private val REPOSITORY = Regex("[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?")
         private val STATUSES = setOf("draft", "active", "paused", "archived")
         private val DEVELOPMENT_MODES = setOf("manual", "autonomous", "observe-only")
+        val ROADMAP_PROCESS_VERSIONS = setOf("legacy-v1", "living-vision-v2")
         private val OWNERSHIPS = setOf("owner", "product-factory")
         private val DAYS_OF_WEEK = setOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY")
         private val TIME_OF_DAY = Regex("([01]\\d|2[0-3]):[0-5]\\d")

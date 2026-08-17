@@ -17,7 +17,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
 server:
   port: ${PF_RUNTIME_PORT:8080}
 product-factory:
@@ -41,6 +41,9 @@ product-factory:
   roadmap:
     enabled: ${PF_ROADMAP_ENABLED:false}
     poll-delay: ${PF_ROADMAP_POLL_DELAY:PT1H}
+    v2-parallelism: ${PF_ROADMAP_V2_PARALLELISM:4}
+    v2-max-attempts: ${PF_ROADMAP_V2_MAX_ATTEMPTS:2}
+    v2-max-concepts: ${PF_ROADMAP_V2_MAX_CONCEPTS:2}
   testing:
     enabled: ${PF_TESTING_ENABLED:true}
     poll-delay: ${PF_TESTING_POLL_DELAY:PT1H}

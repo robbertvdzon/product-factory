@@ -23,6 +23,21 @@ Vervang `fase 1` door de eerstvolgende nog niet afgeronde fase. De fases worden 
 De paralleliteit in dit document gaat over agents **binnen een draaiende roadmapsessie**, niet over
 het gelijktijdig ontwikkelen van afhankelijke fases in dezelfde worktree.
 
+### Realisatiestatus (2026-08-17)
+
+Fases 1 tot en met 7 zijn geïmplementeerd achter de productkeuze `roadmapProcessVersion`. De
+standaard blijft `legacy-v1`; `living-vision-v2` is per product activeerbaar en zonder dataverlies
+terug te schakelen. De gerealiseerde graph bevat drie parallelle scouts, curator, configureerbare
+parallelle UX- en onderzoeksstappen, UX-director, strateeg, criticus, manager en één atomair
+activatiepunt. V29 levert de append-only portfolio-, bewijs-, concept-, graph- en activatieopslag.
+
+Het verificatiebewijs bestaat uit migratietests vanaf V28, repositorytests voor append-only gedrag
+en productisolatie, schema- en promptcontracttests, echte paralleliteits-/recoverytests, een
+synthetische end-to-endgraph met echte PNG-assets, criticus- en activatiefouttests, en Fluttertests
+voor portfolio, proceskeuze en een viewport van 320 pixels. De exacte brede Maven-, Flutter-,
+container- en uitrolresultaten worden bij de oplevering vastgelegd; deze status markeert dus de
+implementatie, niet zelfstandig een productie-uitrol.
+
 ## Aanleiding
 
 Het huidige roadmapproces heeft drie opeenvolgende rollen: visionair, toekomststrateeg en

@@ -11,6 +11,7 @@ Map<String, dynamic> _product() => {
   'targetRepositoryName': 'org/demo-repo',
   'workspaceOwnership': 'product-factory',
   'developmentMode': 'manual',
+  'roadmapProcessVersion': 'legacy-v1',
   'maxStoriesPerCycle': 3,
   'wipLimit': 2,
   'aiProvider': 'openai',
@@ -176,6 +177,15 @@ void main() {
       await tester.tap(find.text('anthropic').last);
       await tester.pumpAndSettle();
 
+      final roadmapProcess = find.byKey(
+        const ValueKey('roadmap-process-version'),
+      );
+      await tester.ensureVisible(roadmapProcess);
+      await tester.tap(roadmapProcess);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Levende visie v2').last);
+      await tester.pumpAndSettle();
+
       final chip0300 = find.ancestor(
         of: find.text('03:00'),
         matching: find.byType(Chip),
@@ -199,6 +209,7 @@ void main() {
       expect(saved!['targetRepositoryName'], 'org/nieuwe-repo');
       expect(saved!['aiProvider'], 'anthropic');
       expect(saved!['aiModel'], 'claude-3-5-sonnet');
+      expect(saved!['roadmapProcessVersion'], 'living-vision-v2');
       expect(saved!['iterationTimes'], ['15:00']);
       expect(saved!['roadmapSchedule'], [
         {'dayOfWeek': 'MONDAY', 'time': '10:00'},

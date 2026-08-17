@@ -99,6 +99,7 @@ data class ProductView(
     val privacyRules: String,
     val accessibilityRules: String,
     val qualityRules: String,
+    val roadmapProcessVersion: String = "legacy-v1",
     val createdAt: Instant,
     val updatedAt: Instant,
     val meetingRequestedAt: Instant? = null,
@@ -308,6 +309,171 @@ data class RoadmapSessionView(
     val workspaceRunId: String? = null,
     val workspacePullRequestUrl: String? = null,
     val workspaceCommitSha: String? = null,
+    val processVersion: String = "legacy-v1",
+)
+
+enum class RoadmapIdeaStatus {
+    SPARK, EXPLORED, CONCEPT, UX_DESIGNED, TESTING, VALIDATED, ROADMAP, PARKED, REJECTED,
+}
+
+enum class RoadmapResearchStatus {
+    UNKNOWN, TESTING, VALIDATED, INVALIDATED, CURRENTLY_BLOCKED, FUNDAMENTALLY_IMPOSSIBLE,
+}
+
+enum class RoadmapStepStatus { PENDING, READY, RUNNING, COMPLETED, SKIPPED, FAILED }
+
+/** Begrensde, productgebonden context die iedere living-vision-agent ontvangt. */
+data class RoadmapProductContextView(
+    val productSlug: String,
+    val name: String,
+    val mission: String,
+    val description: String,
+    val ownerVision: String?,
+    val guardrails: String,
+    val privacyRules: String,
+    val accessibilityRules: String,
+    val qualityRules: String,
+    val urls: Map<String, String>,
+    val memory: List<RoadmapContextItemView>,
+    val currentVision: Map<String, Any?>?,
+    val relevantHistory: List<RoadmapContextItemView>,
+)
+
+data class RoadmapContextItemView(val id: String, val title: String, val content: String)
+
+data class RoadmapHandoffView(
+    val processVersion: String,
+    val sessionId: String,
+    val productSlug: String,
+    val producerRole: String,
+    val consumerRole: String,
+    val scopeKey: String,
+    val inputArtifactIds: List<String>,
+    val outputArtifactIds: List<String>,
+    val summary: String,
+    val payload: Map<String, Any?>,
+)
+
+data class RoadmapIdeaView(
+    val id: String,
+    val productSlug: String,
+    val ideaKey: String,
+    val status: RoadmapIdeaStatus,
+    val currentVersion: Int,
+    val promise: String,
+    val primaryAudience: String,
+    val need: String,
+    val origin: String,
+    val firstSessionId: String?,
+    val statusReason: String?,
+    val evidence: String?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+data class RoadmapIdeaVersionView(
+    val id: Long,
+    val ideaId: String,
+    val productSlug: String,
+    val version: Int,
+    val promise: String,
+    val primaryAudience: String,
+    val need: String,
+    val details: Map<String, Any?>,
+    val changeReason: String,
+    val createdBySessionId: String?,
+    val createdByRole: String,
+    val createdAt: Instant,
+)
+
+data class RoadmapInspirationView(
+    val id: String,
+    val productSlug: String,
+    val sessionId: String,
+    val producerRole: String,
+    val sourceUrl: String,
+    val title: String,
+    val accessedAt: Instant,
+    val observation: String,
+    val interpretation: String,
+    val relevance: String,
+    val limitations: String?,
+    val confidence: Int,
+    val screenshotMediaId: String?,
+    val rightsNote: String?,
+    val createdAt: Instant,
+)
+
+data class RoadmapUxConceptView(
+    val id: String,
+    val productSlug: String,
+    val conceptKey: String,
+    val ideaKey: String,
+    val status: String,
+    val currentVersion: Int,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+data class RoadmapUxConceptVersionView(
+    val id: Long,
+    val conceptId: String,
+    val productSlug: String,
+    val version: Int,
+    val ideaVersion: Int,
+    val viewport: String,
+    val flowPosition: Int,
+    val userGoal: String,
+    val interaction: String,
+    val content: String,
+    val states: List<String>,
+    val decisions: List<String>,
+    val assumptions: List<String>,
+    val openQuestions: List<String>,
+    val review: String?,
+    val createdBySessionId: String?,
+    val createdAt: Instant,
+    val assets: List<ProductMediaView>,
+)
+
+data class RoadmapResearchResultView(
+    val id: String,
+    val productSlug: String,
+    val sessionId: String,
+    val ideaKey: String,
+    val conceptKey: String?,
+    val capabilityKey: String?,
+    val researchType: String,
+    val question: String,
+    val evidence: String,
+    val sources: List<String>,
+    val limitations: String,
+    val confidence: Int,
+    val status: RoadmapResearchStatus,
+    val conclusion: String,
+    val recommendedNextStep: String,
+    val dependencies: List<String>,
+    val createdAt: Instant,
+)
+
+data class RoadmapSessionStepView(
+    val id: String,
+    val sessionId: String,
+    val productSlug: String,
+    val role: String,
+    val scopeKey: String,
+    val status: RoadmapStepStatus,
+    val processVersion: String,
+    val required: Boolean,
+    val attempt: Int,
+    val provider: String?,
+    val model: String?,
+    val inputArtifactIds: List<String>,
+    val outputArtifactIds: List<String>,
+    val handoff: RoadmapHandoffView?,
+    val errorMessage: String?,
+    val startedAt: Instant?,
+    val completedAt: Instant?,
 )
 
 data class DeliveryVerificationView(

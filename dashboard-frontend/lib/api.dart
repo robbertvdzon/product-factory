@@ -39,6 +39,21 @@ class DashboardApi {
   Future<List<dynamic>> roadmapSettledQuestions() =>
       _list('/api/roadmap/settled-questions');
   Future<List<dynamic>> roadmapSessions() => _list('/api/roadmap/sessions');
+  Future<Map<String, dynamic>> livingVisionPortfolio(String slug) => _object(
+    '/api/products/${Uri.encodeComponent(slug)}/roadmap/living-vision/portfolio',
+  );
+  Future<List<dynamic>> livingVisionIdeaHistory(
+    String slug,
+    String ideaKey,
+  ) => _list(
+    '/api/products/${Uri.encodeComponent(slug)}/roadmap/living-vision/ideas/${Uri.encodeComponent(ideaKey)}/history',
+  );
+  Future<List<dynamic>> livingVisionSessionSteps(
+    String slug,
+    String sessionId,
+  ) => _list(
+    '/api/products/${Uri.encodeComponent(slug)}/roadmap/living-vision/sessions/${Uri.encodeComponent(sessionId)}/steps',
+  );
   Future<List<dynamic>> bugs() => _list('/api/bugs');
   Future<List<dynamic>> testSessions() => _list('/api/test-sessions');
   Future<Map<String, dynamic>> aiCatalog() => _object('/api/ai-catalog');

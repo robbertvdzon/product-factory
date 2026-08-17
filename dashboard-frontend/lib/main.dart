@@ -504,8 +504,7 @@ class _OverviewPageState extends State<OverviewPage> {
         Semantics(
           container: true,
           explicitChildNodes: true,
-          label:
-              'Cyclusgeschiedenis voor product ${activeProduct['slug']}',
+          label: 'Cyclusgeschiedenis voor product ${activeProduct['slug']}',
           child: _limitedSection(
             'iterations-${activeProduct['slug']}',
             scopedIterations,
@@ -519,9 +518,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   key: cardKey,
                   iteration: iteration,
                   environmentIdentity: environmentIdentity,
-                  deliveries: deliverySource.loaded
-                      ? linked.deliveries
-                      : null,
+                  deliveries: deliverySource.loaded ? linked.deliveries : null,
                   deliveriesLoading: deliverySource.loading,
                   onOpenDetails: () => _showIteration(iteration),
                 );
@@ -651,6 +648,62 @@ class _OverviewPageState extends State<OverviewPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    }
+  }
+
+  Future<void> _showRoadmapProcess(String productSlug, String sessionId) async {
+    try {
+      final steps = await api.livingVisionSessionSteps(productSlug, sessionId);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Roadmapproces en agenthandoffs'),
+          content: SizedBox(
+            width: 760,
+            child: steps.isEmpty
+                ? const Text(
+                    'Voor deze sessie zijn geen v2-processtappen vastgelegd.',
+                  )
+                : ListView(
+                    shrinkWrap: true,
+                    children: steps.map((raw) {
+                      final step = Map<String, dynamic>.from(raw as Map);
+                      final handoff = step['handoff'] is Map
+                          ? Map<String, dynamic>.from(step['handoff'] as Map)
+                          : const <String, dynamic>{};
+                      return ListTile(
+                        leading: const Icon(Icons.account_tree_outlined),
+                        title: Text('${step['role']} · ${step['status']}'),
+                        subtitle: Text(
+                          [
+                            'Scope: ${step['scopeKey']} · poging ${step['attempt']}',
+                            if ('${handoff['summary'] ?? ''}'.isNotEmpty)
+                              'Overdracht: ${handoff['summary']}',
+                            if ('${step['errorMessage'] ?? ''}'.isNotEmpty)
+                              'Fout: ${step['errorMessage']}',
+                          ].join('\n'),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Sluiten'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Procesdossier kon niet worden geladen: $error'),
+          ),
+        );
       }
     }
   }
@@ -942,8 +995,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   child: Text('Dashboard kon niet laden: ${snapshot.error}'),
                 );
               }
-              final compactOverview =
-                  MediaQuery.sizeOf(context).width <= 320;
+              final compactOverview = MediaQuery.sizeOf(context).width <= 320;
               final products = availableProducts;
               final activeProduct = activeProductSlug == null
                   ? null
@@ -1136,8 +1188,7 @@ class _OverviewPageState extends State<OverviewPage> {
                             'Productoverzicht',
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
-                          if (!compactOverview &&
-                              widget.acceptanceDataset) ...[
+                          if (!compactOverview && widget.acceptanceDataset) ...[
                             const SizedBox(height: 16),
                             const AcceptanceDatasetNotice(),
                           ],
@@ -1158,10 +1209,8 @@ class _OverviewPageState extends State<OverviewPage> {
                                   DashboardNavigationLink(
                                     label: 'Beheer',
                                     onPressed: () => setState(() {
-                                      managementProductSlug =
-                                          activeProductSlug;
-                                      managementProductScopeAnnouncement =
-                                          null;
+                                      managementProductSlug = activeProductSlug;
+                                      managementProductScopeAnnouncement = null;
                                       managementView = true;
                                     }),
                                   ),
@@ -1220,17 +1269,15 @@ class _OverviewPageState extends State<OverviewPage> {
                                 final product = products.firstWhere(
                                   (candidate) => candidate['slug'] == slug,
                                 );
-                                final nextIterations =
-                                    iterationsInProductScope(
-                                      iterations,
-                                      slug,
-                                    );
-                                final nextStories =
-                                    linkedStoriesInProductScope(
-                                      candidates: stories,
-                                      iterations: iterations,
-                                      productSlug: slug,
-                                    );
+                                final nextIterations = iterationsInProductScope(
+                                  iterations,
+                                  slug,
+                                );
+                                final nextStories = linkedStoriesInProductScope(
+                                  candidates: stories,
+                                  iterations: iterations,
+                                  productSlug: slug,
+                                );
                                 await _selectProduct(
                                   slug,
                                   announcement:
@@ -1503,6 +1550,14 @@ class _OverviewPageState extends State<OverviewPage> {
                                           : summary,
                                   ].join(' · '),
                                 ),
+                                onTap:
+                                    session['processVersion'] ==
+                                        'living-vision-v2'
+                                    ? () => _showRoadmapProcess(
+                                        '${session['productSlug']}',
+                                        '${session['id']}',
+                                      )
+                                    : null,
                                 trailing: workspaceRunId == null
                                     ? null
                                     : IconButton(
@@ -2078,9 +2133,7 @@ class _LinkedStoryTileState extends State<LinkedStoryTile> {
       onTap: _openDetails,
       shape: RoundedRectangleBorder(
         side: BorderSide(
-          color: _focusNode.hasFocus
-              ? kCycleToggleFocus
-              : Colors.transparent,
+          color: _focusNode.hasFocus ? kCycleToggleFocus : Colors.transparent,
           width: 3,
         ),
         borderRadius: BorderRadius.circular(12),
@@ -2458,10 +2511,7 @@ class _OperationalSummaryState extends State<OperationalSummary> {
               foregroundColor: const WidgetStatePropertyAll(kCycleToggleText),
               side: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.focused)) {
-                  return const BorderSide(
-                    color: kCycleToggleFocus,
-                    width: 3,
-                  );
+                  return const BorderSide(color: kCycleToggleFocus, width: 3);
                 }
                 return const BorderSide(color: kCycleToggleText);
               }),
@@ -4475,73 +4525,72 @@ Future<void> _showStoryCandidateDetails(
   BuildContext context,
   Map<String, dynamic> story,
   Map<String, dynamic>? delivery,
-) =>
-    showDialog<void>(
-    context: context,
-    traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
-    builder: (context) => AlertDialog(
-      title: Text('${story['title']}'),
-      content: SizedBox(
-        width: 720,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (delivery != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Wrap(
-                    spacing: 8,
-                    children: [
-                      Chip(label: Text('${delivery['status']}')),
-                      if (delivery['externalStoryKey'] != null)
-                        Chip(label: Text('${delivery['externalStoryKey']}')),
-                      if (delivery['remotePhase'] != null)
-                        Chip(label: Text('${delivery['remotePhase']}')),
-                    ],
-                  ),
+) => showDialog<void>(
+  context: context,
+  traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+  builder: (context) => AlertDialog(
+    title: Text('${story['title']}'),
+    content: SizedBox(
+      width: 720,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (delivery != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    Chip(label: Text('${delivery['status']}')),
+                    if (delivery['externalStoryKey'] != null)
+                      Chip(label: Text('${delivery['externalStoryKey']}')),
+                    if (delivery['remotePhase'] != null)
+                      Chip(label: Text('${delivery['remotePhase']}')),
+                  ],
                 ),
-              SelectableText('${story['description']}'),
-              if ('${story['acceptanceCriteria'] ?? ''}'.trim().isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Acceptatiecriteria',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                SelectableText('${story['acceptanceCriteria']}'),
-              ],
-              if ('${story['criticReason'] ?? ''}'.trim().isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Beoordeling criticus',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                SelectableText('${story['criticReason']}'),
-              ],
-              if (delivery?['errorMessage'] != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Foutmelding',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                SelectableText('${delivery!['errorMessage']}'),
-              ],
+              ),
+            SelectableText('${story['description']}'),
+            if ('${story['acceptanceCriteria'] ?? ''}'.trim().isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Acceptatiecriteria',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              SelectableText('${story['acceptanceCriteria']}'),
             ],
-          ),
+            if ('${story['criticReason'] ?? ''}'.trim().isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Beoordeling criticus',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              SelectableText('${story['criticReason']}'),
+            ],
+            if (delivery?['errorMessage'] != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Foutmelding',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              SelectableText('${delivery!['errorMessage']}'),
+            ],
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Sluiten'),
-        ),
-      ],
     ),
-  );
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Sluiten'),
+      ),
+    ],
+  ),
+);
 
 class AddProductDialog extends StatefulWidget {
   const AddProductDialog({required this.aiCatalog, super.key});
@@ -4556,6 +4605,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
   final mission = TextEditingController();
   final maxStoriesPerCycle = TextEditingController(text: '3');
   String developmentMode = 'manual';
+  String roadmapProcessVersion = 'legacy-v1';
   String workspaceOwnership = 'owner';
   late String aiProvider = widget.aiCatalog.keys.first;
   late String aiModel =
@@ -4593,6 +4643,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
       'softwareFactoryProjectKey': normalizedSlug,
       'targetRepositoryName': normalizedSlug,
       'developmentMode': developmentMode,
+      'roadmapProcessVersion': roadmapProcessVersion,
       'workspaceOwnership': workspaceOwnership,
       'status': 'draft',
       'aiProvider': aiProvider,
@@ -4642,6 +4693,19 @@ class _AddProductDialogState extends State<AddProductDialog> {
                 ),
               ],
               onChanged: (value) => setState(() => developmentMode = value!),
+            ),
+            DropdownButtonFormField<String>(
+              initialValue: roadmapProcessVersion,
+              decoration: const InputDecoration(labelText: 'Roadmapproces'),
+              items: const [
+                DropdownMenuItem(value: 'legacy-v1', child: Text('Legacy v1')),
+                DropdownMenuItem(
+                  value: 'living-vision-v2',
+                  child: Text('Levende visie v2'),
+                ),
+              ],
+              onChanged: (value) =>
+                  setState(() => roadmapProcessVersion = value!),
             ),
             DropdownButtonFormField<String>(
               initialValue: workspaceOwnership,
@@ -5238,6 +5302,8 @@ class ProductSettingsDialog extends StatefulWidget {
 
 class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
   late String developmentMode = '${widget.product['developmentMode']}';
+  late String roadmapProcessVersion =
+      '${widget.product['roadmapProcessVersion'] ?? 'legacy-v1'}';
   late final maxStoriesPerCycle = TextEditingController(
     text: '${widget.product['maxStoriesPerCycle']}',
   );
@@ -5283,6 +5349,7 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
     if (stories == null || wip == null || iterationTimes.isEmpty) return;
     Navigator.pop(context, <String, dynamic>{
       'developmentMode': developmentMode,
+      'roadmapProcessVersion': roadmapProcessVersion,
       'maxStoriesPerCycle': stories,
       'wipLimit': wip,
       'aiProvider': aiProvider,
@@ -5351,6 +5418,23 @@ class _ProductSettingsDialogState extends State<ProductSettingsDialog> {
                 ),
               ],
               onChanged: (value) => setState(() => developmentMode = value!),
+            ),
+            DropdownButtonFormField<String>(
+              key: const ValueKey('roadmap-process-version'),
+              initialValue: roadmapProcessVersion,
+              decoration: const InputDecoration(
+                labelText: 'Roadmapproces',
+                helperText: 'Terugschakelen verwijdert geen v2-historie.',
+              ),
+              items: const [
+                DropdownMenuItem(value: 'legacy-v1', child: Text('Legacy v1')),
+                DropdownMenuItem(
+                  value: 'living-vision-v2',
+                  child: Text('Levende visie v2'),
+                ),
+              ],
+              onChanged: (value) =>
+                  setState(() => roadmapProcessVersion = value!),
             ),
             TextField(
               controller: targetRepositoryName,

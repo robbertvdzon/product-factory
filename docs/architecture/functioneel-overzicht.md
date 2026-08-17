@@ -522,3 +522,19 @@ tegelijk aan de Software Factory: met de standaardinstelling (`wipLimit = 1`) ga
 elkaar, pas nadat de vorige story volledig is afgehandeld. Pas als *al* het werk van een cyclus
 (alle leveringen) klaar en geëvalueerd is, mag er automatisch een geheel nieuwe cyclus starten —
 en dat gebeurt hooguit één keer per dag, rond het geconfigureerde tijdstip.
+
+## 9. Levend visieproces
+
+Een product kan naast de bestaande drie-rollenketen het versieerbare `living-vision-v2`-proces
+gebruiken. Drie onafhankelijke scouts zoeken gelijktijdig naar marktinzichten, bronnen en
+verrassende richtingen. Een curator houdt de stabiele ideeënportefeuille bij. Per geselecteerd idee
+ontstaan echte UX-flows en gerichte haalbaarheidsonderzoeken, waarna de UX-director de bewijsimpact
+verwerkt. De strateeg synthetiseert uitsluitend de gecureerde inhoud; de criticus bewaakt
+productfit, bewijs en behoud van kernideeën; de manager plant capabilities, discovery en delivery
+zonder de visie te mogen herschrijven.
+
+Iedere overgang is een opgeslagen handoff. Het dashboard kan daardoor per sessie laten zien welke
+rol welke context ontving, wat nieuw of concreter werd en waar een fout ontstond. De laatste stap
+activeert alle gevalideerde veranderingen gezamenlijk. Zonder succesvolle criticus, manager en
+activatie blijven de huidige visie en roadmap ongewijzigd. De proceskeuze is per product omkeerbaar
+en oudere versies, bronnen, onderzoeken en conceptbeelden blijven raadpleegbaar.

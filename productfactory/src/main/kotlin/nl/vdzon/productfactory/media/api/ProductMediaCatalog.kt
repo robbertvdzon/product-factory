@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
 import java.util.UUID
+import javax.imageio.ImageIO
+import java.io.ByteArrayInputStream
 
 data class ProductMediaContent(val metadata: ProductMediaView, val bytes: ByteArray)
 
@@ -26,6 +28,10 @@ class ProductMediaCatalog(private val jdbc: JdbcTemplate, private val products: 
         require(mediaType in ALLOWED_MEDIA_TYPES) { "Alleen PNG-, JPEG-, WebP- en GIF-afbeeldingen zijn toegestaan" }
         require(bytes.isNotEmpty() && bytes.size <= MAX_IMAGE_BYTES) { "Een afbeelding moet tussen 1 byte en 5 MB groot zijn" }
         require(hasExpectedSignature(mediaType, bytes)) { "De bestandsinhoud komt niet overeen met het afbeeldingstype" }
+        val (width, height) = imageDimensions(mediaType, bytes)
+        require(width in 1..MAX_IMAGE_DIMENSION && height in 1..MAX_IMAGE_DIMENSION && width.toLong() * height <= MAX_IMAGE_PIXELS) {
+            "Afbeeldingsafmetingen zijn ongeldig of te groot"
+        }
         require(source in setOf("owner", "ai")) { "Ongeldige mediabron" }
         val safeFilename = filename.substringAfterLast('/').substringAfterLast('\\').trim().take(255).ifBlank { "afbeelding" }
         val cleanAltText = altText?.trim()?.take(1000)?.ifBlank { null }
@@ -97,9 +103,34 @@ class ProductMediaCatalog(private val jdbc: JdbcTemplate, private val products: 
     private fun ByteArray.startsWith(vararg signature: Int): Boolean = size >= signature.size &&
         signature.indices.all { index -> this[index].toInt() and 0xff == signature[index] }
 
+    private fun imageDimensions(mediaType: String, bytes: ByteArray): Pair<Int, Int> {
+        if (mediaType != "image/webp") {
+            val image = ImageIO.read(ByteArrayInputStream(bytes)) ?: throw IllegalArgumentException("Afbeeldingsafmetingen zijn onleesbaar")
+            return image.width to image.height
+        }
+        require(bytes.size >= 30) { "WebP-afbeelding is onvolledig" }
+        fun u(index: Int) = bytes[index].toInt() and 0xff
+        return when (bytes.decodeToString(12, 16)) {
+            "VP8X" -> (1 + u(24) + (u(25) shl 8) + (u(26) shl 16)) to
+                (1 + u(27) + (u(28) shl 8) + (u(29) shl 16))
+            "VP8L" -> {
+                require(u(20) == 0x2f) { "Ongeldige WebP-lossless-header" }
+                (1 + u(21) + ((u(22) and 0x3f) shl 8)) to
+                    (1 + ((u(22) and 0xc0) shr 6) + (u(23) shl 2) + ((u(24) and 0x0f) shl 10))
+            }
+            "VP8 " -> {
+                require(u(23) == 0x9d && u(24) == 0x01 && u(25) == 0x2a) { "Ongeldige WebP-header" }
+                ((u(26) + (u(27) shl 8)) and 0x3fff) to ((u(28) + (u(29) shl 8)) and 0x3fff)
+            }
+            else -> throw IllegalArgumentException("Onbekende WebP-header")
+        }
+    }
+
     companion object {
         const val MAX_IMAGE_BYTES = 5 * 1024 * 1024
         const val MAX_IMAGES_PER_MESSAGE = 5
+        const val MAX_IMAGE_DIMENSION = 4096
+        const val MAX_IMAGE_PIXELS = 16_000_000L
         val ALLOWED_MEDIA_TYPES = setOf("image/png", "image/jpeg", "image/webp", "image/gif")
         private const val SELECT = "select id, product_slug, filename, media_type, size_bytes, alt_text, source, source_reference, created_at from product_media"
     }

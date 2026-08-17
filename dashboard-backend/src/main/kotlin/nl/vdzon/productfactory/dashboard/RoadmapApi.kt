@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.dashboard
 
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -53,4 +54,27 @@ class RoadmapApi(private val runtime: ProductFactoryRuntimeClient) {
     @PostMapping("/sessions")
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun startSession(@PathVariable slug: String): Any = runtime.startRoadmapSession(slug)
+
+    @GetMapping("/living-vision/portfolio")
+    fun livingVisionPortfolio(@PathVariable slug: String): Any = runtime.livingVisionPortfolio(slug)
+
+    @GetMapping("/living-vision/ideas/{ideaKey}/history")
+    fun livingVisionIdeaHistory(@PathVariable slug: String, @PathVariable ideaKey: String): Any =
+        runtime.livingVisionIdeaHistory(slug, ideaKey)
+
+    @GetMapping("/living-vision/concepts/{conceptKey}/history")
+    fun livingVisionConceptHistory(@PathVariable slug: String, @PathVariable conceptKey: String): Any =
+        runtime.livingVisionConceptHistory(slug, conceptKey)
+
+    @GetMapping("/living-vision/sessions/{id}/steps")
+    fun livingVisionSteps(@PathVariable slug: String, @PathVariable id: String): Any =
+        runtime.livingVisionSessionSteps(slug, id)
+
+    @GetMapping("/living-vision/media/{mediaId}")
+    fun livingVisionMedia(@PathVariable slug: String, @PathVariable mediaId: String): ResponseEntity<ByteArray> =
+        runtime.productMediaContent(slug, mediaId)
+
+    @PostMapping("/living-vision/migrate-legacy")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun migrateLegacy(@PathVariable slug: String): Any = runtime.migrateLegacyVision(slug)
 }

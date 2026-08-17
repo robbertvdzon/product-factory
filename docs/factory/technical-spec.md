@@ -398,3 +398,32 @@ Na een tester-AI-run voert de agentworker deze zelf uit en schrijft additive rev
 `AgentResultFile`; de factory valideert config, commandset, exitcodes en HEAD/worktree-tree onafhankelijk en
 fail-closed. Timeout stopt parent en child-processen; een output-readerfout is nooit groen. Duration moet
 exact met start/eind overeenkomen en samenvatting/rapportlocatie zijn begrensd.
+
+## Living Vision v2
+
+Flyway V29 voegt `roadmap_process_version` aan producten en `process_version` aan sessies toe, beide
+met de compatibele standaard `legacy-v1`. De nieuwe append-only opslag bestaat uit
+`roadmap_idea(_version)`, `roadmap_inspiration`, `roadmap_ux_concept(_version/_asset)`,
+`roadmap_research_result`, `roadmap_session_step(_dependency)` en `roadmap_activation`. Iedere
+domeinrij draagt productscope; samengestelde foreign keys en repositoryqueries voorkomen
+cross-productkoppelingen.
+
+`RoadmapProcessOrchestrator` voert voor `living-vision-v2` een persistente DAG uit. Ready-stappen
+worden atomair geclaimd en begrensd parallel uitgevoerd. Bij herstart gaan achtergelaten
+`RUNNING`-stappen terug naar hervatbaar; de idempotentiesleutel bevat sessie, rol, scope en poging.
+Iedere agentprompt wordt samengesteld uit hetzelfde provider-onafhankelijke procescontract,
+sessiemanifest, rolbevoegdheid, begrensde `RoadmapProductContext` en getypeerde handoffs. De
+agentworker valideert gesloten JSON-schema's vóór materialisatie en geeft browsertoegang alleen aan
+de daarvoor aangewezen scout- en conceptrollen.
+
+De graph bevat drie scouts, curator, configureerbare parallelle concept- en onderzoeksstappen,
+UX-director, strateeg, criticus, manager en activatie. Alleen activatie gebruikt de bestaande
+`RoadmapSessionApplier`; `roadmap_activation.session_id` is uniek en het geheel draait in één
+transactie. Een criticusafwijzing of andere verplichte fout kan daardoor nooit een half actieve
+visie produceren. Instellingen zijn `PF_ROADMAP_V2_PARALLELISM` (standaard 4),
+`PF_ROADMAP_V2_MAX_ATTEMPTS` (2) en `PF_ROADMAP_V2_MAX_CONCEPTS` (2, maximum 4).
+
+Nieuwe runtime-API's onder `/api/products/{slug}/roadmap/living-vision` leveren portfolio,
+idee-/concepthistorie, sessiestappen en de idempotente legacy-migratie. Bestaande roadmap-API's en
+contractvelden blijven additive compatibel. Micrometer publiceert duur, voltooiing, retries,
+bronopbrengst en screenshotproductie per rol; `/actuator/metrics` is intern beschikbaar.

@@ -52,6 +52,7 @@ data class CreateProductRequest(
     val privacyRules: String = "",
     val accessibilityRules: String = "",
     val qualityRules: String = "",
+    val roadmapProcessVersion: String = "legacy-v1",
 ) {
     fun configuration() = ProductConfiguration(
         slug = slug,
@@ -83,6 +84,7 @@ data class CreateProductRequest(
         privacyRules = privacyRules,
         accessibilityRules = accessibilityRules,
         qualityRules = qualityRules,
+        roadmapProcessVersion = roadmapProcessVersion,
     )
 
     companion object {

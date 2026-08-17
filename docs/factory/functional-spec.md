@@ -488,3 +488,25 @@ Een testerresultaat bereikt alleen `tested` met compleet groen machinebewijs uit
 `.factory/verification.yaml` voor exact dezelfde HEAD/worktree-tree. Missing bewijs/config, onbekende
 versie, tool-missing, timeout, non-zero en revisionmismatch leveren altijd `test-rejected` op;
 pre-existing, flaky en omgevingsfouten zijn nooit groen.
+
+## Levend productvisie- en roadmapproces
+
+Een product kiest afzonderlijk tussen `legacy-v1` en `living-vision-v2`. Bestaande en nieuwe
+producten blijven standaard op `legacy-v1` totdat een beheerder de keuze wijzigt; terugschakelen
+verwijdert geen opgebouwde v2-historie. Een reeds gestarte sessie bewaart haar eigen procesversie,
+zodat een latere configuratiewijziging de uitvoering niet halverwege verandert.
+
+Een v2-sessie verzamelt eerst parallelle externe inspiratie en nieuwe mogelijkheden. De curator
+maakt of verfijnt daarna productgebonden ideeën met een stabiele sleutel en append-only
+versiegeschiedenis. Geselecteerde ideeën krijgen parallel UX-concepten en
+haalbaarheidsonderzoeken. De UX-director synthetiseert de resultaten; strateeg, onafhankelijke
+criticus en roadmapmanager vertalen alleen gevalideerde uitkomsten naar visie en roadmap. Pas de
+afsluitende activatiestap vervangt de actieve visie atomair. Bij een mislukte verplichte stap blijft
+de vorige actieve visie volledig intact.
+
+Het productoverzicht toont voor v2-producten de actieve toekomstvisie, het ideeënportfolio met
+status, versie en wijzigingsreden, echte mobiele en desktopconceptbeelden met alt-tekst, bronnen
+waarbij feit en AI-interpretatie apart gelabeld zijn, onderzoeksconclusies en sessiestappen met
+handoffs of fouten. Alle historie en media worden door de actieve productselectie begrensd. Een
+legacy-visie kan idempotent als expliciet gemigreerde beginhistorie worden overgenomen; die migratie
+verzint geen nieuwe inhoud.

@@ -25,6 +25,14 @@ origin en callbackconfiguratie toe aan dezelfde Google OAuth-client als de ander
 De twee publieke Cloudflare-routes staan in `deploy/README.md`. De interne runtime-route is alleen
 voor operationele health/deploycontrole en hoort niet als gebruikersendpoint te worden gedeeld.
 
+Living Vision v2 blijft na deployment standaard per product uit. De niet-gevoelige ConfigMap-
+waarden `PF_ROADMAP_V2_PARALLELISM`, `PF_ROADMAP_V2_MAX_ATTEMPTS` en
+`PF_ROADMAP_V2_MAX_CONCEPTS` begrenzen respectievelijk gelijktijdige graphstappen, pogingen en
+parallelle conceptselecties. Rol- en productspecifieke waarden horen niet in deze instellingen.
+Migreer bestaande visiegegevens vóór omschakeling via de idempotente interne migratie-API en zet
+daarna alleen het bedoelde product op `living-vision-v2`. Terugzetten naar `legacy-v1` is de
+operationele rollback; v2-historie blijft daarbij bewaard.
+
 ## Dashboardidentiteit bij uitrol
 
 Productie, standing acceptatie en PR-previews krijgen elk hun eigen omgevingscode, volledige

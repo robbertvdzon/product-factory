@@ -2,8 +2,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
+
+List<Map<String, dynamic>> _livingMaps(Object? value) => value is List
+    ? value
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList()
+    : const [];
 
 class RoadmapEpic {
   const RoadmapEpic({
@@ -134,6 +142,10 @@ class RoadmapBoard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (product['roadmapProcessVersion'] == 'living-vision-v2') ...[
+                  LivingVisionPortfolioPanel(api: api, productSlug: slug),
+                  const Divider(height: 1),
+                ],
                 if (productVision != null) ...[
                   _FutureVisionPanel(vision: productVision),
                   const Divider(height: 1),
@@ -202,6 +214,290 @@ class RoadmapBoard extends StatelessWidget {
       ),
     );
     if (changed == true) onChanged();
+  }
+}
+
+class LivingVisionPortfolioPanel extends StatelessWidget {
+  const LivingVisionPortfolioPanel({
+    required this.api,
+    required this.productSlug,
+    super.key,
+  });
+
+  final DashboardApi api;
+  final String productSlug;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+    future: api.livingVisionPortfolio(productSlug),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Padding(
+          padding: EdgeInsets.all(20),
+          child: LinearProgressIndicator(semanticsLabel: 'Levende visie laden'),
+        );
+      }
+      if (snapshot.hasError) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text(
+            'Levende visie kon niet worden geladen: ${snapshot.error}',
+          ),
+        );
+      }
+      final data = snapshot.data ?? const <String, dynamic>{};
+      final ideas = _livingMaps(data['ideas']);
+      final conceptVersions = _livingMaps(data['conceptVersions']);
+      final inspiration = _livingMaps(data['inspiration']);
+      final research = _livingMaps(data['research']);
+      return Semantics(
+        container: true,
+        label: 'Levende productvisie',
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Levende productvisie',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${ideas.length} ideeën · ${conceptVersions.length} conceptversies · ${inspiration.length} bronnen · ${research.length} onderzoeken',
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Ideeënportfolio',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (ideas.isEmpty)
+                const Text('Nog geen ideeën gemigreerd of gecureerd.')
+              else
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: ideas
+                      .map(
+                        (idea) => SizedBox(
+                          width: math
+                              .min(300, MediaQuery.sizeOf(context).width - 40)
+                              .toDouble(),
+                          child: Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${idea['ideaKey']}',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleSmall,
+                                  ),
+                                  Text(
+                                    '${idea['status']} · versie ${idea['currentVersion']}',
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text('${idea['promise']}'),
+                                  if ('${idea['statusReason'] ?? ''}'
+                                      .isNotEmpty)
+                                    Text(
+                                      'Wijzigingsreden: ${idea['statusReason']}',
+                                    ),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: TextButton.icon(
+                                      onPressed: () => _showIdeaHistory(
+                                        context,
+                                        api,
+                                        productSlug,
+                                        '${idea['ideaKey']}',
+                                      ),
+                                      icon: const Icon(Icons.history),
+                                      label: const Text('Versiegeschiedenis'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              if (conceptVersions.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'UX-concepten en flows',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                ...conceptVersions.map(
+                  (version) => _ConceptVersionCard(
+                    api: api,
+                    productSlug: productSlug,
+                    version: version,
+                  ),
+                ),
+              ],
+              if (inspiration.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Externe inspiratie',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                ...inspiration
+                    .take(8)
+                    .map(
+                      (source) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.link),
+                        title: Text('${source['title']}'),
+                        subtitle: Text(
+                          'Bronfeit: ${source['observation']}\nAI-interpretatie: ${source['interpretation']}\nBronlink: ${source['sourceUrl']}',
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Open bronlink',
+                          onPressed: () => launchUrl(
+                            Uri.parse('${source['sourceUrl']}'),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          icon: const Icon(Icons.open_in_new),
+                        ),
+                      ),
+                    ),
+              ],
+              if (research.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Onderzoek en conclusies',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                ...research
+                    .take(10)
+                    .map(
+                      (result) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          '${result['researchType']} · ${result['status']}',
+                        ),
+                        subtitle: Text(
+                          'Vraag: ${result['question']}\nTechnische conclusie: ${result['conclusion']}',
+                        ),
+                      ),
+                    ),
+              ],
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _showIdeaHistory(
+  BuildContext context,
+  DashboardApi api,
+  String productSlug,
+  String ideaKey,
+) => showDialog<void>(
+  context: context,
+  builder: (context) => AlertDialog(
+    title: Text('Versiegeschiedenis · $ideaKey'),
+    content: SizedBox(
+      width: 640,
+      child: FutureBuilder<List<dynamic>>(
+        future: api.livingVisionIdeaHistory(productSlug, ideaKey),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const LinearProgressIndicator(
+              semanticsLabel: 'Versiegeschiedenis laden',
+            );
+          }
+          if (snapshot.hasError) {
+            return Text(
+              'Versiegeschiedenis kon niet worden geladen: ${snapshot.error}',
+            );
+          }
+          final versions = _livingMaps(snapshot.data);
+          return ListView(
+            shrinkWrap: true,
+            children: versions
+                .map(
+                  (version) => ListTile(
+                    leading: CircleAvatar(child: Text('${version['version']}')),
+                    title: Text('${version['promise']}'),
+                    subtitle: Text(
+                      'Wijzigingsreden: ${version['changeReason']}\nRol: ${version['createdByRole']}',
+                    ),
+                  ),
+                )
+                .toList(),
+          );
+        },
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Sluiten'),
+      ),
+    ],
+  ),
+);
+
+class _ConceptVersionCard extends StatelessWidget {
+  const _ConceptVersionCard({
+    required this.api,
+    required this.productSlug,
+    required this.version,
+  });
+
+  final DashboardApi api;
+  final String productSlug;
+  final Map<String, dynamic> version;
+
+  @override
+  Widget build(BuildContext context) {
+    final assets = _livingMaps(version['assets']);
+    return Card.outlined(
+      margin: const EdgeInsets.only(top: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${version['viewport']} · flowstap ${version['flowPosition']} · versie ${version['version']}',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            Text('Gebruikersdoel: ${version['userGoal']}'),
+            Text('Interactie: ${version['interaction']}'),
+            for (final asset in assets)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Semantics(
+                  image: true,
+                  label: '${asset['altText'] ?? 'UX-conceptbeeld'}',
+                  child: Image.network(
+                    '${api.baseUrl}/api/products/${Uri.encodeComponent(productSlug)}/roadmap/living-vision/media/${Uri.encodeComponent('${asset['id']}')}',
+                    headers: {
+                      if (api.token != null)
+                        'Authorization': 'Bearer ${api.token}',
+                    },
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => Text(
+                      '${asset['altText'] ?? 'Conceptbeeld niet beschikbaar'}',
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

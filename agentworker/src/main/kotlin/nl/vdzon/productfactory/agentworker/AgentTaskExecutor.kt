@@ -89,6 +89,14 @@ internal fun requiresBrowserAccess(task: AgentTask): Boolean = task.taskType in 
     "roadmap-visionary",
     "roadmap-strategist",
     "roadmap-manager",
+    "roadmap-product-market-scout",
+    "roadmap-domain-source-scout",
+    "roadmap-wild-ideas",
+    "roadmap-ux-concept",
+    "roadmap-feasibility",
+    "roadmap-ux-director",
+    "roadmap-future-strategist",
+    "roadmap-vision-critic",
 )
 
 /** Gedeelde veiligheidsinstructie voor iedere providerimplementatie: dezelfde grenzen, ongeacht de gekozen AI. */

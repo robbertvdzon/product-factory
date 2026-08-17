@@ -36,12 +36,16 @@ import java.time.ZoneId
 @Component
 class RoadmapSessionRunner(
     private val engine: RoadmapSessionEngine,
+    private val orchestrator: RoadmapProcessOrchestrator,
     private val repository: RoadmapSessionRepository,
 ) {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun start(event: RoadmapSessionStarted) {
-        runCatching { engine.run(event.sessionId) }
+        runCatching {
+            val session = repository.requireById(event.sessionId)
+            if (session.processVersion == LIVING_VISION_PROCESS_VERSION) orchestrator.run(event.sessionId) else engine.run(event.sessionId)
+        }
             .onFailure { repository.markFailed(event.sessionId, it.message ?: it.javaClass.simpleName) }
     }
 }
