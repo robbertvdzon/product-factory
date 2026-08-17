@@ -393,8 +393,11 @@ class RoadmapProcessOrchestrator(
     }
 
     private fun persistDirectorRevisions(step: RoadmapSessionStepView, output: JsonNode): List<String> {
-        require(output.path("approved").asBoolean()) { "UX-director heeft de conceptset niet goedgekeurd" }
-        return output.path("conceptRevisions").flatMap { revision ->
+        val revisions = output.path("conceptRevisions")
+        require(output.path("approved").asBoolean() || revisions.size() > 0) {
+            "UX-director heeft de conceptset niet goedgekeurd en geen uitvoerbare revisie geleverd"
+        }
+        return revisions.flatMap { revision ->
             val conceptKey = revision.path("conceptKey").asText()
             val concept = catalog.concepts(step.productSlug).singleOrNull { it.conceptKey == conceptKey }
                 ?: throw IllegalArgumentException("Revisie verwijst naar onbekend concept")
@@ -507,7 +510,7 @@ class RoadmapProcessOrchestrator(
     companion object {
         const val MAX_PARALLELISM = 8
         const val MAX_PARALLEL_CONCEPTS = 4
-        const val STEP_TIMEOUT_SECONDS = 900L
+        const val STEP_TIMEOUT_SECONDS = 1_800L
         private val TERMINAL_STATES = setOf(RoadmapStepStatus.COMPLETED, RoadmapStepStatus.SKIPPED, RoadmapStepStatus.FAILED)
     }
 }

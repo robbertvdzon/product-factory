@@ -112,6 +112,17 @@ class RoadmapProcessOrchestratorTest(
     }
 
     @Test
+    fun `director supplied correction is applied before an initial disapproval can block`() {
+        dispatch.reviseConcept.set(2)
+        val session = sessions.create(slug)
+
+        orchestrator.run(session.id)
+
+        assertEquals("COMPLETED", sessions.require(slug, session.id).status)
+        assertEquals(2, catalog.concepts(slug).single { it.conceptKey == "concept-1" }.currentVersion)
+    }
+
+    @Test
     fun `critic gets one bounded strategy correction and approves the corrected vision`() {
         dispatch.criticRequiresCorrection.set(1)
         val session = sessions.create(slug)
@@ -199,12 +210,13 @@ class RoadmapProcessOrchestratorTest(
         private fun review(approved: Boolean, summary: String) = """{"summary":"$summary","approved":$approved,"revisionRequests":[]}"""
 
         private fun director(): String {
-            val revisions = if (reviseConcept.get() == 1) {
+            val revisions = if (reviseConcept.get() > 0) {
                 """[{"conceptKey":"concept-1","reason":"Onderzoek vraagt zichtbare onzekerheid in de flow.","evidenceImpact":"Onderzoeksbewijs maakt een herstelroute en onzekerheidslabel noodzakelijk.","userGoal":"De gebruiker voltooit het kerndoel en begrijpt resterende onzekerheid.","interaction":"De flow biedt keuze, bevestiging, zichtbare onzekerheid en een herstelroute.","content":"Begrijpelijke interface-inhoud benoemt resultaat, onzekerheid en vervolgstap.","states":["loading","success","uncertain","error"],"decisions":["Maak onderzoeksbeperking zichtbaar."],"assumptions":["De uitleg is begrijpelijk."],"openQuestions":["Welke formulering geeft voldoende vertrouwen?"]}]"""
             } else {
                 "[]"
             }
-            return """{"summary":"De flows vormen één consistente en toegankelijke ervaring.","approved":true,"revisionRequests":[],"conceptRevisions":$revisions}"""
+            val approved = reviseConcept.get() != 2
+            return """{"summary":"De flows vormen één consistente en toegankelijke ervaring.","approved":$approved,"revisionRequests":${if (approved) "[]" else "[\"Pas de concrete gerichte revisie toe.\"]"},"conceptRevisions":$revisions}"""
         }
 
         private fun strategy(): String {
