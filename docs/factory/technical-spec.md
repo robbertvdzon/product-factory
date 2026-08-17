@@ -159,6 +159,11 @@
   maximaal één actieve testsessie per product. `TestSessionEngine` gebruikt het browsertakenprofiel,
   verwerkt gestructureerde CREATE/UPDATE/RESOLVE/OBSOLETE-mutaties en publiceert het testrapport onder
   `product-memory/test-session-NNNN.md`.
+- De Mac-agentworker koppelt browserrollen niet aan de desktop-Browser-plugin: een los CLI-proces heeft
+  daar geen betrouwbare browsersessie. Vóór iedere browserrol start de worker daarom zelf een headless
+  Chromium-preflight via de lokaal geïnstalleerde Playwright-CLI. Alleen na een echte screenshot start
+  de AI-taak, met de geïsoleerde Playwright-route en een expliciet commando voor meerstapsnavigatie.
+  Een ontbrekende desktopbrowser kan daardoor niet meer als inhoudelijke `BLOCKED`-test worden verwerkt.
 
 ## Versiebeheerd productgeheugen
 

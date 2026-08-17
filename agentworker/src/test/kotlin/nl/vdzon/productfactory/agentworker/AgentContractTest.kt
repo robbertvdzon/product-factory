@@ -10,6 +10,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.util.Base64
+import kotlin.io.path.writeBytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -133,10 +134,10 @@ class AgentContractTest {
         )
 
         assertTrue(command.containsAll(listOf("--sandbox", "danger-full-access")))
-        assertFalse(command.contains("--ignore-user-config"))
+        assertTrue(command.contains("--ignore-user-config"))
         assertFalse(command.contains("workspace-write"))
         assertFalse(command.contains("read-only"))
-        assertTrue(command.last().contains("tijdelijke Playwright-scripts en screenshots"))
+        assertTrue(command.last().contains("tijdelijk Playwright-testbestand onder de systeem-tempmap"))
     }
 
     @Test fun `codex command grants the delivery verifier unrestricted browser process access`() {
@@ -173,7 +174,7 @@ class AgentContractTest {
         )
 
         assertTrue(command.containsAll(listOf("--sandbox", "danger-full-access")))
-        assertTrue(command.last().contains("tijdelijke Playwright-scripts en screenshots"))
+        assertTrue(command.last().contains("tijdelijk Playwright-testbestand onder de systeem-tempmap"))
         assertTrue(command.last().contains("Voer geen Git-, GitHub-, OpenShift-, database- of clusterwijzigingen uit"))
     }
 
@@ -190,9 +191,38 @@ class AgentContractTest {
         ) { _, _, _ -> error("niet uitvoeren") }
         val command = executor.command(task, workspace.resolve("last-message"))
 
-        assertFalse(command.contains("--ignore-user-config"))
-        assertTrue(command.last().contains("Browser-plugin"))
+        assertTrue(command.contains("--ignore-user-config"))
+        assertTrue(command.last().contains("npx --no-install playwright"))
+        assertTrue(command.last().contains("Een ontbrekende Browser-plugin is nooit een geldige BLOCKED-uitkomst"))
         assertTrue(command.last().contains("curl gelden niet als browsertest"))
+    }
+
+    @Test fun `browser preflight launches chromium and requires screenshot evidence`() {
+        val workspace = Files.createTempDirectory("pf-browser-preflight-test")
+        val commands = mutableListOf<List<String>>()
+        val task = AgentTask("test-browser", "hkh-autopilot", "test-session", "Test alles")
+
+        val failure = browserPreflightFailure(task, workspace) { command, _, _ ->
+            commands += command
+            Path.of(command.last()).writeBytes(byteArrayOf(1, 2, 3))
+            AgentCommandResult(0, false, "ok")
+        }
+
+        assertEquals(null, failure)
+        assertEquals(
+            listOf("npx", "--no-install", "playwright", "screenshot", "--browser=chromium", "about:blank"),
+            commands.single().dropLast(1),
+        )
+    }
+
+    @Test fun `browser preflight reports playwright failure before an agent starts`() {
+        val task = AgentTask("test-browser-fail", "hkh-autopilot", "test-session", "Test alles")
+
+        val failure = browserPreflightFailure(task, Files.createTempDirectory("pf-browser-preflight-fail")) { _, _, _ ->
+            AgentCommandResult(1, false, "Executable does not exist")
+        }
+
+        assertTrue(failure.orEmpty().contains("Executable does not exist"))
     }
 
     @Test fun `codex command passes a structured output schema`() {
