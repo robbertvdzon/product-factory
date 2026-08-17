@@ -133,6 +133,25 @@ class LivingVisionFoundationTest(
     }
 
     @Test
+    fun `startup recovery terminalizes a session with a failed required step`() {
+        val session = sessions.create(productA)
+        sessions.markRunning(session.id)
+        val stepId = "${session.id}::vision-curator::session"
+        catalog.initializeSteps(
+            session.id, productA, LIVING_VISION_PROCESS_VERSION,
+            listOf(StepDefinition(stepId, "vision-curator", "session", true, emptyList())),
+        )
+        assertTrue(catalog.markRunning(stepId, "codex", "default", emptyList()))
+        catalog.markFailed(stepId, "Terminale testfout", false)
+
+        recovery.recover(session.id)
+
+        val recovered = sessions.require(productA, session.id)
+        assertEquals("FAILED", recovered.status)
+        assertEquals("Verplichte stap vision-curator mislukte: Terminale testfout", recovered.errorMessage)
+    }
+
+    @Test
     fun `generic process templates contain no product or domain examples and every schema is closed`() {
         val genericText = (LivingVisionProcessContract.text + LivingVisionRoleCatalog.roles.joinToString { it.appendix }).lowercase()
         listOf("hkh", "heemskerk", "erfgoed", "archief", "kaarten").forEach { forbidden ->

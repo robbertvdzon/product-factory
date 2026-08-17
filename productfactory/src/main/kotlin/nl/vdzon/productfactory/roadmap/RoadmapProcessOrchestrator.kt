@@ -70,11 +70,16 @@ class RoadmapProcessRecovery(
     override fun run(arguments: ApplicationArguments) {
         if (!enabled) return
         prepareInterruptedSessions().forEach { sessionId ->
-            executor.submit {
-                runCatching { orchestrator.run(sessionId) }
-                    .onFailure { logger.error("Hervatten van roadmap-sessie {} mislukte", sessionId, it) }
-            }
+            executor.submit { recover(sessionId) }
         }
+    }
+
+    internal fun recover(sessionId: String) {
+        runCatching { orchestrator.run(sessionId) }
+            .onFailure {
+                sessions.markFailed(sessionId, it.message ?: it.javaClass.simpleName)
+                logger.error("Hervatten van roadmap-sessie {} mislukte", sessionId, it)
+            }
     }
 
     internal fun prepareInterruptedSessions(): List<String> = sessions.incompleteLivingVisionSessionIds().also { sessionIds ->
