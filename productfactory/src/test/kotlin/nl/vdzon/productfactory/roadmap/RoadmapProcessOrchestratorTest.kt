@@ -111,6 +111,20 @@ class RoadmapProcessOrchestratorTest(
         assertTrue(revisionFrames.all { it.assets.size == 1 })
     }
 
+    @Test
+    fun `critic gets one bounded strategy correction and approves the corrected vision`() {
+        dispatch.criticRequiresCorrection.set(1)
+        val session = sessions.create(slug)
+
+        orchestrator.run(session.id)
+
+        assertEquals("COMPLETED", sessions.require(slug, session.id).status)
+        val critic = catalog.steps(session.id).single { it.role == "vision-critic" }.handoff
+        assertEquals(1, critic?.payload?.get("correctionRound"))
+        assertNotNull(critic?.payload?.get("correctedStrategy"))
+        assertEquals(14, dispatch.calls.get(), "De correctieronde mag exact één strateeg- en één criticusaanroep toevoegen")
+    }
+
     @TestConfiguration
     class Fakes {
         @Bean
@@ -123,6 +137,7 @@ class RoadmapProcessOrchestratorTest(
         val maxActive = AtomicInteger()
         val calls = AtomicInteger()
         val reviseConcept = AtomicInteger()
+        val criticRequiresCorrection = AtomicInteger()
         val failRole = AtomicReference<String?>(null)
         val started = ConcurrentHashMap<String, Long>()
         val ended = ConcurrentHashMap<String, Long>()
@@ -132,6 +147,7 @@ class RoadmapProcessOrchestratorTest(
             maxActive.set(0)
             calls.set(0)
             reviseConcept.set(0)
+            criticRequiresCorrection.set(0)
             failRole.set(null)
             started.clear()
             ended.clear()
@@ -159,7 +175,11 @@ class RoadmapProcessOrchestratorTest(
             "roadmap-feasibility" -> feasibility(if ("selection-2" in task.prompt) 2 else 1)
             "roadmap-ux-director" -> director()
             "roadmap-future-strategist" -> strategy()
-            "roadmap-vision-critic" -> review(true, "De visie behoudt kernideeën, bewijs en onzekerheid.")
+            "roadmap-vision-critic" -> if (criticRequiresCorrection.get() == 1 && "critic-rereview" !in task.runId) {
+                review(false, "Een kernidee ontbreekt en vereist één correctieronde.")
+            } else {
+                review(true, "De visie behoudt kernideeën, bewijs en onzekerheid.")
+            }
             "roadmap-manager" -> manager()
             else -> error("Onverwacht taaktype ${task.taskType}")
         }

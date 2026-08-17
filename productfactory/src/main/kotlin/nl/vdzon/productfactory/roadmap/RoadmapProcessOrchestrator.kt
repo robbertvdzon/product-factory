@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.roadmap
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ObjectNode
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import nl.vdzon.productfactory.agentruntime.api.AgentDispatchPort
@@ -182,7 +183,13 @@ class RoadmapProcessOrchestrator(
                 ),
             )
             require(result.status == "COMPLETED") { result.summary.take(2_000) }
-            val output = mapper.readTree(result.summary).also { require(it.isObject) { "Rol gaf geen JSON-object" } }
+            val initialOutput = mapper.readTree(result.summary).also { require(it.isObject) { "Rol gaf geen JSON-object" } }
+            val output = if (step.role == "vision-critic" && !initialOutput.path("approved").asBoolean()) {
+                executeCriticCorrection(step, inputs, initialOutput)
+            } else {
+                initialOutput
+            }
+            val effectiveInputIds = (inputIds + output.path("correctionArtifactIds").map(JsonNode::asText)).distinct()
             val outputIds = persistOutput(step, output)
             val downstream = LivingVisionRoleCatalog.byKey.getValue(step.role).downstreamConsumer
             val handoff = RoadmapHandoffView(
@@ -192,7 +199,7 @@ class RoadmapProcessOrchestrator(
                 producerRole = step.role,
                 consumerRole = downstream,
                 scopeKey = step.scopeKey,
-                inputArtifactIds = inputIds,
+                inputArtifactIds = effectiveInputIds,
                 outputArtifactIds = outputIds,
                 summary = output.path("summary").asText().trim().take(4_000),
                 payload = mapper.convertValue(output, Map::class.java).entries.associate { it.key.toString() to it.value },
@@ -216,6 +223,76 @@ class RoadmapProcessOrchestrator(
         }
     }
 
+    /** Eén, en nooit meer dan één, correctieronde terug naar de strateeg met een tweede onafhankelijke review. */
+    private fun executeCriticCorrection(
+        step: RoadmapSessionStepView,
+        inputs: List<RoadmapHandoffView>,
+        initialCritique: JsonNode,
+    ): JsonNode {
+        val critiqueId = "critique:${step.id}:round-1"
+        val critiqueHandoff = RoadmapHandoffView(
+            LIVING_VISION_PROCESS_VERSION, step.sessionId, step.productSlug, "vision-critic", "future-strategist",
+            "critic-correction", inputs.flatMap { it.outputArtifactIds }.distinct(), listOf(critiqueId),
+            initialCritique.path("summary").asText(), mapper.convertValue(initialCritique, Map::class.java)
+                .entries.associate { it.key.toString() to it.value },
+        )
+        val correctedStrategy = executeSupplementalRole(
+            step, "future-strategist", "critic-correction", inputs + critiqueHandoff, "strategy-correction",
+        )
+        val correctionId = "strategy-correction:${step.id}:round-1"
+        val correctionHandoff = RoadmapHandoffView(
+            LIVING_VISION_PROCESS_VERSION, step.sessionId, step.productSlug, "future-strategist", "vision-critic",
+            "critic-correction", listOf(critiqueId), listOf(correctionId),
+            correctedStrategy.path("visionChangeSummary").asText(),
+            mapper.convertValue(correctedStrategy, Map::class.java).entries.associate { it.key.toString() to it.value },
+        )
+        val finalCritique = executeSupplementalRole(
+            step, "vision-critic", "critic-correction", inputs + critiqueHandoff + correctionHandoff, "critic-rereview",
+        ).deepCopy<ObjectNode>()
+        finalCritique.set<JsonNode>("correctedStrategy", correctedStrategy)
+        finalCritique.put("correctionRound", 1)
+        finalCritique.putArray("correctionArtifactIds").add(critiqueId).add(correctionId)
+        return finalCritique
+    }
+
+    private fun executeSupplementalRole(
+        step: RoadmapSessionStepView,
+        role: String,
+        scopeKey: String,
+        inputs: List<RoadmapHandoffView>,
+        runSuffix: String,
+    ): JsonNode {
+        val product = products.requireProduct(step.productSlug)
+        val runId = "${step.sessionId}-$runSuffix-a${step.attempt}".replace(Regex("[^A-Za-z0-9._-]"), "-").take(120)
+        val roleContract = LivingVisionRoleCatalog.byKey.getValue(role)
+        val all = catalog.steps(step.sessionId)
+        val manifest = RoadmapSessionManifest(
+            step.sessionId, step.productSlug, step.processVersion, stageFor(role), role,
+            "Verwerk de begrensde correctieronde zonder producthistorie of onzekerheid te verliezen.", scopeKey,
+            all.filter { it.status == RoadmapStepStatus.COMPLETED }.map { it.role }, listOf(role),
+            listOf(roleContract.downstreamConsumer), inputs.flatMap { it.outputArtifactIds }.distinct(),
+            roleContract.downstreamConsumer,
+        )
+        val taskType = "roadmap-$role"
+        agentRuns.register(runId, step.productSlug, taskType)
+        try {
+            val result = agents.execute(
+                AgentTask(
+                    runId, step.productSlug, taskType, prompts.build(manifest, contexts.build(step.productSlug), inputs),
+                    STEP_TIMEOUT_SECONDS, product.aiModel.takeUnless { it == "default" },
+                    LivingVisionSchemas.forRole(role), product.aiProvider,
+                ),
+            )
+            require(result.status == "COMPLETED") { result.summary.take(2_000) }
+            val output = mapper.readTree(result.summary).also { require(it.isObject) { "Correctieronde gaf geen JSON-object" } }
+            agentRuns.complete(step.productSlug, runId, "COMPLETED", "roadmap-session:${step.sessionId}/$role/$scopeKey")
+            return output
+        } catch (exception: Exception) {
+            runCatching { agentRuns.complete(step.productSlug, runId, "FAILED", null) }
+            throw exception
+        }
+    }
+
     private fun executeActivation(step: RoadmapSessionStepView, inputs: List<RoadmapHandoffView>) {
         try {
             val all = catalog.steps(step.sessionId)
@@ -223,7 +300,7 @@ class RoadmapProcessOrchestrator(
             val critic = all.single { it.role == "vision-critic" }.handoff ?: error("Kritiek ontbreekt")
             require((critic.payload["approved"] as? Boolean) == true) { "Visiecriticus heeft activatie geblokkeerd" }
             val manager = inputs.single { it.producerRole == "roadmap-manager" }
-            val strategy = mapper.valueToTree<JsonNode>(strategyHandoff.payload)
+            val strategy = mapper.valueToTree<JsonNode>(critic.payload["correctedStrategy"] ?: strategyHandoff.payload)
             val plan = mapper.valueToTree<JsonNode>(manager.payload)
             validateDiscoveryEpics(plan)
             activator.activate(step.productSlug, step.sessionId, strategy, plan, manager.summary)
