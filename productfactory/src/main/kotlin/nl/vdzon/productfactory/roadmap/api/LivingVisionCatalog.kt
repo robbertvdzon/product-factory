@@ -16,7 +16,6 @@ import nl.vdzon.productfactory.contracts.RoadmapUxConceptVersionView
 import nl.vdzon.productfactory.contracts.RoadmapUxConceptView
 import nl.vdzon.productfactory.media.api.ProductMediaCatalog
 import nl.vdzon.productfactory.product.api.ProductCatalog
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.support.GeneratedKeyHolder
 import org.springframework.stereotype.Service
@@ -346,23 +345,21 @@ class LivingVisionCatalog(
         val slug = products.requireContext(productSlug).slug
         require(definitions.map { it.id }.toSet().size == definitions.size)
         definitions.forEach { definition ->
-            try {
-                jdbc.update(
-                    """insert into roadmap_session_step(id, session_id, product_slug, role, scope_key, status,
-                        process_version, required_step) values (?, ?, ?, ?, ?, 'PENDING', ?, ?)""".trimIndent(),
-                    definition.id, sessionId, slug, definition.role, definition.scopeKey, processVersion, definition.required,
-                )
-            } catch (_: DuplicateKeyException) {
-                // Idempotent graph initialization after a process restart.
-            }
+            jdbc.update(
+                """insert into roadmap_session_step(id, session_id, product_slug, role, scope_key, status,
+                    process_version, required_step) select ?, ?, ?, ?, ?, 'PENDING', ?, ?
+                    where not exists (select 1 from roadmap_session_step where id = ?)""".trimIndent(),
+                definition.id, sessionId, slug, definition.role, definition.scopeKey, processVersion, definition.required, definition.id,
+            )
         }
         definitions.forEach { definition -> definition.dependencyIds.forEach { dependency ->
             require(definitions.any { it.id == dependency }) { "Onbekende stapafhankelijkheid" }
-            try {
-                jdbc.update("insert into roadmap_session_step_dependency(step_id, depends_on_step_id) values (?, ?)", definition.id, dependency)
-            } catch (_: DuplicateKeyException) {
-                // Idempotent.
-            }
+            jdbc.update(
+                """insert into roadmap_session_step_dependency(step_id, depends_on_step_id)
+                    select ?, ? where not exists (select 1 from roadmap_session_step_dependency
+                    where step_id = ? and depends_on_step_id = ?)""".trimIndent(),
+                definition.id, dependency, definition.id, dependency,
+            )
         } }
     }
 
