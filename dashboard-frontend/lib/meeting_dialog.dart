@@ -38,28 +38,51 @@ class _MeetingDialogState extends State<MeetingDialog> {
   int? _awaitingReplyAfterMessageId;
   final List<Map<String, dynamic>> _pendingImages = [];
 
+  /// Laatst daadwerkelijk getoonde overleg-/berichtendata. Dient als terugvalwaarde wanneer één
+  /// van de twee calls faalt, en als vergelijkingsbasis voor de auto-refresh (zie _autoRefreshTick).
+  Map<String, dynamic>? _shownMeeting;
+  List<Map<String, dynamic>>? _shownMessages;
+
   @override
   void initState() {
     super.initState();
     _reload();
-    refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) setState(_reload);
-    });
+    refreshTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _autoRefreshTick(),
+    );
   }
 
+  // Gebruikt voor de eerste load en na een actie (versturen/sluiten): toont dan altijd meteen
+  // verse data. De periodieke auto-refresh loopt via _autoRefreshTick hieronder.
   void _reload() {
+    final baselineMeeting = _shownMeeting;
+    final baselineMessages = _shownMessages;
     final next = Future.wait<dynamic>([
-      widget.api.meeting(widget.productSlug, widget.meetingId),
-      widget.api.meetingMessages(widget.productSlug, widget.meetingId),
+      widget.api.meeting(widget.productSlug, widget.meetingId).catchError((
+        error,
+      ) {
+        if (baselineMeeting != null) return baselineMeeting;
+        throw error;
+      }),
+      widget.api
+          .meetingMessages(widget.productSlug, widget.meetingId)
+          .catchError((error) {
+            if (baselineMessages != null) return baselineMessages;
+            throw error;
+          }),
     ]);
     data = next;
     final awaiting = _awaitingReplyAfterMessageId;
-    if (awaiting == null) return;
     next.then<void>((result) {
-      if (!mounted || _awaitingReplyAfterMessageId != awaiting) return;
-      final messages = (result[1] as List<dynamic>)
+      if (!mounted) return;
+      _shownMeeting = result[0] as Map<String, dynamic>;
+      _shownMessages = (result[1] as List<dynamic>)
           .cast<Map<String, dynamic>>();
-      final answered = messages.any(
+      if (awaiting == null || _awaitingReplyAfterMessageId != awaiting) {
+        return;
+      }
+      final answered = _shownMessages!.any(
         (message) =>
             message['sender'] == 'ai' &&
             ((message['id'] as num?)?.toInt() ?? 0) > awaiting,
@@ -72,6 +95,63 @@ class _MeetingDialogState extends State<MeetingDialog> {
         });
       }
     }, onError: (_, _) {});
+  }
+
+  /// Auto-refresh-tick: haalt op, vergelijkt met wat al getoond wordt, en rebuildt het overleg
+  /// alleen als er echt iets veranderd is — zodat typen, scrollen en tekstselectie ongemoeid
+  /// blijven zolang er geen nieuw bericht of statuswijziging is.
+  Future<void> _autoRefreshTick() async {
+    if (!mounted) return;
+    final baselineMeeting = _shownMeeting;
+    final baselineMessages = _shownMessages;
+    List<dynamic> result;
+    try {
+      result = await Future.wait<dynamic>([
+        widget.api.meeting(widget.productSlug, widget.meetingId).catchError((
+          error,
+        ) {
+          if (baselineMeeting != null) return baselineMeeting;
+          throw error;
+        }),
+        widget.api
+            .meetingMessages(widget.productSlug, widget.meetingId)
+            .catchError((error) {
+              if (baselineMessages != null) return baselineMessages;
+              throw error;
+            }),
+      ]);
+    } catch (_) {
+      // Nog geen enkele succesvolle load om op terug te vallen — laat het scherm zoals het is.
+      return;
+    }
+    if (!mounted) return;
+    final meeting = result[0] as Map<String, dynamic>;
+    final messages = (result[1] as List<dynamic>).cast<Map<String, dynamic>>();
+
+    final awaiting = _awaitingReplyAfterMessageId;
+    final answered =
+        awaiting != null &&
+        messages.any(
+          (message) =>
+              message['sender'] == 'ai' &&
+              ((message['id'] as num?)?.toInt() ?? 0) > awaiting,
+        );
+    if (!answered &&
+        deepEquals(meeting, baselineMeeting) &&
+        deepEquals(messages, baselineMessages)) {
+      return;
+    }
+
+    setState(() {
+      _shownMeeting = meeting;
+      _shownMessages = messages;
+      data = Future.value(result);
+      if (answered) {
+        _sending = false;
+        _awaitingReplyAfterMessageId = null;
+        _error = null;
+      }
+    });
   }
 
   @override

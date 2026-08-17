@@ -216,10 +216,17 @@ class DashboardSource<T> {
   bool get failed => error != null;
 }
 
-Future<DashboardSource<T>> _captureSource<T>(Future<T> future) async {
+/// Haalt `fetch()` op en valt bij een fout terug op [fallback] (de laatst getoonde waarde) in plaats
+/// van de sectie leeg te maken — één haperende endpoint mag de rest van het dashboard niet meeslepen.
+/// Is er nog geen [fallback] (bijv. de allereerste load), dan levert dit gewoon de fout op zoals voorheen.
+Future<DashboardSource<T>> _captureSource<T>(
+  Future<T> Function() fetch, {
+  T? fallback,
+}) async {
   try {
-    return DashboardSource.loaded(await future);
+    return DashboardSource.loaded(await fetch());
   } catch (error) {
+    if (fallback != null) return DashboardSource.loaded(fallback);
     return DashboardSource.failure(error);
   }
 }
@@ -297,6 +304,14 @@ class _OverviewPageState extends State<OverviewPage> {
   String? managementProductScopeAnnouncement;
   List<Map<String, dynamic>> availableProducts = const [];
 
+  /// Laatst daadwerkelijk getoonde data. Dient als (a) terugvalwaarde per endpoint wanneer een
+  /// ophaalactie faalt, en (b) vergelijkingsbasis om te bepalen of een auto-refresh-cyclus iets
+  /// veranderd heeft — pas dan wordt setState aangeroepen.
+  List<dynamic>? _lastRenderedData;
+  DashboardSource<List<dynamic>>? _lastRenderedIterations;
+  DashboardSource<List<dynamic>>? _lastRenderedCandidates;
+  DashboardSource<List<dynamic>>? _lastRenderedDeliveries;
+
   /// Hoeveel items er per sectie zichtbaar zijn. Deze tellers staan bewust in de state en niet in de
   /// FutureBuilder, zodat de auto-refresh (elke 5 s) een uitgeklapte lijst uitgeklapt laat.
   final Map<String, int> visibleCounts = {};
@@ -330,9 +345,10 @@ class _OverviewPageState extends State<OverviewPage> {
         widget.environmentIdentity ?? AppConfig.environmentIdentity;
     api = DashboardApi(AppConfig.apiBaseUrl, widget.session?.token);
     _reload();
-    refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) setState(_reload);
-    });
+    refreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _autoRefreshTick(),
+    );
   }
 
   @override
@@ -344,11 +360,94 @@ class _OverviewPageState extends State<OverviewPage> {
   // Blokvorm (i.p.v. `=>`) is bewust: een expressie-body geeft de Future van Future.wait terug
   // aan de aanroeper, en setState() gooit dan 'setState() callback argument returned a Future'
   // zodra _reload via setState(_reload) wordt doorgegeven (bv. in _changeStatus).
+  //
+  // Gebruikt voor de allereerste load en na een gebruikersactie (bv. _changeStatus): toont dan
+  // altijd meteen verse data. De periodieke auto-refresh loopt via _autoRefreshTick, die pas
+  // rebuildt als er echt iets veranderd is.
   void _reload() {
-    iterationData = _captureSource(api.shadowIterations());
-    candidateData = _captureSource(api.stories());
-    deliveryData = _captureSource(api.deliveries());
+    iterationData = _captureSource(
+      api.shadowIterations,
+      fallback: _lastRenderedIterations?.value,
+    );
+    candidateData = _captureSource(
+      api.stories,
+      fallback: _lastRenderedCandidates?.value,
+    );
+    deliveryData = _captureSource(
+      api.deliveries,
+      fallback: _lastRenderedDeliveries?.value,
+    );
+    iterationData.then((value) {
+      if (mounted) _lastRenderedIterations = value;
+    });
+    candidateData.then((value) {
+      if (mounted) _lastRenderedCandidates = value;
+    });
+    deliveryData.then((value) {
+      if (mounted) _lastRenderedDeliveries = value;
+    });
     data = _loadDashboardData();
+    data.then((value) {
+      if (mounted) _lastRenderedData = value;
+    }, onError: (_, _) {});
+  }
+
+  /// Auto-refresh-tick: haalt alles op, vergelijkt met wat al getoond wordt, en rebuildt de pagina
+  /// alleen als er daadwerkelijk iets veranderd is. Blijft de scrollpositie en eventuele
+  /// tekstselectie ongemoeid als er niets te vernieuwen valt.
+  Future<void> _autoRefreshTick() async {
+    if (!mounted) return;
+    List<dynamic> results;
+    try {
+      results = await Future.wait<dynamic>([
+        _captureSource(
+          api.shadowIterations,
+          fallback: _lastRenderedIterations?.value,
+        ),
+        _captureSource(api.stories, fallback: _lastRenderedCandidates?.value),
+        _captureSource(
+          api.deliveries,
+          fallback: _lastRenderedDeliveries?.value,
+        ),
+        _loadDashboardData(),
+      ]);
+    } catch (_) {
+      // Geen enkele fallback beschikbaar (bv. nog geen succesvolle load ooit) — laat het scherm
+      // zoals het is en probeer het bij de volgende tick opnieuw.
+      return;
+    }
+    if (!mounted) return;
+    final nextIterations = results[0] as DashboardSource<List<dynamic>>;
+    final nextCandidates = results[1] as DashboardSource<List<dynamic>>;
+    final nextDeliveries = results[2] as DashboardSource<List<dynamic>>;
+    final nextData = results[3] as List<dynamic>;
+
+    final unchanged =
+        deepEquals(nextData, _lastRenderedData) &&
+        _sourceUnchanged(nextIterations, _lastRenderedIterations) &&
+        _sourceUnchanged(nextCandidates, _lastRenderedCandidates) &&
+        _sourceUnchanged(nextDeliveries, _lastRenderedDeliveries);
+    if (unchanged) return;
+
+    setState(() {
+      _lastRenderedData = nextData;
+      _lastRenderedIterations = nextIterations;
+      _lastRenderedCandidates = nextCandidates;
+      _lastRenderedDeliveries = nextDeliveries;
+      data = Future.value(nextData);
+      iterationData = Future.value(nextIterations);
+      candidateData = Future.value(nextCandidates);
+      deliveryData = Future.value(nextDeliveries);
+    });
+  }
+
+  bool _sourceUnchanged<T>(
+    DashboardSource<T> next,
+    DashboardSource<T>? previous,
+  ) {
+    if (previous == null) return false;
+    if (next.failed != previous.failed) return false;
+    return deepEquals(next.value, previous.value);
   }
 
   Future<List<dynamic>> _loadDashboardData() async {
@@ -356,18 +455,26 @@ class _OverviewPageState extends State<OverviewPage> {
     final preference = restorePreference
         ? productScopePreferences.read()
         : Future<Object?>.value(null);
+    final baseline = _lastRenderedData;
+    // Eén hapering in een van de 11 parallelle calls mag niet de hele batch (en dus de hele
+    // pagina) laten mislukken — val per endpoint terug op de laatst getoonde waarde.
+    Future<dynamic> resilient(int index, Future<dynamic> Function() fetch) =>
+        fetch().catchError((error) {
+          if (baseline != null) return baseline[index];
+          throw error;
+        });
     final result = await Future.wait<dynamic>([
-      api.products(),
-      api.publications(),
-      api.humanActions(),
-      api.aiCatalog(),
-      api.meetings(),
-      api.roadmapEpics(),
-      api.roadmapVisions(),
-      api.roadmapSettledQuestions(),
-      api.roadmapSessions(),
-      api.bugs(),
-      api.testSessions(),
+      resilient(0, api.products),
+      resilient(1, api.publications),
+      resilient(2, api.humanActions),
+      resilient(3, api.aiCatalog),
+      resilient(4, api.meetings),
+      resilient(5, api.roadmapEpics),
+      resilient(6, api.roadmapVisions),
+      resilient(7, api.roadmapSettledQuestions),
+      resilient(8, api.roadmapSessions),
+      resilient(9, api.bugs),
+      resilient(10, api.testSessions),
       preference,
     ]);
     final storedPreference = result.removeLast();
@@ -3102,20 +3209,51 @@ class _IterationSessionDialogState extends State<IterationSessionDialog> {
   bool _cancelling = false;
   bool _resuming = false;
 
+  /// Laatst daadwerkelijk getoonde sessiedata — vergelijkingsbasis voor de auto-refresh.
+  Map<String, dynamic>? _shownSession;
+
   @override
   void initState() {
     super.initState();
     _reload();
-    refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) setState(_reload);
-    });
+    refreshTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _autoRefreshTick(),
+    );
   }
 
+  // Gebruikt voor de eerste load en na een actie (annuleren/hervatten): toont dan altijd meteen
+  // verse data. De periodieke auto-refresh loopt via _autoRefreshTick hieronder.
   void _reload() {
-    session = widget.api.shadowIterationSession(
+    final next = widget.api.shadowIterationSession(
       widget.productSlug,
       widget.iterationId,
     );
+    session = next;
+    next.then((value) {
+      if (mounted) _shownSession = value;
+    }, onError: (_, _) {});
+  }
+
+  /// Auto-refresh-tick: rebuildt de dialoog alleen als de sessiedata daadwerkelijk veranderd is.
+  /// Bij een tijdelijke hapering blijft gewoon de laatst bekende sessie zichtbaar.
+  Future<void> _autoRefreshTick() async {
+    if (!mounted) return;
+    Map<String, dynamic> value;
+    try {
+      value = await widget.api.shadowIterationSession(
+        widget.productSlug,
+        widget.iterationId,
+      );
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    if (deepEquals(value, _shownSession)) return;
+    setState(() {
+      _shownSession = value;
+      session = Future.value(value);
+    });
   }
 
   @override

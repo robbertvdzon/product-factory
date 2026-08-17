@@ -84,6 +84,29 @@ IterationTiming iterationTiming(
   );
 }
 
+/// Structurele vergelijking van JSON-achtige waarden (List/Map/String/num/bool/null zoals `jsonDecode`
+/// die oplevert). Gebruikt door auto-refreshende schermen om te bepalen of opnieuw opgehaalde data
+/// daadwerkelijk verschilt van wat al op het scherm staat, zodat een ongewijzigde ververscyclus geen
+/// rebuild (en dus geen scroll-/selectiereset) veroorzaakt.
+bool deepEquals(Object? a, Object? b) {
+  if (identical(a, b)) return true;
+  if (a is List && b is List) {
+    if (a.length != b.length) return false;
+    for (var index = 0; index < a.length; index++) {
+      if (!deepEquals(a[index], b[index])) return false;
+    }
+    return true;
+  }
+  if (a is Map && b is Map) {
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key) || !deepEquals(a[key], b[key])) return false;
+    }
+    return true;
+  }
+  return a == b;
+}
+
 /// Sorteert nieuwste eerst op het eerste tijdstempelveld dat een bruikbare waarde heeft.
 /// Items zonder enig bruikbaar tijdstempel zakken naar onderen en behouden onderling hun volgorde.
 List<Map<String, dynamic>> sortedByNewestFirst(
