@@ -141,6 +141,11 @@ class RoadmapProcessOrchestratorTest(
         assertEquals(1, critic?.payload?.get("correctionRound"))
         assertNotNull(critic?.payload?.get("correctedStrategy"))
         assertEquals(14, dispatch.calls.get(), "De correctieronde mag exact één strateeg- en één criticusaanroep toevoegen")
+        val correctionPrompt = dispatch.tasks.single { "strategy-correction" in it.runId }.prompt
+        val rereviewPrompt = dispatch.tasks.single { "critic-rereview" in it.runId }.prompt
+        assertTrue("Pas ieder revisionRequest" in correctionPrompt)
+        assertTrue("Herbeoordeel uitsluitend de gecorrigeerde strategie" in rereviewPrompt)
+        assertTrue("Controleer ieder eerder revisionRequest afzonderlijk" in rereviewPrompt)
     }
 
     @TestConfiguration

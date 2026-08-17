@@ -264,9 +264,18 @@ class RoadmapProcessOrchestrator(
         val runId = "${step.sessionId}-$runSuffix-a${step.attempt}".replace(Regex("[^A-Za-z0-9._-]"), "-").take(120)
         val roleContract = LivingVisionRoleCatalog.byKey.getValue(role)
         val all = catalog.steps(step.sessionId)
+        val correctionGoal = when (role) {
+            "future-strategist" -> "Maak één volledige gecorrigeerde strategie. Pas ieder revisionRequest uit de " +
+                "criticus-handoff aantoonbaar toe; behoud de overige geldige strategie-inhoud en verlaag claims " +
+                "waarvoor het aangeleverde bewijs de gekozen haalbaarheidsstatus niet draagt."
+            "vision-critic" -> "Herbeoordeel uitsluitend de gecorrigeerde strategie uit de future-strategist-handoff. " +
+                "Controleer ieder eerder revisionRequest afzonderlijk en zet approved alleen op true als alle verzoeken " +
+                "zijn opgelost en de volledige strategie het procescontract nog respecteert."
+            else -> "Verwerk de begrensde correctieronde zonder producthistorie of onzekerheid te verliezen."
+        }
         val manifest = RoadmapSessionManifest(
             step.sessionId, step.productSlug, step.processVersion, stageFor(role), role,
-            "Verwerk de begrensde correctieronde zonder producthistorie of onzekerheid te verliezen.", scopeKey,
+            correctionGoal, scopeKey,
             all.filter { it.status == RoadmapStepStatus.COMPLETED }.map { it.role }, listOf(role),
             listOf(roleContract.downstreamConsumer), inputs.flatMap { it.outputArtifactIds }.distinct(),
             roleContract.downstreamConsumer,
