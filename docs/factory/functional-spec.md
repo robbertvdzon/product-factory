@@ -14,10 +14,31 @@ Alle weergaven gebruiken dezelfde beveiligde dashboardsessie en elke 5 seconden 
 Beheer heeft geen eigen URL. Op het productoverzicht staat de als link vormgegeven navigatieactie
 `Beheer`. Deze is met muis of toetsenbord te activeren, heeft linksemantiek en een zichtbare focusrand.
 
-Het productoverzicht bestaat van boven naar beneden uit:
+Op viewports van maximaal 320 CSS-pixels vervangt één native, zichtbaar en toegankelijk gelabelde
+keuze `Sectie kiezen` de horizontale sectienavigatie. De opties staan daar exact als `Overzicht`,
+`Productcycli`, `Stories`, `Roadmap`, `Bugs`, `Epics`, `Testsessies` en `Overleggen`; `Productcycli`
+is alleen het compacte label voor de bestaande sectie `Productsessies`. De keuze is zonder
+horizontaal scrollen met het toetsenbord te bedienen en houdt na activering de focus. Op bredere
+viewports blijven de bestaande horizontale navigatie, labels en volgorde ongewijzigd.
 
-Uitsluitend in de standing acceptatievariant staat direct onder de kop `Productoverzicht` en vóór
-de navigatieacties, metrics en overige overzichtsinhoud de melding `Synthetische acceptatiedata`.
+Het compacte productoverzicht toont bovenaan, direct onder de paginatitel, de veilige genormaliseerde
+waarden `Omgeving` en `Revisie/build-ID`; `Uitgerold op` staat daar niet. Daarna volgen de actieve
+productkeuze en productnaam, de mobiele sectiekeuze en binnen `Overzicht` de inhoudsblokken in deze
+zichtbare, semantische en DOM-volgorde: cyclusstart, eerdere cycli, gekoppelde stories en de
+standaard ingeklapte `Operationele samenvatting`. Samen met de productscope is de volgorde van de
+kerninhoud dus productscope, cyclusstart, recente cycli, gekoppelde stories en operationele
+samenvatting. De bugsamenvatting en de overige bestaande overzichtsonderdelen volgen daarna.
+`Productcycli` en `Stories` blijven daarnaast zelfstandige mobiele secties met exact dezelfde reeds
+geladen, productspecifiek gefilterde gegevens en bestaande acties. Breder dan 320 CSS-pixels blijven
+de bestaande compositie en direct zichtbare metrieken behouden.
+
+Voor deze onderdelen gelden verder de volgende presentatie- en gedragsregels:
+
+Uitsluitend in de standing acceptatievariant staat de melding `Synthetische acceptatiedata`. Op
+bredere viewports staat zij direct onder de kop `Productoverzicht` en vóór de navigatieacties,
+metrics en overige overzichtsinhoud. Op maximaal 320 CSS-pixels volgt zij na de operationele
+samenvatting, zodat de compacte omgevingsaanduiding en kernhandelingen eerst staan; zonder actief
+product volgt zij na de lege toestand en de operationele samenvatting.
 De zichtbare én toegankelijke tekst beschrijft de vaste catalogus als `1 actief` en `3 terminaal`,
 met `expliciet`, `afgeleid` en `onbekend` beslisgedrag. Dit zijn statische aantallen voor de
 synthetische scenariodekking, geen dynamische totalen van alle gegevens in de acceptatiedatabase.
@@ -29,7 +50,11 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    actieve product. Een succesvol geladen teller toont altijd het volledige scope-aantal, ook als
    de lijst eronder is ingekort. Afgeleide tellingen blijven `Laden…` of `Niet beschikbaar` zolang
    een van hun benodigde bronnen laadt of is mislukt, zodat een onvolledige bron niet als nul wordt
-   gepresenteerd.
+   gepresenteerd. Op maximaal 320 CSS-pixels staan alle vijf waarden in `Operationele samenvatting`,
+   ook als er geen actief product is. Deze native button is standaard ingeklapt, communiceert haar
+   toestand via `aria-expanded` en bouwt de metriektegels pas na uitklappen, zodat de ingeklapte
+   inhoud niet in de focus-, DOM- of toegankelijkheidsvolgorde staat. Op bredere viewports blijven
+   de vijf tegels in `Overzicht` direct zichtbaar op hun bestaande positie.
 2. **Actief product** — een compacte productkeuze en daaronder de blijvend zichtbare productnaam.
    Alleen producten met een niet-lege `String` in `Product.slug` zijn beschikbaar. De slugs zijn
    canoniek en hoofdlettergevoelig: de frontend trimt of normaliseert ze niet en gebruikt geen naam,
@@ -44,8 +69,8 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    De wissel filtert uitsluitend reeds geladen gegevens en start geen netwerkverzoek. Zijn er geen
    geldige producten, dan wordt de voorkeur verwijderd, verschijnt een lege toestand en ontbreken
    alle productgebonden acties en resultaten. Op brede en smalle schermen volgen de zichtbare,
-   semantische en toetsenbordvolgorde per gekozen sectie stabiel. De sectiekeuze zelf is horizontaal
-   scrollbaar op smalle schermen en blijft binnen dezelfde productscope.
+   semantische en toetsenbordvolgorde per gekozen sectie stabiel. De gekozen sectie en productscope
+   blijven tijdens automatische verversing en detailnavigatie behouden.
 3. **Cyclus starten** — de bestaande visueel dominante `StartCycleButton`. Eén gedeeld
    presentatiemodel bepaalt de knopstatus, blokkaderedenen, veilige statuslabels en onvervulde
    voorwaarden uitsluitend uit
@@ -276,7 +301,9 @@ begrijpelijk. Productie en PR-previews tonen deze melding niet.
    aanwijst. De bestaande kandidaatdetailactie opent precies de gekozen kandidaat. Een ontbrekende,
    anders getypeerde, lege, kruisproduct- of ambigue relatie wordt niet toegeschreven. De sectie
    gebruikt dezelfde 5/+10-lijstbeperking en toont pas een volledig aantal wanneer kandidaten én
-   cycli geladen zijn.
+   cycli geladen zijn. De storyactie heeft een zichtbare focusindicator; het detail houdt de focus
+   binnen de dialoog en sluiten via de zichtbare actie of Escape herstelt de focus naar precies de
+   oorspronkelijke storyactie.
 6. **Product beheren** — de bestaande acties voor pauzeren/hervatten, instellingen, overleg en
    roadmap-sessie gelden uitsluitend voor het actieve product. Missie, Software Factory-project,
    doelrepository, workspace, `maxStoriesPerCycle`, `wipLimit`, AI-provider/model en cyclustijden

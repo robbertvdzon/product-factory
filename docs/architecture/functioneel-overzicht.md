@@ -157,11 +157,28 @@ zelf of op een subtaak) tijdens het uitvoeren van een fase.
 Het (Google-beveiligde) Flutter-dashboard heeft een productoverzicht en een secundaire beheerweergave.
 Beide gebruiken dezelfde dashboardsessie en dezelfde elke 5 seconden ververste gegevens; Beheer heeft
 geen eigen URL of gegevensbron. Het productoverzicht bevat de focusbare link `Beheer`, met
-linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
+linksemantiek en zichtbare toetsenbordfocus.
 
-- **Synthetische acceptatiedata**: uitsluitend in de standing acceptatievariant staat direct onder
-  `Productoverzicht`, vóór navigatieacties, metrics en overige inhoud, een zichtbare en semantisch
-  gegroepeerde melding. Zij beschrijft de vaste catalogus als `1 actief`, `3 terminaal` en met
+Op maximaal 320 CSS-pixels staat direct onder `Productoverzicht` een compacte, alleen-lezen
+buildidentiteit met `Omgeving` en `Revisie/build-ID`; `Uitgerold op` blijft daar weg. Daarna volgen
+de actieve productkeuze en productnaam en de native, gelabelde keuze `Sectie kiezen`. Die bevat
+zonder horizontaal scrollen exact `Overzicht`, `Productcycli`, `Stories`, `Roadmap`, `Bugs`, `Epics`,
+`Testsessies` en `Overleggen`, in die volgorde. `Productcycli` is alleen het mobiele label van
+`Productsessies`; de data en acties veranderen niet. Breder dan 320 CSS-pixels blijven de bestaande
+horizontale sectienavigatie, labels en volgorde staan.
+
+Binnen het compacte `Overzicht` is de zichtbare, semantische en DOM-volgorde productscope,
+cyclusstart, eerdere cycli, gekoppelde stories en `Operationele samenvatting`. De bugsamenvatting,
+productbeheer, benodigde access tokens, workspace-publicaties en dashboardacties blijven bereikbaar
+en volgen na deze kerninhoud. `Productcycli` en `Stories` blijven ook afzonderlijk te kiezen en
+hergebruiken dezelfde reeds geladen, exact op de actieve productslug gefilterde records. De bredere
+variant behoudt haar bestaande compositie. Het productoverzicht bevat verder:
+
+- **Synthetische acceptatiedata**: uitsluitend in de standing acceptatievariant staat op bredere
+  viewports direct onder `Productoverzicht`, vóór navigatieacties, metrics en overige inhoud, een
+  zichtbare en semantisch gegroepeerde melding. Op maximaal 320 CSS-pixels volgt zij na de
+  operationele samenvatting en dus na de kerninhoud; zonder actief product volgt zij na de lege
+  toestand en die samenvatting. Zij beschrijft de vaste catalogus als `1 actief`, `3 terminaal` en met
   `expliciet`, `afgeleid` en `onbekend` beslisgedrag. Dit is scenariodekking en geen dynamische
   telling van alle acceptatiegegevens. De melding ontbreekt in productie en PR-previews en blijft
   zonder kleur, bij 320 CSS-pixels en 200% tekstvergroting begrijpelijk.
@@ -169,7 +186,10 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   interne storykandidaten, cycli en Software Factory-stories binnen het actieve product. Een
   succesvol geladen tegel toont het volledige scope-aantal, ook wanneer de lijst eronder is
   ingekort. Een afgeleide telling toont `Laden…` of `Niet beschikbaar` zolang een benodigde bron
-  laadt of is mislukt, nooit een misleidende nul.
+  laadt of is mislukt, nooit een misleidende nul. Op maximaal 320 CSS-pixels bevat de standaard
+  ingeklapte button `Operationele samenvatting` alle vijf tegels, ook zonder actief product. De
+  button meldt haar toestand via `aria-expanded`; ingeklapte tegels staan niet in DOM-, focus- of
+  toegankelijkheidsvolgorde. Op bredere viewports blijven de tegels direct zichtbaar.
 - **Actief product**: de volledige productkaarten zijn vervangen door een compacte productkeuze en
   de blijvend zichtbare naam van exact één actief product. Alleen een niet-lege `Product.slug` is
   canoniek; vergelijking is exact en hoofdlettergevoelig, zonder trimmen, normaliseren of fallback
@@ -179,8 +199,10 @@ linksemantiek en zichtbare toetsenbordfocus, en toont van boven naar beneden:
   Wisselen bewaart alleen de gekozen slug, filtert de al geladen bronrecords en veroorzaakt geen
   request. De keuze is met het toetsenbord bedienbaar, heeft een toegankelijke naam, actuele waarde
   en zichtbare focus; de focus blijft na wisselen staan en een zichtbare live-status meldt de nieuwe
-  scope en tellingen. Op brede en smalle schermen is de zichtbare, semantische en tabvolgorde daarna
-  steeds `Cyclus starten`, `Eerdere cycli` en `Gekoppelde stories`.
+  scope en tellingen. Productscope en gekozen sectie blijven bij automatische verversing en het
+  openen en sluiten van details behouden. In het compacte `Overzicht` volgen daarna steeds
+  `Cyclus starten`, `Eerdere cycli` en `Gekoppelde stories`; op brede schermen blijven cycli en
+  stories daarnaast in hun bestaande afzonderlijke secties staan.
 - **Cyclus starten**: de bestaande visueel dominante `StartCycleButton` voor het actieve product.
   Eén presentatiemodel leest uitsluitend `status` en
   `workspaceOwnership`; alleen de exacte waarden `active` en `product-factory` activeren de knop.

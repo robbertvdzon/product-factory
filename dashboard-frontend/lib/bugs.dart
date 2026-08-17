@@ -17,6 +17,23 @@ enum DashboardSection {
   final IconData icon;
 }
 
+const List<DashboardSection> mobileDashboardSections = [
+  DashboardSection.overview,
+  DashboardSection.productSessions,
+  DashboardSection.stories,
+  DashboardSection.roadmap,
+  DashboardSection.bugs,
+  DashboardSection.epics,
+  DashboardSection.testSessions,
+  DashboardSection.meetings,
+];
+
+String mobileDashboardSectionLabel(DashboardSection section) =>
+    switch (section) {
+      DashboardSection.productSessions => 'Productcycli',
+      _ => section.label,
+    };
+
 class DashboardSectionNavigation extends StatelessWidget {
   const DashboardSectionNavigation({
     required this.value,
@@ -46,6 +63,71 @@ class DashboardSectionNavigation extends StatelessWidget {
         showSelectedIcon: false,
         onSelectionChanged: (selection) => onChanged(selection.single),
       ),
+    ),
+  );
+}
+
+/// Native sectiekeuze voor viewports waarop de horizontale segmenten niet
+/// zonder horizontaal scrollen passen. De expliciete volgorde staat los van de
+/// enumvolgorde, zodat het bestaande desktopgedrag ongewijzigd blijft.
+class MobileDashboardSectionNavigation extends StatefulWidget {
+  const MobileDashboardSectionNavigation({
+    required this.value,
+    required this.onChanged,
+    super.key,
+  });
+
+  final DashboardSection value;
+  final ValueChanged<DashboardSection> onChanged;
+
+  @override
+  State<MobileDashboardSectionNavigation> createState() =>
+      _MobileDashboardSectionNavigationState();
+}
+
+class _MobileDashboardSectionNavigationState
+    extends State<MobileDashboardSectionNavigation> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'mobiele-sectiekeuze');
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: 'Sectie kiezen',
+    value: mobileDashboardSectionLabel(widget.value),
+    child: DropdownButtonFormField<DashboardSection>(
+      focusNode: _focusNode,
+      initialValue: widget.value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Sectie kiezen',
+        border: const OutlineInputBorder(),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.primary,
+            width: 3,
+          ),
+        ),
+      ),
+      items: [
+        for (final section in mobileDashboardSections)
+          DropdownMenuItem(
+            value: section,
+            child: Text(mobileDashboardSectionLabel(section)),
+          ),
+      ],
+      onChanged: (section) {
+        if (section == null) return;
+        widget.onChanged(section);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _focusNode.requestFocus();
+        });
+      },
     ),
   );
 }

@@ -263,10 +263,34 @@
   `ProductScopeStatus` is een zichtbare `Semantics(liveRegion: true)`-melding; hoofdscherm en Beheer
   bewaren afzonderlijke meldingstoestand zodat de tijdelijke Beheer-scope niet naar het overzicht
   lekt. Een scopewissel gebruikt de reeds geladen objecten en start zelf geen HTTP-request.
+- `_OverviewPageState` kiest de compacte compositie uitsluitend via
+  `MediaQuery.sizeOf(context).width <= 320`. `MobileDashboardSectionNavigation` gebruikt daar een
+  native `DropdownButtonFormField` met zichtbare en semantische naam `Sectie kiezen`. De expliciete
+  lijst `mobileDashboardSections` legt de mobiele volgorde los van `DashboardSection.values` vast en
+  `mobileDashboardSectionLabel` vertaalt alleen `Productsessies` naar `Productcycli`; daardoor blijven
+  de bestaande desktop-`SegmentedButton`, enumvolgorde en labels ongewijzigd. Selectie vraagt na een
+  wijziging opnieuw focus en `dashboardSection` blijft in de page-state over refreshes behouden.
+- De compacte `Overzicht`-tak bouwt productscope, `StartAvailabilityPanel`,
+  `_cycleHistorySection`, `_linkedStoriesSection` en `OperationalSummary` rechtstreeks in DOM-volgorde;
+  er wordt geen CSS-herordening gebruikt. De twee sectiehelpers worden ook door de zelfstandige
+  mobiele keuzes `Productcycli` en `Stories` gebruikt en ontvangen dezelfde al geladen scopefilters.
+  `CompactEnvironmentIdentity` hergebruikt dezelfde `EnvironmentIdentityPresentation` als Beheer en
+  de terminale cyclusregels, maar rendert alleen omgeving en revisie. De bestaande dashboardacties
+  verhuizen in de compacte compositie naar het einde van de productinhoud.
+- `OperationalSummary` bouwt de vijf bestaande `MetricCard`-children pas wanneer de lokale
+  `_expanded`-status waar is. De native `OutlinedButton` levert button- en expanded-semantiek en een
+  focusrand van drie pixels; daardoor ontbreken ingeklapte kaarten volledig uit widget-, DOM-, focus-
+  en semanticsvolgorde. De compacte lege-producttak hergebruikt dezelfde metriekchildren, zodat ook
+  globale waarden en bronstatussen bereikbaar blijven. Op bredere viewports blijft de bestaande
+  direct zichtbare `Wrap` staan.
 - `DashboardNavigationLink` in `main.dart` verzorgt de interne links `Beheer` en `Terug naar
   overzicht`. Eén expliciete `Semantics`-node levert link-, focus- en tapsemantiek; de onderliggende
   `TextButton` levert pointer- en toetsenbordactivatie en een focusrand van drie pixels. Een eigen
   `FocusNode` houdt Flutter-focus en webfocus gekoppeld, ook tijdens de automatische refresh.
+- `LinkedStoryTile` bezit per story een stabiele `FocusNode`, opent het bestaande kandidaatdetail met
+  een gesloten focuslus en vraagt na sluiten via de knop of Escape de openerfocus terug. De kaart
+  gebruikt dezelfde drie pixels brede focuskleur als de andere kernacties. Cyclusdetailacties houden
+  hun bestaande overeenkomstige focusherstel.
 - `SoftwareFactoryDeliveryTile` laat leveringsrecords bij smalle schermen en tekstvergroting verticaal
   meegroeien. Daardoor kunnen lange sleutel-, titel-, product-, status- en faseteksten teruglopen zonder
   horizontale pagina-scroll.
