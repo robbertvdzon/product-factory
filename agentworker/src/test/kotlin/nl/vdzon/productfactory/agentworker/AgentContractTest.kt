@@ -54,7 +54,8 @@ class AgentContractTest {
             "Maak een mockup",
             responseSchema = """{"generatedImages":{"type":"array"}}""",
         )
-        val bytes = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47)
+        // Real ImageGen output is routinely larger than 512 KiB; keep that regression in the transport test.
+        val bytes = ByteArray(600 * 1024) { (it % 251).toByte() }
         val image = Files.createTempFile("pf-generated-meeting-42-", ".png")
         Files.write(image, bytes)
         val summary = jacksonObjectMapper().writeValueAsString(

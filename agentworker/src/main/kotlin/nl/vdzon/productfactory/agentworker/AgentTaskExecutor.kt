@@ -201,7 +201,7 @@ internal fun materializeGeneratedImages(task: AgentTask, summary: String): Strin
         }
         require(Files.isRegularFile(realPath)) { "Gegenereerd beeld is geen regulier bestand" }
         val size = Files.size(realPath)
-        require(size in 1..MAX_GENERATED_IMAGE_BYTES) { "Gegenereerd beeld moet tussen 1 byte en 512 KB zijn" }
+        require(size in 1..MAX_GENERATED_IMAGE_BYTES) { "Gegenereerd beeld moet tussen 1 byte en 5 MB zijn" }
         require(image.path("mediaType").asText() in GENERATED_IMAGE_MEDIA_TYPES) { "Ongeldig mediatype voor gegenereerd beeld" }
         val bytes = Files.readAllBytes(realPath)
         image.remove("temporaryPath")
@@ -216,7 +216,7 @@ private fun agentTemporaryRoot(): Path = Path.of(System.getProperty("java.io.tmp
 private fun generatedImagePrefix(task: AgentTask): String =
     "pf-generated-${task.runId.replace(Regex("[^A-Za-z0-9._-]"), "-").take(80)}-"
 
-private const val MAX_GENERATED_IMAGE_BYTES = 512L * 1024L
+private const val MAX_GENERATED_IMAGE_BYTES = 5L * 1024L * 1024L
 private const val BROWSER_PREFLIGHT_TIMEOUT_SECONDS = 60L
 private val GENERATED_IMAGE_MEDIA_TYPES = setOf("image/png", "image/jpeg", "image/webp", "image/gif")
 
