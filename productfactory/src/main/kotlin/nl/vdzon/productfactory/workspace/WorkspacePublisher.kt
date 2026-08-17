@@ -17,6 +17,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 data class PublishArtifactRequest(val runId: String, val productSlug: String, val relativePath: String, val content: String)
 
@@ -58,10 +60,11 @@ class WorkspacePublisher(
     @Value("\${PF_WORKSPACE_GITHUB_TOKEN:}") private val workspaceToken: String,
 ) : WorkspacePublicationPort, WorkspaceVisionPort {
     private val logger = LoggerFactory.getLogger(javaClass)
+    private val repositoryLock = ReentrantLock()
 
-    override fun readVision(productSlug: String): String? {
+    override fun readVision(productSlug: String): String? = repositoryLock.withLock {
         val root = Path.of(workspacePath).toAbsolutePath().normalize()
-        if (!Files.isDirectory(root.resolve(".git"))) return null
+        if (!Files.isDirectory(root.resolve(".git"))) return@withLock null
         return runCatching {
             git(root, "checkout", mainBranch)
             if (remotePublication) git(root, "pull", "--ff-only", "origin", mainBranch)
@@ -76,7 +79,7 @@ class WorkspacePublisher(
         return if (end == -1) content.trim() else content.substring(end + 5).trim()
     }
 
-    override fun publish(artifact: WorkspaceArtifact): WorkspacePublicationView {
+    override fun publish(artifact: WorkspaceArtifact): WorkspacePublicationView = repositoryLock.withLock {
         validate(artifact)
         val product = products.requireWorkspacePublication(artifact.productSlug, artifact.relativePath)
         val hash = sha256(artifact.content)
@@ -84,7 +87,7 @@ class WorkspacePublisher(
             if (existing.contentHash != hash || existing.productSlug != artifact.productSlug || existing.artifactPath != artifact.relativePath) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Run-ID is al voor andere inhoud gebruikt")
             }
-            return existing
+            return@withLock existing
         }
 
         WorkspaceRepositoryGuard(repository).requireWorkspaceRepository(readOriginOrConfigured())
@@ -113,7 +116,7 @@ class WorkspacePublisher(
             status = "PULL_REQUEST"
         }
         jdbc.update("insert into workspace_publication(run_id, product_slug, artifact_path, content_hash, status, pull_request_url, commit_sha) values (?, ?, ?, ?, ?, ?, ?)", artifact.runId, artifact.productSlug, artifact.relativePath, hash, status, pullRequest, commitSha)
-        return find(artifact.productSlug, artifact.runId)!!
+        find(artifact.productSlug, artifact.runId)!!
     }
 
     fun find(productSlug: String, runId: String): WorkspacePublicationView? = jdbc.query(
@@ -180,13 +183,13 @@ class WorkspacePublisher(
         }.onFailure { logger.warn("Direct mergen van PR #{} mislukte: {}", prNumber, it.message) }
     }
 
-    fun readArtifact(productSlug: String, runId: String): String {
+    fun readArtifact(productSlug: String, runId: String): String = repositoryLock.withLock {
         val product = products.requireContext(productSlug)
         val publication = find(productSlug, runId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         val root = Path.of(workspacePath).toAbsolutePath().normalize()
         val path = root.resolve(product.workspaceDirectory).resolve(publication.artifactPath).normalize()
         require(path.startsWith(root.resolve(product.workspaceDirectory).normalize())) { "Artefactpad verlaat productdirectory" }
-        return Files.readString(path)
+        Files.readString(path)
     }
 
     private fun validate(request: WorkspaceArtifact) {

@@ -10,6 +10,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.util.Base64
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.writeBytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +20,32 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AgentContractTest {
+    @Test fun `worker task pool executes agent tasks with the configured bound`() {
+        val pool = boundedAgentTaskPool(3)
+        val entered = CountDownLatch(3)
+        val release = CountDownLatch(1)
+        val active = AtomicInteger()
+        val maximum = AtomicInteger()
+        try {
+            val tasks = (1..6).map {
+                pool.submit {
+                    val current = active.incrementAndGet()
+                    maximum.accumulateAndGet(current, ::maxOf)
+                    entered.countDown()
+                    release.await(2, TimeUnit.SECONDS)
+                    active.decrementAndGet()
+                }
+            }
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            assertEquals(3, maximum.get())
+            release.countDown()
+            tasks.forEach { it.get(2, TimeUnit.SECONDS) }
+        } finally {
+            release.countDown()
+            pool.shutdownNow()
+        }
+    }
+
     @Test fun `worker transports a generated image from its guarded temporary path`() {
         val task = AgentTask(
             "meeting-42",

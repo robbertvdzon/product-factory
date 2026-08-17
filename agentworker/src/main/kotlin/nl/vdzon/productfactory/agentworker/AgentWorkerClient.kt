@@ -16,6 +16,7 @@ import java.time.Duration
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -32,7 +33,7 @@ class AgentWorkerClient(
     private val mapper = jacksonObjectMapper().findAndRegisterModules()
     private val socket = AtomicReference<WebSocket?>()
     private val scheduler = Executors.newSingleThreadScheduledExecutor()
-    private val taskThread = Executors.newSingleThreadExecutor()
+    private val taskThreads = boundedAgentTaskPool(settings.parallelism)
     private val reconnectPending = AtomicBoolean(false)
     private val shuttingDown = AtomicBoolean(false)
     private val shutdown = CountDownLatch(1)
@@ -78,7 +79,7 @@ class AgentWorkerClient(
             return
         }
         if (!inFlight.add(frame.task.runId)) return
-        taskThread.submit {
+        taskThreads.submit {
             val result = runCatching { taskExecutor.execute(frame.task) }
                 .getOrElse { AgentResult(frame.task.runId, "FAILED", "Agenttaak faalde: ${it.message ?: it.javaClass.simpleName}") }
             if (result.status != "COMPLETED") {
@@ -121,7 +122,7 @@ class AgentWorkerClient(
         heartbeat?.cancel(true)
         runCatching { socket.get()?.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown")?.join() }
         scheduler.shutdownNow()
-        taskThread.shutdownNow()
+        taskThreads.shutdownNow()
         shutdown.countDown()
     }
 
@@ -192,4 +193,9 @@ class AgentWorkerClient(
         const val MAX_RECONNECT_MS = 60_000L
         const val HEARTBEAT_SECONDS = 30L
     }
+}
+
+internal fun boundedAgentTaskPool(parallelism: Int): ExecutorService {
+    require(parallelism in 1..16) { "PF_AGENT_PARALLELISM moet tussen 1 en 16 liggen" }
+    return Executors.newFixedThreadPool(parallelism)
 }

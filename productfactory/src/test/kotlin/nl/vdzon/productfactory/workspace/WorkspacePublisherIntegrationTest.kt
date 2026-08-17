@@ -10,6 +10,9 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
@@ -21,6 +24,18 @@ class WorkspacePublisherIntegrationTest(
     @Autowired private val publisher: WorkspacePublisher,
     @Autowired private val products: ProductCatalog,
 ) {
+    @Test fun `parallel vision reads serialize shared git workspace access`() {
+        val vision = "Een productspecifieke visie die gelijktijdig veilig gelezen wordt."
+        workspace.resolve("products/hkh-autopilot/product-vision.md").writeText(vision)
+        val pool = Executors.newFixedThreadPool(6)
+        try {
+            val reads = pool.invokeAll(List(12) { Callable { publisher.readVision("hkh-autopilot") } })
+            assertEquals(List(12) { vision }, reads.map { it.get(2, TimeUnit.SECONDS) })
+        } finally {
+            pool.shutdownNow()
+        }
+    }
+
     @Test fun `approved artifact is committed exactly once for a run id`() {
         val request = WorkspaceArtifact(
             "run-phase2-001", "hkh-autopilot", "research/phase-2-proof.md",

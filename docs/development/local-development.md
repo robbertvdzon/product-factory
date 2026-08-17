@@ -116,6 +116,8 @@ Bij succes bevat zowel deze response als de lijst- en detailresponse een optione
 zonder record houden `decision: null`; er is geen backfill.
 
 De runtime verstuurt iedere rol via de interne, met `PF_AGENT_WORKER_TOKEN` beveiligde bridge naar
-de dashboardbackend. Dezelfde token moet dus in runtime, dashboardbackend en lokale agentworker
+de dashboardbackend en de lokale agentworker. `PF_AGENT_PARALLELISM` begrenst het aantal agenttaken
+dat die worker werkelijk gelijktijdig uitvoert (standaard `4`); Git-bewerkingen op de gedeelde
+productworkspace blijven geserialiseerd. Dezelfde token moet dus in runtime, dashboardbackend en lokale agentworker
 staan; hij wordt niet doorgegeven aan het Codex-subproces. Zie
 [shadow-mode.md](../architecture/shadow-mode.md) voor rollen, validatie en opslaggrenzen.

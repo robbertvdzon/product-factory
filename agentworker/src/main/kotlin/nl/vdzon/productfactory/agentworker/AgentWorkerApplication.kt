@@ -20,6 +20,7 @@ class AgentWorkerApplication {
         @Value("\${PF_CODEX_EXECUTABLE:codex}") codexExecutable: String,
         @Value("\${PF_AGENT_MODEL:gpt-5.6-terra}") defaultModel: String,
         @Value("\${PF_CLAUDE_EXECUTABLE:claude}") claudeExecutable: String,
+        @Value("\${PF_AGENT_PARALLELISM:4}") parallelism: Int,
     ) = AgentWorkerSettings(
         url = url,
         token = token,
@@ -29,6 +30,7 @@ class AgentWorkerApplication {
         codexExecutable = codexExecutable,
         defaultModel = defaultModel,
         claudeExecutable = claudeExecutable,
+        parallelism = parallelism,
     )
 
     @Bean

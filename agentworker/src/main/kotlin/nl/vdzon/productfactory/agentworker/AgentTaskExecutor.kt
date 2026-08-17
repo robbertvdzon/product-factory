@@ -19,6 +19,7 @@ data class AgentWorkerSettings(
     val codexExecutable: String,
     val defaultModel: String,
     val claudeExecutable: String = "claude",
+    val parallelism: Int = 4,
 )
 
 data class AgentCommandResult(val exitCode: Int, val timedOut: Boolean, val output: String)
