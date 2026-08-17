@@ -263,7 +263,6 @@ class RoadmapProcessOrchestrator(
         if (action == "NO_CHANGE") return@mapNotNull null
         val key = idea.path("ideaKey").asText()
         val existing = catalog.ideas(step.productSlug).singleOrNull { it.ideaKey == key }
-        if (action != "CREATE" && existing == null) throw IllegalArgumentException("$action vereist bestaand idee '$key'")
         val status = when (action) {
             "PARK" -> RoadmapIdeaStatus.PARKED
             "REJECT" -> RoadmapIdeaStatus.REJECTED
@@ -274,7 +273,7 @@ class RoadmapProcessOrchestrator(
             step.productSlug,
             IdeaMutation(
                 key, status, idea.path("promise").asText(), idea.path("primaryAudience").asText(),
-                idea.path("need").asText(), if (action == "CREATE") "living-vision-discovery" else existing!!.origin,
+                idea.path("need").asText(), existing?.origin ?: "living-vision-discovery",
                 idea.path("reason").asText(), idea.path("evidence").asText().takeIf(String::isNotBlank),
                 mapper.convertValue(idea, Map::class.java).entries.associate { it.key.toString() to it.value },
                 step.sessionId, step.role,
