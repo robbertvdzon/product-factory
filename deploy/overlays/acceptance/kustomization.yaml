@@ -219,4 +219,4 @@ patches:
 images:
 - name: ghcr.io/robbertvdzon/product-factory-dashboard-frontend
   newName: ghcr.io/robbertvdzon/product-factory-dashboard-frontend
-  newTag: sha-bdd806d2e8239ba872545ca643d2f061e4ea6406-acceptance
+  newTag: sha-6023276cdcb1ea587057a0639bd20f173a2bd3c7-acceptance
