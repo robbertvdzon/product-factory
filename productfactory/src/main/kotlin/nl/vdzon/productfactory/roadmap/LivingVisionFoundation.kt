@@ -46,7 +46,7 @@ object LivingVisionRoleCatalog {
         RoadmapRoleDefinition("ux-director", "UX-director", RoadmapDecisionAuthority.CURATE_UX, true, "future-strategist", "Bewaak flowsamenhang. Lever maximaal één gerichte conceptRevision volledig uit; alleen een afwijzing zonder uitvoerbare revisie blokkeert."),
         RoadmapRoleDefinition("future-strategist", "Toekomststrateeg", RoadmapDecisionAuthority.SYNTHESIZE_VISION, true, "vision-critic", "Synthetiseer alleen gecureerde versies tot north star, capabilities en horizons."),
         RoadmapRoleDefinition("vision-critic", "Visiecriticus", RoadmapDecisionAuthority.BLOCK_OR_APPROVE, true, "roadmap-manager", "Blokkeer verlies, claims zonder bewijs, schijnflows en te snelle onmogelijkheidsoordelen."),
-        RoadmapRoleDefinition("roadmap-manager", "Roadmapmanager", RoadmapDecisionAuthority.PLAN_ROADMAP, true, "activation", "Plan capabilities, discovery en delivery; wijzig de visie niet."),
+        RoadmapRoleDefinition("roadmap-manager", "Roadmapmanager", RoadmapDecisionAuthority.PLAN_ROADMAP, true, "activation", "Plan capabilities, discovery en delivery; wijzig de visie niet. Noem in de beschrijving van iedere DISCOVERY-epic expliciet het bewijsdoel en het besliscriterium waarmee je bepaalt of de proef slaagt of niet."),
         RoadmapRoleDefinition("activation", "Atomaire activatie", RoadmapDecisionAuthority.ACTIVATE, true, "dashboard/product-cycles", "Activeer uitsluitend een volledig gevalideerd sessiedossier."),
     )
     val byKey = roles.associateBy { it.key }

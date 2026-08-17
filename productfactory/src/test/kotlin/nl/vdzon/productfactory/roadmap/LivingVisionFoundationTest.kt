@@ -152,6 +152,13 @@ class LivingVisionFoundationTest(
     }
 
     @Test
+    fun `roadmap manager appendix instructs agents to state an evidence goal and decision criterion for discovery epics`() {
+        val appendix = LivingVisionRoleCatalog.byKey.getValue("roadmap-manager").appendix.lowercase()
+        assertTrue("bewijsdoel" in appendix, "Rolbijlage moet het bewijsdoel-vereiste voor discovery-epics benoemen")
+        assertTrue("besliscriterium" in appendix, "Rolbijlage moet het besliscriterium-vereiste voor discovery-epics benoemen")
+    }
+
+    @Test
     fun `generic process templates contain no product or domain examples and every schema is closed`() {
         val genericText = (LivingVisionProcessContract.text + LivingVisionRoleCatalog.roles.joinToString { it.appendix }).lowercase()
         listOf("hkh", "heemskerk", "erfgoed", "archief", "kaarten").forEach { forbidden ->

@@ -148,6 +148,36 @@ class RoadmapProcessOrchestratorTest(
         assertTrue("Controleer ieder eerder revisionRequest afzonderlijk" in rereviewPrompt)
     }
 
+    @Test
+    fun `discovery epic without evidence goal and decision criterion blocks activation and leaves active vision untouched`() {
+        dispatch.managerEpicKind.set("DISCOVERY")
+        dispatch.managerEpicDescription.set("Onderzoek een onzekere technische randvoorwaarde voordat delivery start.")
+        val session = sessions.create(slug)
+
+        val failure = assertFailsWith<java.util.concurrent.ExecutionException> { orchestrator.run(session.id) }
+        assertEquals("Discovery-epic vereist bewijsdoel en besliscriterium", failure.cause?.message)
+
+        assertNull(visions.current(slug))
+        val activation = catalog.steps(session.id).single { it.role == "activation" }
+        assertEquals("FAILED", activation.status.name)
+        assertEquals("Discovery-epic vereist bewijsdoel en besliscriterium", activation.errorMessage)
+    }
+
+    @Test
+    fun `discovery epic naming evidence goal and decision criterion activates successfully`() {
+        dispatch.managerEpicKind.set("DISCOVERY")
+        dispatch.managerEpicDescription.set(
+            "Bewijsdoel: valideer de technische randvoorwaarde binnen een begrensde proef. " +
+                "Besliscriterium: ga door naar delivery zodra de proef zonder blokkerende fout slaagt.",
+        )
+        val session = sessions.create(slug)
+
+        orchestrator.run(session.id)
+
+        assertEquals("COMPLETED", sessions.require(slug, session.id).status)
+        assertNotNull(visions.current(slug))
+    }
+
     @TestConfiguration
     class Fakes {
         @Bean
@@ -162,6 +192,8 @@ class RoadmapProcessOrchestratorTest(
         val reviseConcept = AtomicInteger()
         val criticRequiresCorrection = AtomicInteger()
         val failRole = AtomicReference<String?>(null)
+        val managerEpicKind = AtomicReference("DELIVERY")
+        val managerEpicDescription = AtomicReference("Lever de gevalideerde end-to-end gebruikersflow met toegankelijke toestanden.")
         val started = ConcurrentHashMap<String, Long>()
         val ended = ConcurrentHashMap<String, Long>()
         val tasks = ConcurrentLinkedQueue<AgentTask>()
@@ -173,6 +205,8 @@ class RoadmapProcessOrchestratorTest(
             reviseConcept.set(0)
             criticRequiresCorrection.set(0)
             failRole.set(null)
+            managerEpicKind.set("DELIVERY")
+            managerEpicDescription.set("Lever de gevalideerde end-to-end gebruikersflow met toegankelijke toestanden.")
             started.clear()
             ended.clear()
             tasks.clear()
@@ -241,7 +275,7 @@ class RoadmapProcessOrchestratorTest(
             return """{"northStarTitle":"Een levende en concrete producthorizon","northStar":"Iedere gebruiker kan vanuit een herkenbare behoefte een betrouwbare en betekenisvolle productervaring voltooien.","futureNarrative":"De toekomstige ervaring begint bij een helder doel en bouwt stap voor stap vertrouwen op. Inhoud, interactie en bewijs blijven zichtbaar verbonden, onzekerheid wordt eerlijk getoond en iedere route biedt begrijpelijk herstel. Zo groeit het product zonder zijn kernbelofte of eerder geleerde lessen te verliezen.","experiences":[$experiences],"capabilities":[$capabilities],"assumptions":[{"key":"begrijpelijke-flow","statement":"De gekozen flow en terminologie zijn begrijpelijk voor de primaire gebruikersgroep.","risk":"Onduidelijkheid verhindert dat gebruikers zelfstandig het resultaat bereiken.","probeType":"UX_PROTOTYPE","proposedProbe":"Test de volledige mobiele en desktopflow met representatieve gebruikers en leg uitval vast.","capabilityKeys":["capability-1"],"feasibility":"TESTING"}],"conceptScreens":[$screens],"visionChangeSummary":"Twee gecureerde ideeën zijn met UX en onderzoek tot één bewijsbare horizon samengebracht."}"""
         }
 
-        private fun manager() = """{"summary":"De gevalideerde capability is atomair vertaald naar de roadmap.","epicUpdates":[{"action":"CREATE","epicId":null,"title":"Complete kernflow","description":"Lever de gevalideerde end-to-end gebruikersflow met toegankelijke toestanden.","processRank":1,"dependencyIds":[],"horizon":"NOW","kind":"DELIVERY","capabilityKey":"capability-1"}],"settledQuestions":[],"bugUpdates":[]}"""
+        private fun manager() = """{"summary":"De gevalideerde capability is atomair vertaald naar de roadmap.","epicUpdates":[{"action":"CREATE","epicId":null,"title":"Complete kernflow","description":"${managerEpicDescription.get()}","processRank":1,"dependencyIds":[],"horizon":"NOW","kind":"${managerEpicKind.get()}","capabilityKey":"capability-1"}],"settledQuestions":[],"bugUpdates":[]}"""
     }
 
     companion object {
