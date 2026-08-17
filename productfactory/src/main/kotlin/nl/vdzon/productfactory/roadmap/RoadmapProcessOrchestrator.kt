@@ -202,7 +202,7 @@ class RoadmapProcessOrchestrator(
                 inputArtifactIds = effectiveInputIds,
                 outputArtifactIds = outputIds,
                 summary = output.path("summary").asText().trim().take(4_000),
-                payload = mapper.convertValue(output, Map::class.java).entries.associate { it.key.toString() to it.value },
+                payload = handoffPayload(output),
             )
             catalog.markCompleted(step.id, outputIds, handoff)
             agentRuns.complete(step.productSlug, runId, "COMPLETED", "roadmap-session:${step.sessionId}/${step.role}/${step.scopeKey}")
@@ -233,8 +233,7 @@ class RoadmapProcessOrchestrator(
         val critiqueHandoff = RoadmapHandoffView(
             LIVING_VISION_PROCESS_VERSION, step.sessionId, step.productSlug, "vision-critic", "future-strategist",
             "critic-correction", inputs.flatMap { it.outputArtifactIds }.distinct(), listOf(critiqueId),
-            initialCritique.path("summary").asText(), mapper.convertValue(initialCritique, Map::class.java)
-                .entries.associate { it.key.toString() to it.value },
+            initialCritique.path("summary").asText(), handoffPayload(initialCritique),
         )
         val correctedStrategy = executeSupplementalRole(
             step, "future-strategist", "critic-correction", inputs + critiqueHandoff, "strategy-correction",
@@ -243,8 +242,7 @@ class RoadmapProcessOrchestrator(
         val correctionHandoff = RoadmapHandoffView(
             LIVING_VISION_PROCESS_VERSION, step.sessionId, step.productSlug, "future-strategist", "vision-critic",
             "critic-correction", listOf(critiqueId), listOf(correctionId),
-            correctedStrategy.path("visionChangeSummary").asText(),
-            mapper.convertValue(correctedStrategy, Map::class.java).entries.associate { it.key.toString() to it.value },
+            correctedStrategy.path("visionChangeSummary").asText(), handoffPayload(correctedStrategy),
         )
         val finalCritique = executeSupplementalRole(
             step, "vision-critic", "critic-correction", inputs + critiqueHandoff + correctionHandoff, "critic-rereview",
@@ -457,6 +455,26 @@ class RoadmapProcessOrchestrator(
                 "Discovery-epic vereist bewijsdoel en besliscriterium"
             }
         }
+    }
+
+    /**
+     * Handoffs blijven compacte, herleidbare metadata. Binaire beelden zijn vóór dit punt al in de mediacatalogus
+     * opgeslagen en worden uitsluitend via de outputArtifactIds gerefereerd; base64 opnieuw in iedere downstream
+     * prompt opnemen zou geheugen verspillen en kan de OS-limiet voor procesargumenten overschrijden.
+     */
+    private fun handoffPayload(output: JsonNode): Map<String, Any?> {
+        val sanitized = output.deepCopy<JsonNode>()
+        fun stripBinaryContent(node: JsonNode) {
+            when {
+                node.isObject -> {
+                    (node as ObjectNode).remove(listOf("base64Content", "temporaryPath"))
+                    node.elements().forEachRemaining(::stripBinaryContent)
+                }
+                node.isArray -> node.forEach(::stripBinaryContent)
+            }
+        }
+        stripBinaryContent(sanitized)
+        return mapper.convertValue(sanitized, Map::class.java).entries.associate { it.key.toString() to it.value }
     }
 
     private fun graph(sessionId: String): List<StepDefinition> {

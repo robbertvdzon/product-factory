@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Primary
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
@@ -73,6 +74,10 @@ class RoadmapProcessOrchestratorTest(
             assertEquals(setOf(1), frames.map { it.version }.toSet())
         }
         assertTrue(catalog.research(slug).isNotEmpty())
+        val uxHandoffs = steps.filter { it.role == "ux-concept" }.mapNotNull { it.handoff }
+        assertTrue(uxHandoffs.all { "base64Content" !in it.payload.toString() })
+        val directorPrompt = dispatch.tasks.single { it.taskType == "roadmap-ux-director" }.prompt
+        assertTrue(ONE_PIXEL_PNG !in directorPrompt, "Downstream prompts mogen geen opgeslagen beeldbytes bevatten")
 
         val callsAfterFirstRun = dispatch.calls.get()
         orchestrator.run(session.id)
@@ -152,6 +157,7 @@ class RoadmapProcessOrchestratorTest(
         val failRole = AtomicReference<String?>(null)
         val started = ConcurrentHashMap<String, Long>()
         val ended = ConcurrentHashMap<String, Long>()
+        val tasks = ConcurrentLinkedQueue<AgentTask>()
 
         fun reset() {
             active.set(0)
@@ -162,9 +168,11 @@ class RoadmapProcessOrchestratorTest(
             failRole.set(null)
             started.clear()
             ended.clear()
+            tasks.clear()
         }
 
         override fun execute(task: AgentTask): AgentResult {
+            tasks.add(task)
             calls.incrementAndGet()
             started.putIfAbsent(task.taskType, System.nanoTime())
             val nowActive = active.incrementAndGet()
