@@ -206,6 +206,19 @@ class RoadmapProcessOrchestratorTest(
         assertTrue(catalog.concepts(slug).any { it.conceptKey == "concept-nummer-1" }, "Conceptsleutel moet genormaliseerd zijn, niet geweigerd")
     }
 
+    @Test
+    fun `a validation failure preserves the actual agent output for diagnosis instead of only the short exception message`() {
+        dispatch.uxReferencesUnknownIdea.set("nooit-aangemaakt-idee")
+        val session = sessions.create(slug)
+
+        assertFailsWith<IllegalStateException> { orchestrator.run(session.id) }
+
+        val step = catalog.steps(session.id).single { it.role == "ux-concept" && it.scopeKey == "selection-1" }
+        assertEquals("FAILED", step.status.name)
+        assertTrue(step.errorMessage.orEmpty().contains("agentoutput="), "Foutmelding moet de daadwerkelijke agentoutput bevatten")
+        assertTrue(step.errorMessage.orEmpty().contains("nooit-aangemaakt-idee"), "Foutmelding moet de daadwerkelijk gebruikte foutieve sleutel tonen")
+    }
+
     @TestConfiguration
     class Fakes {
         @Bean
@@ -225,6 +238,7 @@ class RoadmapProcessOrchestratorTest(
         val managerUpdateEpicId = AtomicReference<String?>(null)
         val rawIdeaKeyOverride = AtomicReference<String?>(null)
         val rawConceptKeyOverride = AtomicReference<String?>(null)
+        val uxReferencesUnknownIdea = AtomicReference<String?>(null)
         val started = ConcurrentHashMap<String, Long>()
         val ended = ConcurrentHashMap<String, Long>()
         val tasks = ConcurrentLinkedQueue<AgentTask>()
@@ -241,6 +255,7 @@ class RoadmapProcessOrchestratorTest(
             managerUpdateEpicId.set(null)
             rawIdeaKeyOverride.set(null)
             rawConceptKeyOverride.set(null)
+            uxReferencesUnknownIdea.set(null)
             started.clear()
             ended.clear()
             tasks.clear()
@@ -287,7 +302,7 @@ class RoadmapProcessOrchestratorTest(
 
         private fun idea(index: Int) = """{"action":"${if (index == 1) "REFINE" else "CREATE"}","ideaKey":"${ideaKeyFor(index)}","promise":"Een concrete en onderscheidende productbelofte voor richting $index.","primaryAudience":"De primaire gebruikersgroep van het geselecteerde product.","need":"Een aantoonbare behoefte die onafhankelijk blijft van de eerste oplossing.","reason":"Geselecteerd op productfit, bewijs en leerwaarde.","evidence":"De scouts leverden relevante maar nog onzekere aanwijzingen.","mergedIdeaKeys":[],"selectUx":true,"researchQuestions":["Welke randvoorwaarde bepaalt de haalbaarheid?"]}"""
 
-        private fun ux(index: Int) = """{"summary":"Mobiele en desktopflow voor idee $index.","ideaKey":"${ideaKeyFor(index)}","conceptKey":"${conceptKeyFor(index)}","userGoal":"De gebruiker voltooit zelfstandig een betekenisvol kerndoel.","interaction":"De flow biedt een duidelijke start, keuze, bevestiging en hersteltoestand.","content":"Deterministische interface-tekst met begrijpelijke labels en terugkoppeling.","states":["loading","empty","success","error"],"decisions":["Toetsenbordvolgorde volgt de visuele volgorde."],"assumptions":["De gekozen woorden zijn begrijpelijk."],"openQuestions":["Welke uitleg is in gebruikersonderzoek nodig?"],"generatedImages":[${image(index, "MOBILE", 0)},${image(index, "DESKTOP", 1)}]}"""
+        private fun ux(index: Int) = """{"summary":"Mobiele en desktopflow voor idee $index.","ideaKey":"${if (index == 1) uxReferencesUnknownIdea.get() ?: ideaKeyFor(index) else ideaKeyFor(index)}","conceptKey":"${conceptKeyFor(index)}","userGoal":"De gebruiker voltooit zelfstandig een betekenisvol kerndoel.","interaction":"De flow biedt een duidelijke start, keuze, bevestiging en hersteltoestand.","content":"Deterministische interface-tekst met begrijpelijke labels en terugkoppeling.","states":["loading","empty","success","error"],"decisions":["Toetsenbordvolgorde volgt de visuele volgorde."],"assumptions":["De gekozen woorden zijn begrijpelijk."],"openQuestions":["Welke uitleg is in gebruikersonderzoek nodig?"],"generatedImages":[${image(index, "MOBILE", 0)},${image(index, "DESKTOP", 1)}]}"""
 
         private fun image(index: Int, viewport: String, position: Int) = """{"base64Content":"$ONE_PIXEL_PNG","mediaType":"image/png","filename":"concept-$index-${viewport.lowercase()}.png","altText":"$viewport concept voor idee $index","viewport":"$viewport","flowPosition":$position}"""
 

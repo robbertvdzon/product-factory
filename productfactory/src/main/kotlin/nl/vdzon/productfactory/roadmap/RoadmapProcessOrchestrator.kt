@@ -177,6 +177,7 @@ class RoadmapProcessOrchestrator(
         val runId = "${step.sessionId}-${step.role}-${step.scopeKey}-a${step.attempt}"
             .replace(Regex("[^A-Za-z0-9._-]"), "-")
             .take(120)
+        var lastOutput: JsonNode? = null
         try {
             val manifest = manifest(step, inputs)
             val prompt = prompts.build(manifest, contexts.build(step.productSlug), inputs)
@@ -201,6 +202,7 @@ class RoadmapProcessOrchestrator(
             } else {
                 initialOutput
             }
+            lastOutput = output
             val effectiveInputIds = (inputIds + output.path("correctionArtifactIds").map(JsonNode::asText)).distinct()
             val outputIds = persistOutput(step, output)
             val downstream = LivingVisionRoleCatalog.byKey.getValue(step.role).downstreamConsumer
@@ -222,7 +224,13 @@ class RoadmapProcessOrchestrator(
             metrics.counter("product_factory.roadmap.step.completed", "role", step.role).increment()
         } catch (exception: Exception) {
             runCatching { agentRuns.complete(step.productSlug, runId, "FAILED", null) }
-            val message = exception.message ?: exception.javaClass.simpleName
+            val baseMessage = exception.message ?: exception.javaClass.simpleName
+            // Bewaar de daadwerkelijke (binairvrije) agentoutput bij een mislukking: de korte
+            // uitzonderingsmelding alleen ("Onbekend idee voor dit product") laat geen diagnose toe van
+            // wélke sleutel de rol daadwerkelijk gebruikte.
+            val message = lastOutput?.let { output ->
+                "$baseMessage | agentoutput=${mapper.writeValueAsString(handoffPayload(output)).take(2_000)}"
+            } ?: baseMessage
             when {
                 step.attempt < maxAttempts -> {
                     catalog.markForRetry(step.id, message)
