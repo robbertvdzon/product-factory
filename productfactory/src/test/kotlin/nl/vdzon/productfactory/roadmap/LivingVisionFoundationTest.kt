@@ -182,6 +182,22 @@ class LivingVisionFoundationTest(
     }
 
     @Test
+    fun `ux concept and feasibility appendices instruct agents to reuse the curator supplied idea key verbatim`() {
+        val uxAppendix = LivingVisionRoleCatalog.byKey.getValue("ux-concept").appendix.lowercase()
+        val feasibilityAppendix = LivingVisionRoleCatalog.byKey.getValue("feasibility").appendix.lowercase()
+        listOf(uxAppendix, feasibilityAppendix).forEach { appendix ->
+            assertTrue("curatorhandoff" in appendix, "Rolbijlage moet verwijzen naar de curatorhandoff als bron van de ideeKey")
+            assertTrue("verzin nooit" in appendix, "Rolbijlage moet het verzinnen van een eigen sleutel expliciet verbieden")
+        }
+    }
+
+    @Test
+    fun `feasibility appendix bounds the number of results per response`() {
+        val appendix = LivingVisionRoleCatalog.byKey.getValue("feasibility").appendix.lowercase()
+        assertTrue("beperk" in appendix, "Rolbijlage moet het aantal resultaten per aanroep begrenzen")
+    }
+
+    @Test
     fun `generic process templates contain no product or domain examples and every schema is closed`() {
         val genericText = (LivingVisionProcessContract.text + LivingVisionRoleCatalog.roles.joinToString { it.appendix }).lowercase()
         listOf("hkh", "heemskerk", "erfgoed", "archief", "kaarten").forEach { forbidden ->
