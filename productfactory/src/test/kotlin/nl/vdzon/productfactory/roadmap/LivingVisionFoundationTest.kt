@@ -161,6 +161,14 @@ class LivingVisionFoundationTest(
     }
 
     @Test
+    fun `roadmap manager appendix gives a literal, untranslatable label template for the discovery epic requirement`() {
+        val appendix = LivingVisionRoleCatalog.byKey.getValue("roadmap-manager").appendix.lowercase()
+        assertTrue("'bewijsdoel: '" in appendix, "Rolbijlage moet de letterlijke aanhef 'Bewijsdoel: ' voorschrijven")
+        assertTrue("'besliscriterium: '" in appendix, "Rolbijlage moet de letterlijke aanhef 'Besliscriterium: ' voorschrijven")
+        assertTrue("niet worden vertaald" in appendix, "Rolbijlage moet vertalen van de aanhefwoorden expliciet verbieden")
+    }
+
+    @Test
     fun `roadmap manager appendix instructs agents to only reuse an epicId from the supplied open epics`() {
         val appendix = LivingVisionRoleCatalog.byKey.getValue("roadmap-manager").appendix.lowercase()
         assertTrue("openepics" in appendix, "Rolbijlage moet verwijzen naar productcontext.openepics")
