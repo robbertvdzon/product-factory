@@ -100,6 +100,14 @@ class AgentContractTest {
         assertTrue(prompt.contains("nooit een bedacht"))
     }
 
+    @Test fun `agent prompt forbids clarifying questions since no one reads a non-interactive background task`() {
+        val prompt = agentPrompt(AgentTask("run-noninteractive", "hkh-autopilot", "research", "Onderzoek bronnen"))
+
+        assertTrue(prompt.contains("niet-interactieve achtergrondtaak"))
+        assertTrue(prompt.contains("Stel daarom nooit een verduidelijkingsvraag"))
+        assertTrue(prompt.contains("lever altijd het gevraagde resultaat"))
+    }
+
     @Test fun `worker validates every image before deleting any generated file`() {
         val task = AgentTask(
             "atomic-images",

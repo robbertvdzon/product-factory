@@ -104,6 +104,10 @@ internal fun requiresBrowserAccess(task: AgentTask): Boolean = task.taskType in 
 internal fun agentPrompt(task: AgentTask): String = """
     Je bent een autonome Product Factory-agent voor product '${task.productSlug}'.
     Taaktype: ${task.taskType}.
+    Dit is een eenmalige, niet-interactieve achtergrondtaak: niemand leest of beantwoordt een vervolgvraag.
+    Stel daarom nooit een verduidelijkingsvraag en wacht nooit op meer input. Gebruik uitsluitend de hieronder
+    aangeleverde context en lever altijd het gevraagde resultaat, ook bij onzekerheid of een onvolledige opdracht;
+    benoem onzekerheid dan expliciet in het resultaat zelf in plaats van te vragen om verduidelijking.
     De huidige product-factory-workspace is uitsluitend een leesbare kennisbron. Wijzig geen bronbestanden.
     ${browserInstruction(task)}
     ${generatedImageInstruction(task)}
