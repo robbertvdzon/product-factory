@@ -198,6 +198,13 @@ class LivingVisionFoundationTest(
     }
 
     @Test
+    fun `vision curator appendix requires meaningful idea keys instead of generic sequential placeholders`() {
+        val appendix = LivingVisionRoleCatalog.byKey.getValue("vision-curator").appendix.lowercase()
+        assertTrue("betekenisvolle" in appendix, "Rolbijlage moet een betekenisvolle ideaKey vereisen")
+        assertTrue("volgnummer" in appendix, "Rolbijlage moet generieke volgnummers als sleutel expliciet afraden")
+    }
+
+    @Test
     fun `generic process templates contain no product or domain examples and every schema is closed`() {
         val genericText = (LivingVisionProcessContract.text + LivingVisionRoleCatalog.roles.joinToString { it.appendix }).lowercase()
         listOf("hkh", "heemskerk", "erfgoed", "archief", "kaarten").forEach { forbidden ->
