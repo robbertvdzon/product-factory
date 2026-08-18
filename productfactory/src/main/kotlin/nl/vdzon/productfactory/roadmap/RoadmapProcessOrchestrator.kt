@@ -95,6 +95,18 @@ class RoadmapProcessRecovery(
     }
 }
 
+/**
+ * Modellen leveren idee- en conceptsleutels niet altijd in het strikte kleine-letters-met-koppeltekens-formaat
+ * dat de catalogus vereist, en een zwakker model wijkt daar vaker van af dan een sterker model. Wijs een
+ * afwijkende sleutel niet af: normaliseer elke reeks niet-toegestane tekens naar één koppelteken, zodat dezelfde
+ * bedoelde sleutel altijd naar dezelfde stabiele, geldige sleutel afbeeldt, ongeacht welk model hem aanleverde.
+ * [nl.vdzon.productfactory.roadmap.api.LivingVisionCatalog] valideert de vorm hierna nog steeds.
+ */
+internal fun sanitizeKey(raw: String): String {
+    val normalized = raw.trim().lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').take(100).trim('-')
+    return normalized.ifBlank { "key-${raw.hashCode().toUInt().toString(36)}" }
+}
+
 /** Hervatbare living-vision-v2 graph met databaseclaims en begrensde paralleliteit. */
 @Component
 class RoadmapProcessOrchestrator(
@@ -350,7 +362,7 @@ class RoadmapProcessOrchestrator(
     private fun persistCurator(step: RoadmapSessionStepView, output: JsonNode): List<String> = output.path("ideas").mapNotNull { idea ->
         val action = idea.path("action").asText()
         if (action == "NO_CHANGE") return@mapNotNull null
-        val key = idea.path("ideaKey").asText()
+        val key = sanitizeKey(idea.path("ideaKey").asText())
         val existing = catalog.ideas(step.productSlug).singleOrNull { it.ideaKey == key }
         val status = when (action) {
             "PARK" -> RoadmapIdeaStatus.PARKED
@@ -371,7 +383,8 @@ class RoadmapProcessOrchestrator(
     }
 
     private fun persistConcept(step: RoadmapSessionStepView, output: JsonNode): List<String> {
-        val ideaKey = output.path("ideaKey").asText()
+        val ideaKey = sanitizeKey(output.path("ideaKey").asText())
+        val conceptKey = sanitizeKey(output.path("conceptKey").asText())
         val idea = catalog.ideas(step.productSlug).singleOrNull { it.ideaKey == ideaKey }
             ?: throw IllegalArgumentException("Concept verwijst naar onbekend idee")
         val images = output.path("generatedImages").map { image ->
@@ -384,7 +397,7 @@ class RoadmapProcessOrchestrator(
         val versions = catalog.appendConceptFlow(
             step.productSlug,
             ConceptFlowMutation(
-                output.path("conceptKey").asText(), ideaKey, idea.currentVersion,
+                conceptKey, ideaKey, idea.currentVersion,
                 output.path("userGoal").asText(), output.path("interaction").asText(), output.path("content").asText(),
                 output.path("states").map(JsonNode::asText), output.path("decisions").map(JsonNode::asText),
                 output.path("assumptions").map(JsonNode::asText), output.path("openQuestions").map(JsonNode::asText),
@@ -395,7 +408,7 @@ class RoadmapProcessOrchestrator(
             ),
         )
         return versions.map { version ->
-            "concept:${output.path("conceptKey").asText()}:v${version.version}:${version.viewport}:${version.flowPosition}"
+            "concept:$conceptKey:v${version.version}:${version.viewport}:${version.flowPosition}"
         }
     }
 
@@ -405,7 +418,7 @@ class RoadmapProcessOrchestrator(
             "UX-director heeft de conceptset niet goedgekeurd en geen uitvoerbare revisie geleverd"
         }
         return revisions.flatMap { revision ->
-            val conceptKey = revision.path("conceptKey").asText()
+            val conceptKey = sanitizeKey(revision.path("conceptKey").asText())
             val concept = catalog.concepts(step.productSlug).singleOrNull { it.conceptKey == conceptKey }
                 ?: throw IllegalArgumentException("Revisie verwijst naar onbekend concept")
             val previous = catalog.conceptVersions(step.productSlug, conceptKey)
@@ -435,7 +448,8 @@ class RoadmapProcessOrchestrator(
         catalog.addResearch(
             step.productSlug,
             ResearchMutation(
-                step.sessionId, result.path("ideaKey").asText(), result.path("conceptKey").takeIf(JsonNode::isTextual)?.asText(),
+                step.sessionId, sanitizeKey(result.path("ideaKey").asText()),
+                result.path("conceptKey").takeIf(JsonNode::isTextual)?.asText()?.let(::sanitizeKey),
                 result.path("capabilityKey").takeIf(JsonNode::isTextual)?.asText(), result.path("researchType").asText(),
                 result.path("question").asText(), result.path("evidence").asText(), result.path("sources").map(JsonNode::asText),
                 result.path("limitations").asText(), result.path("confidence").asInt(),

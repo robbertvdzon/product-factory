@@ -193,6 +193,19 @@ class RoadmapProcessOrchestratorTest(
         assertEquals("Complete kernflow", updated.title)
     }
 
+    @Test
+    fun `agent supplied idea and concept keys with unexpected formatting are normalized instead of rejected`() {
+        dispatch.rawIdeaKeyOverride.set("Idee  Nummer 1!!!")
+        dispatch.rawConceptKeyOverride.set("Concept--Nummer_1!!")
+        val session = sessions.create(slug)
+
+        orchestrator.run(session.id)
+
+        assertEquals("COMPLETED", sessions.require(slug, session.id).status)
+        assertTrue(catalog.ideas(slug).any { it.ideaKey == "idee-nummer-1" }, "Sleutel moet genormaliseerd zijn, niet geweigerd")
+        assertTrue(catalog.concepts(slug).any { it.conceptKey == "concept-nummer-1" }, "Conceptsleutel moet genormaliseerd zijn, niet geweigerd")
+    }
+
     @TestConfiguration
     class Fakes {
         @Bean
@@ -210,6 +223,8 @@ class RoadmapProcessOrchestratorTest(
         val managerEpicKind = AtomicReference("DELIVERY")
         val managerEpicDescription = AtomicReference("Lever de gevalideerde end-to-end gebruikersflow met toegankelijke toestanden.")
         val managerUpdateEpicId = AtomicReference<String?>(null)
+        val rawIdeaKeyOverride = AtomicReference<String?>(null)
+        val rawConceptKeyOverride = AtomicReference<String?>(null)
         val started = ConcurrentHashMap<String, Long>()
         val ended = ConcurrentHashMap<String, Long>()
         val tasks = ConcurrentLinkedQueue<AgentTask>()
@@ -224,6 +239,8 @@ class RoadmapProcessOrchestratorTest(
             managerEpicKind.set("DELIVERY")
             managerEpicDescription.set("Lever de gevalideerde end-to-end gebruikersflow met toegankelijke toestanden.")
             managerUpdateEpicId.set(null)
+            rawIdeaKeyOverride.set(null)
+            rawConceptKeyOverride.set(null)
             started.clear()
             ended.clear()
             tasks.clear()
@@ -265,13 +282,16 @@ class RoadmapProcessOrchestratorTest(
 
         private fun curator() = """{"summary":"Twee stabiele ideeën zijn geselecteerd voor verdieping.","ideas":[${idea(1)},${idea(2)}],"surprisingPossibilities":["Een aanvullende mogelijkheid blijft als vonk bewaard."]}"""
 
-        private fun idea(index: Int) = """{"action":"${if (index == 1) "REFINE" else "CREATE"}","ideaKey":"idee-$index","promise":"Een concrete en onderscheidende productbelofte voor richting $index.","primaryAudience":"De primaire gebruikersgroep van het geselecteerde product.","need":"Een aantoonbare behoefte die onafhankelijk blijft van de eerste oplossing.","reason":"Geselecteerd op productfit, bewijs en leerwaarde.","evidence":"De scouts leverden relevante maar nog onzekere aanwijzingen.","mergedIdeaKeys":[],"selectUx":true,"researchQuestions":["Welke randvoorwaarde bepaalt de haalbaarheid?"]}"""
+        private fun ideaKeyFor(index: Int) = if (index == 1) rawIdeaKeyOverride.get() ?: "idee-1" else "idee-$index"
+        private fun conceptKeyFor(index: Int) = if (index == 1) rawConceptKeyOverride.get() ?: "concept-1" else "concept-$index"
 
-        private fun ux(index: Int) = """{"summary":"Mobiele en desktopflow voor idee $index.","ideaKey":"idee-$index","conceptKey":"concept-$index","userGoal":"De gebruiker voltooit zelfstandig een betekenisvol kerndoel.","interaction":"De flow biedt een duidelijke start, keuze, bevestiging en hersteltoestand.","content":"Deterministische interface-tekst met begrijpelijke labels en terugkoppeling.","states":["loading","empty","success","error"],"decisions":["Toetsenbordvolgorde volgt de visuele volgorde."],"assumptions":["De gekozen woorden zijn begrijpelijk."],"openQuestions":["Welke uitleg is in gebruikersonderzoek nodig?"],"generatedImages":[${image(index, "MOBILE", 0)},${image(index, "DESKTOP", 1)}]}"""
+        private fun idea(index: Int) = """{"action":"${if (index == 1) "REFINE" else "CREATE"}","ideaKey":"${ideaKeyFor(index)}","promise":"Een concrete en onderscheidende productbelofte voor richting $index.","primaryAudience":"De primaire gebruikersgroep van het geselecteerde product.","need":"Een aantoonbare behoefte die onafhankelijk blijft van de eerste oplossing.","reason":"Geselecteerd op productfit, bewijs en leerwaarde.","evidence":"De scouts leverden relevante maar nog onzekere aanwijzingen.","mergedIdeaKeys":[],"selectUx":true,"researchQuestions":["Welke randvoorwaarde bepaalt de haalbaarheid?"]}"""
+
+        private fun ux(index: Int) = """{"summary":"Mobiele en desktopflow voor idee $index.","ideaKey":"${ideaKeyFor(index)}","conceptKey":"${conceptKeyFor(index)}","userGoal":"De gebruiker voltooit zelfstandig een betekenisvol kerndoel.","interaction":"De flow biedt een duidelijke start, keuze, bevestiging en hersteltoestand.","content":"Deterministische interface-tekst met begrijpelijke labels en terugkoppeling.","states":["loading","empty","success","error"],"decisions":["Toetsenbordvolgorde volgt de visuele volgorde."],"assumptions":["De gekozen woorden zijn begrijpelijk."],"openQuestions":["Welke uitleg is in gebruikersonderzoek nodig?"],"generatedImages":[${image(index, "MOBILE", 0)},${image(index, "DESKTOP", 1)}]}"""
 
         private fun image(index: Int, viewport: String, position: Int) = """{"base64Content":"$ONE_PIXEL_PNG","mediaType":"image/png","filename":"concept-$index-${viewport.lowercase()}.png","altText":"$viewport concept voor idee $index","viewport":"$viewport","flowPosition":$position}"""
 
-        private fun feasibility(index: Int) = """{"summary":"Gericht haalbaarheidsonderzoek voor idee $index.","results":[{"ideaKey":"idee-$index","conceptKey":null,"capabilityKey":null,"researchType":"TECHNOLOGY","question":"Welke technische randvoorwaarde bepaalt een veilige proef?","evidence":"Een beperkte technische verkenning toont een uitvoerbare richting met resterende onzekerheid.","sources":["https://example.test/evidence-$index"],"limitations":"Nog niet op productieschaal getest.","confidence":75,"status":"TESTING","conclusion":"De richting is testbaar en niet fundamenteel onmogelijk.","recommendedNextStep":"Voer een begrensde productproef uit.","dependencies":["prototype-omgeving"]}]}"""
+        private fun feasibility(index: Int) = """{"summary":"Gericht haalbaarheidsonderzoek voor idee $index.","results":[{"ideaKey":"${ideaKeyFor(index)}","conceptKey":null,"capabilityKey":null,"researchType":"TECHNOLOGY","question":"Welke technische randvoorwaarde bepaalt een veilige proef?","evidence":"Een beperkte technische verkenning toont een uitvoerbare richting met resterende onzekerheid.","sources":["https://example.test/evidence-$index"],"limitations":"Nog niet op productieschaal getest.","confidence":75,"status":"TESTING","conclusion":"De richting is testbaar en niet fundamenteel onmogelijk.","recommendedNextStep":"Voer een begrensde productproef uit.","dependencies":["prototype-omgeving"]}]}"""
 
         private fun review(approved: Boolean, summary: String) = """{"summary":"$summary","approved":$approved,"revisionRequests":[]}"""
 
