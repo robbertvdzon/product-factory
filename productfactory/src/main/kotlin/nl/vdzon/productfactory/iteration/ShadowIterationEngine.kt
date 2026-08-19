@@ -31,6 +31,22 @@ import java.time.ZoneId
 
 private enum class ShadowRole { RESEARCHER, PRODUCT_OWNER, UX_DESIGNER, STORY_WRITER, CRITIC, SUMMARY }
 
+/**
+ * Losstaand van de promptopbouw testbaar: zonder een expliciete tie-breaker voor meerdere even
+ * ernstige bugs koos een cyclus ooit de admin-only bug (die op een eigenaarsbesluit vastliep) boven
+ * een oudere bug die de kernfunctionaliteit blokkeerde en zelfstandig oplosbaar was.
+ */
+internal val BUG_PRIORITY_GUIDANCE = """
+    BUG-ID EN HARDE PRIORITEIT: zet bugId op het numerieke ID van de bug die de kandidaat oplost, of null
+    voor nieuwe functionaliteit. Zolang in OPEN BUGS een P0 of P1 staat, mag je GEEN nieuwe functionaliteit
+    voorstellen: iedere kandidaat moet dan uitsluitend zo'n P0/P1 oplossen. P0 gaat vóór P1. Staan er meerdere
+    openstaande bugs op hetzelfde P0- of P1-niveau, kies dan de oudste bug (langst open, of reeds vaker
+    waargenomen) — niet degene die toevallig het makkelijkst lijkt. Als er geen P0/P1 is maar wel P2/P3 en je
+    levert drie kandidaten, moet minstens één kandidaat een kleine bug oplossen.
+    Maak niet meer stories dan nodig zijn voor de belangrijke bug; één gerichte story is prima. Kies bij meerdere
+    kleine bugs de oudste/reeds vaker waargenomen bug. Verzin nooit een bug-ID.
+""".trimIndent()
+
 @Component
 class ShadowIterationRunner(
     private val engine: ShadowIterationEngine,
@@ -978,12 +994,7 @@ class ShadowIterationEngine(
         themeId. Past geen enkele open epic echt bij deze kandidaat, zet themeId dan op null. Verzin nooit een ID
         dat niet letterlijk in de roadmap hieronder voorkomt.
 
-        BUG-ID EN HARDE PRIORITEIT: zet bugId op het numerieke ID van de bug die de kandidaat oplost, of null
-        voor nieuwe functionaliteit. Zolang in OPEN BUGS een P0 of P1 staat, mag je GEEN nieuwe functionaliteit
-        voorstellen: iedere kandidaat moet dan uitsluitend zo'n P0/P1 oplossen. P0 gaat vóór P1. Als er geen
-        P0/P1 is maar wel P2/P3 en je levert drie kandidaten, moet minstens één kandidaat een kleine bug oplossen.
-        Maak niet meer stories dan nodig zijn voor de belangrijke bug; één gerichte story is prima. Kies bij meerdere
-        kleine bugs de oudste/reeds vaker waargenomen bug. Verzin nooit een bug-ID.
+        $BUG_PRIORITY_GUIDANCE
 
         AUTONOMIEREGEL: iedere story en ieder acceptatiecriterium moet volledig door Product Factory- en Software
         Factory-agents uitvoerbaar en verifieerbaar zijn. Vraag geen handmatige test, schermlezercontrole, productkeuze,
