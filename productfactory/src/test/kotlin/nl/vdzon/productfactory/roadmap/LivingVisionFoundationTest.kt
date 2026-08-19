@@ -161,6 +161,13 @@ class LivingVisionFoundationTest(
     }
 
     @Test
+    fun `roadmap manager appendix restricts dependencyIds to real epic ids and forbids process artifact references`() {
+        val appendix = LivingVisionRoleCatalog.byKey.getValue("roadmap-manager").appendix.lowercase()
+        assertTrue("dependencyids bevat uitsluitend epicid" in appendix, "Rolbijlage moet dependencyIds beperken tot echte epic-ID's")
+        assertTrue("nooit een handoff-, sessie-, idee-" in appendix, "Rolbijlage moet procesartefact-ID's als dependency expliciet verbieden")
+    }
+
+    @Test
     fun `roadmap manager appendix gives a literal, untranslatable label template for the discovery epic requirement`() {
         val appendix = LivingVisionRoleCatalog.byKey.getValue("roadmap-manager").appendix.lowercase()
         assertTrue("'bewijsdoel: '" in appendix, "Rolbijlage moet de letterlijke aanhef 'Bewijsdoel: ' voorschrijven")
