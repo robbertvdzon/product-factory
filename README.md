@@ -31,6 +31,7 @@ agentproces doorgegeven. De backend kan daardoor taken aanbieden zonder een poor
 publiceren; tijdens slaapstand of uitschakelen rapporteert de backend de worker als offline.
 
 - [Architectuurreferentie](docs/architecture/reference-baseline.md)
+- [Eerste opzet voor Product Factory v2](docs/product-factory-v2-eerste-opzet.md)
 - [Modulegrenzen](docs/architecture/modules.md)
 - [Functioneel overzicht: wat doet een productcyclus precies](docs/architecture/functioneel-overzicht.md)
 - [Productagents in shadow mode](docs/architecture/shadow-mode.md)
