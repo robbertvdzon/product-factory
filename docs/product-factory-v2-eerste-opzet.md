@@ -131,8 +131,8 @@ het product. In de eerste toepassing is dat de eigenaar van het product. De Stak
 productdoel en de harde grenzen, neemt deel aan overleggen en kan de richting corrigeren of werk
 stopzetten.
 
-De Stakeholder is niet hetzelfde als de PO uit proces 3. De PO maakt binnen de afgesproken ruimte de
-dagelijkse keuze voor het volgende werkitem. De Stakeholder hoeft die keuzes niet allemaal vooraf
+De Stakeholder is niet hetzelfde als de PO-rol uit proces 2. De PO onderhoudt binnen de afgesproken
+ruimte de dagelijkse backlogvolgorde. De Stakeholder hoeft die keuzes niet allemaal vooraf
 goed te keuren, maar kan altijd uitleg vragen, bijsturen en de grenzen veranderen.
 
 ### Productdoel
@@ -210,9 +210,9 @@ hetzelfde resultaat nastreven.
 
 ### Story
 
-Een story is een klein stuk zichtbaar gedrag dat Software Factory kan bouwen en testen. Iedere story
-hoort bij precies één epic. Stories worden pas gemaakt wanneer een epic bijna aan de beurt is of al
-actief is.
+Een productstory is een klein stuk zichtbaar gedrag dat Software Factory kan bouwen en testen.
+Iedere productstory hoort bij precies één epic. Stories worden pas gemaakt wanneer een epic bijna
+aan de beurt is of al actief is.
 
 Niet alle stories van een epic worden vooraf uitgeschreven. De eerste bruikbare stap moet duidelijk
 zijn; de rest ontstaat pas wanneer we hebben geleerd van eerder werk.
@@ -225,26 +225,20 @@ rechtstreeks als bugfix worden uitgevoerd en hoeft niet kunstmatig een epic te w
 Als meerdere bugs samen één groter probleem laten zien, kan daar wel een epic uit ontstaan. De losse
 symptomen worden dan niet eindeloos één voor één bestreden.
 
-### Kleine verbetering
+### Backlogitem
 
-Een kleine verbetering is een beperkte, duidelijke verandering, zoals een begrijpelijker foutmelding
-of een beter zichtbaar gemaakte knop. Zij kan rechtstreeks worden uitgevoerd als het probleem, de
-oplossing en de controle duidelijk zijn.
+Een backlogitem is precies één concrete opdracht die Software Factory kan bouwen en testen. Er zijn
+twee soorten backlogitems:
 
-Heeft een verbetering onderzoek, een nieuwe gebruikersroute of meerdere samenhangende veranderingen
-nodig, dan wordt zij een epic en komen er stories uit.
+- een **productstory** uit proces 1 die bij precies één epic hoort;
+- een **bugfix** voor een bug uit proces 3.
 
-### Werkitem
+Een kleine verbetering die geen bug is, wordt als productstory binnen een passende, zo klein
+mogelijke epic uitgewerkt. Daardoor hoeft de interface tussen de processen geen derde soort
+uitvoerbaar werk te kennen.
 
-Een werkitem is precies één concrete opdracht die de PO als volgende aan Software Factory kan geven.
-Er zijn drie soorten werkitems:
-
-- een story die bij een epic hoort;
-- een bugfix;
-- een kleine verbetering.
-
-De PO kiest steeds één volgend werkitem. Zo hoeven we een bugfix geen story te noemen en blijft de
-regel eenvoudig: iedere echte story hoort bij een epic.
+Proces 2 is de enige eigenaar van de geprioriteerde backlog. Een backlogitem verwijst naar de
+oorspronkelijke story of bug, maar kopieert die niet en verandert de bron niet.
 
 ### Leerresultaat
 
@@ -270,7 +264,7 @@ waar een productfeit, besluit of status bestaat.
 Een overleg is een gesprek tussen de Stakeholder en één of meer agents over richting, een open vraag,
 een beslissing of bijsturing. Zowel de Stakeholder als een agent of proces kan een overleg aanvragen.
 
-Een overleg is geen vijfde proces. Het is een gedeeld coördinatiemiddel dat ieder van de vier
+Een overleg is geen vierde proces. Het is een gedeeld coördinatiemiddel dat ieder van de drie
 processen kan gebruiken. De uitkomst wordt als notulen, besluiten, acties en expliciete
 geheugenwijzigingen opgeslagen.
 
@@ -401,100 +395,129 @@ De verre toekomst geeft richting aan de komende stappen. Resultaten van vandaag 
 het droombeeld veranderen. Zo wordt de droom geen los document en wordt de roadmap geen verzameling
 toevallige functies.
 
-## De vier vaste processen
+## De drie vaste processen
 
-Product Factory v2 bestaat uit vier processen die tegelijk kunnen lopen. Ze hebben ieder een andere
-vraag en een ander resultaat.
+Product Factory v2 bestaat uit drie zelfstandige Spring Modulith-modules. Onderzoek en richting en
+het maken van epics en stories vormen samen de module **Productontwikkeling**. Zij gebruiken
+voortdurend dezelfde bewijs-, richting-, UX- en epiccontext; een aparte modulegrens zou vooral een
+kunstmatige, cyclische interface opleveren.
 
-```text
-1. Onderzoek en richting
-   vindt kansen en voedt het droombeeld
-                 ↓
-2. Epics maken en ordenen
-   maakt epics klaar en kiest hun volgorde
-                 ↓
-              actieve epic ──→ stories ──┐
-                                          │
-4. Tester bewaakt kwaliteit ──→ bugs ─────┼──→ 3. PO kiest volgend werkitem
-                                          │              ↓
-                      kleine verbetering ─┘      Software Factory
+Iedere module is voor de andere modules een black box: zij kennen alleen de gepubliceerde
+data-interface en weten niets van agents, prompts, stappen, scores of interne tabellen van een
+andere module.
+
+Iedere procesmodule heeft precies één uitvoerende ingang:
+
+```java
+void runProcessSession();
 ```
 
-De processen geven werk aan elkaar door, maar worden niet één grote cyclus. Onderzoek hoeft
-bijvoorbeeld niet stil te staan terwijl Software Factory een story bouwt.
+Een scheduler roept deze functie aan. Eén aanroep claimt atomair hooguit één product waarvoor werk
+nodig is en voert daarvoor één begrensde processessie uit. Is er niets te doen, dan eindigt de
+aanroep als succesvolle no-op. Andere modules kunnen een proces niet starten en kunnen geen interne
+stappen aanroepen.
+
+De modules delen fysiek één database, maar niet één vrij toegankelijk datamodel. Iedere entiteit
+heeft precies één schrijvende module. Andere modules lezen alleen de gepubliceerde velden via een
+Spring Modulith-interface. Zij schrijven nooit rechtstreeks in de tabellen van een andere module.
+Interne entiteiten en repositories blijven buiten de named interface.
+
+Omdat de informatiestroom terugkoppelingen bevat, zouden directe Java-afhankelijkheden tussen de
+drie procesmodules cycli veroorzaken. Daarom staan alleen de stabiele DTO's en read-only queryports
+in een neutrale technische module `processcontracts`. Iedere eigenaar publiceert daarin een
+geversioneerde databaseprojectie van zijn output. Alle procesmodules mogen `processcontracts`
+gebruiken, maar mogen elkaar niet importeren. `processcontracts` bevat geen productlogica en is geen
+procesmodule.
+
+```text
+1. Productontwikkeling
+   onderzoek + richting + epics + productstories
+                 │
+                 ├───────────────────┐
+                 ▼                   │
+2. Backlog en prioritering ◀── 3. Testen en bugs
+   onderhoudt circa 10 items    publiceert uitvoerbare bugs
+                 │
+                 ▼
+       SoftwareFactoryDispatcher
+                 │
+                 ▼
+         Software Factory
+```
+
+De processen communiceren dus niet met elkaars gedrag. Zij reageren tijdens hun volgende geplande
+sessie op duurzaam opgeslagen gegevens die een andere module heeft gepubliceerd.
+
+De `SoftwareFactoryDispatcher` is geen vierde productproces. Het is een eenvoudige geplande adapter
+binnen de proces-2-module. Hij gebruikt geen agents en neemt geen productbesluiten. Hij verwerkt
+eerst de status van eerder verzonden items. Wanneer Software Factory voor een product geen
+openstaand item meer heeft, verstuurt hij precies het bovenste verzendbare backlogitem en bewaart hij
+het externe Software Factory-ID.
 
 ## Input, status en overdracht tussen de processen
 
-Ieder proces heeft een eigen verantwoordelijkheid, maar geen eigen afgesloten administratie. De
-output van het ene proces wordt als duurzaam productobject opgeslagen en kan daarna input zijn voor
-een ander proces. Een agentrun is alleen de uitvoering van een stap; hij is nooit de enige plek waar
-de actuele status bestaat.
+Ieder proces heeft eigen interne administratie en een kleine gepubliceerde interface. Een agentrun is
+alleen de uitvoering van een stap; hij is nooit de enige plek waar actuele productstatus bestaat.
 
 De hoofdregel is:
 
-> Input wordt gelezen uit benoemde productobjecten, voortgang wordt bijgehouden op het object dat
-> verandert en output wordt pas overgedragen nadat zij duurzaam is opgeslagen en naar haar bron
-> verwijst.
+> Eén module schrijft een entiteit. Andere modules lezen een gepubliceerde, geversioneerde weergave
+> en bewaren alleen een verwijzing naar de bron.
 
-Daardoor kan een proces stoppen en later verdergaan, kan een andere agent het overnemen en blijft
-zichtbaar waarom iets is ontstaan.
+Daardoor kan een proces stoppen en later verdergaan zonder dat een andere module zijn interne
+toestand hoeft te begrijpen.
 
 ### Het totaaloverzicht
 
-| Proces | Belangrijkste input | Waar de status wordt bijgehouden | Duurzame output | Wordt daarna input voor |
-|---|---|---|---|---|
-| 1. Onderzoek en richting | productdoel, harde grenzen, Stakeholderrichting, droombeeld, signalen, gebruiksgegevens, externe bronnen, overleguitkomsten, leerresultaten en structurele bugpatronen | onderzoeksdossiers, bronnen, onderzoeksinzichten, signalen en versies van het droombeeld | onderbouwde inzichten, nieuwe of samengevoegde signalen, aangepast droombeeld en epic-kandidaten | proces 2; gerichte onderzoeksvragen kunnen opnieuw naar proces 1 |
-| 2. Epics maken en ordenen | epic-kandidaten, onderzoeksinzichten, droombeeld, productdoel, Stakeholderrichting, UX-verkenning, technische haalbaarheid en productgezondheid | het epicdossier met epicstatus, bewijs, open vragen, actuele UX-richting, technische risico's, klaar-beoordeling en positie in de roadmap | klaarbeoordeelde en geordende epics, maximaal één actieve epic en de eerstvolgende stories van die epic | proces 3; ontbrekend bewijs gaat als onderzoeksvraag naar proces 1 |
-| 3. De PO kiest het volgende werkitem | stories van de actieve epic, bugs, kleine verbeteringen, Stakeholderbijsturing, afhankelijkheden, urgentie, beschikbare uitvoeringsruimte en resultaten van eerder uitgevoerd werk | het PO-besluitlogboek, de geordende werkitemwachtrij en de uitvoeringsstatus van ieder werkitem | één gekozen werkitem voor Software Factory en een vastgelegde prioriteitsreden; na oplevering ook een controleverzoek en een gekoppeld leerresultaat | Software Factory; na oplevering proces 4 voor controle en processen 1 en 2 voor leren en bijsturen |
-| 4. De tester bewaakt de kwaliteit | werkende applicatie, belangrijkste gebruikersroutes, recente wijzigingen en opleveringen, eerdere bugs, Stakeholdersignalen, risico's en testhistorie | teststrategie, testrotatie, testsessies, bevindingen en de levenscyclus van iedere bug | reproduceerbare bugs, hertestresultaten, kwaliteitsbeeld, epic-controle en signalen over structurele problemen | proces 3 voor prioritering; proces 1 voor structurele signalen; proces 2 voor de beoordeling van een actieve epic |
+| Proces | Gepubliceerde input | Eigen duurzame output | Betekenis voor andere modules |
+|---|---|---|---|
+| 1. Productontwikkeling | productopdracht, Stakeholderrichting, backlogvoorraad, leverings- en verificatieresultaten en kwaliteits- en gebruikerssignalen | droombeeld, epics, epicvolgorde, uitvoerbare productstories en leerresultaten | welke productverandering gekozen en klaar voor uitvoering is |
+| 2. Backlog en prioritering | uitvoerbare productstories, uitvoerbare bugs, productgrenzen en leveringsstatus uit Software Factory | geprioriteerde backlog, prioriteitsbesluiten en backlogvoorraadstatus | welke circa tien opdrachten in welke volgorde klaarstaan |
+| 3. Testen en bugs | testbare productconfiguratie, opleveringen, open en opgeloste bugs, epicdoelen en risicosignalen | bugs, verificatieresultaten, kwaliteitsbeeld en structurele kwaliteitssignalen | wat aantoonbaar niet werkt, wat geverifieerd is en welke patronen aandacht vragen |
 
 ### De overdrachtskaart
 
 ```text
-productdoel + droombeeld + bronnen + signalen + leerresultaten
+productopdracht + signalen + leerresultaten + backlogvoorraad
                               │
                               ▼
-                  1. Onderzoek en richting
+                   1. Productontwikkeling
                               │
-          inzichten + droombeeldwijziging + epic-kandidaten
-                              │
-                              ▼
-                  2. Epics maken en ordenen
-                              │
-                 actieve epic + volgende stories
+                 uitvoerbare productstories
                               │
                               ▼
-                 3. PO kiest één werkitem ◀──── bugs en hertestadvies
+                2. Backlog en prioritering ◀──── uitvoerbare bugs
                               │                              ▲
-                  gekozen werkitem + reden                  │
+                  geprioriteerde backlog                    │
+                              │                              │
+                              ▼                              │
+                SoftwareFactoryDispatcher                   │
                               │                              │
                               ▼                              │
                      Software Factory                       │
                               │                              │
-                  oplevering + uitvoeringsstatus            │
+                   oplevering en status                     │
                               │                              │
                               ▼                              │
-                 4. Tester controleert resultaat ───────────┘
+                    3. Testen en bugs ──────────────────────┘
                               │
-              leerresultaat + kwaliteitsbeeld + bugpatronen
+              verificatie + kwaliteitssignalen
                               │
-             ┌────────────────┴────────────────┐
-             ▼                                 ▼
-  1. Onderzoek en richting         2. Epic beoordelen/bijsturen
+                              ▼
+                   1. Productontwikkeling
 ```
 
-Proces 2 kan bovendien een gerichte onderzoeksvraag teruggeven aan proces 1. Proces 3 kan een
-geblokkeerd werkitem teruggeven aan de bijbehorende epic. Zo is iedere terugkoppeling benoemd en
-verdwijnt zij niet in een algemene agentconversatie.
+Onderzoeksvragen, antwoorden en kansvoorstellen blijven interne overdrachten binnen
+Productontwikkeling. Een lage backlogvoorraad maakt alle drie de processen opnieuw planbaar; er is
+geen rechtstreekse oproep van proces 2 naar de andere processen.
 
 ### Twee soorten status
 
 Er zijn twee soorten status die niet met elkaar verward mogen worden.
 
-**Inhoudelijke productstatus** hoort bij een duurzaam productobject. Voorbeelden zijn de status van
-een epic, de herstelstatus van een bug, de uitvoeringsstatus van een werkitem en de conclusie van een
-onderzoeksdossier. Deze status is de productwaarheid en blijft bestaan wanneer geen enkel proces
-draait.
+**Inhoudelijke productstatus** hoort bij een duurzaam productobject en wordt alleen door de eigenaar
+geschreven. Voorbeelden zijn de epicstatus van proces 1, de backlogstatus van proces 2 en de
+bugstatus van proces 3. Deze status blijft bestaan wanneer geen enkel proces draait.
 
 **Operationele processtatus** vertelt alleen wat de automatisering op dit moment doet. Per proces
 wordt apart bijgehouden:
@@ -510,38 +533,38 @@ productwaarheid. Als een agent crasht tijdens het onderzoeken van een epic, blij
 bijvoorbeeld **Onderzoeken** en vermeldt de operationele status dat de laatste run is mislukt. De
 epic wordt niet automatisch **Geblokkeerd** of **Gestopt**.
 
-De vier processen zelf zijn doorlopend en worden niet **Klaar**. Alleen hun afzonderlijke opdrachten,
+De drie processen zelf zijn doorlopend en worden niet **Klaar**. Alleen hun afzonderlijke opdrachten,
 productobjecten en uitvoeringsruns hebben een status.
 
 ### De duurzame productobjecten
 
-De processen werken minimaal met de volgende gedeelde objecten:
+De processen publiceren minimaal de volgende objecten:
 
 - **Productdoel en harde grenzen** — de vaste opdracht waar alle processen hun keuzes aan toetsen;
 - **Stakeholderrichting** — een expliciete aanwijzing, correctie of grens van de Stakeholder, met
   datum, reden en toepassingsgebied;
-- **Droombeeld** — de actuele verre richting, met een zichtbare versiegeschiedenis;
-- **Onderzoeksdossier** — één onderzoeksvraag met bronnen, voortgang, inzichten en conclusie;
-- **Signaal** — een nog niet beoordeelde aanwijzing uit feedback, onderzoek, gebruik of testen;
+- **Droombeeld** — de actuele verre richting van Productontwikkeling, zichtbaar voor de
+  Stakeholder maar geen overdracht naar een ander proces;
 - **Epic** — een samenhangende gewenste verandering, inclusief bewijs, UX, techniek, status en
   roadmappositie;
-- **Story** — een uitvoerbaar zichtbaar onderdeel van precies één actieve epic;
+- **Productstory** — een uitvoerbaar zichtbaar onderdeel van precies één epic;
 - **Bug** — een reproduceerbare afwijking met bewijs, ernst en herstelstatus;
-- **Kleine verbetering** — beperkt werk dat geen epic nodig heeft;
-- **Werkitem** — de concrete story, bugfix of kleine verbetering die door de PO kan worden gekozen;
-- **PO-besluit** — de keuze van het volgende werkitem met reden en afgevallen alternatieven;
-- **Testsessie** — wat is getest, waarom, met welk resultaat en welke dekking daarna nog ontbreekt;
-- **Opleverresultaat** — wat Software Factory heeft teruggegeven en waar het uitgevoerd kan worden;
-- **Leerresultaat** — wat na onderzoek, bouw of controle anders bekend is dan daarvoor;
+- **Backlogitem** — de verwijzing van proces 2 naar een productstory of bugfix, met prioriteit en
+  uitvoeringsstatus;
+- **Backlogvoorraad** — het aantal verzendbare items en of aanvulling nodig is;
+- **Prioriteitsbesluit** — de geordende backlog met reden en afgevallen alternatieven;
+- **Opleverresultaat** — wat Software Factory heeft teruggegeven en waar het is uitgevoerd;
+- **Verificatieresultaat** — het bewijs van proces 3 dat een oplevering wel of niet werkt;
+- **Kwaliteitssignaal** — een structureel patroon dat proces 1 kan onderzoeken;
+- **Leerresultaat** — door proces 1 gevalideerde productkennis over wat na onderzoek, bouw of
+  controle anders bekend is dan daarvoor;
 - **Overleg** — agenda, deelnemers, berichten, geraadpleegde bronnen, status en gekoppelde objecten;
 - **Overleguitkomst** — notulen met besluiten, open vragen, acties en expliciete geheugenwijzigingen;
-- **Agentgeheugen** — actieve, vervangen en ingetrokken lessen van één herkenbare agent;
-- **Procesgeheugen** — gedeelde werkwijze en ervaring van één van de vier processen;
 - **Productgeheugen** — gedeelde actuele kennis, richting en besluiten voor alle processen.
 
-Deze objecten worden niet voor iedere overdracht gekopieerd. Processen verwijzen naar hetzelfde
-object en voegen hun eigen resultaat eraan toe. Een bug die door de tester is gemaakt, blijft dus
-dezelfde bug wanneer de PO hem prioriteert en Software Factory hem oplost.
+Onderzoeksdossiers, bronnen, testsessies, agents, prompts, afwegingen, procesgeheugen en agentgeheugen
+blijven intern bij hun eigenaar. Een andere module kan wel een gepubliceerde samenvatting lezen, maar
+niet het interne object wijzigen.
 
 ### Regels voor iedere overdracht
 
@@ -549,14 +572,14 @@ Een overdracht tussen processen is pas compleet wanneer:
 
 1. de output duurzaam is opgeslagen;
 2. de bron en aanleiding zichtbaar zijn;
-3. duidelijk is welk proces of welke rol nu eigenaar is van de volgende stap;
-4. de ontvangende wachtrij of het ontvangende object is bijgewerkt;
-5. het producerende proces niet hoeft te blijven draaien om de informatie te behouden.
+3. precies één module eigenaar en schrijver van het object is;
+4. de publieke versie en herkomst expliciet zijn;
+5. een volgende module de informatie via een read-only interface kan ophalen;
+6. het producerende proces niet hoeft te blijven draaien om de informatie te behouden.
 
-Een overdracht kan ook teruggaan. Als proces 2 een epic niet klaar kan verklaren door ontbrekend
-bewijs, maakt het een gerichte onderzoeksvraag voor proces 1. Als proces 4 meerdere verwante bugs
-ziet, maakt het naast de losse bugs een structureel signaal voor proces 1. Zo ontstaat terugkoppeling
-zonder dat verantwoordelijkheden door elkaar gaan lopen.
+Een overdracht kan ook teruggaan. Als proces 3 meerdere verwante bugs ziet, publiceert het naast de
+losse bugs een structureel kwaliteitssignaal voor proces 1. Zo ontstaat terugkoppeling zonder dat
+verantwoordelijkheden door elkaar gaan lopen.
 
 ## Geheugen op drie niveaus
 
@@ -584,13 +607,13 @@ of te ontvangen.
 Procesgeheugen is gedeeld door alle agents die hetzelfde proces uitvoeren. Het bevat kennis die nodig
 is om het proces consequent voort te zetten, bijvoorbeeld:
 
-- de actuele onderzoeksaanpak, bronspreiding en nog onderbelichte onderwerpen van proces 1;
-- terugkerende klaarheidsproblemen en bruikbare vergelijkingsprincipes van proces 2;
-- prioriteringspatronen, capaciteitsafspraken en terugkerende blokkades van proces 3;
-- teststrategie, testrotatie, risicogebieden en dekkingsgaten van proces 4.
+- de actuele onderzoeksaanpak, bronspreiding, epic-klaarheidsproblemen en bruikbare
+  vergelijkingsprincipes van proces 1;
+- prioriteringspatronen, capaciteitsafspraken en terugkerende blokkades van proces 2;
+- teststrategie, testrotatie, risicogebieden en dekkingsgaten van proces 3.
 
 Procesgeheugen bewaart ervaring over **hoe** het proces goed wordt uitgevoerd. De actuele status van
-een epic, werkitem, bug of testsessie blijft op dat productobject staan en wordt niet naar het
+een epic, backlogitem, bug of testsessie blijft op dat productobject staan en wordt niet naar het
 procesgeheugen gekopieerd.
 
 ### 3. Productgeheugen
@@ -651,7 +674,7 @@ kan bestaan uit:
 
 - vragen of onderwerpen van de Stakeholder;
 - een overlegverzoek van een agent of proces;
-- relevante epics, werkitems, bugs, testsessies of onderzoeksdossiers;
+- relevante epics, backlogitems, bugs, testsessies of onderzoeksdossiers;
 - eerdere besluiten en actieve geheugenitems;
 - concrete keuzemogelijkheden met hun gevolgen.
 
@@ -671,222 +694,138 @@ Bij het afsluiten ontstaan leesbare notulen met:
 - de productobjecten en geheugenitems die zijn toegevoegd of aangepast.
 
 Een transcript of samenvatting verandert niet vanzelf de roadmap of het productgeheugen. Iedere
-doorwerking is een expliciete, controleerbare wijziging. Een overleg kan zo tegelijk output leveren
-aan proces 1, een epic in proces 2 bijsturen, een prioriteitsgrens voor proces 3 vastleggen en een
-testopdracht voor proces 4 opleveren.
+doorwerking is een expliciete, controleerbare wijziging. Een overleg kan zo tegelijk een epic in
+proces 1 bijsturen, een prioriteitsgrens voor proces 2 vastleggen en een testopdracht voor proces 3
+opleveren.
 
-## Proces 1 — Onderzoek en richting
+## Proces 1 — Productontwikkeling als black box
 
-Dit proces kijkt breed vooruit en terug. Het gebruikt:
+**Doel:** zelfstandig onderzoeken hoe het product beter kan worden, de verre richting onderhouden,
+kansen omzetten in gekozen epics en voldoende uitvoerbare productstories publiceren om de backlog
+aan te vullen.
 
-- het productdoel en de harde grenzen;
-- het actuele droombeeld;
-- onderzoek naar soortgelijke en aangrenzende producten;
-- gebruikerssignalen en gebruiksgegevens;
-- nieuwe technieken en marktontwikkelingen;
-- bugs en patronen die de tester vindt;
-- leerresultaten van opgeleverd werk.
+Onderzoek, bewijs, kansvoorstellen, UX-verkenning, technische verkenning en epicvorming zijn interne
+onderdelen van dezelfde module. Andere modules zien alleen het gekozen resultaat.
 
-Het proces probeert te begrijpen welke problemen, kansen en toekomstmogelijkheden belangrijk zijn.
-Het levert:
+**Uitvoering:** alleen de scheduler roept `runProcessSession()` aan. De module kiest zelf het product
+en de interne onderzoeks-, epic- of storytaak die op dat moment de meeste waarde heeft.
 
-- onderzoeksinzichten;
-- nieuwe signalen;
-- veranderingen in het droombeeld;
-- mogelijke epic-kandidaten.
+### Inputinterface
 
-Het levert nog geen stories op. Een goed idee of opvallend voorbeeld wordt eerst een epic-kandidaat,
-niet meteen gepland werk.
+| Gegeven | Eigenaar en herkomst | Betekenis voor proces 1 |
+|---|---|---|
+| Productopdracht | productmodule; bevestigd door de Stakeholder | doelgroep, productdoel, harde grenzen, repository en producttoegang |
+| Stakeholderrichting | overleg/productmodule | actuele correcties en expliciete beslissingen |
+| Backlogvoorraad | proces 2 | hoeveel nieuwe uitvoerbare productstories nodig zijn en met welke urgentie |
+| Leverings- en verificatieresultaat | proces 2 en proces 3 | wat eerdere productstories werkelijk hebben opgeleverd |
+| Kwaliteitsbeeld en kwaliteitssignaal | proces 3 | structurele problemen die een epic of bijsturing kunnen rechtvaardigen |
+| Gebruikerssignaal | inbox/productmodule | feedback, observatie of gebruiksgegeven dat onderzoek verdient |
 
-## Proces 2 — Epics maken en ordenen
+Externe bronnen worden tijdens een sessie opgehaald en intern als bronregistratie opgeslagen. Ruwe
+bronnen, onderzoeksdossiers, hypotheses en kansvoorstellen steken de modulegrens niet over.
 
-Dit proces maakt van kansrijke ideeën duidelijke epics en bepaalt welke epic als eerste aan de beurt
-zou moeten komen. Hier zit het meeste langetermijndenken van Product Factory.
+### Outputinterface
 
-### De stappen van het epicproces
+| Gegeven | Betekenis |
+|---|---|
+| Droombeeld | geversioneerd beeld van hoe het product zijn opdracht op lange termijn uitzonderlijk goed kan vervullen; zichtbaar voor de Stakeholder |
+| Epic | gekozen verandering met gewenste uitkomst, bewijs, actuele UX-richting, succescriteria, status en positie |
+| Productstory | klein, zelfstandig bouwbaar en testbaar gedrag met precies één epic, acceptatiecriteria en afhankelijkheden |
+| Leerresultaat | gevalideerde productkennis uit onderzoek, oplevering of verificatie, met bron en reikwijdte |
 
-1. **Verzamelen** — neem epic-kandidaten uit onderzoek, het droombeeld, gebruikerssignalen en
-   structurele kwaliteitsproblemen.
-2. **Samenvoegen** — voorkom dubbele of bijna gelijke epics.
-3. **Kiezen voor onderzoek** — werk niet iedere kandidaat volledig uit.
-4. **Onderzoeken** — controleer probleem, doelgroep, bewijs, mogelijke waarde en alternatieven.
-5. **UX verkennen** — maak de belangrijkste gebruikersroute en onzekerheden duidelijk.
-6. **Techniek verkennen** — laat Software Factory vroeg naar haalbaarheid, risico's en mogelijkheden
-   kijken.
-7. **Kleinste eerste versie bepalen** — kies de kleinste bruikbare of leerzame slice.
-8. **Klaar beoordelen** — controleer of de epic veilig kan starten.
-9. **Ordenen** — vergelijk klaarliggende epics en leg uit welke eerst komt.
-10. **Activeren** — maak alleen de beste epic actief wanneer daar ruimte voor is.
+Een productstory krijgt pas de publieke status **Uitvoerbaar** wanneer Software Factory hem zonder
+interne kennis van Productontwikkeling kan oppakken. Proces 2 mag de inhoud niet herschrijven; het
+bepaalt alleen de plek in de backlog. De interne werking staat in
+[Proces 1 — Productontwikkeling](product-factory-v2-proces-1-productontwikkeling.md).
 
-### De statussen van een epic
+## Proces 2 — Backlog en prioritering als black box
 
-- **Kandidaat** — mogelijk interessant, nog nauwelijks onderzocht;
-- **Onderzoeken** — probleem, bewijs en mogelijkheden worden bekeken;
-- **Uitwerken** — UX, techniek en eerste slice worden duidelijk gemaakt;
-- **Klaar** — kan worden gestart, maar is nog niet actief;
-- **Actief** — levert stap voor stap stories op;
-- **Controleren** — het werk is geleverd en de gewenste uitkomst wordt beoordeeld;
-- **Geslaagd** — de gewenste uitkomst is voldoende bereikt;
-- **Gestopt** — bewust niet verder, met een zichtbare reden.
+**Doel:** voor ieder actief product, te beginnen met HKH, een geprioriteerde voorraad van ongeveer
+tien uitvoerbare backlogitems onderhouden. Een backlogitem is een productstory of bugfix.
 
-### Wanneer een epic klaar is
+**Uitvoering:** alleen de scheduler roept `runProcessSession()` aan. De sessie vult en herordent de
+backlog, maar verstuurt zelf niets naar Software Factory.
 
-Een epic is pas **Klaar** wanneer in gewone taal duidelijk is:
+### Inputinterface
 
-- welk probleem of welke kans wordt aangepakt;
-- voor welke gebruikers;
-- welke gewenste uitkomst er is;
-- hoe de epic bij het productdoel en droombeeld past;
-- welk bewijs er is;
-- wat de actuele UX-richting is;
-- wat technisch lastig of riskant is;
-- hoe we het resultaat gaan controleren;
-- wat de kleinste eerste slice is;
-- welke eerste story uitgevoerd kan worden;
-- welke open vragen nog bestaan en waarom die de start niet blokkeren.
+| Gegeven | Eigenaar en herkomst | Betekenis voor proces 2 |
+|---|---|---|
+| Uitvoerbare productstory | proces 1 | kandidaat voor een nieuw productbacklogitem |
+| Uitvoerbare bug | proces 3 | kandidaat voor een bugfixbacklogitem, inclusief ernst en bewijs |
+| Productopdracht en Stakeholderrichting | productmodule | grenzen en expliciete prioriteitsaanwijzingen |
+| Epic en epicpositie | proces 1 | productwaarde, afhankelijkheden en samenhang van stories |
+| Leveringsstatus | SoftwareFactoryDispatcher | of een eerder verzonden item nog open, opgeleverd of geblokkeerd is |
+| Verificatieresultaat | proces 3 | of geleverd werk werkelijk afgerond kan worden |
 
-Niet alle stories hoeven dan al geschreven te zijn. Alleen de eerste slice en de eerste uitvoerbare
-story moeten duidelijk zijn. De rest wordt pas uitgewerkt wanneer eerdere stories nieuwe informatie
-hebben opgeleverd.
+### Outputinterface
 
-De klaar-beoordeling kijkt met meerdere blikken naar dezelfde epic:
+| Gegeven | Betekenis |
+|---|---|
+| Geprioriteerde backlog | geordende lijst van circa tien verzendbare productstories en bugfixes |
+| Backlogitem | verwijzing naar precies één bronstory of bug, met prioriteit, reden en uitvoeringsstatus |
+| Prioriteitsbesluit | uitlegbare vastlegging waarom een item boven alternatieven staat |
+| Backlogvoorraad | aantallen per status en de vlag `aanvullingNodig` |
 
-- onderzoek: is het probleem echt en is de bron betrouwbaar;
-- product: draagt dit genoeg bij aan het productdoel;
-- visie: brengt dit ons in de richting van het droombeeld;
-- UX: begrijpen we de belangrijkste gebruikerservaring;
-- techniek: bestaat er een aannemelijke en veilige bouwroute;
-- kritiek: zijn risico's, onzekerheden en afgevallen alternatieven eerlijk beschreven.
+De standaard lage grens is vier verzendbare items en het streefpeil is tien. Zodra de voorraad op
+vier of lager komt, wordt `aanvullingNodig` waar en maakt de scheduler alle drie processen opnieuw
+planbaar.
+De grens en het streefpeil zijn productconfiguratie; HKH start met vier en tien.
 
-De gebruiker hoeft de interne agents niet te zien. Het zichtbare resultaat is eenvoudig:
+Proces 2 is de enige schrijver van backlogvolgorde en backlogstatus. De interne werking en de
+dispatcher staan in
+[Proces 2 — Backlog en prioritering](product-factory-v2-proces-2-backlog-en-prioritering.md).
 
-> Deze epic is klaar, omdat …
+## Proces 3 — Testen en bugs als black box
 
-of:
+**Doel:** de werkende applicatie voortdurend onderzoeken, opleveringen verifiëren en aantoonbare
+afwijkingen als uitvoerbare bugs publiceren.
 
-> Deze epic is nog niet klaar, omdat …
+**Uitvoering:** alleen de scheduler roept `runProcessSession()` aan. De module kiest zelf één product
+en een begrensde testsessie op basis van opleveringen, risico en testrotatie.
 
-### Welke epic gaat eerst
+### Inputinterface
 
-Product Factory vergelijkt klaarliggende epics op:
+| Gegeven | Eigenaar en herkomst | Betekenis voor proces 3 |
+|---|---|---|
+| Testbare productconfiguratie | productmodule | URL's, toegestane accounts, routes en testgrenzen |
+| Oplevering en externe storyreferentie | SoftwareFactoryDispatcher | wat nieuw of gewijzigd is en waar het getest kan worden |
+| Epic en productstory | proces 1 | gewenst gedrag, succescriteria en acceptatiecriteria |
+| Backlog- en uitvoeringsstatus | proces 2 | welke bugfixes of stories wachten, bezig of geleverd zijn |
+| Bestaande bugs | proces 3 zelf | wat moet worden hergetest en welke patronen al bekend zijn |
+| Stakeholdersignaal | inbox/productmodule | gemelde problemen of risicogebieden |
 
-- waarde voor gebruikers;
-- bijdrage aan het productdoel en droombeeld;
-- sterkte van het bewijs;
-- urgentie;
-- risico en omkeerbaarheid;
-- verwachte hoeveelheid werk;
-- afhankelijkheden;
-- hoeveel we ervan kunnen leren;
-- welk later werk hierdoor mogelijk wordt;
-- de gezondheid van het huidige product.
+### Outputinterface
 
-Een score mag helpen ordenen, maar beslist niet zelfstandig. Product Factory geeft een korte
-vergelijking, bijvoorbeeld:
+| Gegeven | Betekenis |
+|---|---|
+| Bug | reproduceerbare afwijking met verwacht en werkelijk gedrag, bewijs, impact, ernst en herstelstatus |
+| Verificatieresultaat | oordeel met bewijs over een oplevering of bugfix: geslaagd, afgekeurd of geblokkeerd |
+| Kwaliteitsbeeld | actuele samenvatting van dekking, belangrijke risico's en recent onderzochte gebieden |
+| Kwaliteitssignaal | structureel patroon dat proces 1 en 2 als productprobleem kunnen onderzoeken |
 
-> Epic A gaat vóór epic B. A lost een bewezen dagelijks probleem op, maakt twee latere epics mogelijk
-> en kan klein worden gestart. B kan uiteindelijk meer waarde hebben, maar de belangrijkste aanname
-> is nog niet onderzocht.
+Proces 3 bepaalt ernst en bewijs, maar niet de backlogpositie. Proces 2 prioriteert een gepubliceerde
+bug tussen de productstories. De interne werking staat in
+[Proces 3 — Testen en bugs](product-factory-v2-proces-3-testen-en-bugs.md).
 
-Normaal heeft een product:
+## Hoe de drie processen elkaar in beweging houden
 
-- maximaal één actieve epic;
-- maximaal één epic die uitgebreid wordt onderzocht of uitgewerkt;
-- een kleine geordende lijst met klaarliggende epics;
-- alle overige ideeën als kandidaten.
+De processen vormen geen synchrone keten en roepen elkaar niet aan. Iedere module leest tijdens een
+geplande sessie de nieuwste gepubliceerde gegevens:
 
-Zo kan het epicproces de volgende richting voorbereiden terwijl de actieve epic wordt gebouwd, zonder
-veel toekomstig werk onnodig volledig uit te schrijven.
-
-## Proces 3 — De PO kiest het volgende werkitem
-
-De Product Owner, afgekort PO, kan een persoon of een begrensd AI-proces zijn. De PO bepaalt wat
-Software Factory als volgende oppakt zodra daar ruimte voor is.
-
-De PO kiest uit drie soorten werkitems:
-
-- een story uit de actieve epic;
-- een bugfix uit de bugwachtrij;
-- een kleine algemene verbetering.
-
-De PO bekijkt daarbij:
-
-1. Is er een kritieke bug die alles moet onderbreken?
-2. Is er een belangrijke bug die nu zwaarder weegt dan doorgaan met de epic?
-3. Wat is de beste niet-geblokkeerde story uit de actieve epic?
-4. Is er een kleine verbetering die nu veel waarde geeft of een blokkade wegneemt?
-5. Welk werkitem past binnen de afgesproken grens voor werk dat tegelijk bezig is?
-
-De PO geeft steeds precies één volgend werkitem aan Software Factory en legt kort uit waarom dit item
-nu voorrang krijgt. De PO bepaalt niet in zijn eentje de verre productrichting; daarvoor gebruikt hij
-de geordende epics uit proces 2.
-
-Een simpele standaard voor bugs is:
-
-- **P0** — ernstig veiligheidsprobleem, dataverlies of het product is onbruikbaar: onderbreekt alles;
-- **P1** — een belangrijke gebruikersroute werkt niet: gaat meestal voor de volgende epic-story;
-- **P2** — duidelijke fout met een omweg: wordt tegen de actieve epic afgewogen;
-- **P3** — klein of beperkt ongemak: wordt gepland zonder de epic voortdurend te verstoren.
-
-De PO bewaakt ook dat bugs niet alle vernieuwing verdringen en dat de actieve epic niet alle
-productgezondheid verdringt.
-
-Binnen het productdoel en de harde grenzen mag een AI-PO gewone, omkeerbare keuzes zelf maken. Hij
-legt de keuze en afgevallen alternatieven vast. Bij een dure, gevoelige, moeilijk terug te draaien of
-doelveranderende keuze vraagt hij eerst hulp.
-
-## Proces 4 — De tester bewaakt de kwaliteit
-
-De tester kan ook een persoon of een AI-proces zijn. Hij test de applicatie voortdurend, met
-bijvoorbeeld iedere dag een nieuwe testsessie en extra controles na een oplevering.
-
-Niet iedere testsessie doet exact hetzelfde. De tester onderhoudt een overzicht van wat recent is
-getest en wisselt onder andere tussen:
-
-- de belangrijkste gebruikersroutes;
-- nieuw of recent veranderd gedrag;
-- eerder opgeloste bugs;
-- verschillende schermgroottes en mobiel gebruik;
-- toegankelijkheid;
-- lege, langzame en foutsituaties;
-- performance;
-- beveiliging en privacy;
-- vrij onderzoekend testen op onverwacht gedrag.
-
-Een gevonden bug bevat minimaal:
-
-- wat er misgaat;
-- wat er eigenlijk had moeten gebeuren;
-- hoe de fout opnieuw kan worden veroorzaakt;
-- waar en wanneer de fout is gevonden;
-- screenshot, log of ander bewijs;
-- welke gebruikers geraakt worden;
-- een voorgestelde ernst van P0 tot en met P3.
-
-De tester bepaalt niet welk werk als volgende wordt uitgevoerd. Hij levert betrouwbare bugs aan de
-PO. De PO weegt die af tegen de stories van de actieve epic.
-
-Wanneer de tester meerdere bugs vindt die op hetzelfde grotere probleem wijzen, stuurt hij ook een
-signaal naar proces 1. Daar kan vervolgens een UX-, betrouwbaarheids- of technische epic uit ontstaan.
-
-## Hoe de vier processen elkaar in beweging houden
-
-De processen vormen samen geen vaste trein die altijd helemaal van links naar rechts moet. Ze houden
-elkaar voortdurend op de hoogte:
-
-- onderzoek kan een nieuwe epic-kandidaat opleveren;
-- het epicproces kan om gericht nieuw onderzoek vragen;
-- de PO kan melden dat stories steeds geblokkeerd raken;
+- Productontwikkeling kan intern nieuw onderzoek naar een epic of story laten doorstromen;
+- proces 2 kan via de backlogvoorraad zichtbaar maken dat aanvulling nodig is;
 - de tester kan een losse bug of een structureel productprobleem vinden;
 - opgeleverde stories kunnen het droombeeld of de epicvolgorde veranderen;
 - een afgeronde epic levert altijd een leerresultaat op.
 
-Zo blijft Product Factory tegelijk dromen, vooruitkijken, dagelijks sturen en de bestaande software
-bewaken.
+Als HKH vier of minder verzendbare backlogitems over heeft, plant de scheduler nieuwe sessies voor
+alle drie de processen. Proces 1 onderzoekt en maakt voldoende stories uitvoerbaar, proces 3 vult zo
+nodig bugs aan en proces 2 brengt de voorraad terug naar ongeveer tien. Een module mag ook op haar
+normale ritme draaien en eindigt zonder wijziging wanneer er niets nuttigs te doen is.
 
 ## Hoe de roadmap werkt
 
-De roadmap is alleen voor epics. Losse ideeën, bugs en kleine verbeteringen staan er niet tussen.
+De roadmap is alleen voor epics. Losse ideeën, bugs en productstories staan er niet tussen.
 
 De roadmap heeft vier eenvoudige vakken:
 
@@ -910,8 +849,8 @@ De volgorde komt vooral uit:
 Product Factory legt de afweging uit. Een ondoorzichtige score beslist niet zelfstandig wat er moet
 gebeuren.
 
-Bugs en kleine verbeteringen staan naast de roadmap in **Productgezondheid**. Daardoor blijft
-duidelijk welk werk het huidige product gezond houdt en welke epics het product verder brengen.
+Bugs staan naast de roadmap in **Productgezondheid**. Proces 2 brengt productstories en bugfixes pas
+samen in de geprioriteerde backlog.
 
 ## Hoe ideeën worden behandeld
 
@@ -927,16 +866,16 @@ Daarna kan een idee vier kanten op:
 - bewaren voor later;
 - samenvoegen met een bestaand idee;
 - afwijzen, met een korte reden;
-- uitwerken tot een epic-kandidaat.
+- door proces 1 uitwerken tot een kansvoorstel.
 
 Een agent mag ideeën onderzoeken en vergelijken. De agent mag niet doen alsof een mooi geschreven
 idee daarom automatisch een goed productbesluit is.
 
 ## Hoe UX-ontwerpen worden behandeld
 
-UX is geen losse verzameling documenten. Een UX-uitwerking hoort altijd bij één epic, één kleine
-verbetering of één duidelijk benoemd onderdeel van het droombeeld. Een bug verwijst normaal naar het
-bestaande gedrag dat had moeten werken.
+UX is geen losse verzameling documenten. Een UX-uitwerking hoort altijd bij één epic of één duidelijk
+benoemd onderdeel van het droombeeld. Een bug verwijst normaal naar het bestaande gedrag dat had
+moeten werken.
 
 Een UX-uitwerking laat minimaal zien:
 
@@ -963,19 +902,23 @@ De Stakeholder kan daarop reageren voordat er wordt gebouwd.
 
 ## Eén gezamenlijke werkstroom
 
-Epics, dagelijks productbeheer en testen komen samen bij de PO:
+Productstories en bugs komen samen in één duurzame backlog:
 
 ```text
-Actieve epic ──→ story ─────────┐
-                                │
-Tester ────────→ bugfix ────────┼──→ PO kiest één werkitem
-                                │              ↓
-Productgezondheid → verbetering ┘      Software Factory
+Proces 1 ──→ productstory ──┐
+                            ├──→ Proces 2 ──→ geprioriteerde backlog (circa 10)
+Proces 3 ──→ bug ───────────┘                         │
+                                                      ▼
+                                      SoftwareFactoryDispatcher
+                                                      │
+                                                      ▼
+                                             Software Factory
 ```
 
-Er gaat normaal maar één nieuw werkitem tegelijk naar Software Factory. Pas wanneer daar weer ruimte
-is, kiest de PO het volgende. Ieder resultaat gaat terug naar de epic, de bugwachtrij, het onderzoek
-en het productgeheugen waar het bij hoort.
+De dispatcher synchroniseert eerst eerder verstuurd werk. Alleen wanneer Software Factory voor het
+product geen openstaand item heeft, verstuurt hij precies het bovenste verzendbare backlogitem. Hij
+kan geen item overslaan of de prioriteit wijzigen. De volgende geplande processessie verwerkt de
+duurzaam opgeslagen leverings- en verificatieresultaten.
 
 ## Wat de Stakeholder doet en wat agents doen
 
@@ -989,7 +932,7 @@ Agents helpen met:
 - beoordelen of een epic klaar is;
 - een gebruikersroute en eerste epic-slice uitwerken;
 - stories voor de actieve epic schrijven;
-- als PO het volgende werkitem kiezen;
+- als PO een gevulde, geprioriteerde backlog onderhouden;
 - als tester dagelijks en na opleveringen de applicatie onderzoeken;
 - een opgeleverd resultaat beoordelen;
 - ontbrekende informatie aanwijzen.
@@ -1002,7 +945,7 @@ De Stakeholder blijft verantwoordelijk voor:
 - gevoelige gegevens en externe toegang.
 
 Product Factory is binnen die opdracht verantwoordelijk voor het actuele droombeeld, onderzoek, het
-epicportfolio, de epicvolgorde, de PO-keuzes, het testproces en de balans tussen Verbeteren en
+epicportfolio, de epicvolgorde, de backlogkeuzes, het testproces en de balans tussen Verbeteren en
 Vernieuwen. Zij legt deze keuzes uit en maakt ze zichtbaar, zodat de Stakeholder kan ingrijpen zonder
 ieder stapje te hoeven besturen.
 
@@ -1040,7 +983,8 @@ Hier zie je in één oogopslag:
 
 - het productdoel en een korte versie van het droombeeld;
 - welke epic actief is en waarom;
-- welk werkitem de PO als volgende heeft gekozen;
+- welk backlogitem bovenaan staat en waarom;
+- hoeveel verzendbare backlogitems nog klaarstaan;
 - wat bij Software Factory bezig is;
 - welke belangrijke bugs openstaan;
 - wanneer en wat de tester voor het laatst heeft getest;
@@ -1048,12 +992,12 @@ Hier zie je in één oogopslag:
 - wat recent onderzoek heeft veranderd;
 - of ergens hulp nodig is;
 - welke overleggen zijn aangevraagd of openstaan;
-- welke recente Stakeholderrichting de vier processen beïnvloedt.
+- welke recente Stakeholderrichting de drie processen beïnvloedt.
 
 ### 2. Inbox
 
 Hier staan nieuwe feedback, observaties, ideeën en onderzoeksinzichten. Je kunt ze bekijken,
-samenvoegen, afwijzen of laten uitwerken tot een epic-kandidaat. Bugs komen vanuit het testproces in
+samenvoegen, afwijzen of door Productontwikkeling laten onderzoeken. Bugs komen vanuit het testproces in
 de aparte productgezondheidslijst.
 
 ### 3. Plan
@@ -1062,20 +1006,21 @@ Hier staan drie onderdelen bij elkaar:
 
 - het droombeeld als verre richting;
 - de epic-roadmap met Nu, Hierna en Later;
-- Productgezondheid met bugs en kleine verbeteringen.
+- Productgezondheid met bugs;
+- de geprioriteerde backlog met productstories en bugfixes.
 
 Ook is zichtbaar welke epic wordt onderzocht, waarom epics wel of niet klaar zijn en hoe Product
 Factory de klaarliggende epics heeft geordend.
 
 ### 4. Detail
 
-Een epic, story, bug of kleine verbetering heeft één rustige detailpagina met:
+Een epic, productstory, bug of backlogitem heeft één rustige detailpagina met:
 
 - probleem en gewenste uitkomst;
 - bewijs en open vragen;
 - actuele UX-uitwerking, als die nodig is;
 - eventuele bovenliggende epic en relevante storyrelaties;
-- reden van de PO-prioriteit;
+- reden van de backlogprioriteit;
 - voortgang en resultaat;
 - beslissingen en leerresultaten.
 
@@ -1085,20 +1030,22 @@ Overleggen en geheugen hoeven geen extra hoofdscherm te worden. Vanuit Product e
 Stakeholder een overleg openen of starten. Een aparte secundaire weergave toont alle overleggen en de
 geschiedenis van agent-, proces- en productgeheugen, inclusief vervangen en ingetrokken items.
 
-## Eenvoudige statussen voor werkitems
+## Eenvoudige statussen voor backlogitems
 
-Epic-statussen staan bij proces 2. Uitvoerbare stories, bugfixes en kleine verbeteringen gebruiken een
-kortere reeks:
+Epic-statussen worden door proces 1 beheerd. Backlogitems van proces 2 gebruiken een eigen korte
+reeks:
 
-- **Klaar** — duidelijk genoeg om uitgevoerd te worden;
-- **In wachtrij** — de PO heeft het item gekozen;
-- **Bezig** — Software Factory werkt eraan;
-- **Controleren** — opgeleverd, maar nog niet bewezen;
-- **Afgerond** — werkt zoals bedoeld;
+- **Verzendbaar** — compleet en geprioriteerd in de backlog;
+- **Verstuurd** — door de dispatcher in Software Factory aangemaakt;
+- **Bezig** — Software Factory meldt dat eraan wordt gewerkt;
+- **Opgeleverd** — Software Factory heeft het resultaat teruggegeven;
+- **Controleren** — proces 3 moet het resultaat nog bewijzen;
+- **Afgerond** — proces 3 heeft het resultaat goedgekeurd;
 - **Geblokkeerd** — kan niet verder, met een zichtbare reden;
 - **Gestopt** — bewust niet verder, met een zichtbare reden.
 
-Een status beschrijft de toestand van het werk. Een agentnaam of processtap is geen productstatus.
+Alleen proces 2 schrijft deze backlogstatus. Een story houdt daarnaast zijn inhoudelijke status in
+proces 1 en een bug zijn herstelstatus in proces 3.
 
 ## Regels die versie 2 eenvoudig houden
 
@@ -1109,10 +1056,10 @@ Een status beschrijft de toestand van het werk. Een agentnaam of processtap is g
 5. De roadmap bevat epics, geen losse stories, bugs of ideeën.
 6. Iedere story hoort bij precies één epic.
 7. Stories ontstaan pas wanneer een epic bijna aan de beurt is of actief is.
-8. Een bugfix en kleine verbetering mogen rechtstreeks een werkitem zijn.
-9. De PO kiest steeds het volgende werkitem; het epicproces kiest de productrichting.
+8. De backlog bevat alleen productstories en bugfixes.
+9. Proces 2 beheert ongeveer tien geprioriteerde backlogitems; proces 1 kiest de productrichting.
 10. De tester levert bewijs en ernst, maar bepaalt niet de uitvoeringsvolgorde.
-11. Ieder UX-ontwerp hoort bij één epic, kleine verbetering of benoemd droomconcept.
+11. Ieder UX-ontwerp hoort bij één epic of benoemd droomconcept.
 12. Een droomconcept is nooit stilletjes een gepland ontwerp.
 13. Per onderwerp is maar één UX-versie actueel.
 14. We bouwen kleine stappen en leren na iedere oplevering.
@@ -1127,6 +1074,12 @@ Een status beschrijft de toestand van het werk. Een agentnaam of processtap is g
 23. Het gewone scherm toont producttaal, geen interne agent- of databasetaal.
 24. Nieuwe functies komen alleen in Product Factory als ze een hoofdvraag aantoonbaar eenvoudiger
     maken.
+25. Iedere intelligente procesmodule heeft alleen `runProcessSession()` als agentgestuurde ingang;
+    de dispatcher is een afzonderlijke technische adapter zonder productlogica.
+26. Iedere gepubliceerde entiteit heeft precies één schrijvende module.
+27. Andere modules lezen gegevens alleen via de gepubliceerde Spring Modulith-interface.
+28. De dispatcher neemt geen productbesluiten en verstuurt alleen het bovenste backlogitem.
+29. Als HKH vier of minder verzendbare items heeft, worden nieuwe processessies planbaar gemaakt.
 
 ## Wat we uit versie 1 willen behouden
 
@@ -1135,6 +1088,7 @@ De tweede versie hoeft niet alles opnieuw uit te vinden. Waardevolle lessen en o
 - een product kan als gegevens worden toegevoegd, zonder nieuwe productcode in Product Factory;
 - Product Factory en Software Factory hebben ieder een duidelijke taak;
 - weinig werk tegelijk geeft rust en maakt prioriteiten echt;
+- een gevulde backlog voorkomt dat Software Factory op nieuw productwerk hoeft te wachten;
 - beslissingen en resultaten moeten terug te vinden zijn;
 - opgeleverd werk moet nieuwe productkennis opleveren;
 - tokens en andere geheimen horen niet in gewone productgegevens;
@@ -1153,7 +1107,7 @@ We nemen niet standaard mee:
 
 - shadow-iteraties als zichtbaar productbegrip;
 - meerdere concurrerende manieren om een roadmap te maken;
-- automatisch periodiek nieuwe stories maken zonder een duidelijke keuze;
+- periodiek nieuwe stories maken zonder backlogvraag, duidelijke epic of productkeuze;
 - het oude epicmodel met capabilities, horizons, meerdere ranks en scores tegelijk;
 - agents als hoofdnavigatie;
 - ruwe agentuitvoer als normaal productdocument;
@@ -1165,42 +1119,46 @@ Ieder onderdeel uit versie 1 moet opnieuw bewijzen dat het nodig is.
 
 ## De kleinste bruikbare versie
 
-De eerste bruikbare versie moet meteen bewijzen dat de vier processen samen werken. Zij hoeft nog
+De eerste bruikbare versie moet meteen bewijzen dat de drie processen samen werken. Zij hoeft nog
 niet iedere mogelijke bron of vorm van automatisering te ondersteunen.
 
-### Minimaal voor proces 1 — Onderzoek en richting
+### Minimaal voor proces 1 — Productontwikkeling
 
 1. een product met een breed productdoel en harde grenzen vastleggen;
 2. zelf onderzoek naar soortgelijke en aangrenzende producten starten;
 3. bronnen en bruikbare onderzoeksinzichten bewaren;
 4. een ambitieus droombeeld maken en met nieuw bewijs aanpassen;
-5. vanuit onderzoek, signalen en het droombeeld epic-kandidaten maken.
+5. intern kansen onderzoeken en tot epics uitwerken;
+6. één actuele UX-richting en kleinste eerste slice maken;
+7. vroeg technische haalbaarheidsinformatie gebruiken;
+8. zichtbaar beoordelen of een epic klaar is;
+9. maximaal één epic actief maken;
+10. voldoende uitvoerbare productstories publiceren om de backlog aan te vullen.
 
-### Minimaal voor proces 2 — Epics maken en ordenen
+### Minimaal voor proces 2 — Backlog en prioritering
 
-1. één epic-kandidaat onderzoeken en uitwerken;
-2. één actuele UX-richting en kleinste eerste slice maken;
-3. vroeg technische haalbaarheidsinformatie van Software Factory gebruiken;
-4. zichtbaar beoordelen of de epic klaar is;
-5. twee klaarliggende epics begrijpelijk met elkaar vergelijken;
-6. maximaal één epic actief maken;
-7. voor de actieve epic alleen de eerstvolgende nodige stories maken.
+1. kiezen uit uitvoerbare productstories en bugs;
+2. ernst, waarde, afhankelijkheden, blokkades en actueel werk meewegen;
+3. een uitlegbaar geprioriteerde backlog van ongeveer tien items onderhouden;
+4. bij vier of minder verzendbare items `aanvullingNodig` publiceren;
+5. leverings- en verificatiestatus verwerken zonder bronentiteiten te wijzigen;
+6. via de eenvoudige dispatcher precies één item tegelijk naar Software Factory sturen.
 
-### Minimaal voor proces 3 — De PO kiest het volgende werkitem
-
-1. kiezen uit een epic-story, bugfix of kleine verbetering;
-2. ernst, waarde, blokkades en werk-in-uitvoering meewegen;
-3. precies één volgend werkitem met een korte reden aanwijzen;
-4. dit werkitem naar Software Factory sturen;
-5. het resultaat ophalen en terugkoppelen naar de juiste epic, bug of verbetering.
-
-### Minimaal voor proces 4 — De tester bewaakt de kwaliteit
+### Minimaal voor proces 3 — Testen en bugs
 
 1. iedere dag en na een oplevering een gerichte testsessie kunnen starten;
 2. belangrijke routes en wisselende onderzoeksthema's bijhouden;
 3. een reproduceerbare bug met bewijs en voorgestelde ernst maken;
-4. de bug aan de PO aanbieden;
-5. patronen van meerdere bugs als signaal naar onderzoek en het epicproces sturen.
+4. de bug als uitvoerbare input voor proces 2 publiceren;
+5. patronen van meerdere bugs als kwaliteitssignaal naar proces 1 sturen.
+
+### Minimaal voor de SoftwareFactoryDispatcher
+
+1. op een vast ritme de status van eerder verstuurde backlogitems synchroniseren;
+2. het externe Software Factory-ID bij het backlogitem bewaren;
+3. geen nieuw item sturen zolang Software Factory voor het product nog openstaand werk heeft;
+4. anders precies het bovenste verzendbare item aanmaken;
+5. geen agents, herordening of productbesluit bevatten.
 
 ### Minimaal voor overleggen en geheugen
 
@@ -1226,8 +1184,8 @@ De Stakeholder moet zonder technische uitleg binnen één minuut antwoord kunnen
 4. Welke epic is actief en waarom juist deze?
 5. Welke epic staat hierna klaar en waarom?
 6. Waarom is een epic wel of nog niet klaar?
-7. Welk werkitem heeft de PO als volgende gekozen?
-8. Is dat een story, bugfix of kleine verbetering?
+7. Welk backlogitem staat bovenaan en waarom?
+8. Is dat een productstory of bugfix?
 9. Bij welke epic hoort een story?
 10. Wat heeft de tester recent onderzocht en gevonden?
 11. Wat is het actuele UX-ontwerp en is het een droomconcept of een bouwplan?
@@ -1237,6 +1195,8 @@ De Stakeholder moet zonder technische uitleg binnen één minuut antwoord kunnen
 15. Welk overleg is aangevraagd, waarom en door welke rol?
 16. Wat heeft een agent of proces onthouden en wat geldt als gedeelde productwaarheid?
 17. Welke van mijn eerdere aanwijzingen zijn nog actief, vervangen of ingetrokken?
+18. Hoeveel verzendbare backlogitems staan voor HKH klaar?
+19. Welk backlogitem staat open in Software Factory en wat is de laatste leveringsstatus?
 
 Als die antwoorden verspreid staan over meerdere schermen, documenten of agentruns, is het ontwerp
 nog niet eenvoudig genoeg.
@@ -1252,15 +1212,14 @@ Voordat we gaan bouwen, moeten we nog samen kiezen:
 - Hoe ver en hoe wild mag het droombeeld gaan?
 - Wanneer is er genoeg bewijs om het droombeeld wezenlijk te veranderen?
 - Welke harde voorwaarden moet iedere epic doorlopen voordat zij Klaar wordt?
-- Wie of welk AI-proces mag de definitieve epicvolgorde veranderen?
 - Wanneer mag een actieve epic worden onderbroken of gestopt?
-- Hoe vaak kiest de PO opnieuw: na iedere oplevering, bij een kritieke bug of ook op vaste momenten?
-- Hoe bepaalt de PO de normale balans tussen epic-stories, bugs en kleine verbeteringen?
+- Hoe vaak moet proces 2 naast de lage-voorraadtrigger opnieuw prioriteren?
+- Hoe bepaalt proces 2 de normale balans tussen productstories en bugfixes?
 - Welke delen van de applicatie test de tester iedere dag en welke in een langere roulatie?
-- Wanneer worden meerdere losse bugs samen een epic-kandidaat?
+- Wanneer worden meerdere losse bugs samen een intern kansvoorstel voor Productontwikkeling?
 - Welke UX-vorm is minimaal nodig voordat nieuwe zichtbare functionaliteit gebouwd mag worden?
 - Welke gegevens uit versie 1 zijn echt waardevol genoeg om over te nemen?
-- Welke langlevende agents krijgt ieder proces minimaal en wanneer mag een agent worden vervangen?
+- Wanneer mag een langlevende agent worden vervangen en wat gebeurt dan met zijn geheugen?
 - Welke lessen horen in agentgeheugen en wanneer moeten zij naar proces- of productgeheugen worden
   gepromoveerd?
 - Wie mag proces- en productgeheugen activeren, vervangen of intrekken?
@@ -1270,3 +1229,12 @@ Voordat we gaan bouwen, moeten we nog samen kiezen:
 - Bouwen we v2 in deze repository naast v1, of eerst in een aparte repository?
 
 Deze keuzes moeten eerst in gewone taal beantwoord zijn. Daarna pas maken we het technische ontwerp.
+
+## Uitwerking per procesmodule
+
+De black-boxinterfaces hierboven zijn leidend. De interne agents, volgorde, parallelle stappen,
+interne entiteiten en sessieregels staan in drie afzonderlijke documenten:
+
+- [Proces 1 — Productontwikkeling](product-factory-v2-proces-1-productontwikkeling.md)
+- [Proces 2 — Backlog en prioritering](product-factory-v2-proces-2-backlog-en-prioritering.md)
+- [Proces 3 — Testen en bugs](product-factory-v2-proces-3-testen-en-bugs.md)
