@@ -19,6 +19,8 @@ kaart bij de afzonderlijke procesdocumenten en beantwoordt per publiek contract 
 - Een lezer bewaart hoogstens de bron-ID en gebruikte bronversie bij zijn eigen entiteiten.
 - Een nieuwe publicatie vervangt een eerdere versie niet stilzwijgend; versies en herkomst blijven
   herleidbaar.
+- Een besluit heeft een expliciete geldigheidsperiode. Intrekken of vervangen sluit het oude besluit
+  met een einddatum, maar herschrijft de oorspronkelijke inhoud niet.
 - Procesmodules importeren elkaars interne code en tabellen niet.
 - De frontend leest actuele en historische productgegevens uit de database.
 
@@ -70,13 +72,30 @@ Deze contracten komen van ondersteunende modules buiten de drie intelligente pro
 | `UserSignalDispositionView` | productmodule bij ontvangst van het signaal | productmodule, mechanisch afgeleid uit gekoppelde procesresultaten | Productontwerp, Kwaliteitsbewaking, Stakeholder en productbediening | toont nieuw, onderzocht, gekoppeld, duplicaat, onvoldoende bewijs of buiten scope plus bronverwijzingen; wijzigt het signaal niet |
 | `TestableProductView` | productmodule bij het configureren van testtoegang | productmodule | Kwaliteitsbewaking | omgevingen, routes, accounts, databereik en testgrenzen |
 
+### Contract van het Besluitenregister
+
+Het Besluitenregister is een ondersteunende module zonder agents of geplande procesfunctie. De
+bevoegde bronmodule neemt het besluit; het Besluitenregister maakt en beheert de centrale registratie.
+
+| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
+|---|---|---|---|---|
+| `DecisionRecordView` | Besluitenregister na een idempotent registratieverzoek van Productontwerp, Productplanning of product-/overlegmodule | Besluitenregister; inhoud na registratie onveranderlijk, alleen levenscyclusvelden mogen door het register worden gesloten | productmodule, Productontwerp, Productplanning, Kwaliteitsbewaking, Stakeholder en productbediening | betekenisvolle keuze met `decisionKey`, onderbouwing, alternatieven, bronversies, beslisser, toepassingsgebied, `validFrom`, optionele `validUntil`, status en vervangingsrelaties; geen ruwe agentredenering |
+
+Bij een vervangend besluit maakt het register het nieuwe record en zet het in dezelfde transactie de
+einddatum, status **Vervangen** en `replacedByDecisionId` op het oude record. Bij intrekking zonder
+vervanging krijgt het oude besluit status **Ingetrokken**, een einddatum en reden. Historische inhoud
+blijft leesbaar. De volledige interface en regels staan in het
+[Besluitenregister](product-factory-v2-besluitenregister.md).
+
 ### Contracten van Productontwerp
 
 | Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
 |---|---|---|---|---|
 | `DirectionSnapshot` | Productontwerp | Productontwerp | Productontwerp, Stakeholder en productbediening | geversioneerd droombeeld; geen uitvoerbare opdracht voor Productplanning |
 | `EpicDefinitionView` | Productontwerp | Productontwerp | Productplanning, Kwaliteitsbewaking, Productontwerp en productbediening | complete gebruikersverbetering met scope, bewijs, UX, succescriteria en bron-signaal-ID's; een door Productplanning gekozen versie blijft voor altijd bevroren |
-| `LearningResultView` | Productontwerp | Productontwerp | Productontwerp, Stakeholder en productbediening | gevalideerde productkennis met bron-signaal-ID's voor toekomstige keuzes; geen story of backlogitem |
+
+`LearningResult` is een interne entiteit van Productontwerp en heeft geen publieke `View`. Alleen een
+concrete epic, droombeeldversie of betekenisvolle keuze in `DecisionRecordView` verlaat de module.
 
 ### Contracten van Productplanning
 
@@ -86,7 +105,6 @@ Deze contracten komen van ondersteunende modules buiten de drie intelligente pro
 | `ProductStoryView` | Productplanning | Productplanning | Kwaliteitsbewaking, Software Factory-dispatcher, Productplanning en productbediening | zelfstandig uitvoerbaar gedrag binnen één bevroren epic, inclusief volledige relevante UX-momentopname en assets; Productontwerp en Kwaliteitsbewaking maken of wijzigen geen stories |
 | `PrioritizedBacklogView` | Productplanning | Productplanning | Software Factory-dispatcher, Productplanning en productbediening | geversioneerde volgorde van verzendbare stories en bugfixes |
 | `BacklogItemView` | Productplanning | Productplanning; dispatcher alleen voor verzendstatus, externe referentie en leveringstijdstippen | Software Factory-dispatcher, Kwaliteitsbewaking, Productplanning en productbediening | verwijst naar precies één story of bug; alleen Productplanning bepaalt inhoud, positie en prioriteitsreden |
-| `PriorityDecisionView` | Productplanning | Productplanning | Productplanning, Stakeholder en productbediening | uitlegbaar bewijs van epicselectie of backlogvolgorde, inclusief alternatieven en gebruikte bronversies |
 | `BacklogSupplyView` | Productplanning | Productplanning | Productontwerp, Software Factory-dispatcher en productbediening | aantallen per backlogstatus, lage grens, streefpeil en `aanvullingNodig` |
 
 ### Contracten van de Software Factory-dispatcher
@@ -146,8 +164,8 @@ database lezen en in gewone producttaal tonen. Zij schrijft nooit rechtstreeks i
 een gebruikersactie loopt via de application service van de eigenaar.
 
 De frontend toont minimaal Stakeholder en mandaat, productopdracht, signalen en afhandeling,
-droombeeld, epics en UX, epicuitvoering, stories, backlog, bugs, verificaties, kwaliteit,
-leerresultaten, processessies en leveringen. Waar nuttig biedt de frontend versiehistorie en
+droombeeld, epics en UX, epicuitvoering, stories, backlog, bugs, verificaties, kwaliteit, actuele en
+historische besluiten, processessies en leveringen. Waar nuttig biedt de frontend versiehistorie en
 vergelijking tussen twee databaseversies.
 
 De frontend kan dus wel een overleg starten, een gebruikerssignaal indienen of een bevestigde
@@ -160,12 +178,15 @@ alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtba
 | Producent | Gepubliceerde gegevens | Consument |
 |---|---|---|
 | Stakeholder | profielgegevens, bevestigde productopdracht, richting, antwoorden en gebruikerssignalen | product-/overlegmodule via commands |
+| product-/overlegmodule | betekenisvolle Stakeholderbesluiten en hun geldigheid | Besluitenregister |
 | product-/overlegmodule | Stakeholderprofiel, productopdracht, Stakeholderrichting, gebruikerssignalen en afhandeling | Productontwerp |
 | product-/overlegmodule | Stakeholderprofiel, productopdracht en Stakeholderrichting | Productplanning |
 | product-/overlegmodule | Stakeholderprofiel, testconfiguratie, `UserSignalView` en `UserSignalDispositionView` | Kwaliteitsbewaking |
 | Productontwerp | epicdefinitie | Productplanning en Kwaliteitsbewaking |
+| Productontwerp | betekenisvolle ontwerp-, epic- en signaalbesluiten | Besluitenregister |
 | Productplanning | epicuitvoering en backlogvoorraad | Productontwerp |
 | Productplanning | epicuitvoering, productstories en backlogitems | Kwaliteitsbewaking |
+| Productplanning | betekenisvolle epicselecties, prioriteitskeuzes en epicafsluitingen | Besluitenregister |
 | Productplanning | geprioriteerde backlog, backlogitems en productstories | Software Factory-dispatcher |
 | Software Factory-dispatcher | volledig `StoryDeliveryPackage`, inclusief UX en attachments | Software Factory |
 | Software Factory-dispatcher | externe werkstatus en opleverresultaat | Productplanning |
@@ -174,6 +195,7 @@ alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtba
 | Kwaliteitsbewaking | epicverificaties, kwaliteitsbeeld en kwaliteitssignalen | Productontwerp |
 | Kwaliteitsbewaking | `SignalInvestigationResultView` | productmodule, die de signaalafhandeling bijwerkt |
 | productmodule | bijgewerkte `UserSignalDispositionView` | Kwaliteitsbewaking, Productontwerp, Stakeholder en productbediening |
+| Besluitenregister | actuele en historische `DecisionRecordView`-objecten | productbediening; productmodule voor gekoppelde signaalafhandeling |
 | ieder intelligent proces | eigen sessiepublicatie | scheduler, operations en productbediening |
 
 ## Belangrijke levenscyclusregels
@@ -192,13 +214,18 @@ alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtba
 7. Pas een geslaagde `EpicVerificationView` laat Productplanning de epicuitvoering als **Geslaagd**
    afsluiten. Alle stories opgeleverd hebben is op zichzelf niet genoeg.
 8. Een `UserSignalView` blijft ongewijzigd. Kwaliteitsbewaking publiceert een apart
-   `SignalInvestigationResultView`; Productontwerp verwijst vanuit eigen leerresultaten of epics naar
-   gebruikte signalen. De productmodule leidt daaruit een nieuwe `UserSignalDispositionView` af.
+   `SignalInvestigationResultView`; Productontwerp verwijst vanuit epics of geregistreerde
+   signaalbesluiten naar gebruikte signalen. De productmodule leidt daaruit een nieuwe
+   `UserSignalDispositionView` af.
+9. Een besluit blijft inhoudelijk ongewijzigd. Intrekking of vervanging geeft het oude besluit een
+   einddatum en zichtbare relatie naar de levenscyclusaanleiding of het nieuwe besluit.
 
 ## Technische vertaling naar Spring Modulith
 
 - `processcontracts` bevat uitsluitend stabiele DTO's, contractversies en read-only queryports.
 - Iedere eigenaar beheert zijn eigen aggregates, repositories, transacties en publicaties.
+- Alleen het Besluitenregister schrijft besluitrecords. Bronmodules leveren idempotente commands of
+  application events en krijgen geen toegang tot de besluitenrepository.
 - Een procesmodule krijgt geen repository van een andere procesmodule geïnjecteerd.
 - De database mag fysiek gedeeld zijn, maar tabellen en schrijftransacties zijn logisch per module
   afgeschermd.
@@ -215,6 +242,7 @@ alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtba
 ## Gerelateerde documenten
 
 - [Product Factory v2 — eerste opzet](product-factory-v2-eerste-opzet.md)
+- [Besluitenregister](product-factory-v2-besluitenregister.md)
 - [Productontwerp](product-factory-v2-productontwerp.md)
 - [Productplanning](product-factory-v2-productplanning.md)
 - [Kwaliteitsbewaking](product-factory-v2-kwaliteitsbewaking.md)

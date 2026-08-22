@@ -78,14 +78,17 @@ status op het oorspronkelijke signaal.
 |---|---|---|
 | `DirectionSnapshot` | zichtbaar, geversioneerd droombeeld | toekomstverhaal, kernervaringen, obstakels, aannames, bewijsbasis en wijzigingsreden |
 | `EpicDefinitionView` | complete bouwtekening voor één gebruikersverbetering | versie, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's, afhankelijkheden en bron-signaal-ID's |
-| `LearningResultView` | gevalideerde nieuwe productkennis | conclusie, bron, reikwijdte, geldigheid, bron-signaal-ID's en effect op droombeeld of toekomstige epics |
 | `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, gebruikte inputversies, publicatie-ID's, eindstatus en blokkade |
 
 Productontwerp schrijft `ProcessSessionPublication` uitsluitend voor zijn eigen sessies. De scheduler
 roept de procesfunctie aan en de frontend leest het resultaat, maar geen van beide schrijft dit record.
 
-De enige inhoudelijke overdracht naar Productplanning is `EpicDefinitionView`. Het droombeeld en
-leerresultaten zijn productkennis voor de Stakeholder en latere ontwerpsessies, geen uitvoerbaar werk.
+De enige inhoudelijke overdracht naar Productplanning is `EpicDefinitionView`. Het droombeeld is
+zichtbare productrichting, maar geen uitvoerbaar werk. `LearningResult` blijft intern binnen
+Productontwerp. Wanneer daar een concrete keuze uit volgt, laat Productontwerp die keuze als
+`DecisionRecordView` vastleggen door het
+[Besluitenregister](product-factory-v2-besluitenregister.md); het volledige leerresultaat wordt niet
+gepubliceerd.
 
 Alleen Productontwerp schrijft de epicdefinitie. Productplanning kiest een exacte gepubliceerde
 versie, maar wijzigt de inhoud niet. Kwaliteitsbewaking gebruikt diezelfde versie als contract voor
@@ -145,6 +148,7 @@ De volgende entiteiten blijven binnen de module:
 - `SourceRecord` — vindplaats, datum, brontype en toegangsvoorwaarden;
 - `EvidenceClaim` — bewering met ondersteunende en tegensprekende bronnen;
 - `Hypothesis` — nog onbewezen verklaring of kans;
+- `LearningResult` — intern gevalideerde conclusie met reikwijdte, geldigheid en gevolgen voor een volgende ontwerpsessie;
 - `SignalAssessment` — interne beoordeling van een ongewijzigd gebruikerssignaal;
 - `OpportunityCandidate` — intern kansvoorstel vóór epicvorming;
 - `DirectionDraft` — niet-gepubliceerde droombeeldvariant;
@@ -155,8 +159,10 @@ De volgende entiteiten blijven binnen de module:
 - `ProductDesignMemory` — gedeelde lessen over onderzoek, UX en productkeuzes;
 - `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
 
-Onderzoeksvragen, kansvoorstellen en conceptontwerpen zijn interne objecten. Alleen het gevalideerde
-droombeeld, de epicdefinitie en leerresultaten worden gepubliceerd.
+Onderzoeksvragen, kansvoorstellen, leerresultaten en conceptontwerpen zijn interne objecten. Alleen
+het gevalideerde droombeeld en de epicdefinitie worden als inhoudelijke procesoutput gepubliceerd.
+Een betekenisvolle keuze wordt daarnaast in het Besluitenregister vastgelegd zonder het interne
+onderzoeksdossier te kopiëren.
 
 ## Interne levenscyclus van een epicdefinitie
 
@@ -282,7 +288,10 @@ De Epiccriticus controleert minimaal:
 - dat de epic nog niet door Productplanning is gekozen.
 
 Goedgekeurde output wordt atomair opgeslagen: eerst de eigen entiteiten, daarna de geversioneerde
-projecties in `processcontracts`, en als laatste de sessiestatus.
+projecties in `processcontracts`, en als laatste de sessiestatus. Betekenisvolle keuzes leveren een
+idempotent registratieverzoek aan het Besluitenregister. Als een gebruikerssignaal is beoordeeld
+zonder dat een epic ontstaat, bevat dat besluit het signaal-ID en de uitkomst zodat de productmodule
+de afhandeling kan actualiseren.
 
 ## Planning en de HKH-backlog
 
@@ -290,7 +299,7 @@ Een sessie wordt planbaar door:
 
 - een gewijzigd Stakeholderprofiel of een nieuwe of gewijzigde Stakeholderrichting,
   gebruikerssignaal of signaalafhandeling;
-- een nieuwe epicverificatie of geldig leerresultaat;
+- een nieuwe epicverificatie of nieuw intern leerresultaat dat nog om een ontwerpkeuze vraagt;
 - een structureel kwaliteitssignaal;
 - een periodieke onderzoeks- of epiccontrole;
 - `BacklogSupplyView.aanvullingNodig = true` terwijl onvoldoende beschikbare epics bestaan.
@@ -317,5 +326,6 @@ Een sessie is klaar wanneer:
 - iedere gepubliceerde epic door de Epiccriticus is goedgekeurd;
 - iedere epic zelfstandig door Productplanning kan worden begrepen;
 - de publicatiecontrole bewijst dat de epicversie nog niet is gekozen;
+- ieder betekenisvol product- of signaalbesluit idempotent aan het Besluitenregister is aangeboden;
 - output atomair en geversioneerd beschikbaar is;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.

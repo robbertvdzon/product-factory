@@ -18,7 +18,7 @@ De module is eigenaar van:
 - epicselectie en epicuitvoering;
 - productstories en hun inhoudelijke status;
 - backlogitems en hun volgorde;
-- prioriteitsbesluiten en de gebruikte bronversies;
+- prioriteitsbeoordelingen, onderbouwingen en de gebruikte bronversies;
 - de backlogvoorraad en `aanvullingNodig`;
 - de koppeling met Software Factory en de uitvoeringsstatus;
 - het eigen agent- en procesgeheugen.
@@ -67,7 +67,6 @@ Productontwerp of Kwaliteitsbewaking niet rechtstreeks.
 | `ProductStoryView` | zelfstandig uitvoerbaar gedrag binnen de epic | epic-ID en -versie, gedrag, acceptatiecriteria, afhankelijkheden en volledige relevante UX-momentopname met assets |
 | `PrioritizedBacklogView` | actuele geordende backlog | backlogversie, geordende item-ID's, redenen en aanmaakmoment |
 | `BacklogItemView` | één verzendbare of reeds verzonden opdracht | type, bron-ID en -versie, positie, prioriteitsreden, status en externe referentie |
-| `PriorityDecisionView` | uitlegbare keuze achter epicselectie of backlogvolgorde | keuze, alternatieven, criteria, bronversies en beslisser |
 | `BacklogSupplyView` | voorraadstatus voor Productontwerp en interne planbaarheid | aantallen per status, lage grens, streefpeil en `aanvullingNodig` |
 | `StoryDeliveryPackage` | onveranderlijk pakket dat de dispatcher naar Software Factory stuurt | bron-ID's en versies, complete story of bugfix, acceptatiecriteria, UX, attachments, hashes en idempotentiesleutel |
 | `DeliveryResultView` | genormaliseerde terugmelding uit Software Factory | extern ID, backlogitem, status, opleverlocatie, tijdstippen en foutinformatie |
@@ -80,6 +79,13 @@ technische `DispatchAttempt`-records binnen Productplanning.
 Alleen Productplanning schrijft epicuitvoering, productstories, backlogvolgorde en backlogstatus. De
 dispatcher draait binnen dezelfde module en mag uitsluitend leveringsvelden en bijbehorende
 statusovergangen en het mechanisch afgeleide `StoryDeliveryPackage` schrijven.
+
+Een betekenisvolle epicselectie, prioriteitsregel, afwijking van de normale volgorde of
+epicafsluiting wordt als `DecisionRecordView` door het centrale
+[Besluitenregister](product-factory-v2-besluitenregister.md) vastgelegd. Productplanning levert het
+registratieverzoek met keuze, alternatieven, criteria en bronversies; het Besluitenregister is
+eigenaar van het publieke besluitrecord. Kleine mechanische verschuivingen door een afgerond item
+zijn geen nieuw productbesluit.
 
 ## Een epic kiezen en bevriezen
 
@@ -182,7 +188,7 @@ Productplanning zet een epic pas op **Controleren** wanneer alle bekende stories
 | **Onvolledig** met epicgaten | aanvullende stories maken en terug naar **Actief** |
 | **Niet aantoonbaar** | op **Controleren** blijven en wachten op aanvullend bewijs |
 | **Geblokkeerd** | blokkade zichtbaar opslaan en later opnieuw laten controleren |
-| **Niet geslaagd** | afsluiten als **Niet geslaagd** en het leerresultaat beschikbaar maken voor Productontwerp |
+| **Niet geslaagd** | afsluiten als **Niet geslaagd**; Productontwerp leest de epicverificatie en verwerkt de conclusie intern |
 
 Een bouwfout wordt door Kwaliteitsbewaking als bug gepubliceerd en komt als bugfix in de backlog. Een
 epicgat wordt door Productplanning in stories vertaald. Kwaliteitsbewaking schrijft zelf geen stories.
@@ -200,7 +206,7 @@ epicgat wordt door Productplanning in stories vertaald. Kwaliteitsbewaking schri
 - `PriorityAssessment` — vergelijking per prioriteitscriterium;
 - `BacklogDraft` — voorgestelde ordening vóór kritiek;
 - `Backlog` en `BacklogItem` — actuele uitvoeringstoestand;
-- `PriorityDecision` — auditregel voor een keuze;
+- `DecisionDraft` — interne onderbouwing vóór registratie van een betekenisvolle keuze in het Besluitenregister;
 - `SupplyState` — voorraad, lage grens en streefpeil;
 - `StoryDeliveryPackage`, `DispatchAttempt`, `ExternalWorkLink` en `DeliverySync` — technische koppeling;
 - `PlanningMemory` — lessen over slicing, balans en blokkades;
@@ -303,7 +309,8 @@ De Planningscriticus controleert:
 - dat alle posities een begrijpelijke reden hebben;
 - dat epic-, story- en backlogstatus consistent zijn.
 
-Goedgekeurde uitvoering, stories, besluiten en backlog worden atomair gepubliceerd.
+Goedgekeurde uitvoering, stories en backlog worden atomair gepubliceerd. Betekenisvolle keuzes
+worden met een idempotent registratieverzoek aan het Besluitenregister aangeboden.
 
 ## StoryDeliveryPackage-contract
 

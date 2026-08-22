@@ -191,10 +191,10 @@ invoert.
 
 De oorspronkelijke melding, bron, gebruikscontext en eventueel bewijs blijven ongewijzigd bewaard.
 Een gebruikerssignaal is nog geen besluit, bug, epic of story. Kwaliteitsbewaking kan na verificatie
-een bug publiceren; Productontwerp kan er een leerresultaat of epic aan koppelen.
+een bug publiceren; Productontwerp kan er een epic of een geregistreerd ontwerpbesluit aan koppelen.
 
 De productmodule publiceert daarnaast de afhandelstatus. Daarin is zichtbaar of het signaal
-nieuw of onderzocht is en of het is gekoppeld aan een bug, kwaliteitssignaal, leerresultaat of epic,
+nieuw of onderzocht is en of het is gekoppeld aan een bug, kwaliteitssignaal, besluit of epic,
 een duplicaat is, buiten de productgrenzen valt of onvoldoende bewijs heeft. Procesmodules wijzigen
 het oorspronkelijke signaal niet; de afhandelstatus wordt afgeleid uit hun gepubliceerde resultaten
 en de daarin opgenomen bronverwijzingen.
@@ -295,7 +295,7 @@ Wanneer de dispatcher een backlogitem verstuurt, maakt hij mechanisch een onvera
 acceptatiecriteria, relevante UX en alle benodigde attachments. De dispatcher voegt geen nieuwe
 inhoudelijke keuzes toe.
 
-### Leerresultaat
+### Intern leerresultaat
 
 Na de oplevering leggen we kort vast:
 
@@ -305,7 +305,27 @@ Na de oplevering leggen we kort vast:
 - wat we nu anders weten;
 - wat de logische volgende keuze is.
 
-Dit leerresultaat wordt gebruikt bij de volgende keuze.
+Dit leerresultaat wordt gebruikt bij de volgende keuze, maar blijft intern binnen Productontwerp.
+Alleen wanneer er een concrete keuze uit volgt, wordt die keuze met een korte onderbouwing in het
+Besluitenregister vastgelegd.
+
+### Besluit en Besluitenregister
+
+Een besluit is een betekenisvolle keuze die richting, productinhoud, prioriteit, uitvoering of de
+afhandeling van een onderwerp verandert. De module die bevoegd is voor het onderwerp neemt het
+besluit. Het centrale Besluitenregister bewaart daarna de leesbare registratie en neemt zelf geen
+besluiten.
+
+Een besluit bevat de keuze, korte onderbouwing, alternatieven, gebruikte bronnen en entiteitsversies,
+beslisser, toepassingsgebied en geldigheid. Het heeft een ingangsdatum en kan een einddatum krijgen.
+Als een besluit wordt ingetrokken, krijgt het status **Ingetrokken**, een einddatum en een reden. Als
+een nieuw besluit het vervangt, krijgt het oude besluit status **Vervangen** en een einddatum gelijk
+aan de ingangsdatum van het nieuwe besluit. Beide records verwijzen naar elkaar en de oude inhoud
+blijft leesbaar.
+
+Het Besluitenregister is een ondersteunende module zonder agents of geplande procesfunctie. De
+frontend kan actuele en historische besluiten tonen. Procesmodules blijven hun specifieke contracten
+gebruiken en voeren geen vrije besluittekst uit als ongetypeerde opdracht.
 
 ### Agent
 
@@ -329,7 +349,8 @@ Geheugen is duurzame kennis die een volgende uitvoering kan gebruiken. Versie 2 
 
 - agentgeheugen voor wat één agent vanuit zijn eigen rol heeft geleerd;
 - procesgeheugen voor kennis die alle uitvoerders van hetzelfde proces nodig hebben;
-- productgeheugen voor gedeelde productfeiten, richting en besluiten.
+- productgeheugen voor gedeelde productfeiten en richting; betekenisvolle keuzes staan in het
+  afzonderlijke Besluitenregister.
 
 Welke informatie in welke laag hoort en hoeveel gezag zij heeft, wordt verderop expliciet gemaakt.
 
@@ -547,7 +568,7 @@ toestand hoeft te begrijpen.
 
 | Proces | Gepubliceerde input | Eigen duurzame output | Betekenis voor andere modules |
 |---|---|---|---|
-| Productontwerp | productopdracht, Stakeholderrichting, backlogvoorraad, epicresultaten en kwaliteits- en gebruikerssignalen | droombeeld, complete geversioneerde epicdefinities met UX en leerresultaten | welke gebruikersverbeteringen beschikbaar zijn om op te pakken |
+| Productontwerp | productopdracht, Stakeholderrichting, backlogvoorraad, epicresultaten en kwaliteits- en gebruikerssignalen | droombeeld, complete geversioneerde epicdefinities met UX en registraties van betekenisvolle ontwerpbesluiten | welke gebruikersverbeteringen beschikbaar zijn om op te pakken |
 | Productplanning | beschikbare epicversies, uitvoerbare bugs, epicgaten, verificaties, productgrenzen en Software Factory-status | gekozen epicuitvoering, zelfvoorzienende productstories inclusief relevante UX, geprioriteerde backlog en voorraadstatus | welke circa tien opdrachten in welke volgorde klaarstaan |
 | Kwaliteitsbewaking | testbare productconfiguratie, bevroren epicversie, stories, opleveringen en eerdere bugs | bugs, story- en epicverificaties, epicgaten, kwaliteitsbeeld en kwaliteitssignalen | wat aantoonbaar werkt, ontbreekt of verkeerd is gebouwd |
 
@@ -639,7 +660,8 @@ De processen publiceren minimaal de volgende objecten:
 - **Backlogitem** — de verwijzing van Productplanning naar een productstory of bugfix, met prioriteit en
   uitvoeringsstatus;
 - **Backlogvoorraad** — het aantal verzendbare items en of aanvulling nodig is;
-- **Prioriteitsbesluit** — de geordende backlog met reden en afgevallen alternatieven;
+- **Besluit** — een betekenisvolle keuze met onderbouwing, alternatieven, bronversies,
+  toepassingsgebied, ingangsdatum en optionele einddatum of vervangingsrelatie;
 - **Opleverresultaat** — wat Software Factory heeft teruggegeven en waar het is uitgevoerd;
 - **Storyleveringspakket** — de onveranderlijke, volledige JSON-overdracht van één story of bugfix
   naar Software Factory, inclusief UX en attachments;
@@ -647,15 +669,14 @@ De processen publiceren minimaal de volgende objecten:
 - **Epicverificatie** — het bewijs of de complete gebruikersverbetering van de bevroren epic is
   bereikt;
 - **Kwaliteitssignaal** — een structureel patroon dat Productontwerp kan onderzoeken;
-- **Leerresultaat** — door Productontwerp gevalideerde productkennis over wat na onderzoek, bouw of
-  controle anders bekend is dan daarvoor;
 - **Overleg** — agenda, deelnemers, berichten, geraadpleegde bronnen, status en gekoppelde objecten;
 - **Overleguitkomst** — notulen met besluiten, open vragen, acties en expliciete geheugenwijzigingen;
-- **Productgeheugen** — gedeelde actuele kennis, richting en besluiten voor alle processen.
+- **Productgeheugen** — gedeelde actuele feiten en richting voor de processen; besluiten hebben een
+  eigen register.
 
-Onderzoeksdossiers, bronnen, testsessies, agents, prompts, afwegingen, procesgeheugen en agentgeheugen
-blijven intern bij hun eigenaar. Een andere module kan wel een gepubliceerde samenvatting lezen, maar
-niet het interne object wijzigen.
+Onderzoeksdossiers, leerresultaten, bronnen, testsessies, agents, prompts, afwegingen, procesgeheugen
+en agentgeheugen blijven intern bij hun eigenaar. Een andere module kan wel een concrete publieke
+uitkomst of geregistreerd besluit lezen, maar niet het interne object wijzigen.
 
 ### Regels voor iedere overdracht
 
@@ -676,8 +697,8 @@ zonder dat verantwoordelijkheden door elkaar gaan lopen.
 
 De database is de volledige productwaarheid. De frontend haalt actuele én historische versies via
 read-only application-API's uit de database en maakt droombeelden, epics, UX, stories, backlog,
-bugs, verificaties, signalen, leerresultaten, sessies en leveringen voor mensen leesbaar. Waar dat
-waarde heeft kan de frontend versies naast elkaar zetten en verschillen tonen.
+bugs, verificaties, signalen, besluiten, sessies en leveringen voor mensen leesbaar. Waar dat waarde
+heeft kan de frontend versies naast elkaar zetten en verschillen tonen.
 
 De frontend is daarmee de human-readable weergave van de volledige productwaarheid. Correcties lopen
 via de application service van de module die eigenaar is; de frontend schrijft nooit rechtstreeks in
@@ -721,14 +742,19 @@ procesgeheugen gekopieerd.
 
 ### 3. Productgeheugen
 
-Productgeheugen bevat kennis die voor meerdere processen of agents als gedeelde context geldt:
+Productgeheugen bevat feiten en richting die voor meerdere processen of agents als gedeelde context
+gelden:
 
 - Stakeholderrichting en correcties;
-- actuele productregels en besluiten;
-- geldige leerresultaten;
+- actuele productregels;
 - relevante feiten en technische grenzen;
 - samenvattingen van afgesloten overleggen;
 - de herkomst, geldigheid en reikwijdte van ieder kennisitem.
+
+Betekenisvolle keuzes staan niet als vrije geheugenregel in Productgeheugen, maar als
+`DecisionRecordView` in het Besluitenregister. Een intern leerresultaat wordt pas gedeelde
+productwaarheid wanneer het leidt tot een concreet publiek productobject, een productregel of een
+geregistreerd besluit.
 
 Binnen zijn toepassingsgebied heeft een expliciete, actuele richting van de Stakeholder meer gezag
 dan een interpretatie in proces- of agentgeheugen. Een onderzoeksinzicht wordt niet automatisch een
@@ -843,10 +869,12 @@ bronnen, onderzoeksdossiers, hypotheses en kansvoorstellen steken de modulegrens
 |---|---|
 | Droombeeld | geversioneerd beeld van hoe het product zijn opdracht op lange termijn uitzonderlijk goed kan vervullen; zichtbaar voor de Stakeholder |
 | Epicdefinitie | geversioneerde, behapbare gebruikersverbetering met eenduidige scope, bewijs, compleet UX-ontwerp, risico's en succescriteria |
-| Leerresultaat | gevalideerde productkennis uit onderzoek, oplevering of verificatie, met bron en reikwijdte |
+| Besluitregistratie | betekenisvolle ontwerpkeuze met korte onderbouwing, alternatieven, bronversies en geldigheid voor het centrale Besluitenregister |
 
 De enige inhoudelijke overdracht van Productontwerp naar Productplanning is de epicdefinitie. Het
-droombeeld en leerresultaten zijn zichtbare productkennis, geen uitvoerbaar werk.
+droombeeld is zichtbare productrichting, geen uitvoerbaar werk. Leerresultaten en onderzoeksdossiers
+blijven intern bij Productontwerp; alleen hun concrete publieke gevolg en eventuele besluitregistratie
+gaan over de modulegrens.
 
 Productontwerp mag een epic herzien zolang Productplanning hem niet heeft gekozen. Een gekozen
 epicversie is bevroren en wordt nooit stilletjes aangepast. De interne werking staat in
@@ -881,7 +909,7 @@ backlog, maar verstuurt zelf niets naar Software Factory.
 | Productstory | klein, zelfstandig bouwbaar en testbaar deel van precies één bevroren epicversie, met alle relevante UX-inhoud en assets ingebed |
 | Geprioriteerde backlog | geordende lijst van circa tien verzendbare productstories en bugfixes |
 | Backlogitem | verwijzing naar precies één bronstory of bug, met prioriteit, reden en uitvoeringsstatus |
-| Prioriteitsbesluit | uitlegbare vastlegging waarom een item boven alternatieven staat |
+| Besluitregistratie | betekenisvolle epic-, prioriteits- of afsluitkeuze voor het centrale Besluitenregister |
 | Backlogvoorraad | aantallen per status en de vlag `aanvullingNodig` |
 
 De standaard lage grens is vier verzendbare items en het streefpeil is tien. Zodra de voorraad op
@@ -939,7 +967,8 @@ geplande sessie de nieuwste gepubliceerde gegevens:
 - Productplanning kan via de backlogvoorraad zichtbaar maken dat nieuwe epics of stories nodig zijn;
 - Kwaliteitsbewaking kan een bug, epicgat of structureel productprobleem vinden;
 - opgeleverde stories kunnen het droombeeld of de epicvolgorde veranderen;
-- een afgeronde epic levert altijd een leerresultaat op.
+- Productontwerp verwerkt de uitkomst van een afgeronde epic intern als leerresultaat en registreert
+  alleen een besluit wanneer daar een concrete keuze uit volgt.
 
 Als HKH vier of minder verzendbare backlogitems over heeft, worden binnen alle drie de processen
 nieuwe opdrachten planbaar. De scheduler blijft alleen hun functies op het afgesproken ritme
@@ -1079,8 +1108,8 @@ Productplanning is de enige schrijver van de epicuitvoering en verwerkt dit oord
 - bij een echte bouwfout neemt zij de bugfix op in de backlog;
 - bij een epicgat maakt zij aanvullende stories binnen dezelfde bevroren epic;
 - bij **Niet aantoonbaar** blijft de epic op **Controleren**;
-- bij **Niet geslaagd** sluit zij de uitvoering met die uitkomst en stuurt het leerresultaat naar
-  Productontwerp;
+- bij **Niet geslaagd** sluit zij de uitvoering met die uitkomst; Productontwerp leest de
+  epicverificatie en verwerkt de conclusie intern;
 - een moeilijk herstelbare richtingswijziging stopt de oude uitvoering en begint alleen via een
   nieuw gekozen epic-ID of een nieuwe epicversie.
 
@@ -1172,7 +1201,7 @@ Hier zie je in één oogopslag:
 
 Hier staan nieuwe feedback, observaties, ideeën en onderzoeksinzichten. Per gebruikerssignaal blijven
 de oorspronkelijke tekst, bron, context en bijlagen zichtbaar, samen met een afzonderlijke
-afhandelstatus en koppelingen naar onderzoek, leerresultaat, epic, bug of kwaliteitssignaal. Je kunt
+  afhandelstatus en koppelingen naar onderzoek, besluit, epic, bug of kwaliteitssignaal. Je kunt
 signalen bekijken en een onderzoeksverzoek indienen. De productmodule registreert het signaal en
 werkt de afhandelstatus bij op basis van gepubliceerde procesresultaten; het Inbox-scherm schrijft
 niet rechtstreeks in de database. Bugs komen vanuit Kwaliteitsbewaking in de aparte
@@ -1200,7 +1229,7 @@ Een epic, productstory, bug of backlogitem heeft één rustige detailpagina met:
 - eventuele bovenliggende epic en relevante storyrelaties;
 - reden van de backlogprioriteit;
 - voortgang en resultaat;
-- beslissingen en leerresultaten.
+- geldende en historische besluiten met hun onderbouwing en geldigheidsperiode.
 
 Technische details zijn beschikbaar via een aparte knop, maar staan standaard dicht.
 
@@ -1272,6 +1301,8 @@ Kwaliteitsbewaking.
 32. Alle stories afgerond is niet hetzelfde als een geslaagde epic.
 33. Kwaliteitsbewaking maakt bugs en epicgaten, maar geen stories.
 34. Alleen Productplanning verandert de epicuitvoering en sluit haar na inhoudelijke verificatie af.
+35. Interne leerresultaten blijven bij Productontwerp; betekenisvolle keuzes staan met begin-,
+    eind- en vervangingsrelaties in het Besluitenregister.
 
 ## Wat we uit versie 1 willen behouden
 
@@ -1446,6 +1477,7 @@ gegevensstromen; de drie procesdocumenten beschrijven de interne agents, volgord
 stappen, interne entiteiten en sessieregels:
 
 - [Overkoepelend design van processen en publieke entiteiten](product-factory-v2-proces-en-entiteiten-design.md)
+- [Besluitenregister](product-factory-v2-besluitenregister.md)
 - [Productontwerp](product-factory-v2-productontwerp.md)
 - [Productplanning](product-factory-v2-productplanning.md)
 - [Kwaliteitsbewaking](product-factory-v2-kwaliteitsbewaking.md)

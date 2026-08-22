@@ -70,7 +70,7 @@ en exacte geteste omgeving vast.
 |---|---|---|
 | `BugView` | aantoonbare bouw- of productafwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
 | `StoryVerificationView` | oordeel over één concrete story of bugfix | backlogitem, bronversie, omgeving, resultaat, controles, bewijs en blokkade |
-| `EpicVerificationView` | oordeel over de complete gebruikersverbetering | epic-ID en -versie, uitkomst, scope-/UX-dekking, succescriteria, bewijs, gaten en leerresultaat |
+| `EpicVerificationView` | oordeel over de complete gebruikersverbetering | epic-ID en -versie, uitkomst, scope-/UX-dekking, succescriteria, bewijs, gaten en productconclusie |
 | `EpicCompletionGapView` | gedrag binnen de bevroren epic dat nooit in een story stond | scope- of UX-verwijzing, gebruikersimpact, ontbrekend gedrag en bewijs |
 | `SignalInvestigationResultView` | zichtbaar resultaat van onderzoek naar één gebruikerssignaal | signaal-ID en -versie, resultaat, uitleg, bewijs, omgeving, eventuele bug- of kwaliteitssignaalkoppeling, processessie en onderzoekstijdstip |
 | `QualityOverviewView` | zichtbaar actueel kwaliteitsbeeld | recente dekking, risico's, open bugs en onderbelichte gebieden |

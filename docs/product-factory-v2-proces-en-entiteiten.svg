@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1380" viewBox="0 0 1800 1380" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1380" viewBox="0 0 2200 1380" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 processen, entiteiteigenaren en gegevensstromen</title>
-  <desc id="desc">Diagram met de Stakeholder, ondersteunende product- en overlegmodules, Productontwerp, Productplanning, Kwaliteitsbewaking en de Software Factory-dispatcher. Iedere module bevat de publieke entiteiten die zij schrijft. Pijlen tonen welke contracten andere modules lezen, waaronder de afzonderlijke verwerking van gebruikerssignalen.</desc>
+  <desc id="desc">Diagram met de Stakeholder, ondersteunende product- en overlegmodules, Productontwerp, Productplanning, Kwaliteitsbewaking, de Software Factory-dispatcher en het Besluitenregister. Iedere module bevat de publieke entiteiten die zij schrijft. Pijlen tonen geversioneerde gegevensstromen en registratieverzoeken.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
@@ -32,7 +32,7 @@
     </style>
   </defs>
 
-  <rect width="1800" height="1380" fill="#f8fafc"/>
+  <rect width="2200" height="1380" fill="#f8fafc"/>
   <text x="60" y="62" class="title">Product Factory v2 — eigenaarschap en publieke gegevensstromen</text>
   <text x="60" y="94" class="subtitle">Een entiteit wordt door één eigenaar geschreven; pijlen zijn geversioneerde read-only overdrachten via processcontracts.</text>
 
@@ -61,12 +61,12 @@
   <text x="546" y="260" class="owner-label">SCHRIJFT</text>
   <text x="546" y="296" class="entity">DirectionSnapshot</text>
   <text x="546" y="334" class="entity">EpicDefinitionView</text>
-  <text x="546" y="372" class="entity">LearningResultView</text>
-  <text x="546" y="408" class="entity">ProcessSessionPublication</text>
-  <line x1="546" y1="430" x2="904" y2="430" stroke="#bfdbfe"/>
-  <text x="546" y="460" class="note">Onderzoekt de productrichting en maakt</text>
-  <text x="546" y="482" class="note">complete epics inclusief UX. Geen stories.</text>
-  <text x="546" y="518" class="owner-label">SCHRIJFT ALLEEN EIGEN SESSIERESULTATEN</text>
+  <text x="546" y="372" class="entity">ProcessSessionPublication</text>
+  <line x1="546" y1="394" x2="904" y2="394" stroke="#bfdbfe"/>
+  <text x="546" y="424" class="note">Onderzoekt de productrichting en maakt</text>
+  <text x="546" y="446" class="note">complete epics inclusief UX. Geen stories.</text>
+  <text x="546" y="482" class="note">LearningResult blijft intern.</text>
+  <text x="546" y="518" class="owner-label">REGISTREERT BETEKENISVOLLE BESLUITEN</text>
 
   <!-- Productplanning -->
   <rect x="520" y="705" width="410" height="480" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>
@@ -79,13 +79,13 @@
   <text x="546" y="882" class="entity">ProductStoryView</text>
   <text x="546" y="918" class="entity">PrioritizedBacklogView</text>
   <text x="546" y="954" class="entity">BacklogItemView</text>
-  <text x="546" y="990" class="entity">PriorityDecisionView</text>
-  <text x="546" y="1026" class="entity">BacklogSupplyView</text>
-  <text x="546" y="1062" class="entity">ProcessSessionPublication</text>
-  <line x1="546" y1="1086" x2="904" y2="1086" stroke="#a7f3d0"/>
-  <text x="546" y="1115" class="note">Bevriest één epicversie, maakt stories</text>
-  <text x="546" y="1137" class="note">en bepaalt de backlogvolgorde.</text>
-  <text x="546" y="1166" class="note">Dispatcher schrijft alleen verzendvelden.</text>
+  <text x="546" y="990" class="entity">BacklogSupplyView</text>
+  <text x="546" y="1026" class="entity">ProcessSessionPublication</text>
+  <line x1="546" y1="1050" x2="904" y2="1050" stroke="#a7f3d0"/>
+  <text x="546" y="1079" class="note">Bevriest één epicversie, maakt stories</text>
+  <text x="546" y="1101" class="note">en bepaalt de backlogvolgorde.</text>
+  <text x="546" y="1130" class="note">Registreert betekenisvolle besluiten.</text>
+  <text x="546" y="1159" class="note">Dispatcher schrijft alleen verzendvelden.</text>
 
   <!-- Dispatcher -->
   <rect x="1030" y="805" width="315" height="310" rx="18" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
@@ -151,6 +151,21 @@
   <text x="76" y="1232" class="note">antwoorden · signalen · kwaliteitszorg</text>
   <text x="76" y="1270" class="note">Maakt geen epics, stories, bugs of backlog.</text>
 
+  <!-- Besluitenregister -->
+  <rect x="1430" y="970" width="325" height="325" rx="18" fill="#fff1f2" stroke="#be123c" stroke-width="3"/>
+  <rect x="1430" y="970" width="325" height="74" rx="18" fill="#ffe4e6"/>
+  <path d="M1430 1022 V1044 H1755 V1022" fill="#ffe4e6"/>
+  <text x="1454" y="1005" class="box-title">Besluitenregister</text>
+  <text x="1454" y="1030" class="function">geen scheduler of agents</text>
+  <text x="1454" y="1075" class="owner-label">SCHRIJFT</text>
+  <text x="1454" y="1111" class="entity">DecisionRecordView</text>
+  <line x1="1454" y1="1135" x2="1731" y2="1135" stroke="#fecdd3"/>
+  <text x="1454" y="1164" class="note">Neemt geen besluiten; registreert</text>
+  <text x="1454" y="1186" class="note">keuzes van bevoegde bronmodules.</text>
+  <text x="1454" y="1220" class="note">validFrom · validUntil</text>
+  <text x="1454" y="1242" class="note">Actief · Vervangen · Ingetrokken</text>
+  <text x="1454" y="1264" class="note">supersedes · replacedBy</text>
+
   <!-- Gegevensstromen -->
   <path d="M415 275 H520" class="blue-line"/>
   <text x="429" y="262" class="flow-small">profiel · opdracht · richting · signalen</text>
@@ -206,6 +221,15 @@
   <path d="M145 1090 C15 950 10 690 50 500" class="line"/>
   <text x="12" y="805" class="flow-small" transform="rotate(-90 12 805)">profiel · opdracht · richting · signalen</text>
 
+  <path d="M930 300 H1790 V1185 H1755" class="line dashed"/>
+  <text x="1470" y="287" class="flow-small">ontwerpbesluiten</text>
+
+  <path d="M415 155 V130 H1805 V1240 H1755" class="line dashed"/>
+  <text x="1510" y="118" class="flow-small">Stakeholderbesluiten</text>
+
+  <path d="M930 1160 H1390 Q1430 1160 1430 1120" class="line dashed"/>
+  <text x="1160" y="1147" class="flow-small">planningbesluiten</text>
+
   <!-- Legenda -->
   <rect x="50" y="1335" width="14" height="14" rx="3" fill="#dbeafe" stroke="#2563eb"/>
   <text x="74" y="1347" class="note">Productontwerp</text>
@@ -217,5 +241,7 @@
   <text x="644" y="1347" class="note">Dispatcher</text>
   <rect x="750" y="1335" width="14" height="14" rx="3" fill="#fef9c3" stroke="#ca8a04"/>
   <text x="774" y="1347" class="note">Stakeholder</text>
-  <text x="910" y="1347" class="note">De volledige lezerlijst en veldgrenzen staan in de tabel van het design-document.</text>
+  <rect x="910" y="1335" width="14" height="14" rx="3" fill="#ffe4e6" stroke="#be123c"/>
+  <text x="934" y="1347" class="note">Besluitenregister</text>
+  <text x="1095" y="1347" class="note">De volledige lezerlijst en veldgrenzen staan in de tabel van het design-document.</text>
 </svg>
