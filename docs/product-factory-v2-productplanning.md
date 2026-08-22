@@ -114,7 +114,7 @@ Een productstory bevat minimaal:
 - inhoudelijke status en versie.
 
 Een story is alleen **Uitvoerbaar** wanneer Software Factory haar zonder epicquery, intern
-planningsdossier, Product Factory-call of Git-workspace kan bouwen en Kwaliteitsbewaking haar
+planningsdossier of Product Factory-call kan bouwen en Kwaliteitsbewaking haar
 zelfstandig kan testen. Productplanning selecteert de relevante UX uit de bevroren epic zonder haar
 inhoudelijk te herschrijven.
 
@@ -321,8 +321,7 @@ de database opgeslagen vóór verzending en bevat minimaal:
 Tekst, Markdown, JSON en SVG blijven gewone UTF-8-tekst. Alleen binaire inhoud gebruikt bij een
 JSON-only API `base64`; een aparte begrensde attachment-upload mag later hetzelfde contract
 efficiënter transporteren. Software Factory bevestigt pas acceptatie nadat het complete pakket in de
-eigen storystorage staat. Een URL naar Product Factory of de Git-workspace is nooit de enige drager
-van vereiste inhoud.
+eigen storystorage staat. Een URL naar Product Factory is nooit de enige drager van vereiste inhoud.
 
 ## Software Factory-dispatcher
 
@@ -349,9 +348,8 @@ Iedere dispatchersessie:
 12. publiceert leverings- en voorraadstatus.
 
 De dispatcher kan geen item overslaan, story of UX schrijven, epic kiezen of prioriteit veranderen.
-Software Factory leest nooit uit `product-factory-workspace`; een workspacepublicatie is niet nodig
-voor verzending. Voor een JSON-only transport mag een binair attachment Base64 gebruiken, maar de
-database bewaart het oorspronkelijke binaire object en Base64 is geen domein- of opslagformaat.
+Voor een JSON-only transport mag een binair attachment Base64 gebruiken, maar de database bewaart
+het oorspronkelijke binaire object en Base64 is geen domein- of opslagformaat.
 
 ## Planning
 

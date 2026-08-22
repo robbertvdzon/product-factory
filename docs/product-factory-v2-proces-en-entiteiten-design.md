@@ -20,9 +20,7 @@ kaart bij de afzonderlijke procesdocumenten en beantwoordt per publiek contract 
 - Een nieuwe publicatie vervangt een eerdere versie niet stilzwijgend; versies en herkomst blijven
   herleidbaar.
 - Procesmodules importeren elkaars interne code en tabellen niet.
-- De frontend leest actuele en historische productgegevens uit de database, niet uit Git.
-- Een optionele Git-export bevat alleen gegenereerde kopieën van databaseversies en is nooit een
-  procesinterface of bron voor Software Factory.
+- De frontend leest actuele en historische productgegevens uit de database.
 
 In de tabel betekent **aanmaken**: de identiteit en eerste versie vormen. **Schrijven** betekent:
 nieuwe versies, inhoud of toegestane statusvelden opslaan. Een module die alleen leest, kan het
@@ -122,18 +120,6 @@ afzonderlijke schrijfbevoegdheid. Hij verandert nooit de betekenis of prioriteit
 `ProcessSessionPublication` is één technisch contract, maar ieder record heeft precies één
 proces als eigenaar. Een proces mag nooit de sessieregistratie van een ander proces schrijven.
 
-### Optioneel publicatiecontract voor de Git-workspace
-
-De WorkspacePublisher is een technische adapter buiten de productprocessen. Hij leest alleen
-expliciet publiceerbare, geversioneerde databaseprojecties en maakt daar een human-readable kopie van.
-
-| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
-|---|---|---|---|---|
-| `ArtifactPublicationView` | WorkspacePublisher na een optionele exportopdracht | WorkspacePublisher | productbediening en operations | databasebron-ID en -versie, rendererversie, bestandspad, contenthash, Git-status en commit; de inhoud bestaat altijd eerst in de database |
-
-Geen proces en ook Software Factory leest `ArtifactPublicationView` of Git als inhoudelijke input.
-Een publicatiefout wordt apart opnieuw geprobeerd en blokkeert geen proces of levering.
-
 ## Frontend als leesbare databaseweergave
 
 Met **productbediening** in de tabellen bedoelen we de frontend plus haar eigen read-only
@@ -143,9 +129,8 @@ een gebruikersactie loopt via de application service van de eigenaar.
 
 De frontend toont minimaal Stakeholder en mandaat, productopdracht, signalen en afhandeling,
 droombeeld, epics en UX, epicuitvoering, stories, backlog, bugs, verificaties, kwaliteit,
-leerresultaten, processessies en leveringen. Daarmee zijn Git-bestanden niet nodig om Product Factory
-voor mensen leesbaar te maken. Waar nuttig biedt de frontend versiehistorie en vergelijking tussen
-twee databaseversies.
+leerresultaten, processessies en leveringen. Waar nuttig biedt de frontend versiehistorie en
+vergelijking tussen twee databaseversies.
 
 ## Gegevensstromen per onderdeel
 
@@ -165,7 +150,6 @@ twee databaseversies.
 | Kwaliteitsbewaking | bugs, storyverificaties, epicverificaties en epicgaten | Productplanning |
 | Kwaliteitsbewaking | epicverificaties, kwaliteitsbeeld en kwaliteitssignalen | Productontwerp |
 | ieder intelligent proces | eigen sessiepublicatie | scheduler, operations en productbediening |
-| WorkspacePublisher | optionele human-readable kopie plus `ArtifactPublicationView` | Git-workspace, productbediening en operations |
 
 ## Belangrijke levenscyclusregels
 
@@ -184,8 +168,6 @@ twee databaseversies.
    afsluiten. Alle stories opgeleverd hebben is op zichzelf niet genoeg.
 8. Een `UserSignalView` blijft ongewijzigd. De afhandeling wordt apart afgeleid uit gepubliceerde
    bugs, kwaliteitssignalen, leerresultaten en epics die naar het signaal verwijzen.
-9. Alles wat optioneel naar Git gaat bestaat eerst in de database. Git is nooit nodig om een story
-   te bouwen, te testen of te leveren.
 
 ## Technische vertaling naar Spring Modulith
 
@@ -200,7 +182,7 @@ twee databaseversies.
   begrensd attachment met MIME-type, grootte en hash en mogen alleen voor JSON-transport Base64 zijn.
 - Software Factory slaat het complete leveringspakket bij acceptatie in de eigen storystorage op.
 - De frontend gebruikt read models uit de database voor actuele en historische human-readable
-  schermen; zij gebruikt de Git-workspace niet als backend.
+  schermen.
 - Overdrachten zijn idempotent op bron-ID plus bronversie. Een consument mag dezelfde versie niet
   tweemaal als nieuw werk behandelen.
 

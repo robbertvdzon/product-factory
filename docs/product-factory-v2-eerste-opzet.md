@@ -245,8 +245,7 @@ Een productstory is een klein stuk zichtbaar gedrag dat Software Factory kan bou
 Productplanning maakt stories nadat zij een exacte epicversie heeft gekozen. Iedere productstory
 hoort bij precies één bevroren epicversie. Zij bevat niet alleen een verwijzing naar UX, maar een
 zelfstandige kopie van alle relevante UX-informatie en ontwerpassets die nodig zijn om de story te
-bouwen en testen. Software Factory hoeft de epic, Product Factory of een Git-workspace niet te
-raadplegen.
+bouwen en testen. Software Factory hoeft de epic of Product Factory daarna niet te raadplegen.
 
 Niet alle stories van een epic worden vooraf uitgeschreven. De eerste bruikbare stap moet duidelijk
 zijn; de rest ontstaat pas wanneer we hebben geleerd van eerder werk.
@@ -503,7 +502,7 @@ adapter binnen Productplanning. Hij gebruikt geen agents en neemt geen productbe
 eerst de status van eerder verzonden items. Wanneer Software Factory voor een product geen
 openstaand item meer heeft, verstuurt hij precies het bovenste verzendbare backlogitem en bewaart hij
 het externe Software Factory-ID. Software Factory krijgt alle inhoud en UX in het leveringspakket en
-leest niets uit `product-factory-workspace`.
+kan daarmee zelfstandig verder.
 
 ## Input, status en overdracht tussen de processen
 
@@ -628,11 +627,6 @@ De processen publiceren minimaal de volgende objecten:
 - **Overleguitkomst** — notulen met besluiten, open vragen, acties en expliciete geheugenwijzigingen;
 - **Productgeheugen** — gedeelde actuele kennis, richting en besluiten voor alle processen.
 
-Een optionele WorkspacePublisher kan van stabiele versies uit deze database leesbare Markdown-, SVG-
-of afbeeldingsdossiers in `product-factory-workspace` publiceren. De bijbehorende publicatiestatus,
-bronversie, contenthash, pad en commit blijven eveneens in de database staan. Git bevat nooit unieke
-productinformatie en geen proces of Software Factory leest Git als bron.
-
 Onderzoeksdossiers, bronnen, testsessies, agents, prompts, afwegingen, procesgeheugen en agentgeheugen
 blijven intern bij hun eigenaar. Een andere module kan wel een gepubliceerde samenvatting lezen, maar
 niet het interne object wijzigen.
@@ -652,30 +646,16 @@ Een overdracht kan ook teruggaan. Als Kwaliteitsbewaking meerdere verwante bugs 
 naast de losse bugs een structureel kwaliteitssignaal voor Productontwerp. Zo ontstaat terugkoppeling
 zonder dat verantwoordelijkheden door elkaar gaan lopen.
 
-## Database, frontend en optionele Git-workspace
+## Database en frontend
 
 De database is de volledige productwaarheid. De frontend haalt actuele én historische versies via
 read-only application-API's uit de database en maakt droombeelden, epics, UX, stories, backlog,
 bugs, verificaties, signalen, leerresultaten, sessies en leveringen voor mensen leesbaar. Waar dat
 waarde heeft kan de frontend versies naast elkaar zetten en verschillen tonen.
 
-`product-factory-workspace` is in v2 geen geheugen, procesinterface of noodzakelijke schakel. Een
-optionele technische WorkspacePublisher mag afgeronde of expliciet publiceerbare databaseversies
-als leesbare dossiers exporteren. Dat geeft Git-historie, externe links en downloadbare bestanden,
-maar voegt geen nieuwe productwaarheid toe.
-
-Daarvoor gelden de volgende regels:
-
-- alles in Git bestaat eerst volledig en geversioneerd in de database;
-- de Git-bestanden worden gegenereerd en niet handmatig als bron bewerkt;
-- correcties gebeuren in Product Factory en leveren een nieuwe database- en eventueel Git-versie;
-- een Git- of GitHub-storing blokkeert geen processessie, backlogwijziging of levering;
-- Productontwerp, Productplanning, Kwaliteitsbewaking en Software Factory lezen nooit uit Git;
-- de WorkspacePublisher is een technische adapter en geen vierde of vijfde productproces.
-
-Geschikte exports zijn een droombeeld, epicdefinitie met UX, storyplan, belangrijk
-prioriteitsbesluit, epicverificatie, leerresultaat of overleguitkomst. Vluchtige backlogstatus,
-locks, dispatchstatus, technische fouten en ruwe agentoutput blijven alleen in de database.
+De frontend is daarmee de human-readable weergave van de volledige productwaarheid. Correcties lopen
+via de application service van de module die eigenaar is; de frontend schrijft nooit rechtstreeks in
+procestabellen.
 
 ## Geheugen op drie niveaus
 
@@ -1228,29 +1208,28 @@ Kwaliteitsbewaking.
 12. Een droomconcept is nooit stilletjes een gepland ontwerp.
 13. Per onderwerp is maar één UX-versie actueel.
 14. Iedere naar Software Factory verzonden story bevat zelfstandig alle relevante UX en assets.
-15. Software Factory en de processen lezen niet uit de optionele Git-workspace.
-16. We bouwen kleine stappen en leren na iedere oplevering.
-17. Er is weinig werk tegelijk bezig.
-18. Kritieke fouten gaan voor, maar onderhoud verdringt vernieuwing niet stilletjes.
-19. Agents nemen gewone omkeerbare productbesluiten en leggen die uit.
-20. De Stakeholder kan richting geven en bijsturen zonder de dagelijkse planner te worden.
-21. Iedere langlevende agent heeft eigen geheugen; ieder proces heeft gedeeld procesgeheugen.
-22. Agent- en procesgeheugen zijn nooit de enige bron van productwaarheid.
-23. Een overleguitkomst werkt alleen door via expliciete besluiten, acties of geheugenwijzigingen.
-24. Een verborgen score neemt geen groot of onomkeerbaar productbesluit.
-25. Het gewone scherm toont producttaal, geen interne agent- of databasetaal.
-26. Nieuwe functies komen alleen in Product Factory als ze een hoofdvraag aantoonbaar eenvoudiger
+15. We bouwen kleine stappen en leren na iedere oplevering.
+16. Er is weinig werk tegelijk bezig.
+17. Kritieke fouten gaan voor, maar onderhoud verdringt vernieuwing niet stilletjes.
+18. Agents nemen gewone omkeerbare productbesluiten en leggen die uit.
+19. De Stakeholder kan richting geven en bijsturen zonder de dagelijkse planner te worden.
+20. Iedere langlevende agent heeft eigen geheugen; ieder proces heeft gedeeld procesgeheugen.
+21. Agent- en procesgeheugen zijn nooit de enige bron van productwaarheid.
+22. Een overleguitkomst werkt alleen door via expliciete besluiten, acties of geheugenwijzigingen.
+23. Een verborgen score neemt geen groot of onomkeerbaar productbesluit.
+24. Het gewone scherm toont producttaal, geen interne agent- of databasetaal.
+25. Nieuwe functies komen alleen in Product Factory als ze een hoofdvraag aantoonbaar eenvoudiger
     maken.
-27. Iedere intelligente procesmodule heeft alleen `runProcessSession()` als agentgestuurde ingang;
+26. Iedere intelligente procesmodule heeft alleen `runProcessSession()` als agentgestuurde ingang;
     de dispatcher is een afzonderlijke technische adapter zonder productlogica.
-28. Iedere gepubliceerde entiteit heeft precies één schrijvende module.
-29. Andere modules lezen gegevens alleen via de gepubliceerde Spring Modulith-interface.
-30. De dispatcher neemt geen productbesluiten en verstuurt alleen het bovenste backlogitem.
-31. Als HKH vier of minder verzendbare items heeft, worden nieuwe processessies planbaar gemaakt.
-32. Productontwerp mag een niet-gekozen epic herzien, maar nooit een gekozen epicversie wijzigen.
-33. Alle stories afgerond is niet hetzelfde als een geslaagde epic.
-34. Kwaliteitsbewaking maakt bugs en epicgaten, maar geen stories.
-35. Alleen Productplanning verandert de epicuitvoering en sluit haar na inhoudelijke verificatie af.
+27. Iedere gepubliceerde entiteit heeft precies één schrijvende module.
+28. Andere modules lezen gegevens alleen via de gepubliceerde Spring Modulith-interface.
+29. De dispatcher neemt geen productbesluiten en verstuurt alleen het bovenste backlogitem.
+30. Als HKH vier of minder verzendbare items heeft, worden nieuwe processessies planbaar gemaakt.
+31. Productontwerp mag een niet-gekozen epic herzien, maar nooit een gekozen epicversie wijzigen.
+32. Alle stories afgerond is niet hetzelfde als een geslaagde epic.
+33. Kwaliteitsbewaking maakt bugs en epicgaten, maar geen stories.
+34. Alleen Productplanning verandert de epicuitvoering en sluit haar na inhoudelijke verificatie af.
 
 ## Wat we uit versie 1 willen behouden
 
@@ -1336,17 +1315,14 @@ niet iedere mogelijke bron of vorm van automatisering te ondersteunen.
 3. geen nieuw item sturen zolang Software Factory voor het product nog openstaand werk heeft;
 4. anders precies het bovenste verzendbare item als volledig `StoryDeliveryPackage` aanmaken;
 5. tekst en SVG als tekst en begrensde binaire assets als attachments overdragen;
-6. geen Git-workspace nodig hebben voor de overdracht;
-7. geen agents, herordening of productbesluit bevatten.
+6. geen agents, herordening of productbesluit bevatten.
 
-### Minimaal voor de frontend en optionele workspace
+### Minimaal voor de frontend
 
 1. alle actuele en historische productentiteiten vanuit de database leesbaar tonen;
 2. per gebruikerssignaal de oorspronkelijke inhoud en afzonderlijke afhandelstatus tonen;
 3. relevante versies en herkomst zichtbaar maken en waar nuttig vergelijken;
-4. de Git-workspace niet nodig hebben voor gewone productbediening;
-5. stabiele dossiers optioneel en asynchroon naar Git kunnen exporteren zonder processen of
-   leveringen te blokkeren.
+4. wijzigingen uitsluitend via de application service van de eigenaarsmodule laten lopen.
 
 ### Minimaal voor overleggen en geheugen
 
@@ -1389,7 +1365,7 @@ De Stakeholder moet zonder technische uitleg binnen één minuut antwoord kunnen
 21. Welk backlogitem staat open in Software Factory en wat is de laatste leveringsstatus?
 22. Welke gebruikerssignalen zijn binnengekomen en wat is ermee gebeurd?
 23. Welke opdracht, richting, signalen of antwoorden heb ik als Stakeholder geleverd?
-24. Bevat de verzonden Software Factory-story alle benodigde UX zonder externe workspace?
+24. Bevat de verzonden Software Factory-story zelfstandig alle benodigde UX en ontwerpassets?
 
 Als die antwoorden verspreid staan over meerdere schermen, documenten of agentruns, is het ontwerp
 nog niet eenvoudig genoeg.

@@ -44,7 +44,6 @@ Zij publiceren alleen gegevens die Productontwerp tijdens een volgende sessie ka
 De procesmodules importeren elkaar niet. Stabiele DTO's, read-only queryports en geversioneerde
 databaseprojecties staan in de technische module `processcontracts`. Productontwerp schrijft
 uitsluitend zijn eigen publicaties en leest alleen publicaties van andere eigenaren.
-Een optionele Git-export is geen input en wordt nooit als productgeheugen gelezen.
 
 ### Input
 
