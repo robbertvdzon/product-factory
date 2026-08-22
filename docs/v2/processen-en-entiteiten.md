@@ -44,7 +44,7 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 | Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `stopEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpics` |
 | Productplanning | `requestEpicPlanning`, `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `recordDispatchFailure` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
 | Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `linkBugfixStory` | `getBug`, `findVerifications`, `getQualityOverview`, `findQualityWorkItems` |
-| Besluitenregister | `recordDecision`, `withdrawDecision` | `getDecision`, `findDecisions` |
+| Besluitenregister | `createDecision`, `reviseDecision`, `withdrawDecision`, `supersedeDecisions` | `getDecisions(productId, validAt?)`, `getDecisionArchive(productId)` |
 
 Een command mag ID's, verwachte versies, bron, actor en idempotentiesleutel aannemen, maar geen
 vrije velden waarmee de aanroeper de state machine kan omzeilen.
@@ -58,12 +58,30 @@ vertaalt invoer uit de UI naar commands op de juiste eigenaar.
 |---|---|---|
 | identiteit, rol, contactwijze en mandaat | `Stakeholder` | bepaalt wie richting en prioriteit mag geven |
 | productdoel en harde grenzen | `ProductAssignment` | verplichte context voor alle processen |
-| bindende richting, correctie of stopbesluit | `StakeholderDirection` en eventueel `DecisionRecord` | processen volgen de geldende richting |
-| handmatige hoge prioriteit voor een epic | `StakeholderDirection` plus `DecisionRecord` | product-/overlegmodule roept `requestEpicReprioritization(...)` aan |
+| groot, blijvend besluit uit een overleg | `Decision` met `origin = STAKEHOLDER` | notulenagent registreert het; processen lezen de geldige momentopname |
+| bindende richting, correctie of stopbesluit | `StakeholderDirection` | processen volgen de geldende richting; alleen een grote blijvende keuze wordt daarnaast een besluit |
+| handmatige hoge prioriteit voor een epic | `StakeholderDirection` | product-/overlegmodule roept `requestEpicReprioritization(...)` aan; dit is geen besluit |
 | feedback, probleem, kans, risico of kwaliteitszorg | `UserSignal` | ontwerp of kwaliteit onderzoekt dit later; een kwaliteitszorg kan een `QualityWorkItem` opleveren |
 | testomgevingen en toegestane toegang | `TestableProductConfiguration` | maakt gecontroleerd testen mogelijk |
 
 De Stakeholder schrijft geen epic, story, bug, verificatie of backlogpositie.
+
+## Besluiten als aparte modulegrens
+
+Het Besluitenregister bevat alleen grote, blijvende keuzes die meerdere toekomstige processessies
+begrenzen. Een droombeeld, epic, epicstatus, backlogvolgorde, bugprioriteit of andere normale
+processtap is geen besluit.
+
+Een Stakeholderbesluit ontstaat in een overleg; de notulenagent registreert het namens de
+Stakeholder. Een Factorybesluit mag alleen binnen het geldende mandaat worden gemaakt en is direct
+zichtbaar voor de Stakeholder. Beide gebruiken hetzelfde interne `Decision`-aggregate en dezelfde
+versie- en lifecyclecommands.
+
+De normale query `getDecisions(productId, validAt?)` levert per besluit alleen de versie die op het
+gekozen tijdstip geldig was. Zonder datum is dat nu. Ingetrokken of vervangen besluiten ontbreken
+dus normaal, maar verschijnen bij een historische datum als zij toen nog geldig waren. De aparte
+`getDecisionArchive(productId)`-query geeft de frontend alle besluiten en alle versies. Processen
+gebruiken het archief niet als input.
 
 ## Duurzame entiteiten en eigenaarschap
 
@@ -85,12 +103,14 @@ nooit rechtstreeks in de tabel.
 | `QualityWorkItem` | Kwaliteitsbewaking | Productplanning of product-/overlegmodule | Kwaliteitsbewaking, operations en frontend | duurzame testqueue; type `VERIFY_STORY`, `VERIFY_EPIC`, `RETEST_BUGFIX` of `INVESTIGATE_USER_SIGNAL`; dezelfde vijf werkstatussen |
 | `Bug` | Kwaliteitsbewaking | Productplanning mag een bugfixstory koppelen | kwaliteit, planning en frontend | reproduceerbare afwijking, bewijs, ernst en herstelstatus |
 | `Verification` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | kwaliteit, ontwerp, planning en frontend | controle van `STORY`, `EPIC` of `USER_SIGNAL`, met doelversie, uitkomst, bewijs en eventuele dekkingsgaten |
-| `DecisionRecord` | Besluitenregister | bevoegde bronmodule registreert, trekt in of vervangt | alle processen, Stakeholder en frontend | betekenisvol besluit met begin- en optionele einddatum en opvolgingsrelatie |
+| `Decision` | Besluitenregister | notulenagent voor de Stakeholder of bevoegde Factorymodule mag aanmaken, herzien, intrekken of vervangen | alle processen via geldige snapshot; Stakeholder en frontend ook via archief | stabiele identiteit, `origin`, state `ACTIVE`, `WITHDRAWN` of `SUPERSEDED`, historie en eventuele opvolger |
+| `DecisionDetails` | Besluitenregister binnen één `Decision` | uitsluitend via revise-, withdraw- of supersedecommand | via `DecisionDto` of `DecisionHistoryDto` | één versie met ID, `validFrom`, `validUntil` en alleen de besluittekst |
 | `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde batch, inputversies, agentruns, publicaties, eindstatus en blokkade |
 | `DeliveryAttempt` | dispatcher binnen Productplanning | dispatcher via interne service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
 Interne objecten zoals `LearningResult`, drafts, agentruns, onderzoeksdossiers en testobservaties
-steken de modulegrens niet over. Een betekenisvolle conclusie kan wel een `DecisionRecord` worden.
+steken de modulegrens niet over. Alleen een afzonderlijke grote, blijvende Factorykeuze binnen het
+mandaat kan een `Decision` worden; gewone conclusies en proceskeuzes niet.
 
 ## Read-only en transportcontracten
 
@@ -111,7 +131,8 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `VerificationDetails` | Kwaliteitsbewaking | Productontwerp, Productplanning en frontend | doel, uitkomst, bewijs en dekkingsgaten |
 | `QualityOverview` | Kwaliteitsbewaking uit bugs en verificaties | Productontwerp, Stakeholder en frontend | berekend actueel kwaliteitsbeeld |
 | `QualityWorkItemDetails` | Kwaliteitsbewaking uit `QualityWorkItem` | operations en frontend | testopdracht, doelversie, status, claim, resultaat en fout |
-| `DecisionDetails` | Besluitenregister | alle processen, Stakeholder en frontend | actueel of historisch besluit met geldigheid |
+| `DecisionDto` | Besluitenregister uit de versie die op `validAt` geldig is | alle processen, Stakeholder en normale frontend | platte actuele of historische momentopname; geen andere versies en geen op dat moment ongeldige besluiten |
+| `DecisionHistoryDto` | Besluitenregister uit `Decision` plus alle `DecisionDetails` | uitsluitend frontend en audit | actieve, ingetrokken en vervangen besluiten, alle versies, reden en opvolgingsrelatie |
 | `ProcessSessionDetails` | betreffende procesmodule | operations en frontend | operationele sessiestatus en historie |
 | `SoftwareFactoryWork` | externe adapter | dispatcher | tijdelijk extern integratieantwoord |
 | `StoryDeliveryPackage` | dispatcher uit één `StoryDetails` | Software Factory | volledige, onveranderlijke story met UX, assets, hashes en idempotentiesleutel |

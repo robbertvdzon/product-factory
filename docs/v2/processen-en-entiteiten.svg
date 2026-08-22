@@ -145,15 +145,16 @@
   <path d="M55 1072 V1092 H580 V1072" fill="#ffe4e6"/>
   <text x="80" y="1070" class="module-title">Besluitenregister</text>
   <text x="80" y="1122" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="80" y="1152" class="api">«command» recordDecision(...)</text>
-  <text x="80" y="1178" class="api">«command» withdrawDecision(...)</text>
-  <text x="80" y="1210" class="api">«query» getDecision(...) / findDecisions(...)</text>
-  <line x1="80" y1="1240" x2="555" y2="1240" class="divider" stroke="#fecdd3"/>
-  <text x="80" y="1270" class="section-title">EIGEN ENTITEITEN</text>
-  <text x="80" y="1303" class="entity">DecisionRecord</text>
-  <line x1="80" y1="1332" x2="555" y2="1332" class="divider" stroke="#fecdd3"/>
-  <text x="80" y="1362" class="note">Geen scheduler of agents. Neemt zelf geen besluiten.</text>
-  <text x="80" y="1386" class="note">Intrekken of vervangen behoudt de historische inhoud.</text>
+  <text x="80" y="1152" class="api" style="font-size:12px">«command» createDecision(...) / reviseDecision(...)</text>
+  <text x="80" y="1178" class="api" style="font-size:12px">«command» withdrawDecision(...) / supersedeDecisions(...)</text>
+  <text x="80" y="1210" class="api">«query» getDecisions(productId, validAt?)</text>
+  <text x="80" y="1236" class="api">«query» getDecisionArchive(productId)</text>
+  <line x1="80" y1="1260" x2="555" y2="1260" class="divider" stroke="#fecdd3"/>
+  <text x="80" y="1290" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="80" y="1323" class="entity">Decision · DecisionDetails</text>
+  <line x1="80" y1="1352" x2="555" y2="1352" class="divider" stroke="#fecdd3"/>
+  <text x="80" y="1382" class="note">Alleen grote besluiten · origin STAKEHOLDER of FACTORY.</text>
+  <text x="80" y="1406" class="note">Normale query = geldige versie; archief = alles.</text>
 
   <!-- Dispatcher -->
   <g transform="translate(220 0)">
@@ -227,7 +228,7 @@
 
   <!-- Decision commands are summarized to avoid crossing every module -->
   <path d="M320 920 V1030" class="command"/>
-  <text x="335" y="980" class="flow">recordDecision(...)</text>
+  <text x="335" y="980" class="flow">create / revise / withdraw / supersede</text>
   <text x="80" y="1448" class="note">De getoonde module-interface is leidend.</text>
   <text x="80" y="1470" class="note">Niet iedere toegestane relatie heeft een pijl.</text>
 </svg>

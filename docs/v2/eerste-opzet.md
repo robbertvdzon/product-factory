@@ -191,7 +191,8 @@ invoert.
 
 De oorspronkelijke melding, bron, gebruikscontext en eventueel bewijs blijven ongewijzigd bewaard.
 Een gebruikerssignaal is nog geen besluit, bug, epic of story. Kwaliteitsbewaking kan na verificatie
-een bug publiceren; Productontwerp kan er een epic of een geregistreerd ontwerpbesluit aan koppelen.
+een bug publiceren en Productontwerp kan er een epic aan koppelen. De normale afhandeling van het
+signaal is geen besluit.
 
 Status en afhandeling staan op hetzelfde `UserSignal`. De oorspronkelijke melding blijft
 onveranderlijk, maar de productmodule kan via betekenisvolle commands status, uitkomst en links naar
@@ -305,26 +306,33 @@ Na de oplevering leggen we kort vast:
 - wat de logische volgende keuze is.
 
 Dit leerresultaat wordt gebruikt bij de volgende keuze, maar blijft intern binnen Productontwerp.
-Alleen wanneer er een concrete keuze uit volgt, wordt die keuze met een korte onderbouwing in het
-Besluitenregister vastgelegd.
+Alleen wanneer daar een grote, blijvende keuze uit volgt die toekomstige processessies begrenst,
+wordt een Factory-besluit in het Besluitenregister vastgelegd. Een droombeeld, epic of gewone
+proceskeuze is geen besluit.
 
 ### Besluit en Besluitenregister
 
-Een besluit is een betekenisvolle keuze die richting, productinhoud, prioriteit, uitvoering of de
-afhandeling van een onderwerp verandert. De module die bevoegd is voor het onderwerp neemt het
-besluit. Het centrale Besluitenregister bewaart daarna de leesbare registratie en neemt zelf geen
-besluiten.
+Een besluit is een expliciete, blijvende keuze die toekomstige processessies begrenst en niet
+vanzelf uit het normale proces volgt. Denk aan de keuze voor SQL in plaats van MongoDB, een blijvende
+privacygrens of een groot mandaat voor de Factory. Een droombeeld maken, een epic kiezen, een bug
+voorrang geven of een normale statusovergang uitvoeren is geen besluit.
 
-Een besluit bevat de keuze, korte onderbouwing, alternatieven, gebruikte bronnen en entiteitsversies,
-beslisser, toepassingsgebied en geldigheid. Het heeft een ingangsdatum en kan een einddatum krijgen.
-Als een besluit wordt ingetrokken, krijgt het status **Ingetrokken**, een einddatum en een reden. Als
-een nieuw besluit het vervangt, krijgt het oude besluit status **Vervangen** en een einddatum gelijk
-aan de ingangsdatum van het nieuwe besluit. Beide records verwijzen naar elkaar en de oude inhoud
-blijft leesbaar.
+Een besluit komt van de **Stakeholder** of de **Factory**. Bij een Stakeholderbesluit registreert de
+notulenagent na het overleg wat de Stakeholder heeft besloten; de agent is niet de beslisser. De
+Factory mag alleen binnen haar mandaat zelfstandig een groot besluit nemen en maakt dat direct
+zichtbaar voor de Stakeholder.
+
+Een `Decision` heeft een stabiel ID en een historie van `DecisionDetails`-versies met `validFrom`,
+`validUntil` en de besluittekst. Een wijziging van hetzelfde besluit maakt een nieuwe versie. Een
+besluit zonder opvolger kan worden **Ingetrokken** (`WITHDRAWN`). Een inhoudelijk nieuw besluit kan
+het oude overnemen; het oude wordt dan **Vervangen door** (`SUPERSEDED`) en verwijst met
+`supersededByDecisionId` naar het nieuwe besluit.
 
 Het Besluitenregister is een ondersteunende module zonder agents of geplande procesfunctie. De
-frontend kan actuele en historische besluiten tonen. Procesmodules blijven hun specifieke contracten
-gebruiken en voeren geen vrije besluittekst uit als ongetypeerde opdracht.
+normale query geeft alleen de op een gekozen tijdstip geldige besluitversies; zonder datum betekent
+dat de huidige besluiten. Een aparte archiefquery geeft de frontend alle ingetrokken en vervangen
+besluiten en alle versies. Procesmodules blijven hun specifieke contracten gebruiken en voeren geen
+vrije besluittekst uit als ongetypeerde opdracht.
 
 ### Agent
 
@@ -348,7 +356,7 @@ Geheugen is duurzame kennis die een volgende uitvoering kan gebruiken. Versie 2 
 
 - agentgeheugen voor wat één agent vanuit zijn eigen rol heeft geleerd;
 - procesgeheugen voor kennis die alle uitvoerders van hetzelfde proces nodig hebben;
-- productgeheugen voor gedeelde productfeiten en richting; betekenisvolle keuzes staan in het
+- productgeheugen voor gedeelde productfeiten en richting; grote, blijvende besluiten staan in het
   afzonderlijke Besluitenregister.
 
 Welke informatie in welke laag hoort en hoeveel gezag zij heeft, wordt verderop expliciet gemaakt.
@@ -667,8 +675,8 @@ De processen publiceren minimaal de volgende objecten:
 - **Testopdracht** — een duurzaam `QualityWorkItem` met doelversie, type, status en
   idempotentiesleutel; alleen Kwaliteitsbewaking schrijft het;
 - **Bug** — een reproduceerbare afwijking met bewijs, ernst en herstelstatus;
-- **Besluit** — een betekenisvolle keuze met onderbouwing, alternatieven, bronversies,
-  toepassingsgebied, ingangsdatum en optionele einddatum of vervangingsrelatie;
+- **Besluit** — een grote, blijvende keuze van Stakeholder of Factory met een stabiel ID,
+  geversioneerde besluittekst, geldigheid en eventueel intrekking of verwijzing naar een opvolger;
 - **Afleverpoging** — onveranderlijke technische historie van verzending, response, fout en retry;
 - **Storyleveringspakket** — de onveranderlijke, volledige JSON-overdracht van één story of bugfix
   naar Software Factory, inclusief UX en attachments;
@@ -748,7 +756,7 @@ en rol hoort, bijvoorbeeld:
 - onderwerpen die hij later opnieuw wil controleren.
 
 Agentgeheugen is persoonlijk en adviserend. Een agent mag niet in zijn eigen geheugen vastleggen dat
-een productbesluit is genomen of dat een epic van status is veranderd. Daarvoor moet hij het gedeelde
+een groot productbesluit is genomen of dat een epic van status is veranderd. Daarvoor moet hij het gedeelde
 productobject bijwerken. Een andere agent hoeft persoonlijk geheugen niet automatisch te vertrouwen
 of te ontvangen.
 
@@ -778,10 +786,9 @@ gelden:
 - samenvattingen van afgesloten overleggen;
 - de herkomst, geldigheid en reikwijdte van ieder kennisitem.
 
-Betekenisvolle keuzes staan niet als vrije geheugenregel in Productgeheugen, maar als
-`DecisionRecord` in het Besluitenregister. Een intern leerresultaat wordt pas gedeelde
-productwaarheid wanneer het leidt tot een concreet publiek productobject, een productregel of een
-geregistreerd besluit.
+Grote, blijvende keuzes staan niet als vrije geheugenregel in Productgeheugen, maar als `Decision`
+in het Besluitenregister. Een intern leerresultaat wordt pas gedeelde productwaarheid wanneer het
+leidt tot een concreet publiek productobject, een productregel of een geregistreerd groot besluit.
 
 Binnen zijn toepassingsgebied heeft een expliciete, actuele richting van de Stakeholder meer gezag
 dan een interpretatie in proces- of agentgeheugen. Een onderzoeksinzicht wordt niet automatisch een
@@ -840,7 +847,7 @@ expliciet is vastgelegd dat menselijke input noodzakelijk is.
 
 ### Output en doorwerking
 
-Bij het afsluiten ontstaan leesbare notulen met:
+Bij het afsluiten maakt de notulenagent leesbare notulen met:
 
 - de besproken onderwerpen;
 - richting of correcties van de Stakeholder;
@@ -848,6 +855,12 @@ Bij het afsluiten ontstaan leesbare notulen met:
 - open vragen;
 - acties met een eigenaar;
 - de productobjecten en geheugenitems die zijn toegevoegd of aangepast.
+
+Daarna verwerkt de notulenagent alleen de expliciete grote besluiten van de Stakeholder. Hij kan
+een besluit aanmaken, als nieuwe versie herzien, met reden intrekken of door een nieuw besluit laten
+overnemen. De Stakeholder blijft de beslisser; de agent schrijft de gecontroleerde registratie. Een
+epicbijsturing, tijdelijke prioriteit of andere normale procesactie wordt rechtstreeks op het
+betrokken productobject uitgevoerd en komt niet in het Besluitenregister.
 
 Een transcript of samenvatting verandert niet vanzelf de roadmap of het productgeheugen. Iedere
 doorwerking is een expliciete, controleerbare wijziging. Een overleg kan zo tegelijk een nog niet
@@ -886,6 +899,7 @@ epicstatus; ze starten geen ontwerpwerk. Productontwerp heeft geen werkqueue.
 | Stakeholderprofiel | product-/overlegmodule | wie richting mag geven, hoe overleg plaatsvindt en waar het beslissingsmandaat eindigt |
 | Productopdracht | productmodule; bevestigd door de Stakeholder | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | Stakeholderrichting | overleg/productmodule | actuele correcties en expliciete beslissingen |
+| Geldige besluiten | Besluitenregister-query op het huidige tijdstip | grote Stakeholder- en Factorykeuzes die het ontwerp begrenzen |
 | Stories en verificaties | Productplanning en Kwaliteitsbewaking | wat eerdere epics werkelijk hebben opgeleverd |
 | Berekend kwaliteitsbeeld | Kwaliteitsbewaking-query | structurele problemen die een nieuwe epic kunnen rechtvaardigen |
 | Gebruikerssignaal | productmodule | oorspronkelijke feedback plus actuele status en resultaatkoppelingen |
@@ -900,12 +914,12 @@ bronnen, onderzoeksdossiers, hypotheses en kansvoorstellen steken de modulegrens
 | Droombeeld | geversioneerd beeld van hoe het product zijn opdracht op lange termijn uitzonderlijk goed kan vervullen; zichtbaar voor de Stakeholder |
 | Epic | geversioneerde, behapbare gebruikersverbetering met status, eenduidige scope, bewijs, compleet UX-ontwerp, risico's en succescriteria |
 | Planningrequest | `requestEpicPlanning(...)` zet na publicatie alleen een `PLAN_EPIC`-werkitem bij Productplanning klaar; het start geen planner |
-| Besluitregistratie | betekenisvolle ontwerpkeuze met korte onderbouwing, alternatieven, bronversies en geldigheid voor het centrale Besluitenregister |
+| Optioneel besluitcommand | alleen voor een uitzonderlijke grote, blijvende Factorykeuze binnen het mandaat; het Besluitenregister maakt de `Decision` |
 
 De enige inhoudelijke overdracht van Productontwerp naar Productplanning is de epic. Het
 droombeeld is zichtbare productrichting, geen uitvoerbaar werk. Leerresultaten en onderzoeksdossiers
-blijven intern bij Productontwerp; alleen hun concrete publieke gevolg en eventuele besluitregistratie
-gaan over de modulegrens.
+blijven intern bij Productontwerp. Alleen een uitzonderlijke duurzame keuze die meerdere toekomstige
+sessies begrenst, kan daarnaast als Factory-besluit over de modulegrens gaan.
 
 Productontwerp mag een epic herzien zolang Productplanning hem niet heeft gekozen. Een gekozen
 epicversie is bevroren en wordt nooit stilletjes aangepast. De interne werking staat in
@@ -931,6 +945,7 @@ gebruikt deterministische storycommands voor verzending en oplevering.
 | Beschikbare epic | Productontwerp | exacte bron voor `PLAN_EPIC` en later via `claimEpicForPlanning(...)` bevroren |
 | Uitvoerbare bug of epicverificatie | Kwaliteitsbewaking | bewijsbron voor een bugfix of ontbrekende epicdekking |
 | Productopdracht en Stakeholderrichting | productmodule | grenzen en expliciete prioriteitsaanwijzingen |
+| Geldige besluiten | Besluitenregister-query op het huidige tijdstip | grote blijvende grenzen; geen opdracht om een specifieke epic, bug of story te kiezen |
 | Story met leveringsvelden | Productplanning zelf, bijgewerkt via dispatchercommands | of een eerder verzonden item nog open, opgeleverd of geblokkeerd is |
 | Verificatie | Kwaliteitsbewaking | of werk goed is en of de hele epic geslaagd kan worden afgesloten |
 
@@ -941,7 +956,6 @@ gebruikt deterministische storycommands voor verzending en oplevering.
 | Story | complete productstory of bugfixstory met `sequenceNumber`, status `TODO`, `IN_PROGRESS` of `DONE`, acceptatiecriteria en relevante UX en assets |
 | Backlog | berekende lijst van alle stories die niet `DONE` zijn, geordend op `sequenceNumber`; geen aparte entiteit |
 | Planningsopdrachtstatus | read-only overzicht van type, bron, status, claim, resultaat of fout van ieder `PlanningWorkItem` |
-| Besluitregistratie | betekenisvolle epic-, prioriteits- of afsluitkeuze voor het centrale Besluitenregister |
 
 Er geldt geen backloglimiet of streefgetal. Een epic wordt in zo veel stories verdeeld als haar
 scope vraagt. Meerdere epics mogen tegelijk actief zijn en hun `TODO`-stories mogen in de globale
@@ -972,6 +986,7 @@ claimt een vaste batch `QualityWorkItem`s en mag testagents starten. Queuecomman
 | Testopdracht | Kwaliteitsbewaking, aangevraagd door Productplanning of product-/overlegmodule | gericht werk van type `VERIFY_STORY`, `VERIFY_EPIC`, `RETEST_BUGFIX` of `INVESTIGATE_USER_SIGNAL` |
 | Productopdracht | productmodule | productgrenzen en publieke Git-URL voor read-only code, tests en documentatie |
 | Stakeholderrichting | overleg/productmodule | bindende productgrens, correctie, stopbesluit of opdrachtwijziging; een kwaliteitszorg is een gebruikerssignaal |
+| Geldige besluiten | Besluitenregister-query op het huidige tijdstip | grote blijvende privacy-, veiligheids- of productgrenzen die het testen beïnvloeden |
 | Testbare productconfiguratie | productmodule | URL's, toegestane accounts, routes en testgrenzen |
 | Story met oplevering en externe referentie | Productplanning | wat nieuw of gewijzigd is en waar het getest kan worden |
 | Bevroren epic en UX | Productontwerp | scope, complete gebruikersroute, succescriteria en wanneer epiccontrole nodig is |
@@ -1186,7 +1201,8 @@ Agents helpen met:
   productbreed prioriteren;
 - als tester dagelijks en na opleveringen de applicatie onderzoeken;
 - losse opleveringen en complete epics beoordelen;
-- ontbrekende informatie aanwijzen.
+- ontbrekende informatie aanwijzen;
+- na een overleg notulen maken en expliciete Stakeholderbesluiten gecontroleerd registreren.
 
 De Stakeholder blijft verantwoordelijk voor:
 
@@ -1204,6 +1220,11 @@ Product Factory is binnen die opdracht verantwoordelijk voor het actuele droombe
 epicportfolio, de epicvolgorde, de backlogkeuzes, het testproces en de balans tussen Verbeteren en
 Vernieuwen. Zij legt deze keuzes uit en maakt ze zichtbaar, zodat de Stakeholder kan ingrijpen zonder
 ieder stapje te hoeven besturen.
+
+Alleen een grote, blijvende keuze die meerdere toekomstige processessies begrenst, wordt als
+Factory-besluit opgeslagen. Gewone product-, epic-, backlog- en bugkeuzes blijven bij hun eigen
+procesobjecten. Ieder Factory-besluit is zichtbaar voor de Stakeholder en kan later in een overleg
+worden herzien, ingetrokken of door een nieuw besluit worden vervangen.
 
 De Stakeholder en agents ontmoeten elkaar in overleggen. Agents mogen zelf een overleg aanvragen met
 een korte agenda en concrete reden. De Stakeholder kan in een overleg vragen stellen, richting geven,
@@ -1283,7 +1304,8 @@ Een epic, story of bug heeft één rustige detailpagina met:
 - eventuele bovenliggende epic en relevante storyrelaties;
 - reden van de backlogprioriteit;
 - voortgang en resultaat;
-- geldende en historische besluiten met hun onderbouwing en geldigheidsperiode.
+- geldende besluiten en, in de aparte historie, hun eerdere versies, herkomst, intrekking en
+  vervangingsrelaties.
 
 Technische details zijn beschikbaar via een aparte knop, maar staan standaard dicht.
 
@@ -1335,7 +1357,8 @@ daarnaast zijn eigen herstelstatus in Kwaliteitsbewaking.
 16. Er is weinig werk tegelijk bezig; meerdere epics mogen wel actief zijn en de Stakeholder kan
     een urgente epic handmatig voorrang geven.
 17. Kritieke fouten gaan voor, maar onderhoud verdringt vernieuwing niet stilletjes.
-18. Agents nemen gewone omkeerbare productbesluiten en leggen die uit.
+18. Gewone omkeerbare proceskeuzes blijven op hun eigen productobject; alleen grote, blijvende
+    keuzes binnen het mandaat worden als Factory-besluit geregistreerd.
 19. De Stakeholder kan richting geven en bijsturen zonder de dagelijkse planner te worden.
 20. Iedere langlevende agent heeft eigen geheugen; ieder proces heeft gedeeld procesgeheugen.
 21. Agent- en procesgeheugen zijn nooit de enige bron van productwaarheid.
@@ -1355,8 +1378,8 @@ daarnaast zijn eigen herstelstatus in Kwaliteitsbewaking.
 32. Alle stories afgerond is niet hetzelfde als een geslaagde epic.
 33. Kwaliteitsbewaking maakt bugs en verificaties, maar geen stories of aparte epicgaten.
 34. Alleen Productontwerp verandert de epicstatus en sluit haar na inhoudelijke verificatie af.
-35. Interne leerresultaten blijven bij Productontwerp; betekenisvolle keuzes staan met begin-,
-    eind- en vervangingsrelaties in het Besluitenregister.
+35. Interne leerresultaten blijven bij Productontwerp; alleen grote, blijvende besluiten staan
+    geversioneerd in het Besluitenregister.
 36. Alleen `runProcessSession()` mag agents starten; queuecommands slaan alleen duurzaam werk op.
 37. Productplanning en Kwaliteitsbewaking hebben elk hun eigen queue en verwerken per run een vaste
     batch; Productontwerp heeft bewust geen queue.
@@ -1457,14 +1480,18 @@ niet iedere mogelijke bron of vorm van automatisering te ondersteunen.
 1. alle actuele en historische productentiteiten via read-only queries leesbaar tonen;
 2. per gebruikerssignaal de oorspronkelijke inhoud, actuele status en resultaatkoppelingen tonen;
 3. relevante versies en herkomst zichtbaar maken en waar nuttig vergelijken;
-4. wijzigingen uitsluitend via betekenisvolle commands van de eigenaarsmodule laten lopen.
+4. standaard alleen momenteel geldige besluiten tonen;
+5. in een aparte historieweergave ingetrokken en vervangen besluiten, alle versies en
+   opvolgingslinks tonen;
+6. wijzigingen uitsluitend via betekenisvolle commands van de eigenaarsmodule laten lopen.
 
 ### Minimaal voor overleggen en geheugen
 
 1. de Stakeholder kan vanuit een productobject een overleg starten;
 2. ieder proces en iedere bevoegde agent kan met reden en onderwerpen een overleg aanvragen;
 3. een overleg bewaart deelnemers, berichten, bronnen, gekoppelde objecten, status en notulen;
-4. besluiten, acties en geheugenwijzigingen uit het overleg worden expliciet doorgevoerd;
+4. de notulenagent kan expliciete grote Stakeholderbesluiten aanmaken, herzien, intrekken of door
+   een nieuw besluit laten overnemen;
 5. iedere langlevende agent heeft corrigeerbaar agentgeheugen;
 6. ieder proces heeft gedeeld procesgeheugen voor aanpak, continuïteit en terugkerende lessen;
 7. gedeelde productwaarheid staat in productgeheugen of op het bijbehorende productobject;
@@ -1492,7 +1519,8 @@ De Stakeholder moet zonder technische uitleg binnen één minuut antwoord kunnen
 13. Wat wordt op dit moment gebouwd?
 14. Wat hebben we van de laatste oplevering geleerd?
 15. Is de epic alleen technisch klaar of ook aantoonbaar geslaagd?
-16. Welke beslissing heeft mijn aandacht nodig?
+16. Welke grote Factory- en Stakeholderbesluiten gelden nu en welke zijn later ingetrokken of
+    vervangen?
 17. Welk overleg is aangevraagd, waarom en door welke rol?
 18. Wat heeft een agent of proces onthouden en wat geldt als gedeelde productwaarheid?
 19. Welke van mijn eerdere aanwijzingen zijn nog actief, vervangen of ingetrokken?

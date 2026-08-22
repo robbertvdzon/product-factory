@@ -103,6 +103,7 @@ Productplanning gebruikt publieke Spring Modulith-API's. Read-only DTO's staan i
 | `StakeholderDetails` | product-/overlegmodule | identiteit, rol en mandaat achter een prioriteitsaanwijzing |
 | `ProductAssignmentDetails` | productmodule | productidentiteit, grenzen en publieke Git-URL |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende epic- en prioriteitsgrenzen |
+| `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende keuzes die de planning begrenzen; geen directe opdracht om een epic, bug of story te kiezen |
 | `EpicDetails` | Productontwerp | exacte epicversie, gebruikerswaarde, scope, UX, succescriteria en status |
 | `BugDetails` | Kwaliteitsbewaking | uitvoerbare bug inclusief ernst, bewijs en versie |
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor een ontbrekend stuk binnen een bevroren epic |
@@ -124,9 +125,9 @@ product- en UX-informatie.
 | `ProcessSession` | operationele historie van de intelligente run | geclaimde workitems, inputversies, agentruns, publicaties en eindstatus |
 
 `PlanningWorkItem`, `Story`, `ProcessSession` en `DeliveryAttempt` zijn eigendom van
-Productplanning. De backlog is geen entiteit. Een betekenisvolle epickeuze of handmatige
-prioriteitswijziging wordt ook als `DecisionRecord` in het centrale
-[Besluitenregister](besluitenregister.md) vastgelegd.
+Productplanning. De backlog is geen entiteit. Epicselectie, storyvorming, backlogvolgorde en het
+voorrang geven aan een epic of bug zijn gewone proceskeuzes en worden niet in het Besluitenregister
+opgenomen.
 
 ## Een epic plannen
 
@@ -232,7 +233,6 @@ epic heeft gevonden. Het command zelf maakt geen story; het zet alleen een idemp
 - `StoryCandidateSet`, `PriorityAssessment` en `StoryOrderDraft` — kandidaatwerk en ordening;
 - `Story` — inhoud, type, productbrede volgorde en de drie statussen;
 - `StoryDeliveryPackage`, `DeliveryAttempt` en `ExternalWorkLink` — technische levering en historie;
-- `DecisionDraft` — onderbouwing vóór registratie in het Besluitenregister;
 - `PlanningMemory` — lessen over slicing, balans en blokkades;
 - `AgentRun` — input, promptversie, output en fout van één agenttaak.
 

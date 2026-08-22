@@ -2,138 +2,238 @@
 
 Status: eerste ontwerp van ondersteunende module en publieke interface.
 
-Het Besluitenregister bewaart alle betekenisvolle productbesluiten op één leesbare en herleidbare
-plek. Het register neemt zelf geen besluiten. Productontwerp, Productplanning, de product-/overlegmodule
-of een andere bevoegde eigenaar neemt het besluit en levert daarna een registratieverzoek aan.
+Het Besluitenregister bewaart alleen grote, blijvende productbesluiten. Het is geen proceslogboek en
+neemt zelf geen besluiten. Het heeft geen agents, scheduler of `runProcessSession()` en is een
+ondersteunende Spring Modulith-module met eigen tabellen en publieke commands en queries.
 
-Het Besluitenregister is geen vierde intelligent proces. Het heeft geen agents, geen scheduler en
-geen `runProcessSession()`. Het is een ondersteunende Spring Modulith-module met gewone application
-commands, eigen tabellen in dezelfde fysieke productdatabase en read-only queries voor de
-frontend.
+## Wat een besluit is
 
-## Wat wel en niet een besluit is
+> Een besluit is een expliciete, blijvende keuze die toekomstige processessies begrenst en die niet
+> vanzelf uit het normale productproces volgt.
 
-Een besluit verandert richting, productinhoud, prioriteit, uitvoering of de afhandeling van een
-onderwerp. Voorbeelden zijn:
+Een keuze hoort alleen in het register wanneer zij doorgaans:
 
-- een droombeeld wezenlijk aanpassen;
-- een epic maken, herzien, intrekken of bewust niet maken;
-- een gebruikerssignaal zonder epic afsluiten als duplicaat of buiten scope;
-- een exacte epicversie kiezen;
-- een belangrijke prioriteitskeuze of prioriteitsregel vastleggen;
-- een epic na verificatie afsluiten, openhouden of stoppen;
-- een bindende richting, grens of correctie van de Stakeholder vastleggen.
+- over meerdere epics, stories of processessies heen geldt;
+- toekomstige mogelijkheden of uitvoering merkbaar begrenst;
+- kostbaar, riskant of belangrijk is om terug te draaien;
+- iets is waarvan de Stakeholder redelijkerwijs op de hoogte wil zijn en waarop die moet kunnen
+  terugkomen.
 
-Ruwe onderzoeksresultaten, hypotheses, observaties, agentredeneringen, testbewijs en iedere kleine
-uitvoeringsstap zijn geen besluiten. Zij blijven bij hun eigenaar. Een besluit mag ernaar verwijzen
-en bevat alleen de korte onderbouwing die nodig is om de keuze later te begrijpen.
+Voorbeelden zijn de keuze voor SQL in plaats van MongoDB, een blijvende privacygrens, een belangrijke
+doelgroepbeperking of een ruim mandaat waarbinnen de Factory autonoom mag handelen.
 
-Een bugclassificatie, storyverificatie of epicverificatie is eerst een inhoudelijk oordeel met bewijs
-van Kwaliteitsbewaking en blijft in die eigen entiteit staan. De daaropvolgende keuze om bijvoorbeeld
-een fix voorrang te geven, een epic open te houden of een uitvoering te stoppen is wél een besluit
-voor het Besluitenregister. Zo kopieert het register geen testresultaten.
+Het gewone proces volgen is geen besluit. Dit zijn daarom geen besluiten:
 
-## Publieke interface
+- een droombeeld maken of aanpassen;
+- een epic maken, herzien, kiezen, activeren, verifiëren of afsluiten;
+- een epic in stories verdelen;
+- een bug of epic tijdelijk voorrang geven;
+- stories ordenen of een backlogitem dispatchen;
+- een verificatie-uitkomst, gebruikerssignaal of normale statusovergang verwerken;
+- intern onderzoek, bewijs, hypotheses, agentredeneringen of leerresultaten bewaren.
 
-De schrijvende application interface bestaat uit twee idempotente commands:
+Deze gegevens blijven bij hun inhoudelijke eigenaar. Zo blijft het Besluitenregister klein en bevat
+het alleen keuzes die echt richtinggevend zijn.
+
+## Wie een besluit neemt
+
+Een besluit heeft precies één herkomst:
+
+- **Stakeholder** — de Stakeholder neemt het besluit tijdens een overleg. De notulenagent herkent de
+  expliciete besluiten in de afgeronde notulen en registreert of wijzigt ze via de publieke commands.
+  De agent is de registrator en niet de beslisser; een nieuw besluit krijgt
+  `origin = STAKEHOLDER`.
+- **Factory** — een proces of agent neemt binnen het vastgelegde mandaat zelfstandig een groot,
+  blijvend besluit. Het besluit wordt direct zichtbaar voor de Stakeholder. Die kan het later via
+  een overleg herzien, intrekken of vervangen.
+
+Valt een mogelijke keuze buiten het Factory-mandaat, dan registreert de Factory geen actief besluit.
+Zij maakt een overlegverzoek of voorstel waarop de Stakeholder kan beslissen.
+
+## Intern datamodel
+
+Dit is het opslagmodel binnen de module. Andere modules krijgen deze objecten en hun repositories
+niet rechtstreeks.
 
 ```java
-DecisionId recordDecision(RecordDecisionCommand command);
-void withdrawDecision(WithdrawDecisionCommand command);
+class Decision {
+    String id;                         // UUID.toString()
+    String productId;
+    DecisionOrigin origin;             // STAKEHOLDER of FACTORY
+    List<DecisionDetails> history;
+    DecisionState state;               // ACTIVE, WITHDRAWN of SUPERSEDED
+    String supersededByDecisionId;      // alleen bij SUPERSEDED
+    String withdrawalReason;            // optioneel, alleen bij WITHDRAWN
+}
+
+class DecisionDetails {
+    String id;                         // UUID.toString(), ID van deze versie
+    Timestamp validFrom;
+    Timestamp validUntil;              // null zolang deze versie actueel is
+    String decision;
+}
 ```
 
-Procesmodules krijgen geen repository van het Besluitenregister. Zij leveren een command of
-gepubliceerd application event met een idempotentiesleutel. Alleen het Besluitenregister vormt en
-schrijft het duurzame besluitrecord.
+`Decision` is de stabiele identiteit van één besluitonderwerp. `DecisionDetails` bevat de versies
+van de besluittekst. De volgorde volgt uit `validFrom`; een apart versienummer is niet nodig.
 
-De publieke leesinterface retourneert `DecisionDetails`. Dit DTO is geen tweede entiteit. Andere processen gebruiken dit generieke record
-niet als vervanging van hun inhoudelijke contracten. Productplanning blijft bijvoorbeeld
-`EpicDetails` lezen en niet een besluittekst interpreteren om een epic te bouwen. Het
-besluitenregister is primair voor audit, uitleg, de frontend en de afhandeling van expliciet aan een
-gebruikerssignaal gekoppelde ontwerpbesluiten.
+Er staat bewust geen `contractVersion` in dit domeinmodel. Een eventuele versie van een REST- of
+eventcontract hoort in de technische interface- of berichtlaag en zegt niets over het besluit zelf.
 
-## DecisionRecord
+## Aanpassen, intrekken en vervangen
 
-Een besluit bevat minimaal:
+De drie bewerkingen betekenen iets anders.
 
-- stabiel besluit-ID, product-ID en contractversie;
-- een stabiele `decisionKey` voor het onderwerp waarop geldigheid en vervanging worden bewaakt;
-- besluitsoort en toepassingsgebied;
-- de concrete beslissing in gewone producttaal;
-- korte onderbouwing en relevante overwogen alternatieven;
-- verwijzingen naar gebruikte bewijs-, signaal- en productentiteiten met exacte versies;
-- de module en eventueel de bevoegde Stakeholder die het besluit namen;
-- processessie-ID of overleg-ID;
-- `validFrom` en een optionele `validUntil`;
-- status **Gepland**, **Actief**, **Vervangen** of **Ingetrokken**;
-- optioneel `supersedesDecisionId` en `replacedByDecisionId`;
-- aanmaakmoment en, bij intrekking, intrekkingsreden.
+### Hetzelfde besluit aanpassen
 
-De inhoud, onderbouwing, alternatieven en bronverwijzingen van een geregistreerd besluit zijn
-onveranderlijk. Alleen het Besluitenregister mag de levenscyclusvelden invullen wanneer het besluit
-eindigt. Daardoor blijft altijd zichtbaar wat destijds is besloten en op basis waarvan.
+Een tekstuele verduidelijking of wijziging die nog over hetzelfde besluitonderwerp gaat, maakt een
+nieuwe `DecisionDetails` binnen dezelfde `Decision`:
 
-## Geldigheid, intrekken en vervangen
+1. de huidige versie krijgt `validUntil` gelijk aan het wijzigingsmoment;
+2. een nieuwe versie krijgt precies dat moment als `validFrom` en `validUntil = null`;
+3. de `Decision` blijft `ACTIVE`;
+4. de oude versie blijft volledig leesbaar.
 
-Een besluit zonder `validUntil` geldt vanaf `validFrom` totdat het wordt ingetrokken of vervangen.
-De geldigheidsperiode is halfopen: `validFrom` hoort erbij en `validUntil` niet. Daardoor kan een
-nieuw besluit exact beginnen op het moment waarop het oude eindigt zonder overlap.
+### Intrekken zonder opvolger
 
-Bij intrekking zonder vervangend besluit:
+Wanneer een besluit niet meer geldt en geen nieuw besluit het overneemt:
 
-1. het Besluitenregister zet `validUntil` op het effectieve intrekkingsmoment;
-2. de status wordt **Ingetrokken**;
-3. de reden en bron van de intrekking worden vastgelegd;
-4. de oude inhoud blijft leesbaar.
+1. de actuele versie krijgt een `validUntil`;
+2. de `Decision` krijgt state `WITHDRAWN`;
+3. een eventuele `withdrawalReason` wordt opgeslagen;
+4. alle versies blijven in de historie staan.
 
-Bij vervanging door een nieuw besluit gebeurt in één transactie:
+### Laten overnemen door een nieuw besluit
 
-1. het nieuwe besluit wordt aangemaakt met `supersedesDecisionId`;
-2. het oude besluit krijgt `validUntil` gelijk aan `validFrom` van het nieuwe besluit;
-3. het oude besluit krijgt status **Vervangen** en `replacedByDecisionId`;
-4. het nieuwe besluit wordt **Actief**, of **Gepland** wanneer de ingangsdatum in de toekomst ligt.
+Wanneer een inhoudelijk ander besluit het oude vervangt, heet dat **superseded**: in de frontend
+tonen we “Vervangen door”. Het nieuwe besluit krijgt een eigen `Decision`-ID. Het oude besluit:
 
-Voor dezelfde `decisionKey` en hetzelfde toepassingsgebied mogen geldigheidsperioden niet ongemerkt
-overlappen. Een correctie met terugwerkende kracht is een afzonderlijk, zichtbaar administratief
-besluit en herschrijft de historische registratie niet stilletjes.
+1. krijgt state `SUPERSEDED`;
+2. krijgt op zijn actuele versie `validUntil` gelijk aan `validFrom` van het nieuwe besluit;
+3. krijgt `supersededByDecisionId` met het ID van het nieuwe besluit.
 
-## Relatie met interne leerresultaten
+Bij een overstap van MongoDB naar SQL ontstaat dus een nieuw SQL-besluit. Ieder oud MongoDB-besluit
+dat daardoor werkelijk ongeldig wordt, kan `SUPERSEDED` worden en naar hetzelfde SQL-besluit wijzen.
+Een gewone versiecorrectie gebruikt deze relatie niet.
 
-`LearningResult` blijft een interne entiteit van Productontwerp. Het kan onderzoek, hypotheses,
-tegenspraak en uitgebreide conclusies bevatten. Alleen wanneer daar een concrete keuze uit volgt,
-registreert Productontwerp een `DecisionRecord` met een korte onderbouwing en verwijzingen naar
-de interne bronregistratie of publieke bewijsentiteiten.
+Geldigheidsperioden zijn halfopen: `validFrom` hoort erbij en `validUntil` niet. Daardoor kunnen een
+oude en nieuwe versie of een oud en opvolgend besluit exact op hetzelfde tijdstip aansluiten zonder
+overlap.
 
-Als Productontwerp een gebruikerssignaal beoordeelt maar geen epic maakt, registreert het een besluit
-met soort **Signaalbeoordeling** en het signaal-ID. Productontwerp roept daarna een command op de
-productmodule aan om de status en besluitkoppeling op `UserSignal` te actualiseren. Het volledige
-interne leerresultaat wordt niet publiek.
+## Publieke commandinterface
 
-## Eigenaarschap en lezen
+De notulenagent en bevoegde Factory-modules gebruiken vier doelgerichte, idempotente commands:
 
-| Onderdeel | Verantwoordelijkheid |
-|---|---|
-| Bronmodule of bevoegde Stakeholder via productbediening | neemt het besluit en levert inhoud, onderbouwing, bronnen en geldigheid aan |
-| Besluitenregister | maakt het besluitrecord, bewaakt idempotentie, geldigheidsperioden, intrekking en vervanging |
-| Frontend | leest actieve en historische `DecisionDetails`-objecten en toont waarom en wanneer een besluit gold |
-| Procesmodules | blijven hun specifieke procescontracten lezen; zij mogen relevante besluiten tonen of als gecontroleerde context gebruiken, maar niet als ongetypeerde opdracht uitvoeren |
+```java
+DecisionId createDecision(CreateDecisionCommand command);
+void reviseDecision(ReviseDecisionCommand command);
+void withdrawDecision(WithdrawDecisionCommand command);
+DecisionId supersedeDecisions(SupersedeDecisionsCommand command);
+```
 
-De frontend biedt per product een chronologische besluitenlijst en toont bij ieder betrokken object
-het actieve besluit, eerdere versies, ingangs- en einddatum, vervangingsrelaties, onderbouwing en
-bronnen.
+`supersedeDecisions(...)` maakt het nieuwe besluit en sluit één of meer oude besluiten atomair af.
+Ieder command controleert product, beslissingsmandaat, verwachte state en idempotentiesleutel. Er is
+geen algemene setter en een aanroeper schrijft nooit rechtstreeks in `Decision` of
+`DecisionDetails`.
+
+## Query 1 — geldige besluiten op een moment
+
+De normale query levert een platte momentopname en nooit het interne aggregate:
+
+```java
+List<DecisionDto> getDecisions(ProductId productId, Timestamp validAt);
+```
+
+`validAt` is optioneel en staat standaard op het huidige tijdstip. Zonder datum krijgt de aanroeper
+alle besluiten die nu geldig zijn. Met een datum in het verleden krijgt zij alle besluiten die op
+dat moment geldig waren. Dit is vooral bedoeld om later te reconstrueren waarom het product een
+bepaalde richting volgde.
+
+De query:
+
+- kiest per besluit alleen de `DecisionDetails` waarvoor
+  `validFrom <= validAt < validUntil`, waarbij `null` geen einddatum betekent;
+- retourneert geen volledige versiehistorie;
+- retourneert geen besluit dat op het gekozen moment ingetrokken of vervangen was;
+- retourneert een nu ingetrokken of vervangen besluit wél wanneer het op de gevraagde historische
+  datum nog geldig was;
+- filtert daarom nooit eerst uitsluitend op de huidige `Decision.state`.
+
+```java
+class DecisionDto {
+    String id;
+    String productId;
+    DecisionOrigin origin;
+    String decision;
+    Timestamp validFrom;
+    Timestamp validUntil;
+}
+```
+
+Procesmodules gebruiken normaal alleen deze query met het huidige tijdstip. Zij gebruiken geldige
+besluiten als begrenzende context en interpreteren vrije besluittekst niet als een ongetypeerd
+command.
+
+## Query 2 — volledig besluitenarchief
+
+De frontend en auditfuncties gebruiken een aparte query:
+
+```java
+List<DecisionHistoryDto> getDecisionArchive(ProductId productId);
+```
+
+Deze query retourneert alle actieve, ingetrokken en vervangen besluiten met alle versies,
+intrekkingsredenen en vervangingsrelaties. Het archief is read-only en wordt niet als operationele
+input voor de processen gebruikt.
+
+```java
+class DecisionHistoryDto {
+    String id;
+    String productId;
+    DecisionOrigin origin;
+    DecisionState state;
+    String supersededByDecisionId;
+    String withdrawalReason;
+    List<DecisionDetailsDto> history;
+}
+
+class DecisionDetailsDto {
+    String id;
+    Timestamp validFrom;
+    Timestamp validUntil;
+    String decision;
+}
+```
+
+De normale frontendweergave toont de huidige uitkomst van `getDecisions(...)`. Onder **Historie**
+kan de Stakeholder het volledige archief openen, eerdere versies vergelijken, ingetrokken besluiten
+zien en van een vervangen besluit naar zijn opvolger navigeren.
+
+## Overleg en Factory-besluiten
+
+Na afsluiting van een overleg maakt de notulenagent eerst de notulen. Daarna verwerkt hij alleen de
+expliciete grote besluiten uit die notulen:
+
+- een nieuw besluit via `createDecision(...)`;
+- een nieuwe versie van hetzelfde besluit via `reviseDecision(...)`;
+- een intrekking met eventuele reden via `withdrawDecision(...)`;
+- een inhoudelijk nieuw besluit dat oudere besluiten overneemt via `supersedeDecisions(...)`.
+
+De notulen bewaren hun eigen besproken context en kunnen de betrokken besluit-ID's tonen. Die
+vergaderinformatie hoeft daarom niet ook in het minimale `Decision`-aggregate te worden gekopieerd.
+
+Een Factory-besluit volgt exact dezelfde opslag- en lifecycle-regels. Het verschil staat alleen in
+`origin = FACTORY`. De Stakeholder ziet het via de normale frontendquery en kan via een later overleg
+dezelfde revise-, withdraw- of supersedecommands laten uitvoeren.
 
 ## Technische regels
 
-- Het Besluitenregister beheert zijn eigen tabellen, repository en transacties.
-- Het register valideert dat de bronmodule of Stakeholder volgens het mandaat bevoegd is voor de
-  besluitsoort en het toepassingsgebied; alleen die eigenaar of een bevoegde opvolger kan het besluit
-  intrekken of vervangen.
-- Registratie is idempotent op bronmodule, bronobject, bronversie en besluitsoort.
-- Het sluiten van het oude besluit en activeren van het vervangende besluit is atomair.
-- **Gepland** en **Actief** worden uit het huidige tijdstip en de geldigheidsperiode afgeleid; daar is
-  geen geplande processessie voor nodig.
-- Historische besluiten worden nooit fysiek verwijderd om een actuele projectie eenvoudiger te
-  maken.
-- `DecisionDetails` bevat geen geheime prompts, verborgen chain-of-thought, tokens of secrets.
-- Inhoudelijke productentiteiten blijven de bron voor uitvoering; het besluit verwijst ernaar en
-  kopieert ze niet volledig.
+- Het Besluitenregister is de enige schrijver van `Decision` en `DecisionDetails`.
+- Het register bewaakt dat per `Decision` maximaal één `DecisionDetails`-versie tegelijk geldig is.
+- Een revise-, withdraw- of supersedecommand gebruikt de verwachte actuele versie om verloren
+  wijzigingen te voorkomen.
+- Het aanmaken van een opvolger en afsluiten van alle overgenomen besluiten gebeurt atomair.
+- Historische besluiten en versies worden nooit fysiek verwijderd.
+- UUID's worden extern als strings getransporteerd; de implementatie mag intern een UUID-type
+  gebruiken.
+- De DTO's bevatten geen prompts, chain-of-thought, tokens, secrets of interne agentinformatie.

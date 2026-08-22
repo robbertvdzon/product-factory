@@ -70,6 +70,7 @@ domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 | `StakeholderDetails` | product-/overlegmodule | identiteit, contactwijze, rol en beslissingsmandaat van de Stakeholder |
 | `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende richting en expliciete correcties |
+| `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | alleen grote, blijvende Stakeholder- en Factorybesluiten die het ontwerp begrenzen |
 | `UserSignalDetails` | productmodule | oorspronkelijke feedback plus actuele status, uitkomst en resultaatkoppelingen |
 | `StoryDetails` | Productplanning-query | wat Software Factory heeft opgeleverd en welke story bij een epic hoort |
 | `VerificationDetails` | Kwaliteitsbewaking-query | of de bedoelde gebruikersverbetering is bereikt en welk bewijs daarbij hoort |
@@ -102,10 +103,11 @@ roept de procesfunctie aan en de frontend leest het resultaat, maar geen van bei
 
 De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Het droombeeld is
 zichtbare productrichting, maar geen uitvoerbaar werk. `LearningResult` blijft intern binnen
-Productontwerp. Wanneer daar een concrete keuze uit volgt, laat Productontwerp die keuze als
-`DecisionRecord` vastleggen door het
-[Besluitenregister](besluitenregister.md); het volledige leerresultaat wordt niet
-gepubliceerd.
+Productontwerp. Alleen wanneer daar uitzonderlijk een grote, blijvende keuze uit volgt die meerdere
+toekomstige processessies begrenst, kan Productontwerp binnen zijn mandaat via
+`createDecision(...)` een Factory-besluit laten vastleggen door het
+[Besluitenregister](besluitenregister.md). Een droombeeld, epic, signaalafhandeling of normale
+ontwerpkeuze is geen besluit.
 
 Alleen Productontwerp schrijft de `Epic`. Productplanning claimt een exacte versie via
 `claimEpicForPlanning(...)`; dat command bevriest die versie atomair. Kwaliteitsbewaking registreert
@@ -191,8 +193,9 @@ De volgende entiteiten blijven binnen de module:
 
 Onderzoeksvragen, kansvoorstellen, leerresultaten en conceptontwerpen zijn interne objecten. Alleen
 het gevalideerde droombeeld en de `Epic` worden als inhoudelijke procesoutput gepubliceerd.
-Een betekenisvolle keuze wordt daarnaast in het Besluitenregister vastgelegd zonder het interne
-onderzoeksdossier te kopiëren.
+Een uitzonderlijk groot Factory-besluit wordt daarnaast in het Besluitenregister vastgelegd zonder
+het interne onderzoeksdossier te kopiëren. Gewone proceskeuzes blijven uitsluitend op hun eigen
+productobjecten staan.
 
 ## Levenscyclus van een epic
 
@@ -321,9 +324,10 @@ De Epiccriticus controleert minimaal:
 Goedgekeurde output wordt atomair in de eigen entiteiten opgeslagen en daarna wordt de sessiestatus
 afgerond. Query-DTO's worden uit die entiteiten opgebouwd en hebben geen eigen opslag. Na publicatie
 vraagt Productontwerp via `requestEpicPlanning(...)` idempotent planning voor exact die epicversie
-aan. Betekenisvolle keuzes leveren een idempotent registratieverzoek aan het Besluitenregister. Als
-een gebruikerssignaal is beoordeeld zonder dat een epic ontstaat, bevat dat besluit het signaal-ID
-en de uitkomst. Productontwerp roept daarna het passende signaalcommand op de productmodule aan.
+aan. De epicpublicatie, signaalbeoordeling en keuze om geen epic te maken zijn geen besluiten. Alleen
+een afzonderlijke grote, blijvende Factorykeuze binnen het mandaat gebruikt eventueel
+`createDecision(...)`. Productontwerp roept voor een beoordeeld gebruikerssignaal het passende
+signaalcommand op de productmodule aan.
 
 ## Wanneer Productontwerp draait
 
@@ -358,6 +362,7 @@ Een sessie is klaar wanneer:
 - iedere gepubliceerde epic door de Epiccriticus is goedgekeurd;
 - iedere epic zelfstandig door Productplanning kan worden begrepen;
 - de publicatiecontrole bewijst dat de epicversie nog niet is gekozen;
-- ieder betekenisvol product- of signaalbesluit idempotent aan het Besluitenregister is aangeboden;
+- ieder eventueel groot Factory-besluit binnen het mandaat idempotent aan het Besluitenregister is
+  aangeboden en iedere gewone proceskeuze daar juist buiten blijft;
 - output atomair en geversioneerd beschikbaar is;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.

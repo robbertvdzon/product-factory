@@ -92,6 +92,7 @@ adapters.
 | `ProductAssignmentDetails` | productmodule | productgrenzen en publieke Git-URL van het product |
 | `TestableProductDetails` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende productgrenzen en correcties die ook tijdens het testen gelden |
+| `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende privacy-, veiligheids- of productgrenzen die het testen beïnvloeden |
 | `EpicDetails` | Productontwerp | bevroren scope, UX, succescriteria en status van de geclaimde versie |
 | `StoryDetails` | Productplanning | type, storyversie, status, oplevergegevens, acceptatiecriteria en zelfstandige UX |
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
