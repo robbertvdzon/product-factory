@@ -75,17 +75,16 @@
   <text x="546" y="740" class="box-title">Productplanning</text>
   <text x="546" y="765" class="function">runProcessSession()</text>
   <text x="546" y="810" class="owner-label">SCHRIJFT</text>
-  <text x="546" y="846" class="entity">EpicExecutionView</text>
-  <text x="546" y="882" class="entity">ProductStoryView</text>
-  <text x="546" y="918" class="entity">PrioritizedBacklogView</text>
-  <text x="546" y="954" class="entity">BacklogItemView</text>
-  <text x="546" y="990" class="entity">BacklogSupplyView</text>
-  <text x="546" y="1026" class="entity">ProcessSessionPublication</text>
-  <line x1="546" y1="1050" x2="904" y2="1050" stroke="#a7f3d0"/>
-  <text x="546" y="1079" class="note">Bevriest één epicversie, maakt stories</text>
-  <text x="546" y="1101" class="note">en bepaalt de backlogvolgorde.</text>
-  <text x="546" y="1130" class="note">Registreert betekenisvolle besluiten.</text>
-  <text x="546" y="1159" class="note">Dispatcher schrijft alleen verzendvelden.</text>
+  <text x="546" y="846" class="entity">EpicProgressView</text>
+  <text x="546" y="882" class="entity">StoryView</text>
+  <text x="546" y="918" class="entity">BacklogSupplyView</text>
+  <text x="546" y="954" class="entity">ProcessSessionPublication</text>
+  <line x1="546" y1="978" x2="904" y2="978" stroke="#a7f3d0"/>
+  <text x="546" y="1007" class="note">Bevriest één epicversie en maakt stories.</text>
+  <text x="546" y="1029" class="note">Backlog = status ≠ DONE, op sequenceNumber.</text>
+  <text x="546" y="1058" class="note">Story: TODO · IN_PROGRESS · DONE.</text>
+  <text x="546" y="1087" class="note">Registreert betekenisvolle besluiten.</text>
+  <text x="546" y="1116" class="note">Dispatcher schrijft alleen verzendvelden.</text>
 
   <!-- Dispatcher -->
   <rect x="1030" y="805" width="315" height="310" rx="18" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
@@ -187,12 +186,11 @@
   <text x="1050" y="283" class="flow">EpicDefinitionView</text>
 
   <path d="M520 755 C460 730 455 570 520 505" class="blue-line"/>
-  <text x="250" y="590" class="flow-small">EpicExecutionView</text>
+  <text x="250" y="590" class="flow-small">EpicProgressView</text>
   <text x="250" y="610" class="flow-small">BacklogSupplyView</text>
 
   <path d="M930 845 C1120 690 1270 610 1430 570" class="purple-line"/>
-  <text x="995" y="696" class="flow-small">epicuitvoering · stories</text>
-  <text x="995" y="716" class="flow-small">backlogitems</text>
+  <text x="995" y="696" class="flow-small">epicvoortgang · StoryView</text>
 
   <path d="M1430 700 C1250 720 1090 760 930 815" class="green-line"/>
   <text x="1080" y="748" class="flow-small">bugs · verificaties · epicgaten</text>
@@ -202,7 +200,7 @@
   <text x="1032" y="466" class="flow-small">kwaliteitssignalen</text>
 
   <path d="M930 955 H1030" class="line"/>
-  <text x="934" y="940" class="flow-small">backlog · stories</text>
+  <text x="938" y="940" class="flow-small">eerste TODO-story</text>
 
   <path d="M1030 1045 C985 1045 970 1012 930 1012" class="green-line"/>
   <text x="939" y="1067" class="flow-small">werkstatus · levering</text>

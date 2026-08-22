@@ -33,9 +33,9 @@ bronobject nooit corrigeren; zij publiceert daarvoor eigen feedback.
 | Onderdeel | Type | Enige geplande ingang | Eigen verantwoordelijkheid | Schrijft nooit |
 |---|---|---|---|---|
 | Productontwerp | intelligent proces | `runProcessSession()` | productrichting onderzoeken, complete epicdefinities inclusief UX en eigen `ProcessSessionPublication` publiceren | stories, backlog, bugs of verificaties |
-| Productplanning | intelligent proces | `runProcessSession()` | een exacte epicversie kiezen en bevriezen, stories, backlog en eigen `ProcessSessionPublication` publiceren | epicinhoud, bugs of kwaliteitsbewijzen |
+| Productplanning | intelligent proces | `runProcessSession()` | een exacte epicversie kiezen en bevriezen, `EpicProgressView`, geordende stories en eigen `ProcessSessionPublication` publiceren | epicinhoud, bugs of kwaliteitsbewijzen |
 | Kwaliteitsbewaking | intelligent proces | `runProcessSession()` | opgeleverd werk en complete epics toetsen en bevindingen plus eigen `ProcessSessionPublication` publiceren | epics, stories of backlogprioriteit |
-| Software Factory-dispatcher | technische adapter binnen Productplanning | `runDispatchSession()` | externe statussen synchroniseren en precies één bovenste verzendbare opdracht versturen wanneer geen werk openstaat | productinhoud, story-inhoud, epicselectie of prioriteit |
+| Software Factory-dispatcher | technische adapter binnen Productplanning | `runDispatchSession()` | externe statussen synchroniseren en precies de eerste `TODO`-story versturen wanneer geen werk openstaat | productinhoud, story-inhoud, epicselectie of prioriteit |
 
 De scheduler mag deze ingangen starten, maar beslist niet over de inhoud. De processen roepen elkaar
 niet rechtstreeks aan. Ze reageren op gepubliceerde gegevens en hun eigen planningsregels.
@@ -101,11 +101,9 @@ concrete epic, droombeeldversie of betekenisvolle keuze in `DecisionRecordView` 
 
 | Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
 |---|---|---|---|---|
-| `EpicExecutionView` | Productplanning bij selectie van een epicversie | Productplanning | Productontwerp, Kwaliteitsbewaking, Productplanning en productbediening | koppelt de uitvoering aan exact één bevroren epicversie en bewaart voortgang en einduitkomst |
-| `ProductStoryView` | Productplanning | Productplanning | Kwaliteitsbewaking, Software Factory-dispatcher, Productplanning en productbediening | zelfstandig uitvoerbaar gedrag binnen één bevroren epic, inclusief volledige relevante UX-momentopname en assets; Productontwerp en Kwaliteitsbewaking maken of wijzigen geen stories |
-| `PrioritizedBacklogView` | Productplanning | Productplanning | Software Factory-dispatcher, Productplanning en productbediening | geversioneerde volgorde van verzendbare stories en bugfixes |
-| `BacklogItemView` | Productplanning | Productplanning; dispatcher alleen voor verzendstatus, externe referentie en leveringstijdstippen | Software Factory-dispatcher, Kwaliteitsbewaking, Productplanning en productbediening | verwijst naar precies één story of bug; alleen Productplanning bepaalt inhoud, positie en prioriteitsreden |
-| `BacklogSupplyView` | Productplanning | Productplanning | Productontwerp, Software Factory-dispatcher en productbediening | aantallen per backlogstatus, lage grens, streefpeil en `aanvullingNodig` |
+| `EpicProgressView` | Productplanning bij selectie van een epicversie | Productplanning | Productontwerp, Kwaliteitsbewaking, Productplanning en productbediening | verwijst naar exact één bevroren epicversie en bewaart uitsluitend selectie, voortgang, verificatiemomenten en einduitkomst; bevat geen kopie van epicinhoud of UX |
+| `StoryView` | Productplanning als productstory of als bugfixstory voor exact één `BugView` | Productplanning; dispatcher binnen dezelfde module alleen voor externe referentie, tijdstippen en `TODO` → `IN_PROGRESS` → `DONE` | Kwaliteitsbewaking, Software Factory-dispatcher, Productplanning en productbediening | zelfstandig uitvoerbare productstory of bugfix met volledige relevante UX, `sequenceNumber` en drie statussen; de backlog is de query op alle stories die niet `DONE` zijn |
+| `BacklogSupplyView` | Productplanning-queryprojectie uit `StoryView` | geen duurzame schrijver; bij iedere query berekend | Productontwerp, Software Factory-dispatcher, Productplanning en productbediening | aantallen per storystatus, lage grens, streefpeil en `aanvullingNodig`; `TODO` is de klaarliggende voorraad |
 
 ### Contracten van de Software Factory-dispatcher
 
@@ -115,8 +113,8 @@ afzonderlijke schrijfbevoegdheid. Hij verandert nooit de betekenis of prioriteit
 | Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
 |---|---|---|---|---|
 | `SoftwareFactoryWorkView` | Software Factory-dispatcher op basis van extern Software Factory-werk | Software Factory-dispatcher | Productplanning en productbediening | genormaliseerde externe werkstatus; de externe Software Factory blijft bron van de ruwe status |
-| `StoryDeliveryPackage` | Software Factory-dispatcher uit exact één verzendbaar backlogitem en zijn bronversie | Software Factory-dispatcher; na vorming onveranderlijk en uitsluitend mechanisch afgeleid | Software Factory, Software Factory-dispatcher, Productplanning en productbediening | volledige story of bugfix met acceptatiecriteria, UX, attachments, hashes en idempotentiesleutel; bevat geen nieuwe productbeslissingen |
-| `DeliveryResultView` | Software Factory-dispatcher zodra extern werk is opgeleverd of gewijzigd | Software Factory-dispatcher | Productplanning, Kwaliteitsbewaking en Productontwerp | genormaliseerde oplevering met extern ID, backlogitem, status, locatie, tijdstippen en foutinformatie |
+| `StoryDeliveryPackage` | Software Factory-dispatcher uit exact één `TODO`-story en haar versie | Software Factory-dispatcher; na vorming onveranderlijk en uitsluitend mechanisch afgeleid | Software Factory, Software Factory-dispatcher, Productplanning en productbediening | volledige productstory of bugfixstory met acceptatiecriteria, UX, attachments, hashes en idempotentiesleutel; bevat geen nieuwe productbeslissingen |
+| `DeliveryResultView` | Software Factory-dispatcher zodra extern werk is opgeleverd of gewijzigd | Software Factory-dispatcher | Productplanning, Kwaliteitsbewaking en Productontwerp | genormaliseerde oplevering met extern ID, story-ID en -versie, status, locatie, tijdstippen en foutinformatie |
 
 ### Contracten van Kwaliteitsbewaking
 
@@ -164,7 +162,7 @@ database lezen en in gewone producttaal tonen. Zij schrijft nooit rechtstreeks i
 een gebruikersactie loopt via de application service van de eigenaar.
 
 De frontend toont minimaal Stakeholder en mandaat, productopdracht, signalen en afhandeling,
-droombeeld, epics en UX, epicuitvoering, stories, backlog, bugs, verificaties, kwaliteit, actuele en
+droombeeld, epics en UX, epicvoortgang, stories, berekende backlog, bugs, verificaties, kwaliteit, actuele en
 historische besluiten, processessies en leveringen. Waar nuttig biedt de frontend versiehistorie en
 vergelijking tussen twee databaseversies.
 
@@ -184,10 +182,10 @@ alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtba
 | product-/overlegmodule | Stakeholderprofiel, testconfiguratie, `UserSignalView` en `UserSignalDispositionView` | Kwaliteitsbewaking |
 | Productontwerp | epicdefinitie | Productplanning en Kwaliteitsbewaking |
 | Productontwerp | betekenisvolle ontwerp-, epic- en signaalbesluiten | Besluitenregister |
-| Productplanning | epicuitvoering en backlogvoorraad | Productontwerp |
-| Productplanning | epicuitvoering, productstories en backlogitems | Kwaliteitsbewaking |
+| Productplanning | epicvoortgang en berekende backlogvoorraad | Productontwerp |
+| Productplanning | epicvoortgang en geordende `StoryView`-objecten | Kwaliteitsbewaking |
 | Productplanning | betekenisvolle epicselecties, prioriteitskeuzes en epicafsluitingen | Besluitenregister |
-| Productplanning | geprioriteerde backlog, backlogitems en productstories | Software Factory-dispatcher |
+| Productplanning | `TODO`-stories geordend op `sequenceNumber` | Software Factory-dispatcher |
 | Software Factory-dispatcher | volledig `StoryDeliveryPackage`, inclusief UX en attachments | Software Factory |
 | Software Factory-dispatcher | externe werkstatus en opleverresultaat | Productplanning |
 | Software Factory-dispatcher | opleverresultaat | Kwaliteitsbewaking en Productontwerp |
@@ -201,17 +199,17 @@ alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtba
 ## Belangrijke levenscyclusregels
 
 1. Productontwerp kan een nog niet gekozen epicdefinitie als een nieuwe versie publiceren.
-2. Productplanning kiest exact één versie en maakt daarvoor `EpicExecutionView` aan. Vanaf dat
+2. Productplanning kiest exact één versie en maakt daarvoor `EpicProgressView` aan. Vanaf dat
    moment verandert niemand die epicversie.
-3. Alleen Productplanning deelt de epic op in `ProductStoryView`-objecten. Iedere story bevat een
-   zelfstandige momentopname van alle relevante UX-inhoud en assets.
-4. De dispatcher leest de bovenste verzendbare opdracht. Alleen als Software Factory geen open werk
-   voor het product heeft, maakt hij mechanisch één onveranderlijk `StoryDeliveryPackage`, stuurt dat
-   pakket en slaat hij het externe ID op.
+3. Alleen Productplanning maakt `StoryView`-objecten: productstories uit een epic en bugfixstories uit
+   een bug. Iedere story bevat een zelfstandige momentopname van alle relevante UX-inhoud en assets.
+4. De backlog is geen entiteit: het is de lijst stories met status anders dan `DONE`, geordend op
+   `sequenceNumber`. Alleen als Software Factory geen open werk heeft, verstuurt de dispatcher de
+   eerste `TODO`-story en zet haar op `IN_PROGRESS`; na oplevering wordt zij `DONE`.
 5. Kwaliteitsbewaking publiceert bevindingen. Zij repareert geen bronobjecten en maakt geen stories.
 6. Productplanning verwerkt verificaties: een echt bouwdefect wordt een bugfix; een gemist onderdeel
    uit de bevroren epic wordt een aanvullende story op basis van een epicgat.
-7. Pas een geslaagde `EpicVerificationView` laat Productplanning de epicuitvoering als **Geslaagd**
+7. Pas een geslaagde `EpicVerificationView` laat Productplanning de epicvoortgang als **Geslaagd**
    afsluiten. Alle stories opgeleverd hebben is op zichzelf niet genoeg.
 8. Een `UserSignalView` blijft ongewijzigd. Kwaliteitsbewaking publiceert een apart
    `SignalInvestigationResultView`; Productontwerp verwijst vanuit epics of geregistreerde
@@ -229,8 +227,8 @@ alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtba
 - Een procesmodule krijgt geen repository van een andere procesmodule geïnjecteerd.
 - De database mag fysiek gedeeld zijn, maar tabellen en schrijftransacties zijn logisch per module
   afgeschermd.
-- De uitzondering voor dispatcher-velden op het backlogitem wordt als expliciete application service
-  binnen Productplanning aangeboden; de dispatcher krijgt geen vrije repositorytoegang.
+- De dispatcher krijgt binnen Productplanning een smalle application service voor externe
+  storyvelden en de drie toegestane statusovergangen; hij krijgt geen vrije repositorytoegang.
 - Tekst, Markdown, JSON en SVG blijven tekst in `StoryDeliveryPackage`; binaire assets krijgen een
   begrensd attachment met MIME-type, grootte en hash en mogen alleen voor JSON-transport Base64 zijn.
 - Software Factory slaat het complete leveringspakket bij acceptatie in de eigen storystorage op.

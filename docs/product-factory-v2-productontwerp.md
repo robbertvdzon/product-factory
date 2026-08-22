@@ -12,7 +12,7 @@ Productontwerp onderzoekt hoe een product zijn opdracht beter kan vervullen en z
 om in complete, behapbare epicdefinities. Iedere epic bevat een eenduidige gebruikersverbetering,
 duidelijke scope, bewijs, een volledig actueel UX-ontwerp en succescriteria.
 
-Productontwerp maakt geen stories, beheert geen backlog en verandert geen epicuitvoering. De module
+Productontwerp maakt geen stories, beheert geen backlog en verandert geen epicvoortgang. De module
 levert de bouwtekening; Productplanning kiest een exacte versie en maakt daar uitvoerbaar werk van.
 
 De module is eigenaar van:
@@ -55,7 +55,7 @@ uitsluitend zijn eigen publicaties en leest alleen publicaties van andere eigena
 | `UserSignalView` | productmodule | oorspronkelijke feedback, observatie of gebruiksgegeven met bron, context en bewijs |
 | `UserSignalDispositionView` | productmodule | afgeleide status, bestaande koppelingen en wat al met het signaal is gebeurd |
 | `BacklogSupplyView` | Productplanning | of nieuwe beschikbare epics extra urgent zijn |
-| `EpicExecutionView` | Productplanning | welke exacte epicversies zijn gekozen en dus niet meer gewijzigd mogen worden |
+| `EpicProgressView` | Productplanning | welke exacte epicversies zijn gekozen en dus niet meer gewijzigd mogen worden |
 | `DeliveryResultView` | Software Factory-dispatcher | wat Software Factory werkelijk heeft opgeleverd |
 | `EpicVerificationView` | Kwaliteitsbewaking | of de bedoelde gebruikersverbetering is bereikt |
 | `QualitySignalView` | Kwaliteitsbewaking | terugkerende problemen en onjuiste productaannames |
@@ -120,7 +120,7 @@ is geen vooraf geschreven backlog.
 
 Iedere `EpicDefinitionView` is na publicatie onveranderlijk.
 
-Zolang er geen `EpicExecutionView` naar een epic verwijst, mag Productontwerp:
+Zolang er geen `EpicProgressView` naar een epic verwijst, mag Productontwerp:
 
 - een nieuwe versie publiceren;
 - de vorige versie als **Vervangen** markeren;
@@ -135,7 +135,7 @@ Zodra Productplanning een exact epic-ID en versienummer heeft gekozen:
 - kan een vervangende richting alleen via een nieuw gekozen epic-ID of een vooraf gepubliceerde,
   nog niet gekozen epicversie lopen.
 
-De module controleert deze regel vóór iedere publicatie tegen `EpicExecutionView`. Zo kan een
+De module controleert deze regel vóór iedere publicatie tegen `EpicProgressView`. Zo kan een
 langlopende ontwerpsessie niet alsnog een inmiddels gekozen epic overschrijven.
 
 ## Interne entiteiten
@@ -174,7 +174,7 @@ onderzoeksdossier te kopiëren.
 - **Ingetrokken** — bewust niet meer beschikbaar, met reden.
 
 **Geselecteerd**, **Actief**, **Controleren** en eindstatussen horen niet bij de epicdefinitie. Die
-staan op de epicuitvoering van Productplanning.
+staan op de epicvoortgang van Productplanning.
 
 ## Agents
 

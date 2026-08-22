@@ -22,7 +22,7 @@ De module is eigenaar van:
 - het eigen agent- en procesgeheugen.
 
 Kwaliteitsbewaking maakt geen stories, wijzigt geen epicdefinitie en bepaalt geen backlogvolgorde of
-epicuitvoering.
+epicvoortgang.
 
 ## Publieke procesfunctie
 
@@ -54,9 +54,8 @@ testclients zijn interne adapters.
 | `TestableProductView` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
 | `StakeholderDirectionView` | product-/overlegmodule | bindende productgrenzen en correcties die ook tijdens het testen gelden |
 | `EpicDefinitionView` | Productontwerp | bevroren scope, UX en succescriteria van de door Productplanning gekozen versie |
-| `EpicExecutionView` | Productplanning | exacte versie, stories, voortgang en verzoek om volledige epiccontrole |
-| `ProductStoryView` | Productplanning | acceptatiecriteria, verwacht gedrag en zelfstandige relevante UX per story |
-| `BacklogItemView` | Productplanning | uitvoeringsstatus en bronkoppeling |
+| `EpicProgressView` | Productplanning | exacte versie, voortgang en verzoek om volledige epiccontrole |
+| `StoryView` | Productplanning | type, storyversie, status, acceptatiecriteria, verwacht gedrag en zelfstandige relevante UX |
 | `DeliveryResultView` | Software Factory-dispatcher | wat, waar en wanneer moet worden geverifieerd |
 | `UserSignalView` | productmodule | oorspronkelijke melding met bron, context en bewijs; `QUALITY_CONCERN` betekent dat de melder extra onderzoek vraagt |
 | `UserSignalDispositionView` | productmodule | wat al met het signaal is gebeurd en aan welke resultaten het is gekoppeld |
@@ -69,7 +68,7 @@ en exacte geteste omgeving vast.
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
 | `BugView` | aantoonbare bouw- of productafwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
-| `StoryVerificationView` | oordeel over één concrete story of bugfix | backlogitem, bronversie, omgeving, resultaat, controles, bewijs en blokkade |
+| `StoryVerificationView` | oordeel over één concrete story of bugfix | story-ID en -versie, oplevering, omgeving, resultaat, controles, bewijs en blokkade |
 | `EpicVerificationView` | oordeel over de complete gebruikersverbetering | epic-ID en -versie, uitkomst, scope-/UX-dekking, succescriteria, bewijs, gaten en productconclusie |
 | `EpicCompletionGapView` | gedrag binnen de bevroren epic dat nooit in een story stond | scope- of UX-verwijzing, gebruikersimpact, ontbrekend gedrag en bewijs |
 | `SignalInvestigationResultView` | zichtbaar resultaat van onderzoek naar één gebruikerssignaal | signaal-ID en -versie, resultaat, uitleg, bewijs, omgeving, eventuele bug- of kwaliteitssignaalkoppeling, processessie en onderzoekstijdstip |
@@ -123,7 +122,7 @@ Bij **Afgekeurd** publiceert Kwaliteitsbewaking zo nodig een bug. Het herschrijf
 
 ## Epicverificatie
 
-Alle backlogitems van een epic op **Afgerond** is alleen het startsein voor de epiccontrole. De
+Alle stories van een epic op `DONE` is alleen het startsein voor de epiccontrole. De
 controle gebruikt exact de door Productplanning bevroren `EpicDefinitionView` en beoordeelt:
 
 - de volledige gebruikersroute, niet alleen losse schermen;
@@ -142,7 +141,7 @@ De uitkomst is:
 - **Niet geslaagd** — alles werkt zoals ontworpen, maar het bedoelde gebruikersresultaat is niet
   bereikt.
 
-Kwaliteitsbewaking sluit de epicuitvoering niet. Productplanning verwerkt deze uitkomst en is de
+Kwaliteitsbewaking sluit de epicvoortgang niet. Productplanning verwerkt deze uitkomst en is de
 enige schrijver van de epicstatus.
 
 ## Bug, epicgat of nieuwe productkans
@@ -178,15 +177,15 @@ De herstelstatus is:
 
 - **Nieuw** — bevinding bestaat intern maar is nog niet reproduceerbaar;
 - **Uitvoerbaar** — reproduceerbaar en compleet genoeg voor een bugfix;
-- **Gepland** — Productplanning heeft er een backlogitem voor gepubliceerd;
-- **In herstel** — de bugfix staat open in Software Factory;
-- **Hertesten** — de fix is opgeleverd;
+- **Gepland** — Productplanning heeft er een bugfixstory met status `TODO` voor gepubliceerd;
+- **In herstel** — de bugfixstory heeft status `IN_PROGRESS`;
+- **Hertesten** — de bugfixstory heeft status `DONE` en de fix is opgeleverd;
 - **Opgelost** — de fix is in de juiste omgeving goedgekeurd;
 - **Heropend** — de afwijking bestaat nog of is teruggekomen;
 - **Ongeldig** — geen productafwijking, met zichtbare reden.
 
-Kwaliteitsbewaking leidt **Gepland**, **In herstel** en **Hertesten** af uit gepubliceerde backlog- en
-leveringsstatus, maar blijft zelf de enige schrijver van de bugstatus.
+Kwaliteitsbewaking leidt **Gepland**, **In herstel** en **Hertesten** af uit `StoryView` en
+`DeliveryResultView`, maar blijft zelf de enige schrijver van de bugstatus.
 
 ## Epicgatcontract
 
@@ -276,8 +275,8 @@ atomair publiceren en rotatie bijwerken
 
 ### Stap 1 — claimen en omgeving controleren
 
-De module claimt één planbare opdracht, leest exacte versies van epic, uitvoering, stories,
-backlogitems, oplevering en eventueel gebruikerssignaal, controleert de omgeving en registreert
+De module claimt één planbare opdracht, leest exacte versies van epicdefinitie, epicvoortgang,
+stories, oplevering en eventueel gebruikerssignaal, controleert de omgeving en registreert
 productversie en testaccount. Een onbereikbare omgeving leidt tot **Geblokkeerd**, niet tot een
 productbug.
 
@@ -310,7 +309,7 @@ Een sessie wordt planbaar door:
 
 - een nieuwe Software Factory-oplevering;
 - een bugfix op **Hertesten**;
-- een epicuitvoering op **Controleren**;
+- een epicvoortgang op **Controleren**;
 - een nieuw of heropend gebruikerssignaal, of nieuw bewijs bij een eerder onbeslist signaal;
 - een P0/P1-risico of verouderd kwaliteitsbeeld;
 - de dagelijkse kernrouteplanning of testrotatie;
@@ -320,8 +319,8 @@ Kwaliteitsbewaking maakt geen bugs of epicgaten om de backlog kunstmatig tot tie
 
 ## Fouten, hervatten en idempotentie
 
-- Een storyverificatie is uniek voor backlogitem, bronversie, oplevering en omgeving.
-- Een epicverificatie is uniek voor epicuitvoering, epicversie en geteste productversie.
+- Een storyverificatie is uniek voor story-ID, storyversie, oplevering en omgeving.
+- Een epicverificatie is uniek voor epicvoortgang, epicversie en geteste productversie.
 - Herhaling werkt bewijs bij maar maakt geen duplicaat.
 - Een technische testfout wordt apart geregistreerd en niet als productbug gepubliceerd.
 - Een sessie kan na een verlopen claim worden hervat met dezelfde inputmomentopname.
