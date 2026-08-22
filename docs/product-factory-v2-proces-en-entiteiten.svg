@@ -1,242 +1,216 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1380" viewBox="0 0 2200 1380" role="img" aria-labelledby="title desc">
-  <title id="title">Product Factory v2 processen, entiteiteigenaren en gegevensstromen</title>
-  <desc id="desc">Diagram met de Stakeholder, product- en overlegmodules, Productontwerp, Productplanning, Kwaliteitsbewaking, de Software Factory-dispatcher en het Besluitenregister. Iedere module bevat haar eigen duurzame entiteiten. Pijlen tonen read-only queries en betekenisvolle commands aan de eigenaar.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1540" viewBox="0 0 2200 1540" role="img" aria-labelledby="title desc">
+  <title id="title">Product Factory v2 modulecontracten</title>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont bovenaan de publieke scheduled functies, commands en queries en daaronder de entiteiten waarvan de module eigenaar is. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
     </marker>
-    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
-    </marker>
-    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/>
-    </marker>
-    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    <marker id="queryArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#64748b"/>
     </marker>
     <style>
       .title { font: 700 34px Inter, Arial, sans-serif; fill: #0f172a; }
       .subtitle { font: 400 17px Inter, Arial, sans-serif; fill: #475569; }
-      .box-title { font: 700 23px Inter, Arial, sans-serif; fill: #0f172a; }
-      .function { font: 600 15px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #475569; }
-      .owner-label { font: 700 13px Inter, Arial, sans-serif; letter-spacing: 1px; fill: #64748b; }
-      .entity { font: 500 16px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #172033; }
+      .module-title { font: 700 24px Inter, Arial, sans-serif; fill: #0f172a; }
+      .section-title { font: 700 13px Inter, Arial, sans-serif; letter-spacing: 1px; fill: #64748b; }
+      .api { font: 500 14px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #172033; }
+      .entity { font: 600 16px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #172033; }
       .note { font: 400 14px Inter, Arial, sans-serif; fill: #64748b; }
-      .flow { font: 600 14px Inter, Arial, sans-serif; fill: #334155; paint-order: stroke; stroke: #f8fafc; stroke-width: 5px; stroke-linejoin: round; }
-      .flow-small { font: 600 13px Inter, Arial, sans-serif; fill: #334155; paint-order: stroke; stroke: #f8fafc; stroke-width: 5px; stroke-linejoin: round; }
-      .line { fill: none; stroke: #334155; stroke-width: 2.5; marker-end: url(#arrow); }
-      .blue-line { fill: none; stroke: #2563eb; stroke-width: 3; marker-end: url(#arrowBlue); }
-      .green-line { fill: none; stroke: #059669; stroke-width: 3; marker-end: url(#arrowGreen); }
-      .purple-line { fill: none; stroke: #7c3aed; stroke-width: 3; marker-end: url(#arrowPurple); }
-      .dashed { stroke-dasharray: 9 8; }
+      .flow { font: 600 13px Inter, Arial, sans-serif; fill: #334155; paint-order: stroke; stroke: #f8fafc; stroke-width: 5px; stroke-linejoin: round; }
+      .command { fill: none; stroke: #0f172a; stroke-width: 2.8; marker-end: url(#commandArrow); }
+      .query { fill: none; stroke: #64748b; stroke-width: 2.5; stroke-dasharray: 9 7; marker-end: url(#queryArrow); }
+      .divider { stroke-width: 1.5; }
     </style>
   </defs>
 
-  <rect width="2200" height="1380" fill="#f8fafc"/>
-  <text x="60" y="62" class="title">Product Factory v2 — eigenaarschap en publieke gegevensstromen</text>
-  <text x="60" y="94" class="subtitle">Eén eigenaar schrijft; andere modules lezen DTO's of vragen via een betekenisvol command om een geldige overgang.</text>
+  <rect width="2200" height="1540" fill="#f8fafc"/>
+  <text x="55" y="55" class="title">Product Factory v2 — publieke modulecontracten en eigenaarschap</text>
+  <text x="55" y="88" class="subtitle">Boven de scheidslijn staat wat andere onderdelen mogen aanroepen; daaronder staan uitsluitend de eigen entiteiten.</text>
+  <path d="M65 125 H155" class="command"/>
+  <text x="170" y="130" class="note">command: vraagt de eigenaar om een geldige wijziging</text>
+  <path d="M585 125 H675" class="query"/>
+  <text x="690" y="130" class="note">query: levert een read-only DTO</text>
+  <text x="1050" y="130" class="note">«scheduled» wordt alleen door de technische scheduler aangeroepen</text>
 
-  <!-- Ondersteunende productmodules -->
-  <rect x="50" y="155" width="365" height="385" rx="18" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
-  <rect x="50" y="155" width="365" height="62" rx="18" fill="#e2e8f0"/>
-  <path d="M50 199 V217 H415 V199" fill="#e2e8f0"/>
-  <text x="76" y="193" class="box-title">Product en overleg</text>
-  <text x="76" y="245" class="owner-label">SCHRIJFT</text>
-  <text x="76" y="274" class="entity">Product</text>
-  <text x="76" y="308" class="entity">Stakeholder</text>
-  <text x="76" y="342" class="entity">ProductAssignment</text>
-  <text x="76" y="376" class="entity">StakeholderDirection</text>
-  <text x="76" y="410" class="entity">UserSignal + status</text>
-  <text x="76" y="444" class="entity" style="font-size:14px">TestableProductConfiguration</text>
-  <line x1="76" y1="468" x2="389" y2="468" stroke="#cbd5e1"/>
-  <text x="76" y="496" class="note">Ontvangt commands; de Stakeholder schrijft</text>
-  <text x="76" y="518" class="note">geen databaseobjecten rechtstreeks.</text>
+  <!-- Stakeholder actor -->
+  <circle cx="260" cy="177" r="25" fill="#fef9c3" stroke="#ca8a04" stroke-width="3"/>
+  <path d="M260 202 V236 M225 217 H295 M260 236 L232 260 M260 236 L288 260" fill="none" stroke="#ca8a04" stroke-width="3" stroke-linecap="round"/>
+  <text x="315" y="185" class="module-title" style="font-size:20px">Stakeholder</text>
+  <path d="M260 260 V292" class="command"/>
+  <text x="278" y="281" class="flow">invoer via commands</text>
+
+  <!-- Product en overleg -->
+  <rect x="55" y="295" width="525" height="625" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="2.5"/>
+  <rect x="55" y="295" width="525" height="62" rx="18" fill="#e2e8f0"/>
+  <path d="M55 337 V357 H580 V337" fill="#e2e8f0"/>
+  <text x="80" y="335" class="module-title">Product en overleg</text>
+  <text x="80" y="387" class="section-title">PUBLIEKE INTERFACE</text>
+  <text x="80" y="417" class="api">«command» registerStakeholder(...)</text>
+  <text x="80" y="443" class="api">«command» updateProductAssignment(...)</text>
+  <text x="80" y="469" class="api">«command» recordStakeholderDirection(...)</text>
+  <text x="80" y="495" class="api">«command» submitUserSignal(...)</text>
+  <text x="80" y="521" class="api">«command» markUserSignalInReview(...)</text>
+  <text x="80" y="547" class="api">«command» recordUserSignalOutcome(...)</text>
+  <text x="80" y="573" class="api">«command» configureTestableProduct(...)</text>
+  <text x="80" y="605" class="api">«query» getStakeholder(...)</text>
+  <text x="80" y="631" class="api">«query» getProductAssignment(...)</text>
+  <text x="80" y="657" class="api">«query» findApplicableDirections(...)</text>
+  <text x="80" y="683" class="api">«query» getUserSignal(...) / findOpenUserSignals(...)</text>
+  <text x="80" y="709" class="api">«query» getTestableProduct(...)</text>
+  <line x1="80" y1="735" x2="555" y2="735" class="divider" stroke="#cbd5e1"/>
+  <text x="80" y="765" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="80" y="798" class="entity">Product · Stakeholder · ProductAssignment</text>
+  <text x="80" y="829" class="entity">StakeholderDirection · UserSignal</text>
+  <text x="80" y="860" class="entity">TestableProductConfiguration</text>
+  <text x="80" y="891" class="note">Broninhoud van UserSignal blijft onveranderlijk.</text>
+  <text x="80" y="913" class="note">Alleen status en gecontroleerde koppelingen mogen wijzigen.</text>
 
   <!-- Productontwerp -->
-  <rect x="520" y="155" width="410" height="385" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
-  <rect x="520" y="155" width="410" height="74" rx="18" fill="#dbeafe"/>
-  <path d="M520 207 V229 H930 V207" fill="#dbeafe"/>
-  <text x="546" y="190" class="box-title">Productontwerp</text>
-  <text x="546" y="215" class="function">runProcessSession()</text>
-  <text x="546" y="260" class="owner-label">SCHRIJFT</text>
-  <text x="546" y="296" class="entity">DirectionSnapshot</text>
-  <text x="546" y="334" class="entity">Epic + status</text>
-  <text x="546" y="372" class="entity">ProcessSession</text>
-  <line x1="546" y1="394" x2="904" y2="394" stroke="#bfdbfe"/>
-  <text x="546" y="424" class="note">Onderzoekt de productrichting en maakt</text>
-  <text x="546" y="446" class="note">complete epics inclusief UX. Geen stories.</text>
-  <text x="546" y="476" class="note">Commands: claim · activeer · controleer.</text>
-  <text x="546" y="502" class="note">LearningResult blijft intern.</text>
-  <text x="546" y="526" class="owner-label">REGISTREERT BETEKENISVOLLE BESLUITEN</text>
+  <rect x="675" y="180" width="560" height="650" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+  <rect x="675" y="180" width="560" height="62" rx="18" fill="#dbeafe"/>
+  <path d="M675 222 V242 H1235 V222" fill="#dbeafe"/>
+  <text x="700" y="220" class="module-title">Productontwerp</text>
+  <text x="700" y="272" class="section-title">PUBLIEKE INTERFACE</text>
+  <text x="700" y="302" class="api">«scheduled» runProcessSession()</text>
+  <text x="700" y="334" class="api">«query» getEpic(...) / findAvailableEpics(...)</text>
+  <text x="700" y="360" class="api">«query» findActiveEpic(...)</text>
+  <text x="700" y="392" class="api">«command» claimEpicForPlanning(...)</text>
+  <text x="700" y="418" class="api">«command» markEpicActive(...)</text>
+  <text x="700" y="444" class="api">«command» requestEpicVerification(...)</text>
+  <text x="700" y="470" class="api">«command» recordEpicVerification(...)</text>
+  <text x="700" y="496" class="api">«command» stopEpic(...)</text>
+  <line x1="700" y1="526" x2="1210" y2="526" class="divider" stroke="#bfdbfe"/>
+  <text x="700" y="556" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="700" y="589" class="entity">DirectionSnapshot · Epic · ProcessSession</text>
+  <line x1="700" y1="620" x2="1210" y2="620" class="divider" stroke="#bfdbfe"/>
+  <text x="700" y="650" class="section-title">BELANGRIJKE GRENS</text>
+  <text x="700" y="681" class="note">Alleen Productontwerp schrijft Epic.</text>
+  <text x="700" y="705" class="note">Na claim zijn inhoud, scope en UX van die versie bevroren.</text>
+  <text x="700" y="729" class="note">Commands veranderen alleen de geldige epicstatus.</text>
+  <text x="700" y="775" class="note">LearningResult, onderzoek, drafts en agents blijven intern.</text>
 
   <!-- Productplanning -->
-  <rect x="520" y="705" width="410" height="480" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>
-  <rect x="520" y="705" width="410" height="74" rx="18" fill="#d1fae5"/>
-  <path d="M520 757 V779 H930 V757" fill="#d1fae5"/>
-  <text x="546" y="740" class="box-title">Productplanning</text>
-  <text x="546" y="765" class="function">runProcessSession()</text>
-  <text x="546" y="810" class="owner-label">SCHRIJFT</text>
-  <text x="546" y="846" class="entity">Story</text>
-  <text x="546" y="882" class="entity">ProcessSession</text>
-  <text x="546" y="918" class="entity">PlanningRequest</text>
-  <line x1="546" y1="978" x2="904" y2="978" stroke="#a7f3d0"/>
-  <text x="546" y="1007" class="note">Claimt via Productontwerp; maakt stories.</text>
-  <text x="546" y="1029" class="note">Backlog = status ≠ DONE, op sequenceNumber.</text>
-  <text x="546" y="1058" class="note">Story: TODO · IN_PROGRESS · DONE.</text>
-  <text x="546" y="1087" class="note">BacklogSupply is een query, geen entiteit.</text>
-  <text x="546" y="1116" class="note">Dispatcher gebruikt publieke commands.</text>
-
-  <!-- Dispatcher -->
-  <rect x="1030" y="805" width="315" height="310" rx="18" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
-  <rect x="1030" y="805" width="315" height="84" rx="18" fill="#ffedd5"/>
-  <path d="M1030 867 V889 H1345 V867" fill="#ffedd5"/>
-  <text x="1054" y="839" class="box-title">SF-dispatcher</text>
-  <text x="1054" y="865" class="function">runDispatchSession()</text>
-  <text x="1054" y="922" class="owner-label">SCHRIJFT TECHNISCHE HISTORIE</text>
-  <text x="1054" y="958" class="entity">DeliveryAttempt</text>
-  <text x="1054" y="994" class="entity">StoryDeliveryPackage</text>
-  <line x1="1054" y1="1054" x2="1321" y2="1054" stroke="#fed7aa"/>
-  <text x="1054" y="1082" class="note">Verstuurt maximaal één volledig</text>
-  <text x="1054" y="1104" class="note">pakket inclusief UX en assets.</text>
-
-  <!-- Software Factory -->
-  <rect x="1030" y="1210" width="315" height="105" rx="18" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
-  <text x="1054" y="1252" class="box-title">Software Factory</text>
-  <text x="1054" y="1282" class="note">Externe uitvoering en ruwe werkstatus</text>
+  <rect x="675" y="890" width="560" height="590" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>
+  <rect x="675" y="890" width="560" height="62" rx="18" fill="#d1fae5"/>
+  <path d="M675 932 V952 H1235 V932" fill="#d1fae5"/>
+  <text x="700" y="930" class="module-title">Productplanning</text>
+  <text x="700" y="982" class="section-title">PUBLIEKE INTERFACE</text>
+  <text x="700" y="1012" class="api">«scheduled» runProcessSession()</text>
+  <text x="700" y="1044" class="api">«query» getStory(...) / getBacklog(...)</text>
+  <text x="700" y="1070" class="api">«query» getBacklogSupply(...)</text>
+  <text x="700" y="1102" class="api">«command» markStoryAsDispatched(...)</text>
+  <text x="700" y="1128" class="api">«command» markStoryAsDeveloped(...)</text>
+  <text x="700" y="1154" class="api">«command» recordDispatchFailure(...)</text>
+  <text x="700" y="1180" class="api">«command» requestBugfix(...)</text>
+  <text x="700" y="1206" class="api">«command» requestCompletionWork(...)</text>
+  <line x1="700" y1="1236" x2="1210" y2="1236" class="divider" stroke="#a7f3d0"/>
+  <text x="700" y="1266" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="700" y="1299" class="entity">Story · PlanningRequest · ProcessSession</text>
+  <line x1="700" y1="1328" x2="1210" y2="1328" class="divider" stroke="#a7f3d0"/>
+  <text x="700" y="1358" class="section-title">BELANGRIJKE GRENS</text>
+  <text x="700" y="1389" class="note">Alleen Productplanning schrijft Story, status en sequenceNumber.</text>
+  <text x="700" y="1413" class="note">Backlog en BacklogSupply zijn queries, geen entiteiten.</text>
+  <text x="700" y="1437" class="note">Commands voor nieuw planwerk starten geen agents.</text>
 
   <!-- Kwaliteitsbewaking -->
-  <rect x="1430" y="360" width="325" height="570" rx="18" fill="#f5f3ff" stroke="#7c3aed" stroke-width="3"/>
-  <rect x="1430" y="360" width="325" height="74" rx="18" fill="#ede9fe"/>
-  <path d="M1430 412 V434 H1755 V412" fill="#ede9fe"/>
-  <text x="1454" y="395" class="box-title">Kwaliteitsbewaking</text>
-  <text x="1454" y="420" class="function">runProcessSession()</text>
-  <text x="1454" y="465" class="owner-label">SCHRIJFT</text>
-  <text x="1454" y="501" class="entity">Bug</text>
-  <text x="1454" y="537" class="entity">Verification</text>
-  <text x="1454" y="573" class="entity">ProcessSession</text>
-  <text x="1454" y="621" class="note">Verification target:</text>
-  <text x="1454" y="645" class="note">STORY · EPIC · USER_SIGNAL</text>
-  <text x="1454" y="681" class="note">QualityOverview is een query.</text>
-  <line x1="1454" y1="777" x2="1731" y2="777" stroke="#ddd6fe"/>
-  <text x="1454" y="806" class="note">Toetst stories, bugfixes, epics en</text>
-  <text x="1454" y="828" class="note">gebruikerssignalen en bewijs.</text>
-  <text x="1454" y="864" class="note">Publiceert bewijs en bevindingen;</text>
-  <text x="1454" y="886" class="note">maakt geen stories.</text>
-
-  <!-- Scheduler -->
-  <rect x="50" y="760" width="365" height="135" rx="18" fill="#f1f5f9" stroke="#64748b" stroke-width="2" stroke-dasharray="8 7"/>
-  <text x="76" y="800" class="box-title">Scheduler</text>
-  <text x="76" y="830" class="owner-label">ROEPT AAN, SCHRIJFT GEEN RESULTATEN</text>
-  <text x="76" y="860" class="function">runProcessSession() × 3</text>
-  <text x="76" y="884" class="function">runDispatchSession()</text>
-
-  <!-- Frontend -->
-  <rect x="50" y="925" width="365" height="130" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
-  <text x="76" y="965" class="box-title">Frontend</text>
-  <text x="76" y="995" class="owner-label">LEEST VIA QUERY-API'S</text>
-  <text x="76" y="1023" class="entity">read-only ...Details DTO's</text>
-  <text x="76" y="1046" class="note">Commands gaan naar de eigenaarsmodule.</text>
-
-  <!-- Stakeholder -->
-  <rect x="50" y="1090" width="365" height="205" rx="18" fill="#fefce8" stroke="#ca8a04" stroke-width="2"/>
-  <rect x="50" y="1090" width="365" height="58" rx="18" fill="#fef9c3"/>
-  <path d="M50 1130 V1148 H415 V1130" fill="#fef9c3"/>
-  <text x="76" y="1128" class="box-title">Stakeholder</text>
-  <text x="76" y="1176" class="owner-label">LEVERT VIA PRODUCT / OVERLEG</text>
-  <text x="76" y="1208" class="note">profiel · productopdracht · richting</text>
-  <text x="76" y="1232" class="note">antwoorden · signalen · kwaliteitszorg</text>
-  <text x="76" y="1270" class="note">Maakt geen epics, stories, bugs of backlog.</text>
+  <rect x="1370" y="180" width="650" height="680" rx="18" fill="#f5f3ff" stroke="#7c3aed" stroke-width="3"/>
+  <rect x="1370" y="180" width="650" height="62" rx="18" fill="#ede9fe"/>
+  <path d="M1370 222 V242 H2020 V222" fill="#ede9fe"/>
+  <text x="1395" y="220" class="module-title">Kwaliteitsbewaking</text>
+  <text x="1395" y="272" class="section-title">PUBLIEKE INTERFACE</text>
+  <text x="1395" y="302" class="api">«scheduled» runProcessSession()</text>
+  <text x="1395" y="334" class="api">«query» getBug(...)</text>
+  <text x="1395" y="360" class="api">«query» findVerifications(...)</text>
+  <text x="1395" y="386" class="api">«query» getQualityOverview(...)</text>
+  <text x="1395" y="418" class="api">«command» linkBugfixStory(...)</text>
+  <line x1="1395" y1="448" x2="1995" y2="448" class="divider" stroke="#ddd6fe"/>
+  <text x="1395" y="478" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="1395" y="511" class="entity">Bug · Verification · ProcessSession</text>
+  <line x1="1395" y1="540" x2="1995" y2="540" class="divider" stroke="#ddd6fe"/>
+  <text x="1395" y="570" class="section-title">BELANGRIJKE GRENS</text>
+  <text x="1395" y="601" class="note">Verification richt zich op STORY, EPIC of USER_SIGNAL.</text>
+  <text x="1395" y="625" class="note">Kwaliteitsbewaking schrijft geen Story, Epic of UserSignal.</text>
+  <text x="1395" y="649" class="note">Zij vraagt vervolgwerk en statuswijzigingen via commands aan.</text>
+  <text x="1395" y="696" class="note">QualityOverview is een berekende query.</text>
+  <text x="1395" y="744" class="note">Testbewijs en verificaties blijven historisch leesbaar.</text>
 
   <!-- Besluitenregister -->
-  <rect x="1430" y="970" width="325" height="325" rx="18" fill="#fff1f2" stroke="#be123c" stroke-width="3"/>
-  <rect x="1430" y="970" width="325" height="74" rx="18" fill="#ffe4e6"/>
-  <path d="M1430 1022 V1044 H1755 V1022" fill="#ffe4e6"/>
-  <text x="1454" y="1005" class="box-title">Besluitenregister</text>
-  <text x="1454" y="1030" class="function">geen scheduler of agents</text>
-  <text x="1454" y="1075" class="owner-label">SCHRIJFT</text>
-  <text x="1454" y="1111" class="entity">DecisionRecord</text>
-  <line x1="1454" y1="1135" x2="1731" y2="1135" stroke="#fecdd3"/>
-  <text x="1454" y="1164" class="note">Neemt geen besluiten; registreert</text>
-  <text x="1454" y="1186" class="note">keuzes van bevoegde bronmodules.</text>
-  <text x="1454" y="1220" class="note">validFrom · validUntil</text>
-  <text x="1454" y="1242" class="note">Actief · Vervangen · Ingetrokken</text>
-  <text x="1454" y="1264" class="note">supersedes · replacedBy</text>
+  <rect x="55" y="1030" width="525" height="390" rx="18" fill="#fff1f2" stroke="#be123c" stroke-width="3"/>
+  <rect x="55" y="1030" width="525" height="62" rx="18" fill="#ffe4e6"/>
+  <path d="M55 1072 V1092 H580 V1072" fill="#ffe4e6"/>
+  <text x="80" y="1070" class="module-title">Besluitenregister</text>
+  <text x="80" y="1122" class="section-title">PUBLIEKE INTERFACE</text>
+  <text x="80" y="1152" class="api">«command» recordDecision(...)</text>
+  <text x="80" y="1178" class="api">«command» withdrawDecision(...)</text>
+  <text x="80" y="1210" class="api">«query» getDecision(...) / findDecisions(...)</text>
+  <line x1="80" y1="1240" x2="555" y2="1240" class="divider" stroke="#fecdd3"/>
+  <text x="80" y="1270" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="80" y="1303" class="entity">DecisionRecord</text>
+  <line x1="80" y1="1332" x2="555" y2="1332" class="divider" stroke="#fecdd3"/>
+  <text x="80" y="1362" class="note">Geen scheduler of agents. Neemt zelf geen besluiten.</text>
+  <text x="80" y="1386" class="note">Intrekken of vervangen behoudt de historische inhoud.</text>
 
-  <!-- Gegevensstromen -->
-  <path d="M415 275 H520" class="blue-line"/>
-  <text x="429" y="262" class="flow-small">profiel · opdracht · richting · signalen</text>
+  <!-- Dispatcher -->
+  <rect x="1370" y="960" width="650" height="380" rx="18" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
+  <rect x="1370" y="960" width="650" height="62" rx="18" fill="#ffedd5"/>
+  <path d="M1370 1002 V1022 H2020 V1002" fill="#ffedd5"/>
+  <text x="1395" y="1000" class="module-title">Software Factory-dispatcher</text>
+  <text x="1395" y="1052" class="section-title">PUBLIEKE INTERFACE</text>
+  <text x="1395" y="1082" class="api">«scheduled» runDispatchSession()</text>
+  <line x1="1395" y1="1112" x2="1995" y2="1112" class="divider" stroke="#fed7aa"/>
+  <text x="1395" y="1142" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="1395" y="1175" class="entity">DeliveryAttempt</text>
+  <line x1="1395" y1="1204" x2="1995" y2="1204" class="divider" stroke="#fed7aa"/>
+  <text x="1395" y="1234" class="section-title">GEBRUIKT</text>
+  <text x="1395" y="1265" class="note">Storyqueries en storycommands van Productplanning.</text>
+  <text x="1395" y="1289" class="note">Externe Software Factory API.</text>
+  <text x="1395" y="1313" class="note">StoryDeliveryPackage is transport, geen entiteit.</text>
 
-  <path d="M330 540 C350 700 420 820 520 820" class="green-line"/>
-  <text x="327" y="659" class="flow-small">profiel · opdracht · richting</text>
+  <!-- Software Factory external system -->
+  <rect x="1515" y="1410" width="360" height="100" rx="18" fill="#ffffff" stroke="#ea580c" stroke-width="2.5"/>
+  <text x="1540" y="1450" class="module-title">Software Factory</text>
+  <text x="1540" y="1480" class="note">extern systeem</text>
 
-  <path d="M415 395 C850 90 1350 130 1430 400" class="purple-line"/>
-  <text x="955" y="165" class="flow-small">richting · UserSignalDetails</text>
-  <text x="1010" y="186" class="flow-small">profiel · testconfiguratie</text>
+  <!-- Queries and commands between modules -->
+  <path d="M580 390 H675" class="query"/>
+  <text x="588" y="378" class="flow">product · richting · signalen</text>
 
-  <path d="M1430 650 C1170 625 790 605 415 445" class="purple-line"/>
-  <text x="925" y="607" class="flow-small">recordSignalInvestigation(...)</text>
+  <path d="M580 600 C620 770 620 1030 675 1070" class="query"/>
+  <text x="585" y="835" class="flow">product · richting</text>
 
-  <path d="M725 540 V705" class="green-line"/>
-  <text x="740" y="620" class="flow">EpicDetails + claim command</text>
+  <path d="M580 320 C900 125 1170 125 1370 300" class="query"/>
+  <text x="930" y="158" class="flow">StakeholderDetails · UserSignalDetails · testconfiguratie</text>
 
-  <path d="M930 330 C1110 250 1280 265 1430 465" class="purple-line"/>
-  <text x="1050" y="283" class="flow">EpicDetails</text>
+  <path d="M860 890 V830" class="command"/>
+  <text x="690" y="856" class="flow">epic lifecycle commands</text>
+  <path d="M1050 830 V890" class="query"/>
+  <text x="1065" y="862" class="flow">EpicDetails</text>
 
-  <path d="M520 755 C460 730 455 570 520 505" class="blue-line"/>
-  <text x="250" y="590" class="flow-small">Epic is eigen output</text>
-  <text x="250" y="610" class="flow-small">BacklogSupply query</text>
+  <path d="M1235 350 H1370" class="query"/>
+  <text x="1254" y="338" class="flow">EpicDetails</text>
+  <path d="M1370 665 H1235" class="command"/>
+  <text x="1246" y="635" class="flow">recordEpic</text>
+  <text x="1246" y="652" class="flow">Verification(...)</text>
 
-  <path d="M930 845 C1120 690 1270 610 1430 570" class="purple-line"/>
-  <text x="995" y="696" class="flow-small">EpicDetails · StoryDetails</text>
+  <path d="M1370 760 C1315 805 1285 945 1235 1040" class="command"/>
+  <text x="1248" y="875" class="flow">requestBugfix(...)</text>
+  <text x="1248" y="894" class="flow">requestCompletionWork(...)</text>
+  <path d="M1235 980 C1300 900 1320 590 1370 555" class="query"/>
+  <text x="1245" y="790" class="flow">StoryDetails</text>
 
-  <path d="M1430 700 C1250 720 1090 760 930 815" class="green-line"/>
-  <text x="1080" y="748" class="flow-small">bugs · verificaties · plancommands</text>
+  <path d="M1370 1090 H1235" class="command"/>
+  <text x="1244" y="1078" class="flow">story lifecycle commands</text>
+  <path d="M1235 1035 H1370" class="query"/>
+  <text x="1255" y="1023" class="flow">eerste TODO StoryDetails</text>
 
-  <path d="M1430 520 C1250 470 1110 455 930 475" class="blue-line"/>
-  <text x="1032" y="446" class="flow-small">VerificationDetails · QualityOverview</text>
-  <text x="1032" y="466" class="flow-small">recordEpicVerification(...)</text>
+  <path d="M1530 1340 V1410" class="command"/>
+  <text x="1377" y="1380" class="flow">StoryDeliveryPackage</text>
+  <path d="M1815 1410 V1340" class="query"/>
+  <text x="1830" y="1380" class="flow">werkstatus</text>
 
-  <path d="M930 955 H1030" class="line"/>
-  <text x="938" y="940" class="flow-small">eerste TODO-story</text>
-
-  <path d="M1030 1045 C985 1045 970 1012 930 1012" class="green-line"/>
-  <text x="939" y="1067" class="flow-small">story lifecycle commands</text>
-
-  <path d="M1345 970 C1380 970 1390 850 1430 850" class="purple-line"/>
-  <text x="1320" y="951" class="flow-small">levering</text>
-
-  <path d="M1125 805 C1110 590 1020 520 930 500" class="blue-line"/>
-  <text x="960" y="554" class="flow-small">StoryDetails</text>
-
-  <path d="M1187 1115 V1210" class="line"/>
-  <path d="M1215 1210 V1115" class="line"/>
-  <text x="1232" y="1160" class="flow-small">volledig pakket</text>
-  <text x="1232" y="1180" class="flow-small">/ status</text>
-
-  <path d="M145 1090 C15 950 10 690 50 500" class="line"/>
-  <text x="12" y="805" class="flow-small" transform="rotate(-90 12 805)">profiel · opdracht · richting · signalen</text>
-
-  <path d="M930 300 H1790 V1185 H1755" class="line dashed"/>
-  <text x="1470" y="287" class="flow-small">ontwerpbesluiten</text>
-
-  <path d="M415 155 V130 H1805 V1240 H1755" class="line dashed"/>
-  <text x="1510" y="118" class="flow-small">Stakeholderbesluiten</text>
-
-  <path d="M930 1160 H1390 Q1430 1160 1430 1120" class="line dashed"/>
-  <text x="1160" y="1147" class="flow-small">planningbesluiten</text>
-
-  <!-- Legenda -->
-  <rect x="50" y="1335" width="14" height="14" rx="3" fill="#dbeafe" stroke="#2563eb"/>
-  <text x="74" y="1347" class="note">Productontwerp</text>
-  <rect x="220" y="1335" width="14" height="14" rx="3" fill="#d1fae5" stroke="#059669"/>
-  <text x="244" y="1347" class="note">Productplanning</text>
-  <rect x="405" y="1335" width="14" height="14" rx="3" fill="#ede9fe" stroke="#7c3aed"/>
-  <text x="429" y="1347" class="note">Kwaliteitsbewaking</text>
-  <rect x="620" y="1335" width="14" height="14" rx="3" fill="#ffedd5" stroke="#ea580c"/>
-  <text x="644" y="1347" class="note">Dispatcher</text>
-  <rect x="750" y="1335" width="14" height="14" rx="3" fill="#fef9c3" stroke="#ca8a04"/>
-  <text x="774" y="1347" class="note">Stakeholder</text>
-  <rect x="910" y="1335" width="14" height="14" rx="3" fill="#ffe4e6" stroke="#be123c"/>
-  <text x="934" y="1347" class="note">Besluitenregister</text>
-  <text x="1095" y="1347" class="note">De volledige lezerlijst en veldgrenzen staan in de tabel van het design-document.</text>
+  <!-- Decision commands are summarized to avoid crossing every module -->
+  <path d="M320 920 V1030" class="command"/>
+  <text x="335" y="980" class="flow">recordDecision(...)</text>
+  <text x="80" y="1448" class="note">De getoonde module-interface is leidend.</text>
+  <text x="80" y="1470" class="note">Niet iedere toegestane relatie heeft een pijl.</text>
 </svg>

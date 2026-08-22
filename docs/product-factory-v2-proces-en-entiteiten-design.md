@@ -7,6 +7,11 @@ via een read-only query bekijken.
 
 ![Processen, eigenaren en gegevensstromen](product-factory-v2-proces-en-entiteiten.svg)
 
+Het diagram gebruikt UML-achtige moduleblokken: bovenaan staat de publieke interface en onderaan
+staan de eigen entiteiten. De scheduler is niet als module afgebeeld; `«scheduled»` markeert zijn
+aanroeppunten. De frontend gebruikt dezelfde commands en queries en staat daarom evenmin in het
+diagram. De Stakeholder blijft zichtbaar als externe actor bij Product en overleg.
+
 ## Ontwerpregels
 
 - Iedere duurzame entiteit heeft precies één schrijvende module.
