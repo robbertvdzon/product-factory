@@ -14,6 +14,9 @@ De wil van de Stakeholder is leidend. Agents mogen adviseren, doorvragen en gevo
 notulenagent registreert wat expliciet is afgesproken, maar neemt geen besluit namens de
 Stakeholder.
 
+De Stakeholder start en voert het overleg via de gebruikersinterface. De UI gebruikt de publieke
+overlegcommands; zij schrijft nooit rechtstreeks in de database of in een procesmodule.
+
 ## Publieke interface
 
 De precieze command-DTO's kunnen technisch nog worden uitgewerkt. De betekenisvolle modulegrens is:
@@ -62,16 +65,16 @@ drie productprocessen.
 ## Afsluiten en doorwerken
 
 Bij afsluiting maakt de notulenagent een leesbare samenvatting met besproken onderwerpen,
-Stakeholderrichting, grote besluiten, open vragen en acties. Daarna classificeert hij iedere
-expliciete uitkomst:
+aanwijzingen van de Stakeholder, grote besluiten, open vragen en acties. Daarna classificeert hij
+iedere expliciete uitkomst:
 
 | Uitkomst uit het overleg | Vastlegging | Betekenis |
 |---|---|---|
 | productdoel of harde grens verandert | `updateProductAssignment(...)` | nieuwe verplichte context voor alle processen |
-| concrete aanwijzing, correctie, stop of prioriteit | `recordStakeholderDirection(...)` | actuele, leidende Stakeholderrichting |
-| feedback, probleem, kans, risico of kwaliteitszorg | `submitUserSignal(...)` | onderzoekbare melding; nog geen bewezen bug |
+| feedback, correctie, wens, probleem, kans, risico of kwaliteitszorg | `submitUserSignal(...)` | onderzoekbare melding; nog geen bewezen bug of opdracht |
 | grote, blijvende keuze | command op het Besluitenregister | geversioneerd Stakeholderbesluit |
-| normale epic-, story-, bug- of prioriteitsactie | command op de eigenaarsmodule | gewone procesactie, geen besluit |
+| epic intrekken of actieve epic annuleren | `withdrawEpic(...)` of `cancelEpic(...)` | directe actie op Productontwerp, met meeting-ID en reden |
+| epic prioriteren of andere normale procesactie | command op de eigenaarsmodule | gewone procesactie, geen besluit |
 
 Iedere doorwerking bewaart de bron-`Meeting` en een idempotentiesleutel. Als een command mislukt,
 blijft zichtbaar welke uitkomst nog niet verwerkt is; het transcript wordt niet opnieuw

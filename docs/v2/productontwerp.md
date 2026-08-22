@@ -72,7 +72,8 @@ void claimEpicForPlanning(ClaimEpicForPlanningCommand command);
 void markEpicActive(MarkEpicActiveCommand command);
 void markEpicReadyForVerification(MarkEpicReadyForVerificationCommand command);
 void recordEpicVerification(RecordEpicVerificationCommand command);
-void stopEpic(StopEpicCommand command);
+void withdrawEpic(WithdrawEpicCommand command);
+void cancelEpic(CancelEpicCommand command);
 ```
 
 Deze functies starten geen agents. Ze valideren bevoegdheid, verwachte versie en toegestane
@@ -90,12 +91,12 @@ domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
 | `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
-| `StakeholderDirectionDetails` | product-/overlegmodule | bindende richting en expliciete correcties |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | alleen grote, blijvende Stakeholder- en Factorybesluiten die het ontwerp begrenzen |
 | `UserSignalDetails` | productmodule | oorspronkelijke feedback plus actuele status, uitkomst en resultaatkoppelingen |
 | `StoryDetails` | Productplanning-query | wat Software Factory heeft opgeleverd en welke story bij een epic hoort |
 | `VerificationDetails` | Kwaliteitsbewaking-query | of de bedoelde gebruikersverbetering is bereikt en welk bewijs daarbij hoort |
-| `QualityOverview` | Kwaliteitsbewaking-query | berekend beeld van productgezondheid en onderbelichte risicogebieden |
+| `QualitySnapshotDetails` | Kwaliteitsbewaking-query | huidig kwaliteitsbeeld en historische ontwikkeling van dekking, bugs, risico's en verificaties |
+| `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, testaccounts en toegangsgrenzen |
 
 Voor iedere gelezen publicatie worden bron-ID en bronversie vastgelegd. Dezelfde versie wordt niet
 tweemaal als nieuwe input behandeld.
@@ -104,6 +105,11 @@ Bij aanvang van een inhoudelijke sessie mag Productontwerp de publieke Git-URL u
 uitchecken en broncode, tests en documentatie read-only onderzoeken. Productontwerp commit en pusht
 nooit; de gelezen commit-SHA wordt alleen als bronverwijzing bij de sessie of epic vastgelegd. Ruwe
 bronnen steken de modulegrens niet over.
+
+Productontwerp bekijkt daarnaast de werkende applicatie via `TestableProductDetails`. Acceptatie is
+de voorkeursomgeving voor handelingen die data kunnen veranderen. Productie wordt alleen read-only
+of met expliciet veilige testaccounts bekeken; secrets staan nooit in het DTO. Zo baseert de module
+een epic niet alleen op code en documentatie, maar ook op de huidige gebruikerservaring.
 
 Een `UserSignalDetails` is een aanwijzing en geen opdracht. De oorspronkelijke tekst blijft
 onveranderlijk; status, verwerkingsuitkomst en koppelingen staan op dezelfde `UserSignal`. Als
@@ -123,7 +129,7 @@ roept de procesfunctie aan en de frontend leest het resultaat, maar geen van bei
 De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Droombeelden,
 `DirectionSnapshot` en `LearningResult` blijven intern binnen Productontwerp. Alleen wanneer daar
 uitzonderlijk een grote, blijvende keuze uit volgt die meerdere toekomstige processessies begrenst,
-kan Productontwerp binnen de harde grenzen en actuele Stakeholderrichting via
+kan Productontwerp binnen de productopdracht en geldige besluiten via
 `createDecision(...)` een Factory-besluit laten vastleggen door het
 [Besluitenregister](besluitenregister.md). Een droombeeld, epic, signaalafhandeling of normale
 ontwerpkeuze is geen besluit.
@@ -133,10 +139,10 @@ Alleen Productontwerp schrijft de `Epic`. Productplanning claimt een exacte vers
 de afsluitende uitkomst via `recordEpicVerification(...)`. Geen van beide krijgt toegang tot de
 epicrepository of kan inhoud en UX veranderen.
 
-Na het atomair publiceren van een nieuwe beschikbare epic roept Productontwerp idempotent
-`requestEpicPlanning(epicId, epicVersion, ...)` op Productplanning aan. Dat command start geen
-planner en maakt geen stories: het zet alleen een duurzaam `PlanningWorkItem` met type `PLAN_EPIC`
-in de planningsqueue. Een latere planningsrun pakt het werk op.
+Na het atomair publiceren van een nieuwe beschikbare epic hoeft Productontwerp geen command naar
+Productplanning te sturen. Productplanning heeft een eigen schedule en zoekt tijdens een latere processessie zelf
+naar `AVAILABLE` epics. `claimEpicForPlanning(...)` zorgt dat precies één planner de gekozen versie
+bevriest.
 
 `markEpicReadyForVerification(...)` is uitsluitend een gevalideerde statusovergang naar
 **Controleren** (`VERIFYING`). Productplanning roept daarna
@@ -173,7 +179,7 @@ Zolang de epicstatus **Beschikbaar** is, mag Productontwerp:
 
 - een nieuwe versie publiceren;
 - de vorige versie als **Vervangen** markeren;
-- een beschikbare epic intrekken met een zichtbare reden.
+- een beschikbare epic via `withdrawEpic(...)` intrekken met een zichtbare reden.
 
 Zodra `claimEpicForPlanning(...)` een exact epic-ID en versienummer heeft gekozen:
 
@@ -183,6 +189,12 @@ Zodra `claimEpicForPlanning(...)` een exact epic-ID en versienummer heeft gekoze
 - wordt nieuwe kennis een vervolgepic of een voorstel om de uitvoering te stoppen;
 - kan een vervangende richting alleen via een nieuw gekozen epic-ID of een vooraf gepubliceerde,
   nog niet gekozen epicversie lopen.
+
+Een door de Stakeholder bewust gestopte reeds gekozen epic krijgt via `cancelEpic(...)` status
+`CANCELLED`. Productontwerp roept daarna idempotent `cancelStoriesForEpic(...)` op Productplanning
+aan. Productplanning zet alleen nog niet verstuurde stories op `CANCELLED`; een reeds
+`IN_PROGRESS` story loopt normaal af. Een ingetrokken nog niet gekozen epic krijgt `WITHDRAWN` en
+heeft geen stories.
 
 De module controleert deze regel en het verwachte versienummer in dezelfde transactie op de `Epic`.
 Zo kan een langlopende ontwerpsessie niet alsnog een inmiddels geclaimde epic overschrijven.
@@ -225,9 +237,13 @@ productobjecten staan.
 - **In planning** — exact deze versie is geclaimd en wordt in stories verdeeld;
 - **Actief** — één of meer stories of bugfixes worden uitgevoerd;
 - **Controleren** — alle bekende stories zijn geleverd en de hele verbetering wordt getoetst;
-- **Geslaagd**, **Niet geslaagd** of **Gestopt** — eindstatus met reden en eventuele verificatie-ID;
+- **Geslaagd**, **Niet geslaagd** of **Geannuleerd** — eindstatus met reden en eventuele verificatie-ID;
 - **Vervangen** — er is vóór selectie een nieuwere versie gepubliceerd;
 - **Ingetrokken** — bewust niet meer beschikbaar, met reden.
+
+Een epic met status **Niet geslaagd** (`NOT_SUCCESSFUL`) blijft als historisch eindresultaat bestaan
+en wordt niet heropend. Een latere geplande ontwerpsessie kan de verificatie verwerken en een nieuwe
+vervolgepic publiceren. Een geannuleerde epic start geen complete epicverificatie meer.
 
 ## Agents
 
@@ -304,8 +320,8 @@ De module:
 1. claimt één planbare sessie met een database-lock;
 2. leest de exacte inputversies;
 3. controleert eerst of een betrokken epic inmiddels door Productplanning is gekozen;
-4. bepaalt urgentie op basis van nieuwe kennis, kwaliteitssignalen, beschikbare epics en geldende
-   Stakeholderrichting;
+4. bepaalt urgentie op basis van nieuwe kennis, kwaliteitssignalen, beschikbare epics, de
+   productopdracht, geldige besluiten en relevante gebruikerssignalen;
 5. kiest één hoofdtaak en een begrensd tijd-/tokenbudget;
 6. controleert toegangsrechten en harde productgrenzen.
 
@@ -341,11 +357,10 @@ De Epiccriticus controleert minimaal:
 - dat de epic nog niet door Productplanning is gekozen.
 
 Goedgekeurde output wordt atomair in de eigen entiteiten opgeslagen en daarna wordt de sessiestatus
-afgerond. Query-DTO's worden uit die entiteiten opgebouwd en hebben geen eigen opslag. Na publicatie
-vraagt Productontwerp via `requestEpicPlanning(...)` idempotent planning voor exact die epicversie
-aan. De epicpublicatie, signaalbeoordeling en keuze om geen epic te maken zijn geen besluiten. Alleen
-een afzonderlijke grote, blijvende Factorykeuze binnen de harde grenzen en actuele
-Stakeholderrichting gebruikt eventueel
+afgerond. Query-DTO's worden uit die entiteiten opgebouwd en hebben geen eigen opslag. Een latere
+geplande planningsrun vindt de nieuwe `AVAILABLE` epic zelf. De epicpublicatie, signaalbeoordeling en
+keuze om geen epic te maken zijn geen besluiten. Alleen een afzonderlijke grote, blijvende
+Factorykeuze binnen de productopdracht en geldige besluiten gebruikt eventueel
 `createDecision(...)`. Productontwerp roept voor een beoordeeld gebruikerssignaal het passende
 signaalcommand op de productmodule aan.
 
@@ -353,8 +368,8 @@ signaalcommand op de productmodule aan.
 
 Een sessie wordt planbaar door:
 
-- een gewijzigde productopdracht, een nieuwe of gewijzigde Stakeholderrichting,
-  een gebruikerssignaal of signaalstatus;
+- een gewijzigde productopdracht, een nieuw of gewijzigd besluit, een gebruikerssignaal of
+  signaalstatus;
 - een nieuwe epicverificatie of nieuw intern leerresultaat dat nog om een ontwerpkeuze vraagt;
 - een structureel kwaliteitspatroon als gebruikerssignaal;
 - een periodieke onderzoeks- of epiccontrole.
@@ -382,8 +397,8 @@ Een sessie is klaar wanneer:
 - iedere gepubliceerde epic door de Epiccriticus is goedgekeurd;
 - iedere epic zelfstandig door Productplanning kan worden begrepen;
 - de publicatiecontrole bewijst dat de epicversie nog niet is gekozen;
-- ieder eventueel groot Factory-besluit binnen de harde grenzen en actuele Stakeholderrichting
-  idempotent aan het Besluitenregister is
+- ieder eventueel groot Factory-besluit binnen de productopdracht en geldige besluiten idempotent
+  aan het Besluitenregister is
   aangeboden en iedere gewone proceskeuze daar juist buiten blijft;
 - output atomair en geversioneerd beschikbaar is;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.

@@ -12,6 +12,10 @@ queues en interne werking staan in de documenten onderaan.
 Per product is er één Stakeholder: de klant voor wie we het product maken. De Stakeholder is een
 actor en wordt niet als apart productobject opgeslagen.
 
+De Stakeholder communiceert met Product Factory via de gebruikersinterface. De UI vertaalt iedere
+actie naar een publiek command op de module die het betrokken productobject bezit; de Stakeholder
+schrijft nooit rechtstreeks in de database.
+
 De Stakeholder:
 
 - geeft het productdoel en de harde grenzen;
@@ -34,17 +38,17 @@ werkdocumenten, prompts en agentadministratie horen hier niet bij.
 |---|---|
 | `Product` | Het product waaraan Product Factory werkt. |
 | `ProductAssignment` | Het doel, de doelgroep, de harde grenzen en de publieke Git-URL van het product. |
-| `StakeholderDirection` | Een expliciete aanwijzing, correctie of prioriteit van de Stakeholder. |
 | `UserSignal` | Feedback, een probleem, zorg, kans of observatie, met zichtbare verwerking en uitkomst. |
 | `Decision` | Een grote, blijvende keuze die meerdere toekomstige sessies richting geeft. |
 | `Epic` | Een complete en behapbare gebruikersverbetering, inclusief scope, succescriteria en UX-ontwerp. |
 | `Story` | Eén zelfstandig uitvoerbaar stuk productwerk of bugfixwerk voor Software Factory. |
 | `Bug` | Een reproduceerbare afwijking tussen verwacht en werkelijk gedrag. |
 | `Verification` | Onveranderlijk bewijs en een oordeel over een story, epic of gebruikerssignaal. |
+| `QualitySnapshot` | Een onveranderlijke momentopname van de aantoonbare productkwaliteit na een kwaliteitssessie. |
 | `Meeting` | Een overleg met de Stakeholder, inclusief agenda, gesprek en gecontroleerde uitkomst. |
 
-De **backlog** is geen apart object. Het is de lijst van alle stories die nog niet `DONE` zijn,
-geordend op `sequenceNumber`.
+De **backlog** is geen apart object. Het is de lijst van stories met status `TODO` of
+`IN_PROGRESS`, geordend op `sequenceNumber`.
 
 ## De hele route
 
@@ -54,12 +58,12 @@ In gewone taal gebeurt het volgende:
 2. Feedback, zorgen en kansen worden als gebruikerssignalen bewaard.
 3. Productontwerp onderzoekt het product en maakt een complete epic met het benodigde UX-ontwerp.
 4. Productplanning bevriest de gekozen epicversie en verdeelt de hele epic in zelfstandige stories.
-5. Alle nog niet afgeronde stories vormen samen één geprioriteerde backlog.
+5. Alle stories met status `TODO` of `IN_PROGRESS` vormen samen één geprioriteerde backlog.
 6. De dispatcher stuurt de bovenste uitvoerbare story naar Software Factory.
 7. Wanneer Software Factory de story heeft opgeleverd, wordt de story `DONE` en kan gericht
    testwerk worden klaargezet.
-8. Wanneer alle stories van een epic zijn opgeleverd, wordt een controle van de complete epic
-   klaargezet.
+8. Wanneer alle stories van een niet-geannuleerde epic zijn opgeleverd, wordt een controle van de
+   complete epic klaargezet.
 9. Kwaliteitsbewaking controleert of het product echt werkt en of de epic de bedoelde verbetering
    voor de gebruiker heeft bereikt.
 10. Bij een bouwfout komt er een bugfixverzoek. Bij ontbrekend werk binnen de epic komt er een
@@ -119,19 +123,18 @@ doet.
 | Gegeven | Hoe komt het binnen? | Betekenis |
 |---|---|---|
 | `ProductAssignment` | Read-only query op de productmodule | Doel, doelgroep, grenzen en Git-URL. |
-| `StakeholderDirection` | Read-only query op de product-/overlegmodule | De actuele wil en prioriteiten van de Stakeholder. |
 | Geldige `Decision`s | Query op het Besluitenregister | Grote keuzes die nu gelden. |
 | `UserSignal`s | Read-only query op de productmodule | Feedback, problemen, kansen en kwaliteitszorgen. |
 | Stories en `Verification`s | Read-only queries op planning en kwaliteit | Wat eerder werkelijk is gebouwd en aangetoond. |
+| Huidig kwaliteitsbeeld en historie | Queries op `QualitySnapshot`s | Aantoonbare kwaliteit, risico's en ontwikkeling door de tijd. |
 | Huidige code en documentatie | Read-only checkout van `ProductAssignment.gitUrl` | Hoe het product er nu voorstaat. |
+| Acceptatie- en eventueel productieomgeving | Read-only `TestableProductConfiguration` | Hoe het product nu werkelijk werkt en aanvoelt; productie alleen binnen veilige grenzen. |
 
 ### Output
 
 | Gegeven | Betekenis |
 |---|---|
-| `Epic` | De gekozen gebruikersverbetering, met eenduidige scope, bewijs, risico's, succescriteria en compleet UX-ontwerp. |
-| Planningrequest | `requestEpicPlanning(...)` zet duurzaam planwerk bij Productplanning klaar en start geen agent. |
-| Epicstatus | Alleen Productontwerp voert geldige epicovergangen uit op verzoek van planning of kwaliteit. |
+| `Epic` | De gekozen gebruikersverbetering, inclusief status, eenduidige scope, bewijs, risico's, succescriteria en compleet UX-ontwerp. |
 
 Productontwerp mag een beschikbare epic nog verbeteren. Zodra Productplanning een exacte epicversie
 kiest, wordt die versie bevroren en niet meer aangepast.
@@ -143,28 +146,30 @@ Onderzoeksvragen, bronnen, tussenresultaten en concepten blijven intern binnen P
 **Doel:** epics en herstelverzoeken omzetten in volledige stories en alle open stories in één
 uitlegbare volgorde zetten.
 
-Een scheduler of bevoegde handmatige aanroep start `runProcessSession()`. De run claimt werk uit de
-eigen `PlanningWorkItem`-queue. Een lege queue is een geldige no-op.
+Een scheduler of bevoegde handmatige aanroep start `runProcessSession()`. De run zoekt zelf naar
+`AVAILABLE` epics en claimt daarnaast gericht werk uit de eigen `PlanningWorkItem`-queue. Als beide
+ontbreken, is de run een geldige no-op.
 
 ### Input
 
 | Gegeven | Hoe komt het binnen? | Betekenis |
 |---|---|---|
-| `PlanningWorkItem` | Via een snel, idempotent requestcommand | Een verzoek om een epic, bugfix, ontbrekende dekking of handmatige herplanning te verwerken. |
-| `Epic` | Read-only query op Productontwerp | De exacte bron die wordt gekozen en bevroren. |
+| `PlanningWorkItem` | Via een snel, idempotent requestcommand | Een gericht verzoek voor een bugfix, ontbrekende dekking, storyreparatie, prioriteit of handmatige herplanning. |
+| Beschikbare `Epic`s | Read-only query op Productontwerp | De planner kiest en bevriest zelf een exacte epicversie. |
 | `Bug` en `Verification` | Read-only queries op Kwaliteitsbewaking | Bewijs voor herstelwerk of ontbrekende epicdekking. |
-| `ProductAssignment`, `StakeholderDirection` en geldige `Decision`s | Read-only queries | De grenzen en actuele prioriteitsrichting. |
+| `ProductAssignment` en geldige `Decision`s | Read-only queries | Het productdoel, de grenzen en blijvende keuzes. |
 | Bestaande `Story`s | Eigen database | Reeds gepland, verzonden en opgeleverd werk. |
 | Huidige code en documentatie | Read-only checkout van de publieke Git-URL | Context voor een realistische storiesplitsing. |
+| Acceptatie- en eventueel productieomgeving | Read-only `TestableProductConfiguration` | Bestaande gebruikersroutes, schermen en gedrag; productie alleen binnen veilige grenzen. |
 
 ### Output
 
 | Gegeven | Betekenis |
 |---|---|
 | `Story` | Zelfstandige productstory of bugfixstory met acceptatiecriteria, relevante UX, assets, status en `sequenceNumber`. |
-| Backlogquery | Alle stories die niet `DONE` zijn, geordend op `sequenceNumber`. |
+| Backlogquery | Alle stories met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber`. |
 | Planningstatus | Zichtbaar resultaat van ieder `PlanningWorkItem`. |
-| Kwaliteitsrequest | Gerichte story-, bugfix- of epiccontrole die in de kwaliteitsqueue wordt gezet. |
+| `QualityWorkItem` bij Kwaliteitsbewaking | Productplanning vraagt de eigenaar om een gerichte story-, bugfix- of epiccontrole klaar te zetten. |
 
 Alleen Productplanning schrijft stories, story-inhoud, status en volgorde. De dispatcher meldt
 leveringsgebeurtenissen via publieke planningcommands en verandert de story niet rechtstreeks.
@@ -183,7 +188,7 @@ eigen `QualityWorkItem`-queue. Een queuecommand start nooit onmiddellijk een tes
 |---|---|---|
 | `QualityWorkItem` | Via een snel, idempotent requestcommand | Verzoek om een story, epic, bugfix of gebruikerssignaal te onderzoeken. |
 | `ProductAssignment` en testconfiguratie | Read-only query op de productmodule | Productgrenzen, omgeving, toegestane accounts en Git-URL. |
-| `StakeholderDirection` en geldige `Decision`s | Read-only queries | Geldende product-, privacy- en kwaliteitsgrenzen. |
+| Geldige `Decision`s | Read-only query | Grote product-, privacy- en kwaliteitskeuzes die nu gelden. |
 | `Story` | Read-only query op Productplanning | Wat is gebouwd en waar de oplevering bij hoort. |
 | Bevroren `Epic` met UX | Read-only query op Productontwerp | De volledige bedoeling die na alle stories moet worden gecontroleerd. |
 | `UserSignal` | Read-only query op de productmodule | De oorspronkelijke zorg of observatie die onderzocht moet worden. |
@@ -195,8 +200,8 @@ eigen `QualityWorkItem`-queue. Een queuecommand start nooit onmiddellijk een tes
 |---|---|
 | `Bug` | Reproduceerbare bouwfout met verwacht en werkelijk gedrag, bewijs en ernst. |
 | `Verification` | Onveranderlijk oordeel en bewijs over een story, epic of gebruikerssignaal. |
-| Kwaliteitsbeeld | Berekend read-only overzicht van dekking, risico's en recent onderzoek. |
-| Herstelrequest | Verzoek aan Productplanning om een bugfix of ontbrekende epicdekking te plannen. |
+| `QualitySnapshot` | Onveranderlijke momentopname na iedere afgeronde niet-lege kwaliteitssessie, met dekking, risico's, bugs en verificatie-uitkomsten. |
+| `PlanningWorkItem` bij Productplanning | Kwaliteitsbewaking vraagt de eigenaar om een bugfix of ontbrekende epicdekking te plannen. |
 
 Kwaliteitsbewaking maakt geen stories en wijzigt geen epic. Zij publiceert bewijs en vraagt de
 eigenaar via een betekenisvol command om de geldige vervolgactie.
@@ -221,20 +226,26 @@ productlogica en beheert geen eigen productentiteiten.
 | Gegeven | Betekenis |
 |---|---|
 | `StoryDeliveryPackage` | Volledige momentopname van de story met alle benodigde UX en assets. |
-| Storycommands | Meldingen `markStoryAsDispatched(...)`, `markStoryAsDeveloped(...)` of `recordDispatchFailure(...)` aan Productplanning. |
+| Storycommands | Meldingen `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)` aan Productplanning. |
 | `DeliveryAttempt` | Technische historie binnen Productplanning van verzending, response, fout en retry. |
 
 De dispatcher verstuurt niets zolang Software Factory voor dat product nog een openstaande story
 heeft. Software Factory hoeft de productrepository niet te lezen: alle inhoud en UX staan in het
 storypakket.
 
+Een tijdelijke dispatchfout handelt de dispatcher zelf af met een `DeliveryAttempt`, gecontroleerde
+retry en dezelfde idempotentiesleutel. Een configuratie- of autorisatiefout blokkeert de levering en
+wordt operationeel zichtbaar. Alleen wanneer Software Factory de story-inhoud definitief afwijst,
+maakt Productplanning intern een `REPAIR_STORY`-workitem; de dispatcher verzint nooit zelf inhoud.
+
 ## Wanneer een epic klaar is
 
-Een story gebruikt drie eenvoudige statussen:
+Een story gebruikt vier eenvoudige statussen:
 
 - `TODO` — klaar voor uitvoering maar nog niet verstuurd;
 - `IN_PROGRESS` — naar Software Factory gestuurd en daar nog open;
-- `DONE` — door Software Factory opgeleverd; dit is nog geen kwaliteitsoordeel.
+- `DONE` — door Software Factory opgeleverd; dit is nog geen kwaliteitsoordeel;
+- `CANCELLED` — bewust niet meer uitvoeren, met een zichtbare bron en reden.
 
 Een epic gebruikt:
 
@@ -244,7 +255,7 @@ Een epic gebruikt:
 - `VERIFYING` — alle geplande stories zijn klaar en de complete epic wordt gecontroleerd;
 - `COMPLETED` — de bedoelde gebruikersverbetering is aangetoond;
 - `NOT_SUCCESSFUL` — alles is geleverd, maar het gebruikersresultaat is niet bereikt;
-- `STOPPED` — bewust gestopt met een zichtbare reden;
+- `CANCELLED` — een reeds gekozen of actieve epic is bewust gestopt;
 - `SUPERSEDED` — een nog niet gekozen epicversie is door een nieuwere versie vervangen;
 - `WITHDRAWN` — een nog niet gekozen epic is bewust ingetrokken.
 
@@ -256,16 +267,23 @@ Bij een bouwfout vraagt Kwaliteitsbewaking bugfixwerk aan. Bij ontbrekend gedrag
 scope vraagt zij aanvullende stories voor dezelfde epic aan. Na herstel volgt opnieuw controle.
 Alleen Productontwerp verwerkt het verificatieresultaat en sluit de epic af.
 
+Een `NOT_SUCCESSFUL` epic blijft als historisch eindresultaat bestaan en wordt niet heropend.
+Productontwerp kan tijdens een latere geplande run op basis van de verificatie een nieuwe vervolgepic
+maken. Een `WITHDRAWN` epic was nog niet gekozen en heeft daarom geen stories. Bij een `CANCELLED`
+epic zet Productplanning alle nog niet verstuurde stories direct op `CANCELLED`; een reeds
+`IN_PROGRESS` story loopt normaal af en er wordt geen nieuwe epiccontrole gestart.
+
 ## Overleg en richting
 
 De Stakeholder kan vanuit de UI een overleg starten. Een proces kan om overleg vragen wanneer
 menselijke richting nodig is. Bij afsluiting maakt een notulenagent leesbare notulen en verwerkt hij
 alleen expliciete uitkomsten:
 
-- een concrete aanwijzing of correctie wordt `StakeholderDirection`;
-- feedback of een kwaliteitszorg wordt `UserSignal`;
+- feedback, een correctie, wens of kwaliteitszorg wordt `UserSignal`;
 - alleen een grote, blijvende keuze wordt `Decision`;
-- een gewone epic-, story-, bug- of prioriteitsactie blijft bij het betreffende productobject.
+- een wijziging van doel of harde grens past `ProductAssignment` aan;
+- een gewone epic-, story-, bug-, annulerings- of prioriteitsactie wordt een direct command op de
+  eigenaarsmodule.
 
 Een transcript verandert niet vanzelf het product. Iedere doorwerking gebeurt via een zichtbaar
 command aan de module die het betreffende object bezit.

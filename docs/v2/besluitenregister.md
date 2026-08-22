@@ -43,10 +43,9 @@ Een besluit heeft precies één herkomst:
   expliciete besluiten in de afgeronde notulen en registreert of wijzigt ze via de publieke commands.
   De agent is de registrator en niet de beslisser; een nieuw besluit krijgt
   `origin = STAKEHOLDER`.
-- **Factory** — een proces of agent neemt binnen de `ProductAssignment`, actuele
-  `StakeholderDirection`s en geldige besluiten zelfstandig een grote, blijvende beslissing. Het
-  besluit wordt direct zichtbaar voor de Stakeholder. Die kan het later via een overleg herzien,
-  intrekken of vervangen.
+- **Factory** — een proces of agent neemt binnen de `ProductAssignment` en geldige besluiten
+  zelfstandig een grote, blijvende beslissing. Het besluit wordt direct zichtbaar voor de
+  Stakeholder. Die kan het later via een overleg herzien, intrekken of vervangen.
 
 Past een mogelijke keuze niet binnen de bestaande richting of zou zij die richting wezenlijk
 veranderen, dan registreert de Factory geen actief besluit. Zij maakt een overlegverzoek of voorstel

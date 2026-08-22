@@ -18,6 +18,7 @@ De module is eigenaar van:
 - testsessies, observaties en bewijs;
 - bugs, ernst en herstelstatus;
 - verificaties van stories, epics en gebruikerssignalen;
+- onveranderlijke kwaliteitssnapshots en hun historie;
 - structurele kwaliteitspatronen en hun bewijs;
 - het eigen agent- en procesgeheugen.
 
@@ -49,7 +50,8 @@ eigen bugs:
 ```java
 BugDetails getBug(BugId bugId);
 List<VerificationDetails> findVerifications(VerificationTarget target);
-QualityOverview getQualityOverview(ProductId productId);
+QualitySnapshotDetails getCurrentQuality(ProductId productId);
+List<QualitySnapshotDetails> getQualityHistory(ProductId productId, TimeRange range);
 List<QualityWorkItemDetails> findQualityWorkItems(ProductId productId, WorkItemStatus status);
 QualityWorkItemId requestStoryVerification(RequestStoryVerificationCommand command);
 QualityWorkItemId requestEpicVerification(RequestEpicVerificationCommand command);
@@ -90,7 +92,6 @@ adapters.
 |---|---|---|
 | `ProductAssignmentDetails` | productmodule | productgrenzen en publieke Git-URL van het product |
 | `TestableProductDetails` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
-| `StakeholderDirectionDetails` | product-/overlegmodule | bindende productgrenzen en correcties die ook tijdens het testen gelden |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende privacy-, veiligheids- of productgrenzen die het testen beïnvloeden |
 | `EpicDetails` | Productontwerp | bevroren scope, UX, succescriteria en status van de geclaimde versie |
 | `StoryDetails` | Productplanning | type, storyversie, status, oplevergegevens, acceptatiecriteria en zelfstandige UX |
@@ -106,15 +107,16 @@ nooit. Code is context en geen bewijs dat gedrag werkt; de gedeployde applicatie
 testbewijs blijven leidend. Waar bekend legt
 de verificatie vast welke commit is bekeken en welke productversie werkelijk is getest.
 
-### Output
+### Eigen output en downstream effect
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
 | `BugDetails` | read-only weergave van een aantoonbare afwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
 | `VerificationDetails` | read-only weergave van een story-, epic- of signaalcontrole | doeltype en -versie, uitkomst, omgeving, controles, bewijs, blokkade, ontbrekende dekking en vervolgkoppelingen |
-| `QualityOverview` | berekend queryresultaat, geen duurzame entiteit | recente dekking, risico's, open bugs en onderbelichte gebieden |
+| `QualitySnapshotDetails` | read-only kwaliteitsbeeld en historie | tijdstip, omgeving, productversie, onderzochte gebieden, dekking, open bugs per ernst, verificatie-uitkomsten, risico's en bron-ID's |
 | `QualityWorkItemDetails` | read-only inzicht in de kwaliteitsqueue | type, doelversie, status, claim, resultaat en fout; geen wijzigbaar requestobject |
 | `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, inputversies, publicatie-ID's en eindstatus |
+| `PlanningWorkItem` bij Productplanning | downstream effect van een gericht herstelcommand; Productplanning maakt en bezit dit object | type bugfix of epicgat, exact bron-ID en -versie, bewijsreferentie en idempotentiesleutel |
 
 Kwaliteitsbewaking schrijft `ProcessSession` uitsluitend voor zijn eigen sessies. De
 scheduler roept alleen de procesfunctie aan; scheduler en frontend wijzigen het sessieresultaat niet.
@@ -124,6 +126,27 @@ Alleen Kwaliteitsbewaking schrijft `Bug` en `Verification`. Zij vraagt Productpl
 `recordEpicVerification(...)` om een epicuitkomst vast te leggen en de productmodule via
 `recordSignalInvestigation(...)` om een gebruikerssignaal bij te werken. Geen ontvangende module
 kan de onderliggende verificatie of het bewijs veranderen.
+
+## Kwaliteitsbeeld en historie
+
+Een `QualitySnapshot` is een onveranderlijke momentopname van wat op dat moment aantoonbaar bekend
+is over de productkwaliteit. Kwaliteitsbewaking maakt na iedere afgeronde processessie waarin
+daadwerkelijk is getest precies één nieuwe snapshot. Een no-op-sessie maakt geen duplicaat en een
+oude snapshot wordt nooit bijgewerkt.
+
+Een snapshot bevat geen verborgen totaalscore. Hij toont afzonderlijk:
+
+- geteste omgeving en productversie;
+- belangrijke routes en gebieden die recent zijn onderzocht;
+- gebieden waarvan de controle verouderd is of ontbreekt;
+- open bugs per ernst en relevante veranderingen sinds de vorige snapshot;
+- aantallen en uitkomsten van story-, epic- en signaalverificaties;
+- actuele risico's, blokkades en de bron-ID's waarop het beeld is gebaseerd.
+
+`getCurrentQuality(...)` retourneert de nieuwste snapshot. `getQualityHistory(...)` retourneert de
+snapshots in de gevraagde periode, zodat de frontend en Productontwerp per kwaliteitsdimensie kunnen
+zien wat verbetert of verslechtert. Bugs en onveranderlijke verificaties blijven de inhoudelijke
+bron; de snapshot is het controleerbare historische beeld daarvan op één moment.
 
 ## Een kwaliteitszorg uit een overleg
 
@@ -153,8 +176,7 @@ Een signaalonderzoeksresultaat bevat minimaal:
 
 Het command zet de actuele signaalstatus en koppelt het verificatie-ID. Daardoor kan de frontend op
 één `UserSignalDetails` tonen wat is onderzocht en wat daaruit kwam, terwijl bronmelding en
-testbewijs ieder hun eigen eigenaar houden. `StakeholderDirectionDetails` blijft alleen bedoeld voor echte bindende
-productrichting, grenzen, correcties en stopbesluiten.
+testbewijs ieder hun eigen eigenaar houden.
 
 ## Storyverificatie
 
@@ -168,7 +190,8 @@ Bij **Afgekeurd** publiceert Kwaliteitsbewaking zo nodig een bug. Het herschrijf
 
 ## Epicverificatie
 
-Alle stories van een epic op `DONE` is alleen het startsein voor de epiccontrole. De
+Wanneer alle niet-geannuleerde stories van een niet-geannuleerde epic op `DONE` staan, is dat alleen
+het startsein voor de epiccontrole. Een `CANCELLED` epic krijgt geen nieuwe epicverificatie. De
 controle gebruikt exact de door Productontwerp bevroren `EpicDetails` en beoordeelt:
 
 - de volledige gebruikersroute, niet alleen losse schermen;
@@ -273,6 +296,7 @@ opgelost. Zo blijft het bewijs historisch intact zonder een tweede lifecycle naa
 - `EpicCoverageAssessment` — vergelijking van epic, UX, stories en geleverd gedrag;
 - `VerificationDraft` — story-, epic- of signaalcontrole vóór publicatie;
 - `Verification` — duurzame, onveranderlijke controle met doeltype, uitkomst en bewijs;
+- `QualitySnapshot` — onveranderlijk kwaliteitsbeeld na een afgeronde niet-lege processessie;
 - `QualityPattern` — clustering van verwante bevindingen;
 - `QualityMemory` — lessen over risico's, testaanpak en dekkingsgaten;
 - `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
@@ -327,7 +351,7 @@ reproductie, dekking en classificatie
 story-/epicverificatie + bug/gat
                  │
                  ▼
-atomair publiceren en rotatie bijwerken
+atomair publiceren, snapshot maken en rotatie bijwerken
 ```
 
 ### Stap 1 — claimen en omgeving controleren
@@ -392,5 +416,6 @@ Een sessie is klaar wanneer:
 - ieder onderzocht gebruikerssignaal naar exact signaal-ID en -versie verwijst en een zichtbaar
   onderzoeksresultaat of expliciete blokkade heeft;
 - testrotatie en kwaliteitsbeeld zijn bijgewerkt;
+- na een niet-lege testsessie precies één nieuwe `QualitySnapshot` is opgeslagen;
 - publicaties atomair en geversioneerd beschikbaar zijn;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.

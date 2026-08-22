@@ -4,6 +4,9 @@ De frontend is de leesbare weergave van de productwaarheid in de database. Zij h
 productwaarheid. Acties lopen altijd via de publieke commands van de module die de betrokken
 entiteit bezit.
 
+Voor de Stakeholder is deze gebruikersinterface de normale ingang tot Product Factory: overleggen,
+signalen, besluiten, prioriteitsacties en handmatige processessies beginnen hier.
+
 ## Ontwerpregels
 
 - De gewone schermen gebruiken producttaal en geen agent-, prompt-, queue- of databasetaal.
@@ -21,9 +24,10 @@ Het hoofdscherm laat in één oogopslag zien:
 - de actieve epics en eventuele handmatig urgente epic;
 - de eerste `TODO`-story en de story die `IN_PROGRESS` is;
 - de geordende backlog en open bugs;
+- het huidige kwaliteitsbeeld en de ontwikkeling per kwaliteitsdimensie door de tijd;
 - recente verificaties en belangrijke kwaliteitsrisico's;
 - nieuwe en open gebruikerssignalen;
-- actuele Stakeholderrichtingen en geldige besluiten;
+- geldige besluiten;
 - aangevraagde of open overleggen.
 
 Interne droombeelden, onderzoeksdossiers en leerresultaten van Productontwerp staan hier niet.
@@ -48,6 +52,7 @@ Het planningsscherm toont:
 
 - epics per actuele epicstatus;
 - alle open stories op `sequenceNumber`;
+- geannuleerde epics en stories apart van de backlog, met bron en reden;
 - storytype `PRODUCT_STORY` of `BUGFIX`;
 - de reden voor een handmatige prioriteitswijziging;
 - de Software Factory-status van de verzonden story.
@@ -57,14 +62,19 @@ berekende storylijst zijn de enige bronnen.
 
 ## Detailpagina
 
-Een epic, story, bug, verificatie, signaal of besluit heeft een rustige detailpagina. Die toont
-alleen de velden die bij dat object horen, plus relaties naar bron- en vervolgobjecten.
+Een epic, story, bug, verificatie, kwaliteitssnapshot, signaal of besluit heeft een rustige
+detailpagina. Die toont alleen de velden die bij dat object horen, plus relaties naar bron- en
+vervolgobjecten.
 
 Een epic toont onder meer scope, gebruikersverbetering, succescriteria en het actuele UX-ontwerp.
 Een story toont zelfstandig alle relevante UX en assets die ook naar Software Factory worden
 verstuurd. Een verificatie toont omgeving, controles, oordeel en bewijs. Een besluit toont normaal
 alleen de geldige tekst; een aparte archiefweergave toont eerdere versies, ingetrokken besluiten en
 vervangingsrelaties.
+
+De kwaliteitsweergave gebruikt `getCurrentQuality(...)` en `getQualityHistory(...)`. Zij toont geen
+ondoorzichtige totaalscore, maar tijdlijnen voor onder meer kritieke bugs, onderzochte routes,
+verificatie-uitkomsten, verouderde dekking en blokkades.
 
 ## Overleggen en richting geven
 
@@ -74,9 +84,10 @@ toont agenda, berichten, gekoppelde objecten, status, notulen en de expliciete d
 Snelle acties mogen ook rechtstreeks het juiste command aanbieden, bijvoorbeeld:
 
 - productopdracht aanpassen;
-- Stakeholderrichting vastleggen;
 - gebruikerssignaal indienen;
+- een grote blijvende keuze via een overleg als besluit vastleggen;
 - een urgente epic laten herprioriteren;
+- een beschikbare epic intrekken of een actieve epic annuleren;
 - een processessie handmatig starten.
 
 Een handmatige `runProcessSession()` geeft een duidelijke fout als in die module al een run actief
