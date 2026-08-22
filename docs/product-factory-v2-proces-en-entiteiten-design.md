@@ -30,9 +30,9 @@ bronobject nooit corrigeren; zij publiceert daarvoor eigen feedback.
 
 | Onderdeel | Type | Enige geplande ingang | Eigen verantwoordelijkheid | Schrijft nooit |
 |---|---|---|---|---|
-| Productontwerp | intelligent proces | `runProcessSession()` | productrichting onderzoeken en complete, geversioneerde epicdefinities inclusief UX publiceren | stories, backlog, bugs of verificaties |
-| Productplanning | intelligent proces | `runProcessSession()` | een exacte epicversie kiezen en bevriezen, stories maken en de backlog prioriteren | epicinhoud, bugs of kwaliteitsbewijzen |
-| Kwaliteitsbewaking | intelligent proces | `runProcessSession()` | opgeleverd werk en de complete epic toetsen en bevindingen met bewijs publiceren | epics, stories of backlogprioriteit |
+| Productontwerp | intelligent proces | `runProcessSession()` | productrichting onderzoeken, complete epicdefinities inclusief UX en eigen `ProcessSessionPublication` publiceren | stories, backlog, bugs of verificaties |
+| Productplanning | intelligent proces | `runProcessSession()` | een exacte epicversie kiezen en bevriezen, stories, backlog en eigen `ProcessSessionPublication` publiceren | epicinhoud, bugs of kwaliteitsbewijzen |
+| Kwaliteitsbewaking | intelligent proces | `runProcessSession()` | opgeleverd werk en complete epics toetsen en bevindingen plus eigen `ProcessSessionPublication` publiceren | epics, stories of backlogprioriteit |
 | Software Factory-dispatcher | technische adapter binnen Productplanning | `runDispatchSession()` | externe statussen synchroniseren en precies één bovenste verzendbare opdracht versturen wanneer geen werk openstaat | productinhoud, story-inhoud, epicselectie of prioriteit |
 
 De scheduler mag deze ingangen starten, maar beslist niet over de inhoud. De processen roepen elkaar
@@ -48,7 +48,7 @@ hoe die persoon bereikbaar is en voor welke beslissingen menselijke goedkeuring 
 |---|---|---|---|
 | identiteit, rol, contactwijze en beslissingsmandaat | verplicht bij productstart en bij wijziging | `StakeholderProfileView` | bepaalt wie bevoegd richting of antwoorden kan geven en wanneer overleg nodig is |
 | breed productdoel en harde grenzen | verplicht bij productstart; later alleen bij wezenlijke wijziging | door de Stakeholder bevestigde `ProductAssignmentView` | vormt het vaste kader voor alle processen |
-| expliciete richting, correctie, stopbesluit of antwoord op een overlegvraag | wanneer nodig | `StakeholderDirectionView` | wordt als bindende input binnen het geldige mandaat verwerkt |
+| expliciete richting, correctie, stopbesluit of antwoord op een overlegvraag | wanneer nodig | `StakeholderDirectionView`; voor extra testfocus met type `QUALITY_FOCUS` | wordt als bindende input binnen het geldige mandaat verwerkt en kan een processessie planbaar maken |
 | gebruikersfeedback, observatie, probleem, kans of risico | optioneel en op ieder moment | `UserSignalView` via inbox | blijft een onbeoordeeld signaal totdat een proces bewijs of een vervolgobject publiceert |
 | gevoelige toegang of extern besluit | alleen wanneer Product Factory dit niet zelfstandig mag regelen | productconfiguratie of beveiligde voorziening; nooit in vrije signaaltekst | heft een concrete blokkade op zonder secrets in procesdocumenten te zetten |
 
@@ -63,9 +63,9 @@ Deze contracten komen van ondersteunende modules buiten de drie intelligente pro
 
 | Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
 |---|---|---|---|---|
-| `StakeholderProfileView` | product-/overlegmodule bij registratie van de Stakeholder | product-/overlegmodule na bevestiging door een bevoegde Stakeholder | Productontwerp, Productplanning, Kwaliteitsbewaking, scheduler en productbediening | identiteit, rol, contactwijze en beslissingsmandaat; bevat geen secrets |
+| `StakeholderProfileView` | product-/overlegmodule bij registratie van de Stakeholder | product-/overlegmodule na bevestiging door een bevoegde Stakeholder | Productontwerp, Productplanning, Kwaliteitsbewaking en productbediening | identiteit, rol, contactwijze en beslissingsmandaat; bevat geen secrets |
 | `ProductAssignmentView` | productmodule na het aanmaken van een product | productmodule | Productontwerp, Productplanning en productbediening | productidentiteit, doelgroep, doel, harde grenzen, repository, toegang en backlogconfiguratie |
-| `StakeholderDirectionView` | Stakeholder via overleg of productbediening | product-/overlegmodule | Productontwerp, Productplanning, Kwaliteitsbewaking en productbediening | bindende aanwijzing of correctie; processen verwerken haar maar veranderen haar niet |
+| `StakeholderDirectionView` | Stakeholder via overleg of productbediening | product-/overlegmodule | Productontwerp, Productplanning, Kwaliteitsbewaking en productbediening | bindende aanwijzing of correctie met type en toepassingsgebied; `QUALITY_FOCUS` bepaalt testfocus maar nooit het testresultaat |
 | `UserSignalView` | gebruiker, Stakeholder of toegestane integratie via de inbox | inbox/productmodule; oorspronkelijke inhoud na ontvangst onveranderlijk | Productontwerp, Kwaliteitsbewaking en productbediening | onbeoordeelde feedback, observatie of gebruiksgegeven met bron, context en bewijs; nog geen bug, epic of story |
 | `UserSignalDispositionView` | inbox/productmodule tegelijk met het signaal | inbox/productmodule, mechanisch afgeleid uit gekoppelde procesresultaten | Productontwerp, Kwaliteitsbewaking, Stakeholder en productbediening | toont nieuw, onderzocht, gekoppeld, duplicaat, onvoldoende bewijs of buiten scope plus bronverwijzingen; wijzigt het signaal niet |
 | `TestableProductView` | productmodule bij het configureren van testtoegang | productmodule | Kwaliteitsbewaking | omgevingen, routes, accounts, databereik en testgrenzen |
@@ -84,10 +84,10 @@ Deze contracten komen van ondersteunende modules buiten de drie intelligente pro
 |---|---|---|---|---|
 | `EpicExecutionView` | Productplanning bij selectie van een epicversie | Productplanning | Productontwerp, Kwaliteitsbewaking, Productplanning en productbediening | koppelt de uitvoering aan exact één bevroren epicversie en bewaart voortgang en einduitkomst |
 | `ProductStoryView` | Productplanning | Productplanning | Kwaliteitsbewaking, Software Factory-dispatcher, Productplanning en productbediening | zelfstandig uitvoerbaar gedrag binnen één bevroren epic, inclusief volledige relevante UX-momentopname en assets; Productontwerp en Kwaliteitsbewaking maken of wijzigen geen stories |
-| `PrioritizedBacklogView` | Productplanning | Productplanning | Software Factory-dispatcher, scheduler, Productplanning en productbediening | geversioneerde volgorde van verzendbare stories en bugfixes |
+| `PrioritizedBacklogView` | Productplanning | Productplanning | Software Factory-dispatcher, Productplanning en productbediening | geversioneerde volgorde van verzendbare stories en bugfixes |
 | `BacklogItemView` | Productplanning | Productplanning; dispatcher alleen voor verzendstatus, externe referentie en leveringstijdstippen | Software Factory-dispatcher, Kwaliteitsbewaking, Productplanning en productbediening | verwijst naar precies één story of bug; alleen Productplanning bepaalt inhoud, positie en prioriteitsreden |
 | `PriorityDecisionView` | Productplanning | Productplanning | Productplanning, Stakeholder en productbediening | uitlegbaar bewijs van epicselectie of backlogvolgorde, inclusief alternatieven en gebruikte bronversies |
-| `BacklogSupplyView` | Productplanning | Productplanning | Productontwerp, scheduler, Software Factory-dispatcher en productbediening | aantallen per backlogstatus, lage grens, streefpeil en `aanvullingNodig` |
+| `BacklogSupplyView` | Productplanning | Productplanning | Productontwerp, Software Factory-dispatcher en productbediening | aantallen per backlogstatus, lage grens, streefpeil en `aanvullingNodig` |
 
 ### Contracten van de Software Factory-dispatcher
 
@@ -120,6 +120,23 @@ afzonderlijke schrijfbevoegdheid. Hij verandert nooit de betekenis of prioriteit
 `ProcessSessionPublication` is één technisch contract, maar ieder record heeft precies één
 proces als eigenaar. Een proces mag nooit de sessieregistratie van een ander proces schrijven.
 
+De scheduler maakt dit record niet. Na een scheduler-aanroep claimt het intelligente proces zelf een
+opdracht, maakt het zijn interne sessie aan en publiceert het bij afronding het resultaat. De
+dispatcher bewaart zijn eigen technische `DispatchAttempt` binnen Productplanning en gebruikt niet
+dit intelligente-processessiecontract.
+
+## Scheduler
+
+De scheduler is een technische klok en geen eigenaar van productentiteiten. Hij:
+
+- roept de drie functies `runProcessSession()` en `runDispatchSession()` op hun eigen ritme aan;
+- geeft geen product-ID, opdracht of inhoudelijke keuze mee;
+- mag `ProcessSessionPublication` lezen voor monitoring en technische retry;
+- schrijft geen procesresultaten, productstatus, backlog of verificatie.
+
+Een aangeroepen proces bepaalt zelf of werk planbaar is, claimt hooguit één opdracht en eindigt als
+succesvolle no-op wanneer niets hoeft te gebeuren.
+
 ## Frontend als leesbare databaseweergave
 
 Met **productbediening** in de tabellen bedoelen we de frontend plus haar eigen read-only
@@ -132,6 +149,10 @@ droombeeld, epics en UX, epicuitvoering, stories, backlog, bugs, verificaties, k
 leerresultaten, processessies en leveringen. Waar nuttig biedt de frontend versiehistorie en
 vergelijking tussen twee databaseversies.
 
+De frontend kan dus wel een overleg starten, een gebruikerssignaal indienen of een bevestigde
+Stakeholderrichting laten vastleggen. Dat zijn commands naar respectievelijk de overleg-, inbox- of
+productmodule; de frontend wordt daardoor niet zelf de schrijver van die entiteiten.
+
 ## Gegevensstromen per onderdeel
 
 | Producent | Gepubliceerde gegevens | Consument |
@@ -139,7 +160,8 @@ vergelijking tussen twee databaseversies.
 | Stakeholder | profielgegevens, bevestigde productopdracht, richting, antwoorden en gebruikerssignalen | product-/overleg-/inboxmodule |
 | product-/overleg-/inboxmodule | Stakeholderprofiel, productopdracht, Stakeholderrichting, gebruikerssignalen en afhandeling | Productontwerp |
 | product-/overlegmodule | Stakeholderprofiel, productopdracht en Stakeholderrichting | Productplanning |
-| product-/overleg-/inboxmodule | Stakeholderprofiel, testconfiguratie, Stakeholderrichting, gebruikerssignalen en afhandeling | Kwaliteitsbewaking |
+| overleg-/inboxmodule | `StakeholderDirectionView` met eventueel `QUALITY_FOCUS` en/of `UserSignalView` | Kwaliteitsbewaking |
+| productmodule | Stakeholderprofiel en testconfiguratie | Kwaliteitsbewaking |
 | Productontwerp | epicdefinitie | Productplanning en Kwaliteitsbewaking |
 | Productplanning | epicuitvoering en backlogvoorraad | Productontwerp |
 | Productplanning | epicuitvoering, productstories en backlogitems | Kwaliteitsbewaking |

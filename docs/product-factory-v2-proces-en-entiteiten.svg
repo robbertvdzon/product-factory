@@ -50,7 +50,7 @@
   <text x="76" y="444" class="entity">TestableProductView</text>
   <line x1="76" y1="468" x2="389" y2="468" stroke="#cbd5e1"/>
   <text x="76" y="496" class="note">Bron van mandaat, productgrenzen,</text>
-  <text x="76" y="518" class="note">richting, signalen en testtoegang.</text>
+  <text x="76" y="518" class="note">richting/QUALITY_FOCUS en signalen.</text>
 
   <!-- Productontwerp -->
   <rect x="520" y="155" width="410" height="385" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
@@ -62,10 +62,11 @@
   <text x="546" y="296" class="entity">DirectionSnapshot</text>
   <text x="546" y="334" class="entity">EpicDefinitionView</text>
   <text x="546" y="372" class="entity">LearningResultView</text>
-  <line x1="546" y1="405" x2="904" y2="405" stroke="#bfdbfe"/>
-  <text x="546" y="437" class="note">Onderzoekt de productrichting en maakt</text>
-  <text x="546" y="460" class="note">complete epics inclusief UX. Geen stories.</text>
-  <text x="546" y="500" class="owner-label">LEEST OOK KWALITEITS- EN LEVERINGSSIGNALEN</text>
+  <text x="546" y="408" class="entity">ProcessSessionPublication</text>
+  <line x1="546" y1="430" x2="904" y2="430" stroke="#bfdbfe"/>
+  <text x="546" y="460" class="note">Onderzoekt de productrichting en maakt</text>
+  <text x="546" y="482" class="note">complete epics inclusief UX. Geen stories.</text>
+  <text x="546" y="518" class="owner-label">SCHRIJFT ALLEEN EIGEN SESSIERESULTATEN</text>
 
   <!-- Productplanning -->
   <rect x="520" y="705" width="410" height="480" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>
@@ -80,10 +81,11 @@
   <text x="546" y="954" class="entity">BacklogItemView</text>
   <text x="546" y="990" class="entity">PriorityDecisionView</text>
   <text x="546" y="1026" class="entity">BacklogSupplyView</text>
-  <line x1="546" y1="1055" x2="904" y2="1055" stroke="#a7f3d0"/>
-  <text x="546" y="1085" class="note">Bevriest één epicversie, maakt stories</text>
-  <text x="546" y="1107" class="note">en bepaalt de backlogvolgorde.</text>
-  <text x="546" y="1146" class="note">Dispatcher schrijft alleen verzendvelden.</text>
+  <text x="546" y="1062" class="entity">ProcessSessionPublication</text>
+  <line x1="546" y1="1086" x2="904" y2="1086" stroke="#a7f3d0"/>
+  <text x="546" y="1115" class="note">Bevriest één epicversie, maakt stories</text>
+  <text x="546" y="1137" class="note">en bepaalt de backlogvolgorde.</text>
+  <text x="546" y="1166" class="note">Dispatcher schrijft alleen verzendvelden.</text>
 
   <!-- Dispatcher -->
   <rect x="1030" y="805" width="315" height="310" rx="18" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
@@ -117,20 +119,26 @@
   <text x="1454" y="609" class="entity">EpicCompletionGapView</text>
   <text x="1454" y="645" class="entity">QualityOverviewView</text>
   <text x="1454" y="681" class="entity">QualitySignalView</text>
-  <line x1="1454" y1="714" x2="1731" y2="714" stroke="#ddd6fe"/>
-  <text x="1454" y="745" class="note">Toetst stories, bugfixes en de</text>
-  <text x="1454" y="767" class="note">complete bevroren epic.</text>
-  <text x="1454" y="807" class="note">Publiceert bewijs en bevindingen;</text>
-  <text x="1454" y="829" class="note">maakt geen stories.</text>
+  <text x="1454" y="717" class="entity">ProcessSessionPublication</text>
+  <line x1="1454" y1="741" x2="1731" y2="741" stroke="#ddd6fe"/>
+  <text x="1454" y="770" class="note">Toetst stories, bugfixes, epics en</text>
+  <text x="1454" y="792" class="note">QUALITY_FOCUS uit een overleg.</text>
+  <text x="1454" y="828" class="note">Publiceert bewijs en bevindingen;</text>
+  <text x="1454" y="850" class="note">maakt geen stories.</text>
 
-  <!-- Scheduler en bediening -->
-  <rect x="50" y="805" width="365" height="225" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="2" stroke-dasharray="8 7"/>
-  <text x="76" y="845" class="box-title">Scheduler en productbediening</text>
-  <text x="76" y="880" class="owner-label">LEEST</text>
-  <text x="76" y="916" class="entity">ProcessSessionPublication</text>
-  <text x="76" y="951" class="note">Elk intelligent proces maakt alleen zijn</text>
-  <text x="76" y="973" class="note">eigen onveranderlijke sessierecords.</text>
-  <text x="76" y="1005" class="note">Frontend leest alle publieke views uit de DB.</text>
+  <!-- Scheduler -->
+  <rect x="50" y="760" width="365" height="135" rx="18" fill="#f1f5f9" stroke="#64748b" stroke-width="2" stroke-dasharray="8 7"/>
+  <text x="76" y="800" class="box-title">Scheduler</text>
+  <text x="76" y="830" class="owner-label">ROEPT AAN, SCHRIJFT GEEN RESULTATEN</text>
+  <text x="76" y="860" class="function">runProcessSession() × 3</text>
+  <text x="76" y="884" class="function">runDispatchSession()</text>
+
+  <!-- Frontend -->
+  <rect x="50" y="925" width="365" height="130" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+  <text x="76" y="965" class="box-title">Frontend</text>
+  <text x="76" y="995" class="owner-label">LEEST PUBLIEKE DATABASEVIEWS</text>
+  <text x="76" y="1023" class="entity">ProcessSessionPublication</text>
+  <text x="76" y="1046" class="note">Commands gaan naar de eigenaarsmodule.</text>
 
   <!-- Stakeholder -->
   <rect x="50" y="1090" width="365" height="205" rx="18" fill="#fefce8" stroke="#ca8a04" stroke-width="2"/>
@@ -139,7 +147,7 @@
   <text x="76" y="1128" class="box-title">Stakeholder</text>
   <text x="76" y="1176" class="owner-label">LEVERT VIA PRODUCT / OVERLEG / INBOX</text>
   <text x="76" y="1208" class="note">profiel · productopdracht · richting</text>
-  <text x="76" y="1232" class="note">antwoorden · gebruikerssignalen · toegang</text>
+  <text x="76" y="1232" class="note">antwoorden · signalen · QUALITY_FOCUS</text>
   <text x="76" y="1270" class="note">Maakt geen epics, stories, bugs of backlog.</text>
 
   <!-- Gegevensstromen -->
@@ -150,7 +158,8 @@
   <text x="327" y="659" class="flow-small">profiel · opdracht · richting</text>
 
   <path d="M415 395 C850 90 1350 130 1430 400" class="purple-line"/>
-  <text x="960" y="165" class="flow-small">profiel · testconfiguratie · richting · signalen</text>
+  <text x="955" y="165" class="flow-small">QUALITY_FOCUS · UserSignalView</text>
+  <text x="1010" y="186" class="flow-small">profiel · testconfiguratie</text>
 
   <path d="M725 540 V705" class="green-line"/>
   <text x="740" y="620" class="flow">EpicDefinitionView</text>
@@ -189,11 +198,6 @@
   <path d="M1215 1210 V1115" class="line"/>
   <text x="1232" y="1160" class="flow-small">volledig pakket</text>
   <text x="1232" y="1180" class="flow-small">/ status</text>
-
-  <path d="M520 455 C440 520 410 700 350 805" class="line dashed"/>
-  <path d="M520 1110 C475 1080 430 1010 415 975" class="line dashed"/>
-  <path d="M1430 885 C980 1190 590 1140 415 990" class="line dashed"/>
-  <text x="72" y="1070" class="flow-small">gestippeld: ProcessSessionPublication naar scheduler/operations</text>
 
   <path d="M145 1090 C15 950 10 690 50 500" class="line"/>
   <text x="12" y="805" class="flow-small" transform="rotate(-90 12 805)">profiel · opdracht · richting · signalen</text>

@@ -51,7 +51,7 @@ testclients zijn interne adapters.
 |---|---|---|
 | `StakeholderProfileView` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter kwaliteitsgrenzen en risico's |
 | `TestableProductView` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
-| `StakeholderDirectionView` | product-/overlegmodule | expliciete kwaliteitsgrenzen en gemelde risico's |
+| `StakeholderDirectionView` | product-/overlegmodule | expliciete kwaliteitsgrenzen, gemelde risico's en `QUALITY_FOCUS`-opdrachten uit overleggen |
 | `EpicDefinitionView` | Productontwerp | bevroren scope, UX en succescriteria van de door Productplanning gekozen versie |
 | `EpicExecutionView` | Productplanning | exacte versie, stories, voortgang en verzoek om volledige epiccontrole |
 | `ProductStoryView` | Productplanning | acceptatiecriteria, verwacht gedrag en zelfstandige relevante UX per story |
@@ -75,8 +75,35 @@ en exacte geteste omgeving vast.
 | `QualitySignalView` | groter productprobleem voor Productontwerp | patroon, betrokken bevindingen, impact, hypothese en gewenste onderzoeksvraag |
 | `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, inputversies, publicatie-ID's en eindstatus |
 
+Kwaliteitsbewaking schrijft `ProcessSessionPublication` uitsluitend voor zijn eigen sessies. De
+scheduler roept alleen de procesfunctie aan; scheduler en frontend wijzigen het sessieresultaat niet.
+
 Alleen Kwaliteitsbewaking schrijft bugs, verificaties, epicgaten en kwaliteitssignalen.
 Productplanning verwerkt die output maar verandert haar niet.
+
+## Kwaliteitsrichting uit een overleg
+
+Wanneer de Stakeholder in een overleg aangeeft dat een onderdeel mogelijk niet goed werkt, kan de
+overleg-/inboxmodule twee verschillende contracten publiceren:
+
+- `UserSignalView` voor de oorspronkelijke, nog onbewezen waarneming;
+- `StakeholderDirectionView` met `directionType = QUALITY_FOCUS` voor een expliciet verzoek om een
+  bepaald gebied extra te onderzoeken.
+
+Een `QUALITY_FOCUS` bevat minimaal:
+
+- stabiel richting-ID, product-ID, versie en bronoverleg-ID;
+- onderwerp en reden;
+- betrokken productgebied, gebruikersroute, apparaat of kwaliteitsdimensie;
+- gewenste controles en meegegeven risico's;
+- urgentie en onderbouwing;
+- ingangsdatum en optionele einddatum of stopvoorwaarde;
+- status **Actief**, **Vervangen** of **Ingetrokken**.
+
+De richting bepaalt mede de testagenda, maar niet de uitkomst. Kwaliteitsbewaking blijft zelf
+verantwoordelijk voor reproductie, bewijs, ernst en classificatie. Iedere bevinding of sessie die
+door de richting is gestart bewaart richting-ID en versie, zodat de frontend kan tonen wat is
+onderzocht en wat daaruit is gekomen.
 
 ## Storyverificatie
 
@@ -213,7 +240,8 @@ testrollen verplicht.
 4. **Dagelijkse kernroutes testen** — belangrijkste gebruikersresultaten bewaken.
 5. **Kwaliteitsrotatie uitvoeren** — een onderbelicht thema of apparaat onderzoeken.
 6. **Gebruikerssignaal onderzoeken** — een gemeld probleem reproduceren.
-7. **Patroon analyseren** — verwante bevindingen tot een kwaliteitssignaal vormen.
+7. **Stakeholderfocus onderzoeken** — de actieve `QUALITY_FOCUS` uit een overleg uitvoeren.
+8. **Patroon analyseren** — verwante bevindingen tot een kwaliteitssignaal vormen.
 
 Nieuwe opleveringen en P0/P1-signalen gaan voor periodieke rotatie. Een epic op **Controleren** gaat
 voor losse exploratieve tests wanneer alle benodigde omgevingen beschikbaar zijn.
@@ -243,8 +271,9 @@ atomair publiceren en rotatie bijwerken
 ### Stap 1 — claimen en omgeving controleren
 
 De module claimt één planbare opdracht, leest exacte versies van epic, uitvoering, stories,
-backlogitems en oplevering, controleert de omgeving en registreert productversie en testaccount. Een
-onbereikbare omgeving leidt tot **Geblokkeerd**, niet tot een productbug.
+backlogitems, oplevering en eventuele `QUALITY_FOCUS`, controleert de omgeving en registreert
+productversie en testaccount. Een onbereikbare omgeving leidt tot **Geblokkeerd**, niet tot een
+productbug.
 
 ### Stap 2 — testen
 
@@ -275,6 +304,7 @@ Een sessie wordt planbaar door:
 - een nieuwe Software Factory-oplevering;
 - een bugfix op **Hertesten**;
 - een epicuitvoering op **Controleren**;
+- een nieuwe, gewijzigde of opnieuw geactiveerde `QUALITY_FOCUS`;
 - een nieuw of gewijzigd gebruikerssignaal of zijn afhandelstatus;
 - een P0/P1-risico of verouderd kwaliteitsbeeld;
 - de dagelijkse kernrouteplanning of testrotatie;
@@ -300,6 +330,8 @@ Een sessie is klaar wanneer:
 - iedere publieke bug reproduceerbaar en van bewijs voorzien is;
 - ieder epicgat aantoonbaar binnen de bevroren epic valt en niet door een story wordt gedekt;
 - iedere verificatie naar exacte epic-, story-, opleverings- en omgevingsversies verwijst;
+- iedere afgehandelde `QUALITY_FOCUS` naar richting-ID en versie verwijst en een zichtbaar resultaat
+  of expliciete blokkade heeft;
 - testrotatie en kwaliteitsbeeld zijn bijgewerkt;
 - publicaties atomair en geversioneerd beschikbaar zijn;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.

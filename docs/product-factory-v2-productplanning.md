@@ -68,10 +68,14 @@ Productontwerp of Kwaliteitsbewaking niet rechtstreeks.
 | `PrioritizedBacklogView` | actuele geordende backlog | backlogversie, geordende item-ID's, redenen en aanmaakmoment |
 | `BacklogItemView` | één verzendbare of reeds verzonden opdracht | type, bron-ID en -versie, positie, prioriteitsreden, status en externe referentie |
 | `PriorityDecisionView` | uitlegbare keuze achter epicselectie of backlogvolgorde | keuze, alternatieven, criteria, bronversies en beslisser |
-| `BacklogSupplyView` | voorraadstatus voor scheduler en Productontwerp | aantallen per status, lage grens, streefpeil en `aanvullingNodig` |
+| `BacklogSupplyView` | voorraadstatus voor Productontwerp en interne planbaarheid | aantallen per status, lage grens, streefpeil en `aanvullingNodig` |
 | `StoryDeliveryPackage` | onveranderlijk pakket dat de dispatcher naar Software Factory stuurt | bron-ID's en versies, complete story of bugfix, acceptatiecriteria, UX, attachments, hashes en idempotentiesleutel |
 | `DeliveryResultView` | genormaliseerde terugmelding uit Software Factory | extern ID, backlogitem, status, opleverlocatie, tijdstippen en foutinformatie |
 | `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, gebruikte inputversies, wijzigingen en eindstatus |
+
+Productplanning schrijft `ProcessSessionPublication` uitsluitend voor zijn eigen intelligente
+sessies. De scheduler en frontend schrijven dit record niet. De dispatcher bewaart afzonderlijke
+technische `DispatchAttempt`-records binnen Productplanning.
 
 Alleen Productplanning schrijft epicuitvoering, productstories, backlogvolgorde en backlogstatus. De
 dispatcher draait binnen dezelfde module en mag uitsluitend leveringsvelden en bijbehorende

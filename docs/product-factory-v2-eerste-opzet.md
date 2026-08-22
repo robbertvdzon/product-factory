@@ -504,6 +504,24 @@ openstaand item meer heeft, verstuurt hij precies het bovenste verzendbare backl
 het externe Software Factory-ID. Software Factory krijgt alle inhoud en UX in het leveringspakket en
 kan daarmee zelfstandig verder.
 
+### Scheduler, processessies en frontend
+
+De scheduler en frontend zijn verschillende technische onderdelen:
+
+- de **scheduler** roept op een vast ritme de drie functies `runProcessSession()` en de functie
+  `runDispatchSession()` aan; hij kiest geen product, taak, epic of backlogitem;
+- ieder intelligent proces claimt na zo'n aanroep zelf een opdracht, maakt zijn eigen processessie
+  aan en schrijft na afloop zijn eigen onveranderlijke `ProcessSessionPublication`;
+- de scheduler mag sessieresultaten lezen voor monitoring en een technische retry, maar schrijft
+  geen sessiepublicatie;
+- de **frontend** leest publieke databaseviews om actuele toestand en historie te tonen;
+- een actie in de frontend wordt als command naar de application service van de eigenaarsmodule
+  gestuurd en is geen rechtstreekse databasewijziging.
+
+Productontwerp, Productplanning en Kwaliteitsbewaking gebruiken hetzelfde contracttype voor hun
+sessieresultaat, maar ieder record heeft precies één van die processen als schrijver. De dispatcher
+houdt zijn technische dispatchpogingen binnen Productplanning bij.
+
 ## Input, status en overdracht tussen de processen
 
 Ieder proces heeft eigen interne administratie en een kleine gepubliceerde interface. Een agentrun is
@@ -775,6 +793,18 @@ doorwerking is een expliciete, controleerbare wijziging. Een overleg kan zo tege
 gekozen epic in Productontwerp bijsturen, een prioriteitsgrens voor Productplanning vastleggen en een
 testopdracht voor Kwaliteitsbewaking opleveren.
 
+Voor Kwaliteitsbewaking kent een overleg twee verschillende uitkomsten:
+
+- een `UserSignalView` wanneer de Stakeholder meldt dat iets mogelijk niet goed werkt; dit is nog
+  geen bewezen bug;
+- een `StakeholderDirectionView` met type `QUALITY_FOCUS` wanneer de Stakeholder een onderdeel,
+  gebruikersroute, apparaat of kwaliteitsdimensie nadrukkelijk onderzocht wil hebben.
+
+Een kwaliteitsrichting bevat minimaal onderwerp, reden, gewenste controles, toepassingsgebied,
+urgentie, geldigheidsduur en bronoverleg-ID. Zij maakt Kwaliteitsbewaking planbaar en beïnvloedt de
+testagenda, maar nooit het testresultaat: Kwaliteitsbewaking blijft zelf verantwoordelijk voor
+bewijs, classificatie en oordeel.
+
 ## Productontwerp als black box
 
 **Doel:** zelfstandig onderzoeken hoe het product beter kan worden, de verre richting onderhouden en
@@ -849,8 +879,9 @@ backlog, maar verstuurt zelf niets naar Software Factory.
 | Backlogvoorraad | aantallen per status en de vlag `aanvullingNodig` |
 
 De standaard lage grens is vier verzendbare items en het streefpeil is tien. Zodra de voorraad op
-vier of lager komt, wordt `aanvullingNodig` waar en maakt de scheduler alle drie processen opnieuw
-planbaar. De grens en het streefpeil zijn productconfiguratie; HKH start met vier en tien.
+vier of lager komt, wordt `aanvullingNodig` waar. De drie processen herkennen dit tijdens hun
+volgende geplande aanroep als planbare aanleiding. De grens en het streefpeil zijn
+productconfiguratie; HKH start met vier en tien.
 
 Productplanning is de enige schrijver van epicuitvoering, stories, backlogvolgorde en backlogstatus.
 De interne werking en de dispatcher staan in
@@ -869,6 +900,7 @@ en een begrensde testsessie op basis van opleveringen, risico en testrotatie.
 | Gegeven | Eigenaar en herkomst | Betekenis voor Kwaliteitsbewaking |
 |---|---|---|
 | Stakeholderprofiel | product-/overlegmodule | wie kwaliteitsgrenzen en gemelde risico's bevoegd mag verduidelijken |
+| Stakeholderrichting | overleg/productmodule | onder meer een expliciete `QUALITY_FOCUS` uit een overleg, met onderwerp, reden en gewenste controles |
 | Testbare productconfiguratie | productmodule | URL's, toegestane accounts, routes en testgrenzen |
 | Oplevering en externe storyreferentie | Software Factory-dispatcher | wat nieuw of gewijzigd is en waar het getest kan worden |
 | Bevroren epicdefinitie en UX | Productontwerp via de door Productplanning gekozen versie | scope, complete gebruikersroute en succescriteria |
@@ -902,11 +934,12 @@ geplande sessie de nieuwste gepubliceerde gegevens:
 - opgeleverde stories kunnen het droombeeld of de epicvolgorde veranderen;
 - een afgeronde epic levert altijd een leerresultaat op.
 
-Als HKH vier of minder verzendbare backlogitems over heeft, plant de scheduler nieuwe sessies voor
-alle drie de processen. Productontwerp zorgt voor beschikbare complete epics, Productplanning maakt
-voldoende stories en brengt de voorraad terug naar ongeveer tien en Kwaliteitsbewaking werkt zo
-nodig open bevindingen uit tot bugs. Een module mag ook op haar normale ritme draaien en eindigt
-zonder wijziging wanneer er niets nuttigs te doen is.
+Als HKH vier of minder verzendbare backlogitems over heeft, worden binnen alle drie de processen
+nieuwe opdrachten planbaar. De scheduler blijft alleen hun functies op het afgesproken ritme
+aanroepen. Productontwerp zorgt voor beschikbare complete epics, Productplanning maakt voldoende
+stories en brengt de voorraad terug naar ongeveer tien en Kwaliteitsbewaking werkt zo nodig open
+bevindingen uit tot bugs. Een module kan eindigen zonder wijziging wanneer er niets nuttigs te doen
+is.
 
 ## Hoe de roadmap werkt
 

@@ -81,6 +81,9 @@ status op het oorspronkelijke signaal.
 | `LearningResultView` | gevalideerde nieuwe productkennis | conclusie, bron, reikwijdte, geldigheid, bron-signaal-ID's en effect op droombeeld of toekomstige epics |
 | `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, gebruikte inputversies, publicatie-ID's, eindstatus en blokkade |
 
+Productontwerp schrijft `ProcessSessionPublication` uitsluitend voor zijn eigen sessies. De scheduler
+roept de procesfunctie aan en de frontend leest het resultaat, maar geen van beide schrijft dit record.
+
 De enige inhoudelijke overdracht naar Productplanning is `EpicDefinitionView`. Het droombeeld en
 leerresultaten zijn productkennis voor de Stakeholder en latere ontwerpsessies, geen uitvoerbaar werk.
 
