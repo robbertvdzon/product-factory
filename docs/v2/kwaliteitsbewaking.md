@@ -3,7 +3,7 @@
 Status: eerste ontwerp van modulegrens en interne werking.
 
 Dit document werkt Kwaliteitsbewaking uit. De black-boxinterface in
-[Product Factory v2 — eerste opzet](eerste-opzet.md) is leidend.
+[Product Factory v2 — overzicht](overzicht.md) is leidend.
 
 ## Verantwoordelijkheid
 
@@ -88,7 +88,6 @@ adapters.
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
-| `StakeholderDetails` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter kwaliteitsgrenzen en risico's |
 | `ProductAssignmentDetails` | productmodule | productgrenzen en publieke Git-URL van het product |
 | `TestableProductDetails` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende productgrenzen en correcties die ook tijdens het testen gelden |
@@ -102,9 +101,9 @@ De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebr
 en exacte geteste omgeving vast.
 
 Kwaliteitsbewaking mag de publieke Git-URL uit de productopdracht uitchecken en code, tests en
-documentatie read-only gebruiken voor testselectie, regressierisico en uitleg. Daarvoor is geen
-aparte workspace of Git-service nodig. Zij commit en pusht nooit. Code is context en geen bewijs dat
-gedrag werkt; de gedeployde applicatie en het verzamelde testbewijs blijven leidend. Waar bekend legt
+documentatie read-only gebruiken voor testselectie, regressierisico en uitleg. Zij commit en pusht
+nooit. Code is context en geen bewijs dat gedrag werkt; de gedeployde applicatie en het verzamelde
+testbewijs blijven leidend. Waar bekend legt
 de verificatie vast welke commit is bekeken en welke productversie werkelijk is getest.
 
 ### Output

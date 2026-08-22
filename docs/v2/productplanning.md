@@ -3,7 +3,7 @@
 Status: eerste ontwerp van modulegrens en interne werking.
 
 Dit document werkt Productplanning en de technische Software Factory-dispatcher uit. De
-black-boxinterface in [Product Factory v2 — eerste opzet](eerste-opzet.md) is
+black-boxinterface in [Product Factory v2 — overzicht](overzicht.md) is
 leidend.
 
 ## Verantwoordelijkheid
@@ -100,7 +100,6 @@ Productplanning gebruikt publieke Spring Modulith-API's. Read-only DTO's staan i
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
 | `PlanningWorkItem` | Productplanning | duurzame opdracht die de run claimt; andere modules kunnen alleen een aanvraagcommand doen |
-| `StakeholderDetails` | product-/overlegmodule | identiteit, rol en mandaat achter een prioriteitsaanwijzing |
 | `ProductAssignmentDetails` | productmodule | productidentiteit, grenzen en publieke Git-URL |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende epic- en prioriteitsgrenzen |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende keuzes die de planning begrenzen; geen directe opdracht om een epic, bug of story te kiezen |
@@ -151,6 +150,11 @@ dan `REPRIORITIZE_EPIC` aan. Een volgende planningsrun mag die epic claimen, sto
 
 Iedere epic wordt onafhankelijk voltooid en geverifieerd. De globale `sequenceNumber`-volgorde is
 de enige werkelijke dispatchvolgorde; stories van verschillende epics mogen door elkaar staan.
+
+Er is geen aparte duurzame roadmapentiteit met vakken als Nu, Hierna en Later. De actuele
+epicstatussen laten zien welke epics beschikbaar, in planning, actief of in controle zijn. De
+werkelijke uitvoeringsprioriteit staat uitsluitend in de `sequenceNumber`s van open stories. Zo
+ontstaan geen twee concurrerende bronnen voor de volgorde.
 
 ## Storycontract en backlog
 

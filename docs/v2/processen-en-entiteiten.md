@@ -29,7 +29,7 @@ het diagram. `«scheduled/manual»` markeert de aanroeppunten. De Stakeholder is
 
 | Onderdeel | Uitvoerende ingang | Eigen publieke entiteiten | Deterministische verantwoordelijkheid |
 |---|---|---|---|
-| Productontwerp | `runProcessSession()` | `Epic`, `DirectionSnapshot` | epicstatuscommands uitvoeren en na publicatie planning aanvragen |
+| Productontwerp | `runProcessSession()` | `Epic` | epicstatuscommands uitvoeren en na publicatie planning aanvragen |
 | Productplanning | `runProcessSession()` | `PlanningWorkItem`, `Story` | planverzoeken queueën, storylevering verwerken en zo nodig epicverificatie aanvragen |
 | Kwaliteitsbewaking | `runProcessSession()` | `QualityWorkItem`, `Bug`, `Verification` | testverzoeken queueën en gevalideerde uitkomsten doorgeven |
 | Software Factory-dispatcher | `runDispatchSession()` | geen productentiteit; `DeliveryAttempt` binnen Productplanning | externe status synchroniseren en steeds de eerste uitvoerbare `TODO`-story versturen |
@@ -40,7 +40,7 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 
 | Eigenaar | Commands | Read-only queries |
 |---|---|---|
-| product-/overlegmodule | `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `recordStakeholderDirection` | `getUserSignal`, `findOpenUserSignals`, `getStakeholder`, `getProductAssignment`, `getTestableProduct` |
+| product-/overlegmodule | `updateProductAssignment`, `recordStakeholderDirection`, `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `startMeeting`, `recordMeetingMessage`, `closeMeeting` | `getProductAssignment`, `findApplicableDirections`, `getUserSignal`, `findOpenUserSignals`, `getTestableProduct`, `getMeeting`, `findMeetings` |
 | Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `stopEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpics` |
 | Productplanning | `requestEpicPlanning`, `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `recordDispatchFailure` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
 | Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `linkBugfixStory` | `getBug`, `findVerifications`, `getQualityOverview`, `findQualityWorkItems` |
@@ -51,17 +51,23 @@ vrije velden waarmee de aanroeper de state machine kan omzeilen.
 
 ## De Stakeholder
 
-De Stakeholder is een actor en duurzame productrelatie, geen proces. De product-/overlegmodule
-vertaalt invoer uit de UI naar commands op de juiste eigenaar.
+Per product is er precies één Stakeholder: de klant voor wie het product wordt gemaakt. De
+Stakeholder is een externe actor en geen duurzame domeinentiteit of procesinput. Een technisch
+account of contactgegeven kan buiten deze productinterfaces bestaan voor inloggen en autorisatie.
+De product-/overlegmodule vertaalt de invoer uit de UI naar commands op de juiste eigenaar.
+
+Agents mogen adviseren, doorvragen en gevolgen uitleggen. De expliciete richting van de Stakeholder
+is uiteindelijk leidend. De Factory handelt zelfstandig binnen de `ProductAssignment`, actuele
+`StakeholderDirection`s en geldige `Decision`s; de Stakeholder kan die richting altijd corrigeren.
 
 | Levering door de Stakeholder | Vastlegging | Doorwerking |
 |---|---|---|
-| identiteit, rol, contactwijze en mandaat | `Stakeholder` | bepaalt wie richting en prioriteit mag geven |
 | productdoel en harde grenzen | `ProductAssignment` | verplichte context voor alle processen |
 | groot, blijvend besluit uit een overleg | `Decision` met `origin = STAKEHOLDER` | notulenagent registreert het; processen lezen de geldige momentopname |
 | bindende richting, correctie of stopbesluit | `StakeholderDirection` | processen volgen de geldende richting; alleen een grote blijvende keuze wordt daarnaast een besluit |
 | handmatige hoge prioriteit voor een epic | `StakeholderDirection` | product-/overlegmodule roept `requestEpicReprioritization(...)` aan; dit is geen besluit |
 | feedback, probleem, kans, risico of kwaliteitszorg | `UserSignal` | ontwerp of kwaliteit onderzoekt dit later; een kwaliteitszorg kan een `QualityWorkItem` opleveren |
+| overleg, vragen en antwoorden | `Meeting` | bewaart de bespreking en maakt expliciete doorwerking controleerbaar |
 | testomgevingen en toegestane toegang | `TestableProductConfiguration` | maakt gecontroleerd testen mogelijk |
 
 De Stakeholder schrijft geen epic, story, bug, verificatie of backlogpositie.
@@ -73,8 +79,9 @@ begrenzen. Een droombeeld, epic, epicstatus, backlogvolgorde, bugprioriteit of a
 processtap is geen besluit.
 
 Een Stakeholderbesluit ontstaat in een overleg; de notulenagent registreert het namens de
-Stakeholder. Een Factorybesluit mag alleen binnen het geldende mandaat worden gemaakt en is direct
-zichtbaar voor de Stakeholder. Beide gebruiken hetzelfde interne `Decision`-aggregate en dezelfde
+Stakeholder. Een Factorybesluit moet passen binnen de productopdracht, actuele Stakeholderrichting
+en geldige besluiten en is direct zichtbaar voor de Stakeholder. De Stakeholder kan het later
+herzien, intrekken of vervangen. Beide gebruiken hetzelfde interne `Decision`-aggregate en dezelfde
 versie- en lifecyclecommands.
 
 De normale query `getDecisions(productId, validAt?)` levert per besluit alleen de versie die op het
@@ -91,12 +98,11 @@ nooit rechtstreeks in de tabel.
 | Entiteit | Aanmaker en enige schrijver | Wie mag een wijziging aanvragen | Lezers | Betekenis en status |
 |---|---|---|---|---|
 | `Product` | productmodule | productbediening | alle processen en frontend | productidentiteit en configuratie |
-| `Stakeholder` | product-/overlegmodule | Stakeholder of beheerder | alle processen en frontend | identiteit, contact en mandaat |
 | `ProductAssignment` | productmodule | Stakeholder | alle processen en frontend | doelgroep, doel, grenzen en publieke Git-URL |
 | `StakeholderDirection` | product-/overlegmodule | Stakeholder | alle processen en frontend | bindende richting, scope, prioriteit en geldigheid |
 | `TestableProductConfiguration` | productmodule | Stakeholder of beheerder | Kwaliteitsbewaking | omgeving, routes, accounts, data- en testgrenzen |
 | `UserSignal` | productmodule | gebruiker/Stakeholder dient in; ontwerp of kwaliteit registreert een uitkomst via command | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | onveranderlijke melding plus actuele verwerkingsstatus en resultaatlinks |
-| `DirectionSnapshot` | Productontwerp | niemand buiten Productontwerp | Productontwerp, Stakeholder en frontend | geversioneerde verre productrichting; geen uitvoerbaar werk |
+| `Meeting` | product-/overlegmodule | Stakeholder of een proces vraagt een overleg aan; de notulenagent sluit het af | Stakeholder, betrokken processen en frontend | agenda, berichten, gekoppelde objecten, status, notulen en expliciete doorwerking |
 | `Epic` | Productontwerp | Productplanning vraagt planning/statusovergangen; Kwaliteitsbewaking registreert uitkomst | ontwerp, planning, kwaliteit en frontend | complete verbetering met scope, UX, versie en status `AVAILABLE`, `IN_PLANNING`, `ACTIVE`, `VERIFYING`, `COMPLETED`, `NOT_SUCCESSFUL`, `STOPPED`, `SUPERSEDED` of `WITHDRAWN` |
 | `PlanningWorkItem` | Productplanning | Productontwerp, Kwaliteitsbewaking, product-/overlegmodule of bevoegde bediening | Productplanning, operations en frontend | duurzame planningsqueue; type `PLAN_EPIC`, `PLAN_BUGFIX`, `PLAN_EPIC_GAP`, `REPRIORITIZE_EPIC` of `MANUAL_REPLAN`; status `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` of `FAILED` |
 | `Story` | Productplanning | dispatcher meldt verzending/oplevering; niemand schrijft inhoud of volgorde buiten planning | planning, dispatcher, kwaliteit en frontend | complete productstory of bugfix met UX, productbreed `sequenceNumber` en status `TODO`, `IN_PROGRESS` of `DONE` |
@@ -109,8 +115,10 @@ nooit rechtstreeks in de tabel.
 | `DeliveryAttempt` | dispatcher binnen Productplanning | dispatcher via interne service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
 Interne objecten zoals `LearningResult`, drafts, agentruns, onderzoeksdossiers en testobservaties
-steken de modulegrens niet over. Alleen een afzonderlijke grote, blijvende Factorykeuze binnen het
-mandaat kan een `Decision` worden; gewone conclusies en proceskeuzes niet.
+steken de modulegrens niet over. Alleen een afzonderlijke grote, blijvende Factorykeuze binnen de
+productopdracht en actuele Stakeholderrichting kan een `Decision` worden; gewone conclusies en
+proceskeuzes niet. `DirectionSnapshot`, droombeelden en leerresultaten blijven intern bij
+Productontwerp.
 
 ## Read-only en transportcontracten
 
@@ -118,11 +126,11 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 
 | Contract | Producent | Lezers/ontvangers | Betekenis |
 |---|---|---|---|
-| `StakeholderDetails` | product-/overlegmodule | alle processen en frontend | identiteit en mandaat |
 | `ProductAssignmentDetails` | productmodule | alle processen en frontend | productdoel, grenzen en publieke Git-URL |
 | `StakeholderDirectionDetails` | product-/overlegmodule | alle processen en frontend | geldende bindende richting en prioriteit |
 | `TestableProductDetails` | productmodule | Kwaliteitsbewaking | veilige testconfiguratie zonder secrets |
 | `UserSignalDetails` | productmodule | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | bronmelding, status, uitkomst en koppelingen |
+| `MeetingDetails` | product-/overlegmodule | Stakeholder, betrokken processen en frontend | agenda, gesprek, status, gekoppelde objecten, notulen en doorwerking |
 | `EpicDetails` | Productontwerp | Productplanning, Kwaliteitsbewaking en frontend | epicinhoud, UX, versie en status; read-only |
 | `StoryDetails` | Productplanning | dispatcher, Kwaliteitsbewaking en frontend | storyinhoud, UX, volgorde en leveringsstatus; read-only |
 | backlogquery | Productplanning uit `Story` | dispatcher en frontend | alle stories die niet `DONE` zijn, geordend op `sequenceNumber` |
@@ -139,11 +147,10 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 
 ## Publieke productrepository als leesbron
 
-`ProductAssignment.gitUrl` wijst naar de publiek leesbare GitHub-repository. Er is geen aparte
-workspace of Git-module. Productontwerp, Productplanning en Kwaliteitsbewaking mogen de repository
-bij een inhoudelijke sessie uitchecken en code, tests en documentatie lezen. Zij committen en pushen
-niet. De Software Factory-story blijft zelfstandig en gebruikt Git nooit als enige drager van
-product- of UX-keuzes.
+`ProductAssignment.gitUrl` wijst naar de publiek leesbare GitHub-repository. Productontwerp,
+Productplanning en Kwaliteitsbewaking mogen de repository bij een inhoudelijke sessie uitchecken en
+code, tests en documentatie lezen. Zij committen en pushen niet. De Software Factory-story blijft
+zelfstandig en gebruikt Git nooit als enige drager van product- of UX-keuzes.
 
 ## Backlog, queues en levering
 
@@ -200,8 +207,10 @@ Iedere run claimt een stabiele batch; nieuw werk wacht tot de volgende run.
 
 ## Gerelateerde documenten
 
-- [Product Factory v2 — eerste opzet](eerste-opzet.md)
+- [Product Factory v2 — overzicht](overzicht.md)
 - [Besluitenregister](besluitenregister.md)
+- [Overleggen met de Stakeholder](overleggen.md)
+- [Frontend](frontend.md)
 - [Productontwerp](productontwerp.md)
 - [Productplanning](productplanning.md)
 - [Kwaliteitsbewaking](kwaliteitsbewaking.md)

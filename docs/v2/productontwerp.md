@@ -3,7 +3,7 @@
 Status: eerste ontwerp van modulegrens en interne werking.
 
 Dit document werkt de module Productontwerp uit. De black-boxinterface in
-[Product Factory v2 — eerste opzet](eerste-opzet.md) is leidend. Interne namen,
+[Product Factory v2 — overzicht](overzicht.md) is leidend. Interne namen,
 agentprompts en taakverdeling kunnen later veranderen zonder gevolgen voor andere modules.
 
 ## Verantwoordelijkheid
@@ -24,6 +24,28 @@ De module is eigenaar van:
 - epics, versies, scope, UX-ontwerp, succescriteria en epicstatus;
 - leerresultaten over productrichting en gebruikerswaarde;
 - het eigen agent- en procesgeheugen.
+
+## Interne productverkenning
+
+Productontwerp wacht niet alleen op een kant-en-klare vraag. Tijdens een sessie mag de module zelf
+gebruikersproblemen, vergelijkbare producten, aangrenzende oplossingen en nieuwe technische
+mogelijkheden onderzoeken. Bronnen, hypotheses, kansvoorstellen en conclusies blijven intern.
+
+De module kijkt intern op drie afstanden:
+
+- **nu** — welk werkelijk probleem of kwaliteitsrisico vraagt aandacht;
+- **volgende verbetering** — welke behapbare epic merkbare gebruikerswaarde kan leveren;
+- **verre richting** — welke grotere productmogelijkheid helpt om niet alleen losse problemen op te
+  lossen.
+
+Die verre richting kan als geversioneerd `DirectionSnapshot` worden opgeslagen, maar is geen
+publieke module-output en geen roadmapitem. Zij helpt Productontwerp alleen bij onderzoek en
+epicvorming. Nieuwe kennis verandert nooit rechtstreeks een gekozen epic; zij leidt tot een nieuwe
+versie van een nog beschikbare epic of tot een vervolgepic.
+
+Een los idee is eveneens intern. Het kan worden bewaard, samengevoegd, afgewezen of verder
+onderzocht. Pas wanneer probleem, gebruikersverbetering, scope, UX en succescriteria compleet zijn,
+publiceert Productontwerp een `Epic`.
 
 ## Publieke module-interface
 
@@ -67,7 +89,6 @@ domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
-| `StakeholderDetails` | product-/overlegmodule | identiteit, contactwijze, rol en beslissingsmandaat van de Stakeholder |
 | `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende richting en expliciete correcties |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | alleen grote, blijvende Stakeholder- en Factorybesluiten die het ontwerp begrenzen |
@@ -80,10 +101,9 @@ Voor iedere gelezen publicatie worden bron-ID en bronversie vastgelegd. Dezelfde
 tweemaal als nieuwe input behandeld.
 
 Bij aanvang van een inhoudelijke sessie mag Productontwerp de publieke Git-URL uit de productopdracht
-uitchecken en broncode, tests en documentatie read-only onderzoeken. Daarvoor is geen aparte
-Product Factory-workspace of Git-module nodig. Productontwerp commit en pusht nooit; de gelezen
-commit-SHA wordt alleen als bronverwijzing bij de sessie of epic vastgelegd. Ruwe bronnen steken de
-modulegrens niet over.
+uitchecken en broncode, tests en documentatie read-only onderzoeken. Productontwerp commit en pusht
+nooit; de gelezen commit-SHA wordt alleen als bronverwijzing bij de sessie of epic vastgelegd. Ruwe
+bronnen steken de modulegrens niet over.
 
 Een `UserSignalDetails` is een aanwijzing en geen opdracht. De oorspronkelijke tekst blijft
 onveranderlijk; status, verwerkingsuitkomst en koppelingen staan op dezelfde `UserSignal`. Als
@@ -94,17 +114,16 @@ aan. Het krijgt nooit directe schrijftoegang tot het signaal.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `DirectionSnapshot` | zichtbaar, geversioneerd droombeeld | toekomstverhaal, kernervaringen, obstakels, aannames, bewijsbasis en wijzigingsreden |
 | `EpicDetails` | read-only weergave van één complete gebruikersverbetering | versie, status, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's, afhankelijkheden en bron-signaal-ID's |
 | `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, gebruikte inputversies, publicatie-ID's, eindstatus en blokkade |
 
 Productontwerp schrijft `ProcessSession` uitsluitend voor zijn eigen sessies. De scheduler
 roept de procesfunctie aan en de frontend leest het resultaat, maar geen van beide schrijft dit record.
 
-De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Het droombeeld is
-zichtbare productrichting, maar geen uitvoerbaar werk. `LearningResult` blijft intern binnen
-Productontwerp. Alleen wanneer daar uitzonderlijk een grote, blijvende keuze uit volgt die meerdere
-toekomstige processessies begrenst, kan Productontwerp binnen zijn mandaat via
+De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Droombeelden,
+`DirectionSnapshot` en `LearningResult` blijven intern binnen Productontwerp. Alleen wanneer daar
+uitzonderlijk een grote, blijvende keuze uit volgt die meerdere toekomstige processessies begrenst,
+kan Productontwerp binnen de harde grenzen en actuele Stakeholderrichting via
 `createDecision(...)` een Factory-besluit laten vastleggen door het
 [Besluitenregister](besluitenregister.md). Een droombeeld, epic, signaalafhandeling of normale
 ontwerpkeuze is geen besluit.
@@ -133,7 +152,7 @@ Een beschikbare epicdefinitie bevat minimaal:
 - het aantoonbare probleem of de kans;
 - de merkbare gewenste gebruikersverbetering;
 - expliciete scope: wat hoort er wel en niet bij;
-- relatie met productdoel en droombeeld;
+- relatie met productdoel en de intern vastgelegde productrichting;
 - bewijs, bronnen, aannames en relevante tegenspraak;
 - het volledige actuele UX-ontwerp;
 - hoofdroute, alternatieve routes en schermtoestanden;
@@ -191,8 +210,8 @@ De volgende entiteiten blijven binnen de module:
 - `ProductDesignMemory` — gedeelde lessen over onderzoek, UX en productkeuzes;
 - `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
 
-Onderzoeksvragen, kansvoorstellen, leerresultaten en conceptontwerpen zijn interne objecten. Alleen
-het gevalideerde droombeeld en de `Epic` worden als inhoudelijke procesoutput gepubliceerd.
+Onderzoeksvragen, kansvoorstellen, droombeelden, leerresultaten en conceptontwerpen zijn interne
+objecten. Alleen de `Epic` wordt als inhoudelijke procesoutput gepubliceerd.
 Een uitzonderlijk groot Factory-besluit wordt daarnaast in het Besluitenregister vastgelegd zonder
 het interne onderzoeksdossier te kopiëren. Gewone proceskeuzes blijven uitsluitend op hun eigen
 productobjecten staan.
@@ -325,7 +344,8 @@ Goedgekeurde output wordt atomair in de eigen entiteiten opgeslagen en daarna wo
 afgerond. Query-DTO's worden uit die entiteiten opgebouwd en hebben geen eigen opslag. Na publicatie
 vraagt Productontwerp via `requestEpicPlanning(...)` idempotent planning voor exact die epicversie
 aan. De epicpublicatie, signaalbeoordeling en keuze om geen epic te maken zijn geen besluiten. Alleen
-een afzonderlijke grote, blijvende Factorykeuze binnen het mandaat gebruikt eventueel
+een afzonderlijke grote, blijvende Factorykeuze binnen de harde grenzen en actuele
+Stakeholderrichting gebruikt eventueel
 `createDecision(...)`. Productontwerp roept voor een beoordeeld gebruikerssignaal het passende
 signaalcommand op de productmodule aan.
 
@@ -333,8 +353,8 @@ signaalcommand op de productmodule aan.
 
 Een sessie wordt planbaar door:
 
-- een gewijzigd Stakeholderprofiel of een nieuwe of gewijzigde Stakeholderrichting,
-  gebruikerssignaal of signaalstatus;
+- een gewijzigde productopdracht, een nieuwe of gewijzigde Stakeholderrichting,
+  een gebruikerssignaal of signaalstatus;
 - een nieuwe epicverificatie of nieuw intern leerresultaat dat nog om een ontwerpkeuze vraagt;
 - een structureel kwaliteitspatroon als gebruikerssignaal;
 - een periodieke onderzoeks- of epiccontrole.
@@ -362,7 +382,8 @@ Een sessie is klaar wanneer:
 - iedere gepubliceerde epic door de Epiccriticus is goedgekeurd;
 - iedere epic zelfstandig door Productplanning kan worden begrepen;
 - de publicatiecontrole bewijst dat de epicversie nog niet is gekozen;
-- ieder eventueel groot Factory-besluit binnen het mandaat idempotent aan het Besluitenregister is
+- ieder eventueel groot Factory-besluit binnen de harde grenzen en actuele Stakeholderrichting
+  idempotent aan het Besluitenregister is
   aangeboden en iedere gewone proceskeuze daar juist buiten blijft;
 - output atomair en geversioneerd beschikbaar is;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.

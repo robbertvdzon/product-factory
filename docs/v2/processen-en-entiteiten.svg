@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2420" height="1540" viewBox="0 0 2420 1540" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont bovenaan de publieke functies en daaronder de entiteiten waarvan de module eigenaar is. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont bovenaan de publieke functies en daaronder de publieke entiteiten waarvan de module eigenaar is. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -25,7 +25,7 @@
 
   <rect width="2420" height="1540" fill="#f8fafc"/>
   <text x="55" y="55" class="title">Product Factory v2 — publieke modulecontracten en eigenaarschap</text>
-  <text x="55" y="88" class="subtitle">Boven de scheidslijn staat wat andere onderdelen mogen aanroepen; daaronder staan uitsluitend de eigen entiteiten.</text>
+  <text x="55" y="88" class="subtitle">Boven de scheidslijn staat wat andere onderdelen mogen aanroepen; daaronder staan uitsluitend de eigen publieke entiteiten.</text>
   <path d="M65 125 H155" class="command"/>
   <text x="170" y="130" class="note">command: vraagt de eigenaar om een geldige wijziging</text>
   <path d="M585 125 H675" class="query"/>
@@ -45,21 +45,21 @@
   <path d="M55 337 V357 H580 V337" fill="#e2e8f0"/>
   <text x="80" y="335" class="module-title">Product en overleg</text>
   <text x="80" y="387" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="80" y="417" class="api">«command» registerStakeholder(...)</text>
-  <text x="80" y="443" class="api">«command» updateProductAssignment(...)</text>
-  <text x="80" y="469" class="api">«command» recordStakeholderDirection(...)</text>
-  <text x="80" y="495" class="api">«command» submitUserSignal(...)</text>
-  <text x="80" y="521" class="api">«command» markUserSignalInReview(...)</text>
-  <text x="80" y="547" class="api">«command» recordSignalInvestigation(...)</text>
-  <text x="80" y="573" class="api">«command» configureTestableProduct(...)</text>
-  <text x="80" y="605" class="api">«query» getStakeholder(...)</text>
-  <text x="80" y="631" class="api">«query» getProductAssignment(...)</text>
-  <text x="80" y="657" class="api">«query» findApplicableDirections(...)</text>
-  <text x="80" y="683" class="api">«query» getUserSignal(...) / findOpenUserSignals(...)</text>
-  <text x="80" y="709" class="api">«query» getTestableProduct(...)</text>
+  <text x="80" y="417" class="api">«command» updateProductAssignment(...)</text>
+  <text x="80" y="443" class="api">«command» recordStakeholderDirection(...)</text>
+  <text x="80" y="469" class="api">«command» submitUserSignal(...)</text>
+  <text x="80" y="495" class="api">«command» markUserSignalInReview(...)</text>
+  <text x="80" y="521" class="api">«command» recordSignalInvestigation(...)</text>
+  <text x="80" y="547" class="api">«command» configureTestableProduct(...)</text>
+  <text x="80" y="573" class="api" style="font-size:12px">«command» start/record/closeMeeting(...)</text>
+  <text x="80" y="605" class="api">«query» getProductAssignment(...)</text>
+  <text x="80" y="631" class="api">«query» findApplicableDirections(...)</text>
+  <text x="80" y="657" class="api">«query» getUserSignal(...) / findOpenUserSignals(...)</text>
+  <text x="80" y="683" class="api">«query» getTestableProduct(...)</text>
+  <text x="80" y="709" class="api">«query» getMeeting(...) / findMeetings(...)</text>
   <line x1="80" y1="735" x2="555" y2="735" class="divider" stroke="#cbd5e1"/>
-  <text x="80" y="765" class="section-title">EIGEN ENTITEITEN</text>
-  <text x="80" y="798" class="entity">Product · Stakeholder · ProductAssignment</text>
+  <text x="80" y="765" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
+  <text x="80" y="798" class="entity">Product · ProductAssignment · Meeting</text>
   <text x="80" y="829" class="entity">StakeholderDirection · UserSignal</text>
   <text x="80" y="860" class="entity">TestableProductConfiguration</text>
   <text x="80" y="891" class="note">Broninhoud van UserSignal blijft onveranderlijk.</text>
@@ -80,14 +80,14 @@
   <text x="700" y="470" class="api">«command» recordEpicVerification(...)</text>
   <text x="700" y="496" class="api">«command» stopEpic(...)</text>
   <line x1="700" y1="552" x2="1210" y2="552" class="divider" stroke="#bfdbfe"/>
-  <text x="700" y="582" class="section-title">EIGEN ENTITEITEN</text>
-  <text x="700" y="615" class="entity">DirectionSnapshot · Epic · ProcessSession</text>
+  <text x="700" y="582" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
+  <text x="700" y="615" class="entity">Epic · ProcessSession</text>
   <line x1="700" y1="646" x2="1210" y2="646" class="divider" stroke="#bfdbfe"/>
   <text x="700" y="676" class="section-title">BELANGRIJKE GRENS</text>
   <text x="700" y="707" class="note">Alleen Productontwerp schrijft Epic.</text>
   <text x="700" y="731" class="note">Na claim zijn inhoud, scope en UX van die versie bevroren.</text>
   <text x="700" y="755" class="note">Geen queue; een gepubliceerde epic vraagt planning aan.</text>
-  <text x="700" y="801" class="note">LearningResult, onderzoek, drafts en agents blijven intern.</text>
+  <text x="700" y="801" class="note">Droombeeld, leren, onderzoek, drafts en agents blijven intern.</text>
 
   <!-- Productplanning -->
   <rect x="675" y="890" width="560" height="590" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>
@@ -104,7 +104,7 @@
   <text x="700" y="1174" class="api">«command» markStoryAsDispatched/Developed(...)</text>
   <text x="700" y="1200" class="api">«command» recordDispatchFailure(...)</text>
   <line x1="700" y1="1236" x2="1210" y2="1236" class="divider" stroke="#a7f3d0"/>
-  <text x="700" y="1266" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="700" y="1266" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="700" y="1299" class="entity">PlanningWorkItem · Story · ProcessSession</text>
   <line x1="700" y1="1328" x2="1210" y2="1328" class="divider" stroke="#a7f3d0"/>
   <text x="700" y="1358" class="section-title">BELANGRIJKE GRENS</text>
@@ -129,7 +129,7 @@
   <text x="1395" y="496" class="api">«command» requestSignalInvestigation(...)</text>
   <text x="1395" y="522" class="api">«command» linkBugfixStory(...)</text>
   <line x1="1395" y1="552" x2="1995" y2="552" class="divider" stroke="#ddd6fe"/>
-  <text x="1395" y="582" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="1395" y="582" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="1395" y="615" class="entity">QualityWorkItem · Bug · Verification · ProcessSession</text>
   <line x1="1395" y1="644" x2="1995" y2="644" class="divider" stroke="#ddd6fe"/>
   <text x="1395" y="674" class="section-title">BELANGRIJKE GRENS</text>
@@ -150,7 +150,7 @@
   <text x="80" y="1210" class="api">«query» getDecisions(productId, validAt?)</text>
   <text x="80" y="1236" class="api">«query» getDecisionArchive(productId)</text>
   <line x1="80" y1="1260" x2="555" y2="1260" class="divider" stroke="#fecdd3"/>
-  <text x="80" y="1290" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="80" y="1290" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="80" y="1323" class="entity">Decision · DecisionDetails</text>
   <line x1="80" y1="1352" x2="555" y2="1352" class="divider" stroke="#fecdd3"/>
   <text x="80" y="1382" class="note">Alleen grote besluiten · origin STAKEHOLDER of FACTORY.</text>
@@ -165,7 +165,7 @@
   <text x="1395" y="1052" class="section-title">PUBLIEKE INTERFACE</text>
   <text x="1395" y="1082" class="api">«scheduled» runDispatchSession()</text>
   <line x1="1395" y1="1112" x2="1995" y2="1112" class="divider" stroke="#fed7aa"/>
-  <text x="1395" y="1142" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="1395" y="1142" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="1395" y="1175" class="entity">DeliveryAttempt</text>
   <line x1="1395" y1="1204" x2="1995" y2="1204" class="divider" stroke="#fed7aa"/>
   <text x="1395" y="1234" class="section-title">GEBRUIKT</text>

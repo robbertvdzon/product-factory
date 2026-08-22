@@ -19,8 +19,8 @@ Een keuze hoort alleen in het register wanneer zij doorgaans:
 - iets is waarvan de Stakeholder redelijkerwijs op de hoogte wil zijn en waarop die moet kunnen
   terugkomen.
 
-Voorbeelden zijn de keuze voor SQL in plaats van MongoDB, een blijvende privacygrens, een belangrijke
-doelgroepbeperking of een ruim mandaat waarbinnen de Factory autonoom mag handelen.
+Voorbeelden zijn de keuze voor SQL in plaats van MongoDB, een blijvende privacygrens of een
+belangrijke doelgroepbeperking.
 
 Het gewone proces volgen is geen besluit. Dit zijn daarom geen besluiten:
 
@@ -43,12 +43,14 @@ Een besluit heeft precies één herkomst:
   expliciete besluiten in de afgeronde notulen en registreert of wijzigt ze via de publieke commands.
   De agent is de registrator en niet de beslisser; een nieuw besluit krijgt
   `origin = STAKEHOLDER`.
-- **Factory** — een proces of agent neemt binnen het vastgelegde mandaat zelfstandig een groot,
-  blijvend besluit. Het besluit wordt direct zichtbaar voor de Stakeholder. Die kan het later via
-  een overleg herzien, intrekken of vervangen.
+- **Factory** — een proces of agent neemt binnen de `ProductAssignment`, actuele
+  `StakeholderDirection`s en geldige besluiten zelfstandig een grote, blijvende beslissing. Het
+  besluit wordt direct zichtbaar voor de Stakeholder. Die kan het later via een overleg herzien,
+  intrekken of vervangen.
 
-Valt een mogelijke keuze buiten het Factory-mandaat, dan registreert de Factory geen actief besluit.
-Zij maakt een overlegverzoek of voorstel waarop de Stakeholder kan beslissen.
+Past een mogelijke keuze niet binnen de bestaande richting of zou zij die richting wezenlijk
+veranderen, dan registreert de Factory geen actief besluit. Zij maakt een overlegverzoek of voorstel
+waarop de Stakeholder kan beslissen.
 
 ## Intern datamodel
 
@@ -132,7 +134,7 @@ DecisionId supersedeDecisions(SupersedeDecisionsCommand command);
 ```
 
 `supersedeDecisions(...)` maakt het nieuwe besluit en sluit één of meer oude besluiten atomair af.
-Ieder command controleert product, beslissingsmandaat, verwachte state en idempotentiesleutel. Er is
+Ieder command controleert product, bevoegde aanroeper, verwachte state en idempotentiesleutel. Er is
 geen algemene setter en een aanroeper schrijft nooit rechtstreeks in `Decision` of
 `DecisionDetails`.
 
@@ -237,3 +239,9 @@ dezelfde revise-, withdraw- of supersedecommands laten uitvoeren.
 - UUID's worden extern als strings getransporteerd; de implementatie mag intern een UUID-type
   gebruiken.
 - De DTO's bevatten geen prompts, chain-of-thought, tokens, secrets of interne agentinformatie.
+
+## Gerelateerde documenten
+
+- [Overzicht](overzicht.md)
+- [Overleggen met de Stakeholder](overleggen.md)
+- [Processen en entiteiten](processen-en-entiteiten.md)
