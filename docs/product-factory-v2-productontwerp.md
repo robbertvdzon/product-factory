@@ -52,8 +52,8 @@ uitsluitend zijn eigen publicaties en leest alleen publicaties van andere eigena
 | `StakeholderProfileView` | product-/overlegmodule | identiteit, contactwijze, rol en beslissingsmandaat van de Stakeholder |
 | `ProductAssignmentView` | productmodule | doelgroep, productdoel, harde grenzen, repository en toegestane toegang |
 | `StakeholderDirectionView` | product-/overlegmodule | bindende richting en expliciete correcties |
-| `UserSignalView` | inbox/productmodule | oorspronkelijke feedback, observatie of gebruiksgegeven met bron, context en bewijs |
-| `UserSignalDispositionView` | inbox/productmodule | afgeleide status, bestaande koppelingen en wat al met het signaal is gebeurd |
+| `UserSignalView` | productmodule | oorspronkelijke feedback, observatie of gebruiksgegeven met bron, context en bewijs |
+| `UserSignalDispositionView` | productmodule | afgeleide status, bestaande koppelingen en wat al met het signaal is gebeurd |
 | `BacklogSupplyView` | Productplanning | of nieuwe beschikbare epics extra urgent zijn |
 | `EpicExecutionView` | Productplanning | welke exacte epicversies zijn gekozen en dus niet meer gewijzigd mogen worden |
 | `DeliveryResultView` | Software Factory-dispatcher | wat Software Factory werkelijk heeft opgeleverd |
@@ -69,7 +69,7 @@ de module zelf opgehaald. Ruwe bronnen steken de modulegrens niet over.
 
 Een `UserSignalView` is een onbewerkte aanwijzing en geen opdracht. Productontwerp behoudt de
 originele tekst, maakt eigen onderzoek of productoutput en neemt het signaal-ID daarin als bron op.
-De inbox/productmodule leidt daaruit `UserSignalDispositionView` af; Productontwerp schrijft geen
+De productmodule leidt daaruit `UserSignalDispositionView` af; Productontwerp schrijft geen
 status op het oorspronkelijke signaal.
 
 ### Output

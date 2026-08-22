@@ -193,11 +193,18 @@ De oorspronkelijke melding, bron, gebruikscontext en eventueel bewijs blijven on
 Een gebruikerssignaal is nog geen besluit, bug, epic of story. Kwaliteitsbewaking kan na verificatie
 een bug publiceren; Productontwerp kan er een leerresultaat of epic aan koppelen.
 
-De inbox/productmodule publiceert daarnaast de afhandelstatus. Daarin is zichtbaar of het signaal
+De productmodule publiceert daarnaast de afhandelstatus. Daarin is zichtbaar of het signaal
 nieuw of onderzocht is en of het is gekoppeld aan een bug, kwaliteitssignaal, leerresultaat of epic,
 een duplicaat is, buiten de productgrenzen valt of onvoldoende bewijs heeft. Procesmodules wijzigen
 het oorspronkelijke signaal niet; de afhandelstatus wordt afgeleid uit hun gepubliceerde resultaten
 en de daarin opgenomen bronverwijzingen.
+
+Wanneer Kwaliteitsbewaking een gebruikerssignaal onderzoekt, publiceert zij een afzonderlijk
+`SignalInvestigationResultView`. Daarin staat bijvoorbeeld **Bevestigde bug**, **Geen probleem
+gevonden**, **Meer bewijs nodig**, **Duplicaat**, **Buiten testscope** of **Kwaliteitspatroon
+gevonden**, met uitleg en bewijs. De productmodule verwerkt dat resultaat vervolgens in
+`UserSignalDispositionView`. Zo kan de tester zichtbaar maken wat er met een melding is gebeurd
+zonder de oorspronkelijke woorden van de melder te herschrijven.
 
 ### Epic
 
@@ -345,8 +352,9 @@ oplossing eruit moet zien.
 
 ## Hoe signalen binnenkomen
 
-Alle losse informatie komt eerst in één inbox. Product Factory doet niet alsof ieder idee meteen goed
-of belangrijk is.
+Alle losse informatie wordt door de productmodule als gebruikerssignaal geregistreerd. In de
+frontend staat dit register op het scherm **Inbox**. Product Factory doet niet alsof ieder idee
+meteen goed of belangrijk is; **Inbox** is dus een schermnaam en geen aparte technische module.
 
 Een signaal kan komen van:
 
@@ -791,19 +799,17 @@ Bij het afsluiten ontstaan leesbare notulen met:
 Een transcript of samenvatting verandert niet vanzelf de roadmap of het productgeheugen. Iedere
 doorwerking is een expliciete, controleerbare wijziging. Een overleg kan zo tegelijk een nog niet
 gekozen epic in Productontwerp bijsturen, een prioriteitsgrens voor Productplanning vastleggen en een
-testopdracht voor Kwaliteitsbewaking opleveren.
+gebruikerssignaal voor Kwaliteitsbewaking opleveren.
 
-Voor Kwaliteitsbewaking kent een overleg twee verschillende uitkomsten:
+Voor Kwaliteitsbewaking kan een overleg een `UserSignalView` opleveren wanneer de Stakeholder meldt
+dat iets mogelijk niet goed werkt of nadrukkelijk onderzocht moet worden. Zo'n melding kan worden
+gecategoriseerd als `QUALITY_CONCERN` en bevat de oorspronkelijke observatie, het betrokken
+productgebied, gewenste aandacht, urgentie, context, eventueel bewijs en het bronoverleg-ID. Het is
+nog geen bewezen bug en schrijft het testresultaat niet voor.
 
-- een `UserSignalView` wanneer de Stakeholder meldt dat iets mogelijk niet goed werkt; dit is nog
-  geen bewezen bug;
-- een `StakeholderDirectionView` met type `QUALITY_FOCUS` wanneer de Stakeholder een onderdeel,
-  gebruikersroute, apparaat of kwaliteitsdimensie nadrukkelijk onderzocht wil hebben.
-
-Een kwaliteitsrichting bevat minimaal onderwerp, reden, gewenste controles, toepassingsgebied,
-urgentie, geldigheidsduur en bronoverleg-ID. Zij maakt Kwaliteitsbewaking planbaar en beïnvloedt de
-testagenda, maar nooit het testresultaat: Kwaliteitsbewaking blijft zelf verantwoordelijk voor
-bewijs, classificatie en oordeel.
+`StakeholderDirectionView` blijft gereserveerd voor echte productrichting: een bindende grens,
+correctie, stopbesluit of wijziging van de opdracht binnen het mandaat. Extra aandacht vragen voor
+een mogelijk kwaliteitsprobleem is een signaal en geen aparte richtingsoort.
 
 ## Productontwerp als black box
 
@@ -826,7 +832,7 @@ en de interne onderzoeks- of epictaak die op dat moment de meeste waarde heeft.
 | Backlogvoorraad en epicuitvoering | Productplanning | of nieuwe epics nodig zijn en welke epicversies al bevroren zijn |
 | Leverings- en epicverificatie | Productplanning en Kwaliteitsbewaking | wat eerdere epics werkelijk hebben opgeleverd |
 | Kwaliteitsbeeld en kwaliteitssignaal | Kwaliteitsbewaking | structurele problemen die een nieuwe epic kunnen rechtvaardigen |
-| Gebruikerssignaal en afhandeling | inbox/productmodule | oorspronkelijke feedback, observatie of gebruiksgegeven plus wat er al mee is gebeurd |
+| Gebruikerssignaal en afhandeling | productmodule | oorspronkelijke feedback, observatie of gebruiksgegeven plus wat er al mee is gebeurd |
 
 Externe bronnen worden tijdens een sessie opgehaald en intern als bronregistratie opgeslagen. Ruwe
 bronnen, onderzoeksdossiers, hypotheses en kansvoorstellen steken de modulegrens niet over.
@@ -900,13 +906,13 @@ en een begrensde testsessie op basis van opleveringen, risico en testrotatie.
 | Gegeven | Eigenaar en herkomst | Betekenis voor Kwaliteitsbewaking |
 |---|---|---|
 | Stakeholderprofiel | product-/overlegmodule | wie kwaliteitsgrenzen en gemelde risico's bevoegd mag verduidelijken |
-| Stakeholderrichting | overleg/productmodule | onder meer een expliciete `QUALITY_FOCUS` uit een overleg, met onderwerp, reden en gewenste controles |
+| Stakeholderrichting | overleg/productmodule | bindende productgrens, correctie, stopbesluit of opdrachtwijziging; een kwaliteitszorg is een gebruikerssignaal |
 | Testbare productconfiguratie | productmodule | URL's, toegestane accounts, routes en testgrenzen |
 | Oplevering en externe storyreferentie | Software Factory-dispatcher | wat nieuw of gewijzigd is en waar het getest kan worden |
 | Bevroren epicdefinitie en UX | Productontwerp via de door Productplanning gekozen versie | scope, complete gebruikersroute en succescriteria |
 | Productstories en epicuitvoering | Productplanning | verwacht gedrag en wanneer een volledige epiccontrole nodig is |
 | Bestaande bugs | Kwaliteitsbewaking zelf | wat moet worden hergetest en welke patronen al bekend zijn |
-| Gebruikerssignaal en afhandeling | inbox/productmodule | oorspronkelijke melding, context, bewijs en wat er al mee is gebeurd |
+| Gebruikerssignaal en afhandeling | productmodule | oorspronkelijke melding, context, bewijs en wat er al mee is gebeurd |
 
 ### Outputinterface
 
@@ -916,6 +922,7 @@ en een begrensde testsessie op basis van opleveringen, risico en testrotatie.
 | Storyverificatie | oordeel met bewijs over een productstory of bugfix: geslaagd, afgekeurd of geblokkeerd |
 | Epicverificatie | oordeel of de volledige epic geslaagd, onvolledig, niet aantoonbaar, geblokkeerd of niet geslaagd is |
 | Epicgat | gedrag uit de bevroren scope of UX waarvoor Productplanning nooit een story maakte |
+| Signaalonderzoeksresultaat | zichtbaar oordeel over een onderzocht gebruikerssignaal, met uitleg, bewijs en eventuele koppeling naar bug of kwaliteitspatroon |
 | Kwaliteitsbeeld | actuele samenvatting van dekking, belangrijke risico's en recent onderzochte gebieden |
 | Kwaliteitssignaal | structureel patroon of onjuiste productaanname die Productontwerp kan onderzoeken |
 
@@ -1166,8 +1173,10 @@ Hier zie je in één oogopslag:
 Hier staan nieuwe feedback, observaties, ideeën en onderzoeksinzichten. Per gebruikerssignaal blijven
 de oorspronkelijke tekst, bron, context en bijlagen zichtbaar, samen met een afzonderlijke
 afhandelstatus en koppelingen naar onderzoek, leerresultaat, epic, bug of kwaliteitssignaal. Je kunt
-signalen bekijken, als duplicaat herkennen of laten onderzoeken. Bugs komen vanuit
-Kwaliteitsbewaking in de aparte productgezondheidslijst.
+signalen bekijken en een onderzoeksverzoek indienen. De productmodule registreert het signaal en
+werkt de afhandelstatus bij op basis van gepubliceerde procesresultaten; het Inbox-scherm schrijft
+niet rechtstreeks in de database. Bugs komen vanuit Kwaliteitsbewaking in de aparte
+productgezondheidslijst.
 
 ### 3. Plan
 

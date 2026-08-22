@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1380" viewBox="0 0 1800 1380" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 processen, entiteiteigenaren en gegevensstromen</title>
-  <desc id="desc">Diagram met de Stakeholder, modules Productontwerp, Productplanning, Kwaliteitsbewaking en de Software Factory-dispatcher. Iedere module bevat de publieke entiteiten die zij schrijft. Pijlen tonen welke contracten andere modules lezen.</desc>
+  <desc id="desc">Diagram met de Stakeholder, ondersteunende product- en overlegmodules, Productontwerp, Productplanning, Kwaliteitsbewaking en de Software Factory-dispatcher. Iedere module bevat de publieke entiteiten die zij schrijft. Pijlen tonen welke contracten andere modules lezen, waaronder de afzonderlijke verwerking van gebruikerssignalen.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
@@ -40,7 +40,7 @@
   <rect x="50" y="155" width="365" height="385" rx="18" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
   <rect x="50" y="155" width="365" height="62" rx="18" fill="#e2e8f0"/>
   <path d="M50 199 V217 H415 V199" fill="#e2e8f0"/>
-  <text x="76" y="193" class="box-title">Product, overleg en inbox</text>
+  <text x="76" y="193" class="box-title">Product en overleg</text>
   <text x="76" y="245" class="owner-label">SCHRIJFT</text>
   <text x="76" y="274" class="entity">StakeholderProfileView</text>
   <text x="76" y="308" class="entity">ProductAssignmentView</text>
@@ -49,8 +49,8 @@
   <text x="76" y="410" class="entity">UserSignalDispositionView</text>
   <text x="76" y="444" class="entity">TestableProductView</text>
   <line x1="76" y1="468" x2="389" y2="468" stroke="#cbd5e1"/>
-  <text x="76" y="496" class="note">Bron van mandaat, productgrenzen,</text>
-  <text x="76" y="518" class="note">richting/QUALITY_FOCUS en signalen.</text>
+  <text x="76" y="496" class="note">Ontvangt commands; de Stakeholder schrijft</text>
+  <text x="76" y="518" class="note">geen databaseobjecten rechtstreeks.</text>
 
   <!-- Productontwerp -->
   <rect x="520" y="155" width="410" height="385" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
@@ -117,14 +117,15 @@
   <text x="1454" y="537" class="entity">StoryVerificationView</text>
   <text x="1454" y="573" class="entity">EpicVerificationView</text>
   <text x="1454" y="609" class="entity">EpicCompletionGapView</text>
-  <text x="1454" y="645" class="entity">QualityOverviewView</text>
-  <text x="1454" y="681" class="entity">QualitySignalView</text>
-  <text x="1454" y="717" class="entity">ProcessSessionPublication</text>
-  <line x1="1454" y1="741" x2="1731" y2="741" stroke="#ddd6fe"/>
-  <text x="1454" y="770" class="note">Toetst stories, bugfixes, epics en</text>
-  <text x="1454" y="792" class="note">QUALITY_FOCUS uit een overleg.</text>
-  <text x="1454" y="828" class="note">Publiceert bewijs en bevindingen;</text>
-  <text x="1454" y="850" class="note">maakt geen stories.</text>
+  <text x="1454" y="645" class="entity" style="font-size:14px">SignalInvestigationResultView</text>
+  <text x="1454" y="681" class="entity">QualityOverviewView</text>
+  <text x="1454" y="717" class="entity">QualitySignalView</text>
+  <text x="1454" y="753" class="entity">ProcessSessionPublication</text>
+  <line x1="1454" y1="777" x2="1731" y2="777" stroke="#ddd6fe"/>
+  <text x="1454" y="806" class="note">Toetst stories, bugfixes, epics en</text>
+  <text x="1454" y="828" class="note">onveranderlijke gebruikerssignalen.</text>
+  <text x="1454" y="864" class="note">Publiceert bewijs en bevindingen;</text>
+  <text x="1454" y="886" class="note">maakt geen stories.</text>
 
   <!-- Scheduler -->
   <rect x="50" y="760" width="365" height="135" rx="18" fill="#f1f5f9" stroke="#64748b" stroke-width="2" stroke-dasharray="8 7"/>
@@ -145,9 +146,9 @@
   <rect x="50" y="1090" width="365" height="58" rx="18" fill="#fef9c3"/>
   <path d="M50 1130 V1148 H415 V1130" fill="#fef9c3"/>
   <text x="76" y="1128" class="box-title">Stakeholder</text>
-  <text x="76" y="1176" class="owner-label">LEVERT VIA PRODUCT / OVERLEG / INBOX</text>
+  <text x="76" y="1176" class="owner-label">LEVERT VIA PRODUCT / OVERLEG</text>
   <text x="76" y="1208" class="note">profiel · productopdracht · richting</text>
-  <text x="76" y="1232" class="note">antwoorden · signalen · QUALITY_FOCUS</text>
+  <text x="76" y="1232" class="note">antwoorden · signalen · kwaliteitszorg</text>
   <text x="76" y="1270" class="note">Maakt geen epics, stories, bugs of backlog.</text>
 
   <!-- Gegevensstromen -->
@@ -158,8 +159,11 @@
   <text x="327" y="659" class="flow-small">profiel · opdracht · richting</text>
 
   <path d="M415 395 C850 90 1350 130 1430 400" class="purple-line"/>
-  <text x="955" y="165" class="flow-small">QUALITY_FOCUS · UserSignalView</text>
+  <text x="955" y="165" class="flow-small">richting · UserSignalView · afhandeling</text>
   <text x="1010" y="186" class="flow-small">profiel · testconfiguratie</text>
+
+  <path d="M1430 650 C1170 625 790 605 415 445" class="purple-line"/>
+  <text x="925" y="607" class="flow-small">SignalInvestigationResultView</text>
 
   <path d="M725 540 V705" class="green-line"/>
   <text x="740" y="620" class="flow">EpicDefinitionView</text>

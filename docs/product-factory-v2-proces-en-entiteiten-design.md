@@ -48,8 +48,8 @@ hoe die persoon bereikbaar is en voor welke beslissingen menselijke goedkeuring 
 |---|---|---|---|
 | identiteit, rol, contactwijze en beslissingsmandaat | verplicht bij productstart en bij wijziging | `StakeholderProfileView` | bepaalt wie bevoegd richting of antwoorden kan geven en wanneer overleg nodig is |
 | breed productdoel en harde grenzen | verplicht bij productstart; later alleen bij wezenlijke wijziging | door de Stakeholder bevestigde `ProductAssignmentView` | vormt het vaste kader voor alle processen |
-| expliciete richting, correctie, stopbesluit of antwoord op een overlegvraag | wanneer nodig | `StakeholderDirectionView`; voor extra testfocus met type `QUALITY_FOCUS` | wordt als bindende input binnen het geldige mandaat verwerkt en kan een processessie planbaar maken |
-| gebruikersfeedback, observatie, probleem, kans of risico | optioneel en op ieder moment | `UserSignalView` via inbox | blijft een onbeoordeeld signaal totdat een proces bewijs of een vervolgobject publiceert |
+| expliciete richting, correctie, stopbesluit of antwoord op een overlegvraag | wanneer nodig | `StakeholderDirectionView` | wordt als bindende input binnen het geldige mandaat verwerkt en kan een processessie planbaar maken |
+| gebruikersfeedback, observatie, probleem, kans, risico of verzoek om kwaliteitsonderzoek | optioneel en op ieder moment | `UserSignalView`, eventueel met categorie `QUALITY_CONCERN` | blijft een onbeoordeeld signaal totdat een proces bewijs of een vervolgobject publiceert |
 | gevoelige toegang of extern besluit | alleen wanneer Product Factory dit niet zelfstandig mag regelen | productconfiguratie of beveiligde voorziening; nooit in vrije signaaltekst | heft een concrete blokkade op zonder secrets in procesdocumenten te zetten |
 
 De Stakeholder hoeft geen oplossing, UX, epic, story, bug of backlogpositie te schrijven en sluit
@@ -57,7 +57,7 @@ een epic niet administratief af. Die verantwoordelijkheden blijven bij de betref
 
 ## Eigenaarschap per publieke entiteit
 
-### Product-, overleg- en inboxcontracten
+### Product- en overlegcontracten
 
 Deze contracten komen van ondersteunende modules buiten de drie intelligente processen.
 
@@ -65,9 +65,9 @@ Deze contracten komen van ondersteunende modules buiten de drie intelligente pro
 |---|---|---|---|---|
 | `StakeholderProfileView` | product-/overlegmodule bij registratie van de Stakeholder | product-/overlegmodule na bevestiging door een bevoegde Stakeholder | Productontwerp, Productplanning, Kwaliteitsbewaking en productbediening | identiteit, rol, contactwijze en beslissingsmandaat; bevat geen secrets |
 | `ProductAssignmentView` | productmodule na het aanmaken van een product | productmodule | Productontwerp, Productplanning en productbediening | productidentiteit, doelgroep, doel, harde grenzen, repository, toegang en backlogconfiguratie |
-| `StakeholderDirectionView` | Stakeholder via overleg of productbediening | product-/overlegmodule | Productontwerp, Productplanning, Kwaliteitsbewaking en productbediening | bindende aanwijzing of correctie met type en toepassingsgebied; `QUALITY_FOCUS` bepaalt testfocus maar nooit het testresultaat |
-| `UserSignalView` | gebruiker, Stakeholder of toegestane integratie via de inbox | inbox/productmodule; oorspronkelijke inhoud na ontvangst onveranderlijk | Productontwerp, Kwaliteitsbewaking en productbediening | onbeoordeelde feedback, observatie of gebruiksgegeven met bron, context en bewijs; nog geen bug, epic of story |
-| `UserSignalDispositionView` | inbox/productmodule tegelijk met het signaal | inbox/productmodule, mechanisch afgeleid uit gekoppelde procesresultaten | Productontwerp, Kwaliteitsbewaking, Stakeholder en productbediening | toont nieuw, onderzocht, gekoppeld, duplicaat, onvoldoende bewijs of buiten scope plus bronverwijzingen; wijzigt het signaal niet |
+| `StakeholderDirectionView` | product-/overlegmodule na een bevoegd command van de Stakeholder | product-/overlegmodule | Productontwerp, Productplanning, Kwaliteitsbewaking en productbediening | bindende productgrens, correctie, stopbesluit of opdrachtwijziging met toepassingsgebied; geen kwaliteitsmelding of testresultaat |
+| `UserSignalView` | productmodule na invoer van gebruiker, Stakeholder of toegestane integratie | productmodule; oorspronkelijke inhoud na ontvangst onveranderlijk | Productontwerp, Kwaliteitsbewaking en productbediening | onbeoordeelde feedback, observatie of gebruiksgegeven met bron, context en bewijs; categorie `QUALITY_CONCERN` vraagt aandacht maar schrijft geen uitkomst voor |
+| `UserSignalDispositionView` | productmodule bij ontvangst van het signaal | productmodule, mechanisch afgeleid uit gekoppelde procesresultaten | Productontwerp, Kwaliteitsbewaking, Stakeholder en productbediening | toont nieuw, onderzocht, gekoppeld, duplicaat, onvoldoende bewijs of buiten scope plus bronverwijzingen; wijzigt het signaal niet |
 | `TestableProductView` | productmodule bij het configureren van testtoegang | productmodule | Kwaliteitsbewaking | omgevingen, routes, accounts, databereik en testgrenzen |
 
 ### Contracten van Productontwerp
@@ -108,6 +108,7 @@ afzonderlijke schrijfbevoegdheid. Hij verandert nooit de betekenis of prioriteit
 | `StoryVerificationView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productplanning, Kwaliteitsbewaking en productbediening | bewijs en oordeel over één story of bugfix; Productplanning verwerkt het oordeel maar wijzigt het niet |
 | `EpicVerificationView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productplanning, Productontwerp, Kwaliteitsbewaking en productbediening | oordeel over de hele bevroren epic: geslaagd, onvolledig, niet aantoonbaar, geblokkeerd of niet geslaagd |
 | `EpicCompletionGapView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productplanning, Kwaliteitsbewaking en productbediening | gedrag binnen de bevroren scope of UX waarvoor nooit een story bestond; Productplanning maakt zo nodig aanvullende stories |
+| `SignalInvestigationResultView` | Kwaliteitsbewaking na onderzoek van een exacte gebruikerssignaalversie | Kwaliteitsbewaking; na publicatie onveranderlijk | productmodule, Kwaliteitsbewaking en productbediening | resultaat **Bevestigde bug**, **Geen probleem gevonden**, **Meer bewijs nodig**, **Duplicaat**, **Buiten testscope** of **Kwaliteitspatroon gevonden**, met uitleg, bewijs en eventuele vervolgkoppeling |
 | `QualityOverviewView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productontwerp, Kwaliteitsbewaking, Stakeholder en productbediening | actueel beeld van dekking, open bugs, risico's en onderbelichte gebieden |
 | `QualitySignalView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productontwerp, Kwaliteitsbewaking en productbediening | terugkerend patroon of onjuiste productaanname dat nieuw onderzoek kan rechtvaardigen |
 
@@ -150,18 +151,18 @@ leerresultaten, processessies en leveringen. Waar nuttig biedt de frontend versi
 vergelijking tussen twee databaseversies.
 
 De frontend kan dus wel een overleg starten, een gebruikerssignaal indienen of een bevestigde
-Stakeholderrichting laten vastleggen. Dat zijn commands naar respectievelijk de overleg-, inbox- of
-productmodule; de frontend wordt daardoor niet zelf de schrijver van die entiteiten.
+Stakeholderrichting laten vastleggen. Dat zijn commands naar respectievelijk de overleg- of
+productmodule; de frontend wordt daardoor niet zelf de schrijver van die entiteiten. **Inbox** is
+alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtbaar zijn.
 
 ## Gegevensstromen per onderdeel
 
 | Producent | Gepubliceerde gegevens | Consument |
 |---|---|---|
-| Stakeholder | profielgegevens, bevestigde productopdracht, richting, antwoorden en gebruikerssignalen | product-/overleg-/inboxmodule |
-| product-/overleg-/inboxmodule | Stakeholderprofiel, productopdracht, Stakeholderrichting, gebruikerssignalen en afhandeling | Productontwerp |
+| Stakeholder | profielgegevens, bevestigde productopdracht, richting, antwoorden en gebruikerssignalen | product-/overlegmodule via commands |
+| product-/overlegmodule | Stakeholderprofiel, productopdracht, Stakeholderrichting, gebruikerssignalen en afhandeling | Productontwerp |
 | product-/overlegmodule | Stakeholderprofiel, productopdracht en Stakeholderrichting | Productplanning |
-| overleg-/inboxmodule | `StakeholderDirectionView` met eventueel `QUALITY_FOCUS` en/of `UserSignalView` | Kwaliteitsbewaking |
-| productmodule | Stakeholderprofiel en testconfiguratie | Kwaliteitsbewaking |
+| product-/overlegmodule | Stakeholderprofiel, testconfiguratie, `UserSignalView` en `UserSignalDispositionView` | Kwaliteitsbewaking |
 | Productontwerp | epicdefinitie | Productplanning en Kwaliteitsbewaking |
 | Productplanning | epicuitvoering en backlogvoorraad | Productontwerp |
 | Productplanning | epicuitvoering, productstories en backlogitems | Kwaliteitsbewaking |
@@ -171,6 +172,8 @@ productmodule; de frontend wordt daardoor niet zelf de schrijver van die entitei
 | Software Factory-dispatcher | opleverresultaat | Kwaliteitsbewaking en Productontwerp |
 | Kwaliteitsbewaking | bugs, storyverificaties, epicverificaties en epicgaten | Productplanning |
 | Kwaliteitsbewaking | epicverificaties, kwaliteitsbeeld en kwaliteitssignalen | Productontwerp |
+| Kwaliteitsbewaking | `SignalInvestigationResultView` | productmodule, die de signaalafhandeling bijwerkt |
+| productmodule | bijgewerkte `UserSignalDispositionView` | Kwaliteitsbewaking, Productontwerp, Stakeholder en productbediening |
 | ieder intelligent proces | eigen sessiepublicatie | scheduler, operations en productbediening |
 
 ## Belangrijke levenscyclusregels
@@ -188,8 +191,9 @@ productmodule; de frontend wordt daardoor niet zelf de schrijver van die entitei
    uit de bevroren epic wordt een aanvullende story op basis van een epicgat.
 7. Pas een geslaagde `EpicVerificationView` laat Productplanning de epicuitvoering als **Geslaagd**
    afsluiten. Alle stories opgeleverd hebben is op zichzelf niet genoeg.
-8. Een `UserSignalView` blijft ongewijzigd. De afhandeling wordt apart afgeleid uit gepubliceerde
-   bugs, kwaliteitssignalen, leerresultaten en epics die naar het signaal verwijzen.
+8. Een `UserSignalView` blijft ongewijzigd. Kwaliteitsbewaking publiceert een apart
+   `SignalInvestigationResultView`; Productontwerp verwijst vanuit eigen leerresultaten of epics naar
+   gebruikte signalen. De productmodule leidt daaruit een nieuwe `UserSignalDispositionView` af.
 
 ## Technische vertaling naar Spring Modulith
 

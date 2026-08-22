@@ -18,6 +18,7 @@ De module is eigenaar van:
 - bugs, ernst en herstelstatus;
 - story- en epicverificaties;
 - epicgaten en structurele kwaliteitssignalen;
+- onderzoeksresultaten voor gebruikerssignalen;
 - het eigen agent- en procesgeheugen.
 
 Kwaliteitsbewaking maakt geen stories, wijzigt geen epicdefinitie en bepaalt geen backlogvolgorde of
@@ -51,14 +52,14 @@ testclients zijn interne adapters.
 |---|---|---|
 | `StakeholderProfileView` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter kwaliteitsgrenzen en risico's |
 | `TestableProductView` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
-| `StakeholderDirectionView` | product-/overlegmodule | expliciete kwaliteitsgrenzen, gemelde risico's en `QUALITY_FOCUS`-opdrachten uit overleggen |
+| `StakeholderDirectionView` | product-/overlegmodule | bindende productgrenzen en correcties die ook tijdens het testen gelden |
 | `EpicDefinitionView` | Productontwerp | bevroren scope, UX en succescriteria van de door Productplanning gekozen versie |
 | `EpicExecutionView` | Productplanning | exacte versie, stories, voortgang en verzoek om volledige epiccontrole |
 | `ProductStoryView` | Productplanning | acceptatiecriteria, verwacht gedrag en zelfstandige relevante UX per story |
 | `BacklogItemView` | Productplanning | uitvoeringsstatus en bronkoppeling |
 | `DeliveryResultView` | Software Factory-dispatcher | wat, waar en wanneer moet worden geverifieerd |
-| `UserSignalView` | inbox/productmodule | oorspronkelijke melding met bron, context en bewijs |
-| `UserSignalDispositionView` | inbox/productmodule | wat al met het signaal is gebeurd en aan welke resultaten het is gekoppeld |
+| `UserSignalView` | productmodule | oorspronkelijke melding met bron, context en bewijs; `QUALITY_CONCERN` betekent dat de melder extra onderzoek vraagt |
+| `UserSignalDispositionView` | productmodule | wat al met het signaal is gebeurd en aan welke resultaten het is gekoppeld |
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte contractversies
 en exacte geteste omgeving vast.
@@ -71,6 +72,7 @@ en exacte geteste omgeving vast.
 | `StoryVerificationView` | oordeel over één concrete story of bugfix | backlogitem, bronversie, omgeving, resultaat, controles, bewijs en blokkade |
 | `EpicVerificationView` | oordeel over de complete gebruikersverbetering | epic-ID en -versie, uitkomst, scope-/UX-dekking, succescriteria, bewijs, gaten en leerresultaat |
 | `EpicCompletionGapView` | gedrag binnen de bevroren epic dat nooit in een story stond | scope- of UX-verwijzing, gebruikersimpact, ontbrekend gedrag en bewijs |
+| `SignalInvestigationResultView` | zichtbaar resultaat van onderzoek naar één gebruikerssignaal | signaal-ID en -versie, resultaat, uitleg, bewijs, omgeving, eventuele bug- of kwaliteitssignaalkoppeling, processessie en onderzoekstijdstip |
 | `QualityOverviewView` | zichtbaar actueel kwaliteitsbeeld | recente dekking, risico's, open bugs en onderbelichte gebieden |
 | `QualitySignalView` | groter productprobleem voor Productontwerp | patroon, betrokken bevindingen, impact, hypothese en gewenste onderzoeksvraag |
 | `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, inputversies, publicatie-ID's en eindstatus |
@@ -78,32 +80,36 @@ en exacte geteste omgeving vast.
 Kwaliteitsbewaking schrijft `ProcessSessionPublication` uitsluitend voor zijn eigen sessies. De
 scheduler roept alleen de procesfunctie aan; scheduler en frontend wijzigen het sessieresultaat niet.
 
-Alleen Kwaliteitsbewaking schrijft bugs, verificaties, epicgaten en kwaliteitssignalen.
-Productplanning verwerkt die output maar verandert haar niet.
+Alleen Kwaliteitsbewaking schrijft bugs, verificaties, epicgaten, signaalonderzoeksresultaten en
+kwaliteitssignalen. Productplanning verwerkt de uitvoeringsgerichte bevindingen; de productmodule
+verwerkt signaalonderzoeksresultaten. Geen van beide verandert de publicaties van
+Kwaliteitsbewaking.
 
-## Kwaliteitsrichting uit een overleg
+## Een kwaliteitszorg uit een overleg
 
-Wanneer de Stakeholder in een overleg aangeeft dat een onderdeel mogelijk niet goed werkt, kan de
-overleg-/inboxmodule twee verschillende contracten publiceren:
+Wanneer de Stakeholder aangeeft dat een onderdeel mogelijk niet goed werkt of extra aandacht nodig
+heeft, registreert de productmodule dit als `UserSignalView`. De optionele categorie
+`QUALITY_CONCERN` helpt Kwaliteitsbewaking bij de testagenda, maar maakt van de melding geen opdracht
+met een vooraf bepaald resultaat.
 
-- `UserSignalView` voor de oorspronkelijke, nog onbewezen waarneming;
-- `StakeholderDirectionView` met `directionType = QUALITY_FOCUS` voor een expliciet verzoek om een
-  bepaald gebied extra te onderzoeken.
+De Stakeholder schrijft dit databaseobject niet rechtstreeks. De frontend of overlegmodule voert een
+command uit op de productmodule; die bewaart de oorspronkelijke melding daarna onveranderlijk.
+Kwaliteitsbewaking leest het signaal en publiceert na onderzoek een eigen
+`SignalInvestigationResultView`. Zij wijzigt `UserSignalView` en `UserSignalDispositionView` nooit.
 
-Een `QUALITY_FOCUS` bevat minimaal:
+Een signaalonderzoeksresultaat bevat minimaal:
 
-- stabiel richting-ID, product-ID, versie en bronoverleg-ID;
-- onderwerp en reden;
-- betrokken productgebied, gebruikersroute, apparaat of kwaliteitsdimensie;
-- gewenste controles en meegegeven risico's;
-- urgentie en onderbouwing;
-- ingangsdatum en optionele einddatum of stopvoorwaarde;
-- status **Actief**, **Vervangen** of **Ingetrokken**.
+- stabiel resultaat-ID, product-ID, signaal-ID en exact signaalversienummer;
+- resultaat **Bevestigde bug**, **Geen probleem gevonden**, **Meer bewijs nodig**, **Duplicaat**,
+  **Buiten testscope** of **Kwaliteitspatroon gevonden**;
+- uitleg, uitgevoerde controles, geteste omgeving en bewijs;
+- eventuele koppeling naar `BugView`, `QualitySignalView` of het duplicaatsignaal;
+- processessie-ID en onderzoekstijdstip.
 
-De richting bepaalt mede de testagenda, maar niet de uitkomst. Kwaliteitsbewaking blijft zelf
-verantwoordelijk voor reproductie, bewijs, ernst en classificatie. Iedere bevinding of sessie die
-door de richting is gestart bewaart richting-ID en versie, zodat de frontend kan tonen wat is
-onderzocht en wat daaruit is gekomen.
+De productmodule leest dit resultaat en publiceert een nieuwe `UserSignalDispositionView`. Daardoor
+kan de frontend tonen wat is onderzocht en wat daaruit kwam, terwijl bronmelding en testbewijs ieder
+hun eigen eigenaar houden. `StakeholderDirectionView` blijft alleen bedoeld voor echte bindende
+productrichting, grenzen, correcties en stopbesluiten.
 
 ## Storyverificatie
 
@@ -209,6 +215,7 @@ ontbrekende gedrag is geleverd en opnieuw gecontroleerd.
 - `BugCandidate` en `Bug` — bevinding en duurzame levenscyclus;
 - `EpicCoverageAssessment` — vergelijking van epic, UX, stories en geleverd gedrag;
 - `EpicCompletionGap` — ontbrekende dekking binnen een bevroren epic;
+- `SignalInvestigationResult` — gevalideerde conclusie over één exacte gebruikerssignaalversie;
 - `StoryVerification` en `EpicVerification` — interne controles vóór publicatie;
 - `QualityPattern` — clustering van verwante bevindingen;
 - `QualityMemory` — lessen over risico's, testaanpak en dekkingsgaten;
@@ -240,8 +247,7 @@ testrollen verplicht.
 4. **Dagelijkse kernroutes testen** — belangrijkste gebruikersresultaten bewaken.
 5. **Kwaliteitsrotatie uitvoeren** — een onderbelicht thema of apparaat onderzoeken.
 6. **Gebruikerssignaal onderzoeken** — een gemeld probleem reproduceren.
-7. **Stakeholderfocus onderzoeken** — de actieve `QUALITY_FOCUS` uit een overleg uitvoeren.
-8. **Patroon analyseren** — verwante bevindingen tot een kwaliteitssignaal vormen.
+7. **Patroon analyseren** — verwante bevindingen tot een kwaliteitssignaal vormen.
 
 Nieuwe opleveringen en P0/P1-signalen gaan voor periodieke rotatie. Een epic op **Controleren** gaat
 voor losse exploratieve tests wanneer alle benodigde omgevingen beschikbaar zijn.
@@ -271,7 +277,7 @@ atomair publiceren en rotatie bijwerken
 ### Stap 1 — claimen en omgeving controleren
 
 De module claimt één planbare opdracht, leest exacte versies van epic, uitvoering, stories,
-backlogitems, oplevering en eventuele `QUALITY_FOCUS`, controleert de omgeving en registreert
+backlogitems, oplevering en eventueel gebruikerssignaal, controleert de omgeving en registreert
 productversie en testaccount. Een onbereikbare omgeving leidt tot **Geblokkeerd**, niet tot een
 productbug.
 
@@ -295,6 +301,7 @@ De criticus:
 - bepaalt ernst en gebruikersimpact;
 - controleert bewijs op geheimen en persoonsgegevens;
 - geeft het story- of epicoordeel;
+- geeft ieder onderzocht gebruikerssignaal een expliciet onderzoeksresultaat;
 - publiceert eigen objecten en projecties atomair.
 
 ## Planning en de HKH-backlog
@@ -304,8 +311,7 @@ Een sessie wordt planbaar door:
 - een nieuwe Software Factory-oplevering;
 - een bugfix op **Hertesten**;
 - een epicuitvoering op **Controleren**;
-- een nieuwe, gewijzigde of opnieuw geactiveerde `QUALITY_FOCUS`;
-- een nieuw of gewijzigd gebruikerssignaal of zijn afhandelstatus;
+- een nieuw of heropend gebruikerssignaal, of nieuw bewijs bij een eerder onbeslist signaal;
 - een P0/P1-risico of verouderd kwaliteitsbeeld;
 - de dagelijkse kernrouteplanning of testrotatie;
 - lage backlogvoorraad, zodat bekende bevindingen tijdig worden gereproduceerd.
@@ -330,8 +336,8 @@ Een sessie is klaar wanneer:
 - iedere publieke bug reproduceerbaar en van bewijs voorzien is;
 - ieder epicgat aantoonbaar binnen de bevroren epic valt en niet door een story wordt gedekt;
 - iedere verificatie naar exacte epic-, story-, opleverings- en omgevingsversies verwijst;
-- iedere afgehandelde `QUALITY_FOCUS` naar richting-ID en versie verwijst en een zichtbaar resultaat
-  of expliciete blokkade heeft;
+- ieder onderzocht gebruikerssignaal naar exact signaal-ID en -versie verwijst en een zichtbaar
+  onderzoeksresultaat of expliciete blokkade heeft;
 - testrotatie en kwaliteitsbeeld zijn bijgewerkt;
 - publicaties atomair en geversioneerd beschikbaar zijn;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.
