@@ -43,9 +43,10 @@ Daarnaast heeft de module een kleine deterministische command- en query-interfac
 ```java
 EpicDetails getEpic(EpicId epicId);
 List<EpicDetails> findAvailableEpics(ProductId productId);
+List<EpicDetails> findEpicsAwaitingVerification();
 void claimEpicForPlanning(ClaimEpicForPlanningCommand command);
 void markEpicActive(MarkEpicActiveCommand command);
-void requestEpicVerification(RequestEpicVerificationCommand command);
+void markEpicReadyForVerification(MarkEpicReadyForVerificationCommand command);
 void recordEpicVerification(RecordEpicVerificationCommand command);
 void stopEpic(StopEpicCommand command);
 ```
@@ -65,7 +66,7 @@ domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
 | `StakeholderDetails` | product-/overlegmodule | identiteit, contactwijze, rol en beslissingsmandaat van de Stakeholder |
-| `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en toegestane toegang |
+| `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende richting en expliciete correcties |
 | `UserSignalDetails` | productmodule | oorspronkelijke feedback plus actuele status, uitkomst en resultaatkoppelingen |
 | `BacklogSupply` | Productplanning-query | berekende voorraad en of nieuwe beschikbare epics extra urgent zijn |
@@ -76,8 +77,11 @@ domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 Voor iedere gelezen publicatie worden bron-ID en bronversie vastgelegd. Dezelfde versie wordt niet
 tweemaal als nieuwe input behandeld.
 
-Externe onderzoeksbronnen en repository-informatie worden binnen de toegestane productgrenzen door
-de module zelf opgehaald. Ruwe bronnen steken de modulegrens niet over.
+Bij aanvang van een inhoudelijke sessie mag Productontwerp de publieke Git-URL uit de productopdracht
+uitchecken en broncode, tests en documentatie read-only onderzoeken. Daarvoor is geen aparte
+Product Factory-workspace of Git-module nodig. Productontwerp commit en pusht nooit; de gelezen
+commit-SHA wordt alleen als bronverwijzing bij de sessie of epic vastgelegd. Ruwe bronnen steken de
+modulegrens niet over.
 
 Een `UserSignalDetails` is een aanwijzing en geen opdracht. De oorspronkelijke tekst blijft
 onveranderlijk; status, verwerkingsuitkomst en koppelingen staan op dezelfde `UserSignal`. Als
@@ -106,6 +110,11 @@ Alleen Productontwerp schrijft de `Epic`. Productplanning claimt een exacte vers
 `claimEpicForPlanning(...)`; dat command bevriest die versie atomair. Kwaliteitsbewaking registreert
 de afsluitende uitkomst via `recordEpicVerification(...)`. Geen van beide krijgt toegang tot de
 epicrepository of kan inhoud en UX veranderen.
+
+`markEpicReadyForVerification(...)` is uitsluitend een gevalideerde statusovergang naar
+**Controleren** (`VERIFYING`). Het command maakt geen testqueue in Productontwerp en start geen
+agents. Kwaliteitsbewaking vindt zulke epics via `findEpicsAwaitingVerification()` tijdens
+`runProcessSession()`.
 
 ## Epiccontract
 

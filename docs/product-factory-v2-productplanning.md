@@ -67,12 +67,19 @@ Read-only DTO's staan in `processcontracts` en zijn geen eigen database-entiteit
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
 | `StakeholderDetails` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter Stakeholderrichting |
-| `ProductAssignmentDetails` | productmodule | productidentiteit, grenzen en backlogconfiguratie |
+| `ProductAssignmentDetails` | productmodule | productidentiteit, grenzen, backlogconfiguratie en publieke Git-URL |
 | `StakeholderDirectionDetails` | product-/overlegmodule | expliciete epic- en prioriteitsgrenzen |
 | `EpicDetails` | Productontwerp | beschikbare of geclaimde epicversie, status, gebruikerswaarde, scope, UX en succescriteria |
 | `BugDetails` | Kwaliteitsbewaking | uitvoerbare bugfixkandidaat inclusief ernst en bewijs |
 | `VerificationDetails` | Kwaliteitsbewaking | story- of epicuitkomst, bewijs en eventueel ontbrekende dekking |
 | `SoftwareFactoryWork` | dispatcheradapter | actuele externe status van eerder verzonden werk; tijdelijk integratiegegeven |
+
+Tijdens een inhoudelijke sessie mag Productplanning de publieke Git-URL uit de productopdracht
+uitchecken en broncode, tests en documentatie read-only bekijken. Zo kan zij bestaande componenten,
+afhankelijkheden en technische grenzen herkennen zonder de implementatie voor te schrijven. Er is
+geen aparte workspace of Git-service: de URL volstaat. Productplanning commit en pusht nooit en legt
+de bekeken commit-SHA alleen als bronverwijzing bij de sessie of story vast. De story blijft
+zelfstandig en bevat alle benodigde product- en UX-informatie.
 
 ### Output
 
@@ -190,16 +197,25 @@ De door Productontwerp beheerde `Epic` gebruikt:
 - **Niet geslaagd** — alles is geleverd, maar het bedoelde gebruikersresultaat is niet bereikt;
 - **Gestopt** — bewust niet verder, met reden.
 
-Productplanning roept `requestEpicVerification(...)` pas aan wanneer alle bekende stories `DONE`
-zijn. Een `VerificationDetails` bepaalt daarna het vervolg:
+Productplanning roept `markEpicReadyForVerification(...)` pas aan wanneer alle bekende stories
+`DONE` zijn. Productontwerp zet de epic daarmee alleen op **Controleren** (`VERIFYING`);
+Kwaliteitsbewaking vindt haar daarna zelf tijdens een geplande sessie. Een `VerificationDetails`
+bepaalt daarna het vervolg:
 
-| Uitkomst | Actie van Productplanning |
+| Uitkomst | Vervolg |
 |---|---|
-| **Geslaagd** | Productontwerp registreert via zijn command de epic als **Geslaagd** |
-| **Onvolledig** met dekkingsgaten | aanvullende stories maken en terug naar **Actief** |
-| **Niet aantoonbaar** | op **Controleren** blijven en wachten op aanvullend bewijs |
-| **Geblokkeerd** | blokkade zichtbaar opslaan en later opnieuw laten controleren |
-| **Niet geslaagd** | Productontwerp registreert via zijn command **Niet geslaagd** en verwerkt de conclusie intern |
+| **Geslaagd** | Productontwerp registreert de epic als **Geslaagd**; geen planwerk |
+| **Onvolledig** met dekkingsgaten | Kwaliteitsbewaking roept `requestCompletionWork(...)` aan; Productplanning maakt aanvullende stories en de epic gaat terug naar **Actief** |
+| bouwfout | Kwaliteitsbewaking maakt een bug en roept `requestBugfix(...)` aan; Productplanning maakt een bugfixstory en de epic blijft of gaat **Actief** |
+| **Niet aantoonbaar** | epic blijft op **Controleren**; Kwaliteitsbewaking plant nieuw bewijswerk |
+| **Geblokkeerd** | epic blijft op **Controleren** en de blokkade blijft zichtbaar; geen planwerk tenzij ontwikkeling nodig blijkt |
+| **Niet geslaagd** | Productontwerp registreert **Niet geslaagd** en kan later een vervolgepic onderzoeken; geen automatisch planwerk |
+
+Er komt geen algemeen verificatieantwoord terug naar Productplanning. Alleen als nieuw ontwikkelwerk
+nodig is, roept Kwaliteitsbewaking `requestBugfix(...)` of `requestCompletionWork(...)` aan. Dat
+command maakt idempotent een `PlanningRequest`, waarna een volgende `runProcessSession()` de nieuwe
+story vormt. Bij **Geslaagd**, **Niet aantoonbaar**, **Geblokkeerd** of **Niet geslaagd** hoeft
+Productplanning zonder zo'n gericht planverzoek niets te doen.
 
 Een bouwfout wordt door Kwaliteitsbewaking als bug gepubliceerd en wordt een bugfixstory in de
 backlog. Een dekkingsgat wordt door Productplanning in stories vertaald. Kwaliteitsbewaking schrijft zelf

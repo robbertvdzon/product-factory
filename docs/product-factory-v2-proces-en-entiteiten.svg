@@ -74,20 +74,21 @@
   <text x="700" y="302" class="api">«scheduled» runProcessSession()</text>
   <text x="700" y="334" class="api">«query» getEpic(...) / findAvailableEpics(...)</text>
   <text x="700" y="360" class="api">«query» findActiveEpic(...)</text>
-  <text x="700" y="392" class="api">«command» claimEpicForPlanning(...)</text>
-  <text x="700" y="418" class="api">«command» markEpicActive(...)</text>
-  <text x="700" y="444" class="api">«command» requestEpicVerification(...)</text>
-  <text x="700" y="470" class="api">«command» recordEpicVerification(...)</text>
-  <text x="700" y="496" class="api">«command» stopEpic(...)</text>
-  <line x1="700" y1="526" x2="1210" y2="526" class="divider" stroke="#bfdbfe"/>
-  <text x="700" y="556" class="section-title">EIGEN ENTITEITEN</text>
-  <text x="700" y="589" class="entity">DirectionSnapshot · Epic · ProcessSession</text>
-  <line x1="700" y1="620" x2="1210" y2="620" class="divider" stroke="#bfdbfe"/>
-  <text x="700" y="650" class="section-title">BELANGRIJKE GRENS</text>
-  <text x="700" y="681" class="note">Alleen Productontwerp schrijft Epic.</text>
-  <text x="700" y="705" class="note">Na claim zijn inhoud, scope en UX van die versie bevroren.</text>
-  <text x="700" y="729" class="note">Commands veranderen alleen de geldige epicstatus.</text>
-  <text x="700" y="775" class="note">LearningResult, onderzoek, drafts en agents blijven intern.</text>
+  <text x="700" y="386" class="api">«query» findEpicsAwaitingVerification(...)</text>
+  <text x="700" y="418" class="api">«command» claimEpicForPlanning(...)</text>
+  <text x="700" y="444" class="api">«command» markEpicActive(...)</text>
+  <text x="700" y="470" class="api">«command» markEpicReadyForVerification(...)</text>
+  <text x="700" y="496" class="api">«command» recordEpicVerification(...)</text>
+  <text x="700" y="522" class="api">«command» stopEpic(...)</text>
+  <line x1="700" y1="552" x2="1210" y2="552" class="divider" stroke="#bfdbfe"/>
+  <text x="700" y="582" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="700" y="615" class="entity">DirectionSnapshot · Epic · ProcessSession</text>
+  <line x1="700" y1="646" x2="1210" y2="646" class="divider" stroke="#bfdbfe"/>
+  <text x="700" y="676" class="section-title">BELANGRIJKE GRENS</text>
+  <text x="700" y="707" class="note">Alleen Productontwerp schrijft Epic.</text>
+  <text x="700" y="731" class="note">Na claim zijn inhoud, scope en UX van die versie bevroren.</text>
+  <text x="700" y="755" class="note">Commands veranderen alleen de geldige epicstatus.</text>
+  <text x="700" y="801" class="note">LearningResult, onderzoek, drafts en agents blijven intern.</text>
 
   <!-- Productplanning -->
   <rect x="675" y="890" width="560" height="590" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>
@@ -173,13 +174,13 @@
 
   <!-- Queries and commands between modules -->
   <path d="M580 390 H675" class="query"/>
-  <text x="588" y="378" class="flow">product · richting · signalen</text>
+  <text x="608" y="378" class="flow">gitUrl</text>
 
   <path d="M580 600 C620 770 620 1030 675 1070" class="query"/>
-  <text x="585" y="835" class="flow">product · richting</text>
+  <text x="585" y="835" class="flow">product · richting · gitUrl</text>
 
   <path d="M580 320 C900 125 1170 125 1370 300" class="query"/>
-  <text x="930" y="158" class="flow">StakeholderDetails · UserSignalDetails · testconfiguratie</text>
+  <text x="890" y="158" class="flow">ProductAssignmentDetails(gitUrl) · UserSignalDetails · testconfiguratie</text>
 
   <path d="M860 890 V830" class="command"/>
   <text x="690" y="856" class="flow">epic lifecycle commands</text>

@@ -48,7 +48,7 @@ De precieze Java-signatures kunnen bij implementatie worden verfijnd, maar de fu
 | Eigenaar | Commands | Read-only queries |
 |---|---|---|
 | product-/overlegmodule | `submitUserSignal`, `recordSignalInvestigation`, `linkSignalToEpic`, `recordStakeholderDirection` | `getUserSignal`, `findOpenUserSignals`, `getStakeholder`, `getProductAssignment`, `getTestableProduct` |
-| Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `requestEpicVerification`, `recordEpicVerification`, `stopEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpic` |
+| Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `stopEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpic`, `findEpicsAwaitingVerification` |
 | Productplanning | `markStoryAsDispatched`, `markStoryAsDeveloped`, `recordDispatchFailure`, `requestBugfix`, `requestCompletionWork` | `getStory`, `getBacklog`, `getBacklogSupply` |
 | Kwaliteitsbewaking | `linkBugfixStory` | `getBug`, `findVerifications`, `getQualityOverview` |
 | Besluitenregister | `recordDecision`, `withdrawDecision` | `getDecision`, `findDecisions` |
@@ -80,7 +80,7 @@ modules gebruiken uitsluitend het publieke command; zij schrijven de entiteit no
 |---|---|---|---|---|
 | `Product` | productmodule | bevoegde productbediening | alle processen en frontend | productidentiteit en configuratie |
 | `Stakeholder` | product-/overlegmodule | bevoegde Stakeholder of beheerder | alle processen en frontend | identiteit, contact en mandaat |
-| `ProductAssignment` | productmodule | bevoegde Stakeholder | Productontwerp, Productplanning en frontend | doelgroep, productdoel en harde grenzen |
+| `ProductAssignment` | productmodule | bevoegde Stakeholder | Productontwerp, Productplanning, Kwaliteitsbewaking en frontend | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | `StakeholderDirection` | product-/overlegmodule | bevoegde Stakeholder | alle processen en frontend | bindende richting met toepassingsgebied en geldigheid |
 | `TestableProductConfiguration` | productmodule | bevoegde Stakeholder of beheerder | Kwaliteitsbewaking | omgeving, routes, accounts, databereik en testgrenzen |
 | `UserSignal` | productmodule | gebruiker/Stakeholder mag indienen; Productontwerp en Kwaliteitsbewaking mogen een verwerkingsuitkomst registreren | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | onveranderlijke broninhoud plus status `NEW`, `IN_REVIEW`, `PROCESSED`, `NEEDS_EVIDENCE`, `DUPLICATE`, `OUT_OF_SCOPE` of `DISMISSED`, en links naar verificatie, epic, bug of besluit |
@@ -104,7 +104,7 @@ schrijver. De producent bouwt bij een query of overdracht een momentopname uit z
 | Contract | Producent | Lezers/ontvangers | Betekenis |
 |---|---|---|---|
 | `StakeholderDetails` | product-/overlegmodule uit `Stakeholder` | alle processen en frontend | identiteit en mandaat |
-| `ProductAssignmentDetails` | productmodule uit `ProductAssignment` | Productontwerp, Productplanning en frontend | productdoel en grenzen |
+| `ProductAssignmentDetails` | productmodule uit `ProductAssignment` | Productontwerp, Productplanning, Kwaliteitsbewaking en frontend | productdoel, grenzen en publieke Git-URL |
 | `StakeholderDirectionDetails` | product-/overlegmodule uit `StakeholderDirection` | alle processen en frontend | geldende bindende richting |
 | `TestableProductDetails` | productmodule uit `TestableProductConfiguration` | Kwaliteitsbewaking | veilige testconfiguratie zonder secrets |
 | `UserSignalDetails` | productmodule uit `UserSignal` | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | bronmelding, actuele status, uitkomst en koppelingen |
@@ -118,6 +118,19 @@ schrijver. De producent bouwt bij een query of overdracht een momentopname uit z
 | `ProcessSessionDetails` | betreffende procesmodule uit `ProcessSession` | scheduler, operations en frontend | operationele sessiestatus en historie |
 | `SoftwareFactoryWork` | dispatcheradapter uit externe Software Factory-status | dispatcher | tijdelijk integratieantwoord; niet duurzaam in Product Factory |
 | `StoryDeliveryPackage` | dispatcher uit één exacte `StoryDetails` | Software Factory | volledige, onveranderlijke story met UX, assets, hashes en idempotentiesleutel |
+
+## Publieke productrepository als leesbron
+
+`ProductAssignment.gitUrl` wijst naar de publiek leesbare GitHub-repository van het product. Dit is
+geen Product Factory-entiteit en er komt geen aparte workspace of Git-module. Productontwerp,
+Productplanning en Kwaliteitsbewaking mogen de URL bij een inhoudelijke sessie uitchecken en code,
+tests en documentatie lezen. Zij hebben geen commit- of pushfunctie. De gevonden commit-SHA kan als
+bronverwijzing worden vastgelegd; de repository zelf wordt niet naar de productdatabase gekopieerd.
+
+De drie processen gebruiken dezelfde bron verschillend: Productontwerp begrijpt de huidige
+productwerking, Productplanning herkent afhankelijkheden en Kwaliteitsbewaking selecteert risico's
+en tests. Voor Kwaliteitsbewaking blijft gedeployed gedrag plus testbewijs leidend. De Software
+Factory-story blijft zelfstandig en verwijst niet naar Git als enige drager van product- of UX-keuzes.
 
 ## Wat uit het oude model verdwijnt
 
@@ -165,8 +178,9 @@ laat de oorspronkelijke story `DONE`; Kwaliteitsbewaking maakt een `Bug` en vraa
 4. De dispatcher verwerkt steeds de eerste `TODO`-story via storycommands van Productplanning.
 5. Kwaliteitsbewaking maakt onveranderlijke verificaties. Voor een bug of ontbrekende dekking vraagt
    zij via Productplanning nieuw planwerk aan.
-6. Als alle bekende epicstories `DONE` zijn, vraagt Productplanning via Productontwerp epiccontrole
-   aan. Kwaliteitsbewaking registreert de verificatie en geeft haar ID en uitkomst via
+6. Als alle bekende epicstories `DONE` zijn, zet Productplanning de epic via
+   `markEpicReadyForVerification(...)` op `VERIFYING`. Dit start geen testwerk. Kwaliteitsbewaking
+   vindt de epic tijdens `runProcessSession()`, registreert de verificatie en geeft haar ID en uitkomst via
    `recordEpicVerification(...)` aan Productontwerp.
 7. Productontwerp is de enige schrijver van de uiteindelijke epicstatus.
 8. Een signaalonderzoek wordt een `Verification`; via `recordSignalInvestigation(...)` actualiseert

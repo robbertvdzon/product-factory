@@ -34,8 +34,9 @@ void runProcessSession();
 ```
 
 Alleen de scheduler gebruikt deze functie. De module claimt zelf atomair één product en één
-begrensde testopdracht. Per product kan maximaal één sessie tegelijk actief zijn. Zonder planbaar of
-periodiek testwerk eindigt de functie als succesvolle no-op.
+begrensde testopdracht. Een epic met status **Controleren** (`VERIFYING`) is zo'n opdracht; er staat
+geen testqueue bij Productontwerp. Per product kan maximaal één sessie tegelijk actief zijn. Zonder
+planbaar of periodiek testwerk eindigt de functie als succesvolle no-op.
 
 Andere modules kunnen geen testagent of teststap starten. Een nieuwe oplevering, epic op
 **Controleren** of gebruikerssignaal wordt tijdens een volgende sessie gelezen.
@@ -65,6 +66,7 @@ adapters.
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
 | `StakeholderDetails` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter kwaliteitsgrenzen en risico's |
+| `ProductAssignmentDetails` | productmodule | productgrenzen en publieke Git-URL van het product |
 | `TestableProductDetails` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende productgrenzen en correcties die ook tijdens het testen gelden |
 | `EpicDetails` | Productontwerp | bevroren scope, UX, succescriteria en status van de geclaimde versie |
@@ -73,6 +75,12 @@ adapters.
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte contractversies
 en exacte geteste omgeving vast.
+
+Kwaliteitsbewaking mag de publieke Git-URL uit de productopdracht uitchecken en code, tests en
+documentatie read-only gebruiken voor testselectie, regressierisico en uitleg. Daarvoor is geen
+aparte workspace of Git-service nodig. Zij commit en pusht nooit. Code is context en geen bewijs dat
+gedrag werkt; de gedeployde applicatie en het verzamelde testbewijs blijven leidend. Waar bekend legt
+de verificatie vast welke commit is bekeken en welke productversie werkelijk is getest.
 
 ### Output
 
@@ -153,6 +161,22 @@ De uitkomst is:
 Kwaliteitsbewaking schrijft eerst een onveranderlijke `Verification` en roept daarna
 `recordEpicVerification(...)` op Productontwerp aan. Productontwerp controleert de epicversie en is
 de enige schrijver van de epicstatus.
+
+Het vervolg per uitkomst is:
+
+| Uitkomst | Epic bij Productontwerp | Bericht aan Productplanning |
+|---|---|---|
+| **Geslaagd** | **Geslaagd** (`COMPLETED`) | geen |
+| **Onvolledig** | terug naar **Actief** | `requestCompletionWork(...)` met verificatie-ID |
+| bouwfout in uitgevoerd storygedrag | terug naar of blijft **Actief** | `requestBugfix(...)` met bug- en verificatie-ID |
+| **Niet aantoonbaar** | blijft **Controleren** | geen; Kwaliteitsbewaking plant later nieuw bewijswerk |
+| **Geblokkeerd** | blijft **Controleren** | geen, tenzij aantoonbaar ontwikkelwerk nodig is |
+| **Niet geslaagd** | **Niet geslaagd** (`NOT_SUCCESSFUL`) | geen; Productontwerp kan vanuit het resultaat een vervolgepic onderzoeken |
+
+Productplanning krijgt dus geen generiek verificatieresultaat terug. Alleen een gericht plancommand
+betekent dat zij nieuw ontwikkelwerk moet vormen. Gedrag binnen de bevroren scope wordt een
+aanvullende story of bugfixstory binnen dezelfde epic. Alleen een nieuwe wens buiten scope of een
+onjuiste productaanname kan later tot een nieuwe vervolgepic leiden.
 
 ## Bug, ontbrekende dekking of nieuwe productkans
 

@@ -233,7 +233,8 @@ een andere epic te kiezen.
 
 Inhoud en voortgang staan op één `Epic`, waarvan Productontwerp eigenaar is. Productplanning kan een
 beschikbare versie via `claimEpicForPlanning(...)` atomair claimen en later via expliciete commands
-**Actief** of **Controleren** laten worden. Kwaliteitsbewaking kan met
+**Actief** of via `markEpicReadyForVerification(...)` **Controleren** laten worden. Dat laatste
+start geen tester of queue in Productontwerp. Kwaliteitsbewaking kan met
 `recordEpicVerification(...)` een onveranderlijk verificatieresultaat laten verwerken. Alleen
 Productontwerp schrijft de epic en geen enkele publieke functie kan scope of UX van een geclaimde
 versie veranderen.
@@ -641,7 +642,8 @@ productobjecten en uitvoeringsruns hebben een status.
 De processen publiceren minimaal de volgende objecten:
 
 - **Stakeholderprofiel** — identiteit, rol, contactwijze en het afgesproken beslissingsmandaat;
-- **Productdoel en harde grenzen** — de vaste opdracht waar alle processen hun keuzes aan toetsen;
+- **Productopdracht** — productdoel, harde grenzen en publieke Git-URL waar de processen hun keuzes
+  aan toetsen en de huidige code en documentatie read-only kunnen bekijken;
 - **Stakeholderrichting** — een expliciete aanwijzing, correctie of grens van de Stakeholder, met
   datum, reden en toepassingsgebied;
 - **Gebruikerssignaal** — oorspronkelijke feedback met bron en bewijs, plus actuele status,
@@ -698,6 +700,26 @@ heeft kan de frontend versies naast elkaar zetten en verschillen tonen.
 De frontend is daarmee de human-readable weergave van de volledige productwaarheid. Correcties lopen
 via de application service van de module die eigenaar is; de frontend schrijft nooit rechtstreeks in
 procestabellen.
+
+## Read-only productrepository
+
+De productdatabase is de waarheid over richting, epics, stories, signalen, bugs, verificaties en
+besluiten. De bestaande productrepository is de waarheid over de huidige code, tests en
+productdocumentatie. `ProductAssignment` bewaart daarvoor alleen de publieke Git-URL.
+
+Productontwerp, Productplanning en Kwaliteitsbewaking mogen die URL tijdens een processessie gewoon
+uitchecken en de repository read-only onderzoeken:
+
+- Productontwerp gebruikt code en documentatie om het huidige product te begrijpen en geen bestaand
+  gedrag opnieuw te ontwerpen;
+- Productplanning gebruikt ze om stories realistisch te snijden en afhankelijkheden te herkennen;
+- Kwaliteitsbewaking gebruikt ze om regressierisico's en relevante tests te vinden, maar beschouwt
+  code nooit als bewijs dat het gedeployde gedrag werkt.
+
+Hiervoor komt geen `product-factory-workspace`, Git-module, schrijfrepository of synchronisatiedatabase.
+De processen committen en pushen nooit. De bij checkout gevonden commit-SHA mag als eenvoudige
+bronverwijzing op `ProcessSession`, `Epic`, `Story` of `Verification` worden bewaard. Software Factory
+krijgt nog steeds een zelfstandige story met alle product- en UX-inhoud.
 
 ## Geheugen op drie niveaus
 
@@ -849,7 +871,7 @@ status van een epic volgens de vaste lifecycle veranderen; ze starten geen ontwe
 | Gegeven | Eigenaar en herkomst | Betekenis voor Productontwerp |
 |---|---|---|
 | Stakeholderprofiel | product-/overlegmodule | wie richting mag geven, hoe overleg plaatsvindt en waar het beslissingsmandaat eindigt |
-| Productopdracht | productmodule; bevestigd door de Stakeholder | doelgroep, productdoel, harde grenzen, repository en producttoegang |
+| Productopdracht | productmodule; bevestigd door de Stakeholder | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | Stakeholderrichting | overleg/productmodule | actuele correcties en expliciete beslissingen |
 | Berekende backlogvoorraad | Productplanning-query | of nieuwe epics nodig zijn |
 | Stories en verificaties | Productplanning en Kwaliteitsbewaking | wat eerdere epics werkelijk hebben opgeleverd |
@@ -932,6 +954,7 @@ zelf één product en een begrensde testsessie. Publieke commands starten geen t
 | Gegeven | Eigenaar en herkomst | Betekenis voor Kwaliteitsbewaking |
 |---|---|---|
 | Stakeholderprofiel | product-/overlegmodule | wie kwaliteitsgrenzen en gemelde risico's bevoegd mag verduidelijken |
+| Productopdracht | productmodule | productgrenzen en publieke Git-URL voor read-only code, tests en documentatie |
 | Stakeholderrichting | overleg/productmodule | bindende productgrens, correctie, stopbesluit of opdrachtwijziging; een kwaliteitszorg is een gebruikerssignaal |
 | Testbare productconfiguratie | productmodule | URL's, toegestane accounts, routes en testgrenzen |
 | Story met oplevering en externe referentie | Productplanning | wat nieuw of gewijzigd is en waar het getest kan worden |
@@ -1085,7 +1108,9 @@ volgende geplande processessie verwerkt stories en duurzaam opgeslagen verificat
 ## Wanneer een epic klaar is
 
 Alle stories op `DONE` betekent nog niet automatisch dat de epic geslaagd is. Productplanning roept
-`requestEpicVerification(...)` op Productontwerp aan. Kwaliteitsbewaking controleert daarna het geheel tegen
+`markEpicReadyForVerification(...)` op Productontwerp aan. Dat zet de epic alleen op
+**Controleren** (`VERIFYING`). Kwaliteitsbewaking vindt haar zelf tijdens `runProcessSession()` en
+controleert daarna het geheel tegen
 de bevroren scope, het UX-ontwerp en de succescriteria.
 
 Kwaliteitsbewaking publiceert één van deze uitkomsten:
@@ -1102,12 +1127,16 @@ Kwaliteitsbewaking bewaart het oordeel als `Verification`; Productontwerp is de 
 de epicstatus en verwerkt het via `recordEpicVerification(...)`:
 
 - bij **Geslaagd** sluit Productontwerp de epic als **Geslaagd** af;
-- bij een echte bouwfout maakt zij een nieuwe bugfixstory op `TODO`;
-- bij een dekkingsgat vraagt Kwaliteitsbewaking aanvullende stories aan binnen dezelfde bevroren epic;
-- bij **Niet aantoonbaar** blijft de epic op **Controleren**;
+- bij een echte bouwfout maakt Kwaliteitsbewaking een bug en vraagt zij Productplanning via
+  `requestBugfix(...)` om een nieuwe bugfixstory;
+- bij een dekkingsgat vraagt Kwaliteitsbewaking via `requestCompletionWork(...)` aanvullende stories
+  aan binnen dezelfde bevroren epic;
+- in beide herstelgevallen gaat de epic terug naar **Actief** en wordt zij na oplevering opnieuw gecontroleerd;
+- bij **Niet aantoonbaar** of **Geblokkeerd** blijft de epic op **Controleren** en plant
+  Kwaliteitsbewaking later nieuw bewijs- of testwerk;
 - bij **Niet geslaagd** registreert Productontwerp die uitkomst en verwerkt de conclusie intern;
-- een moeilijk herstelbare richtingswijziging stopt de oude uitvoering en begint alleen via een
-  nieuw gekozen epic-ID of een nieuwe epicversie.
+- een wens buiten scope of onjuiste productaanname kan later via Productontwerp een nieuwe
+  vervolgepic worden; de bevroren epic wordt niet herschreven.
 
 Kwaliteitsbewaking schrijft dus geen stories of epics. Zij levert het inhoudelijke bewijs en vraagt
 de eigenaar via een command om het vervolg; de eigenaar valideert en schrijft zijn eigen entiteit.
