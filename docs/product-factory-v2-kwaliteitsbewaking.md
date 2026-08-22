@@ -33,13 +33,15 @@ De enige agentgestuurde ingang is:
 void runProcessSession();
 ```
 
-Alleen de scheduler gebruikt deze functie. De module claimt zelf atomair één product en één
-begrensde testopdracht. Een epic met status **Controleren** (`VERIFYING`) is zo'n opdracht; er staat
-geen testqueue bij Productontwerp. Per product kan maximaal één sessie tegelijk actief zijn. Zonder
-planbaar of periodiek testwerk eindigt de functie als succesvolle no-op.
+De scheduler of een handmatige UI-/REST-actie kan deze functie starten. Er kan modulebreed maximaal
+één kwaliteitssessie tegelijk actief zijn. Een tweede handmatige aanroep krijgt een
+`ProcessAlreadyRunning`-fout; een botsende geplande aanroep wordt als overgeslagen geregistreerd.
+Alleen deze functie mag testagents starten.
 
-Andere modules kunnen geen testagent of teststap starten. Een nieuwe oplevering, epic op
-**Controleren** of gebruikerssignaal wordt tijdens een volgende sessie gelezen.
+Een run claimt atomair een vaste momentopname van de `PENDING` `QualityWorkItem`s die bij de start
+klaarstaan. Nieuwe verzoeken wachten op de volgende run. Naast deze gerichte queueopdrachten mag de
+run zelf periodiek testwerk kiezen. Zonder queuewerk of periodiek werk eindigt zij als succesvolle
+no-op.
 
 De deterministische publieke functies zijn beperkt tot read-only queries en lifecycle-commands voor
 eigen bugs:
@@ -48,12 +50,33 @@ eigen bugs:
 BugDetails getBug(BugId bugId);
 List<VerificationDetails> findVerifications(VerificationTarget target);
 QualityOverview getQualityOverview(ProductId productId);
+List<QualityWorkItemDetails> findQualityWorkItems(ProductId productId, WorkItemStatus status);
+QualityWorkItemId requestStoryVerification(RequestStoryVerificationCommand command);
+QualityWorkItemId requestEpicVerification(RequestEpicVerificationCommand command);
+QualityWorkItemId requestBugfixRetest(RequestBugfixRetestCommand command);
+QualityWorkItemId requestSignalInvestigation(RequestSignalInvestigationCommand command);
 void linkBugfixStory(LinkBugfixStoryCommand command);
 ```
 
-`linkBugfixStory(...)` laat Productplanning alleen een story-ID aan een bestaande uitvoerbare bug
-koppelen. Het command controleert bugstatus, versie en idempotentie; Productplanning krijgt geen
-toegang tot de bugrepository.
+De vier `request...`-commands starten geen test en geen agent. Zij valideren de bron en voegen alleen
+een idempotent `PENDING`-werkitem toe. `linkBugfixStory(...)` laat Productplanning alleen een story-ID
+aan een bestaande uitvoerbare bug koppelen. Geen aanroeper krijgt toegang tot de kwaliteitsrepository.
+
+## QualityWorkItem: de queuegrens
+
+Een `QualityWorkItem` bevat work-item-ID, product-ID, type, bron-ID en -versie, doelomgeving,
+prioriteit, idempotentiesleutel, status, claim en eventuele foutinformatie. De typen zijn:
+
+| Type | Normale aanvrager | Betekenis |
+|---|---|---|
+| `VERIFY_STORY` | Productplanning na een relevante storyoplevering | toets storycriteria en regressierisico |
+| `VERIFY_EPIC` | Productplanning nadat alle stories van die epic `DONE` zijn | toets de volledige bevroren epic |
+| `RETEST_BUGFIX` | Productplanning na oplevering van een bugfixstory | herhaal reproductie en aangrenzende controles |
+| `INVESTIGATE_USER_SIGNAL` | product-/overlegmodule | onderzoek een gemeld kwaliteitsprobleem |
+
+De statussen zijn `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` en `FAILED`. De commandhandler mag een
+prioriteit overnemen, maar de latere kwaliteitsrun bepaalt zelf de testaanpak. De queue hoort bij
+Kwaliteitsbewaking; Productontwerp bevat geen testqueue.
 
 ## Interface met andere modules en services
 
@@ -72,6 +95,7 @@ adapters.
 | `EpicDetails` | Productontwerp | bevroren scope, UX, succescriteria en status van de geclaimde versie |
 | `StoryDetails` | Productplanning | type, storyversie, status, oplevergegevens, acceptatiecriteria en zelfstandige UX |
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
+| `QualityWorkItem` | Kwaliteitsbewaking | duurzame gerichte testopdracht die de run claimt |
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte contractversies
 en exacte geteste omgeving vast.
@@ -89,13 +113,14 @@ de verificatie vast welke commit is bekeken en welke productversie werkelijk is 
 | `BugDetails` | read-only weergave van een aantoonbare afwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
 | `VerificationDetails` | read-only weergave van een story-, epic- of signaalcontrole | doeltype en -versie, uitkomst, omgeving, controles, bewijs, blokkade, ontbrekende dekking en vervolgkoppelingen |
 | `QualityOverview` | berekend queryresultaat, geen duurzame entiteit | recente dekking, risico's, open bugs en onderbelichte gebieden |
+| `QualityWorkItemDetails` | read-only inzicht in de kwaliteitsqueue | type, doelversie, status, claim, resultaat en fout; geen wijzigbaar requestobject |
 | `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, inputversies, publicatie-ID's en eindstatus |
 
 Kwaliteitsbewaking schrijft `ProcessSession` uitsluitend voor zijn eigen sessies. De
 scheduler roept alleen de procesfunctie aan; scheduler en frontend wijzigen het sessieresultaat niet.
 
 Alleen Kwaliteitsbewaking schrijft `Bug` en `Verification`. Zij vraagt Productplanning via
-`requestBugfix(...)` of `requestCompletionWork(...)` om vervolgwerk, Productontwerp via
+`requestBugfix(...)` of `requestEpicGapPlanning(...)` om vervolgwerk, Productontwerp via
 `recordEpicVerification(...)` om een epicuitkomst vast te leggen en de productmodule via
 `recordSignalInvestigation(...)` om een gebruikerssignaal bij te werken. Geen ontvangende module
 kan de onderliggende verificatie of het bewijs veranderen.
@@ -107,9 +132,13 @@ heeft, registreert de productmodule dit als `UserSignal`. De optionele categorie
 `QUALITY_CONCERN` helpt Kwaliteitsbewaking bij de testagenda, maar maakt van de melding geen opdracht
 met een vooraf bepaald resultaat.
 
+Na registratie roept de product-/overlegmodule bij zo'n signaal idempotent
+`requestSignalInvestigation(...)` aan. Dat zet alleen een `INVESTIGATE_USER_SIGNAL`-workitem in de
+kwaliteitsqueue. De melding bepaalt dus wel wat onderzocht moet worden, maar niet wat de uitkomst is.
+
 De Stakeholder schrijft dit databaseobject niet rechtstreeks. De frontend of overlegmodule voert een
 command uit op de productmodule; die bewaart de oorspronkelijke melding daarna onveranderlijk.
-Kwaliteitsbewaking leest `UserSignalDetails`, bewaart het onderzoek als `Verification` en roept
+Tijdens een latere run leest Kwaliteitsbewaking `UserSignalDetails`, bewaart het onderzoek als `Verification` en roept
 `recordSignalInvestigation(...)` op de productmodule aan. Alleen de productmodule wijzigt status en
 resultaatkoppelingen op `UserSignal`.
 
@@ -167,7 +196,7 @@ Het vervolg per uitkomst is:
 | Uitkomst | Epic bij Productontwerp | Bericht aan Productplanning |
 |---|---|---|
 | **Geslaagd** | **Geslaagd** (`COMPLETED`) | geen |
-| **Onvolledig** | terug naar **Actief** | `requestCompletionWork(...)` met verificatie-ID |
+| **Onvolledig** | terug naar **Actief** | `requestEpicGapPlanning(...)` met verificatie-ID |
 | bouwfout in uitgevoerd storygedrag | terug naar of blijft **Actief** | `requestBugfix(...)` met bug- en verificatie-ID |
 | **Niet aantoonbaar** | blijft **Controleren** | geen; Kwaliteitsbewaking plant later nieuw bewijswerk |
 | **Geblokkeerd** | blijft **Controleren** | geen, tenzij aantoonbaar ontwikkelwerk nodig is |
@@ -226,13 +255,14 @@ schrijver van de duurzame bugstatus.
 
 Een dekkingsgat is geen afzonderlijke entiteit meer. Een epicverificatie kan één of meer gestructureerde
 dekkingsgaten bevatten met scope- of UX-verwijzing, gebruikersimpact, ontbrekend gedrag en bewijs.
-Kwaliteitsbewaking roept `requestCompletionWork(...)` aan met het verificatie-ID. Productplanning
+Kwaliteitsbewaking roept `requestEpicGapPlanning(...)` aan met het verificatie-ID. Productplanning
 maakt tijdens een processessie de aanvullende stories; een latere verificatie toont of het gat is
 opgelost. Zo blijft het bewijs historisch intact zonder een tweede lifecycle naast epic en story.
 
 ## Interne entiteiten
 
 - `ProcessSession` — geclaimde en begrensde processessie en haar operationele historie;
+- `QualityWorkItem` — duurzame queueopdracht met type, doelversie, status, claim en idempotentiesleutel;
 - `TestStrategy` — kwaliteitsdoelen en risicoprioriteiten per product;
 - `TestRotation` — wanneer routes en thema's voor het laatst zijn onderzocht;
 - `TestAgenda` — doelen, omgeving en budget voor één sessie;
@@ -275,8 +305,8 @@ testrollen verplicht.
 6. **Gebruikerssignaal onderzoeken** — een gemeld probleem reproduceren.
 7. **Patroon analyseren** — verwante bevindingen als `UserSignal` van categorie `QUALITY_PATTERN` registreren.
 
-Nieuwe opleveringen en P0/P1-signalen gaan voor periodieke rotatie. Een epic op **Controleren** gaat
-voor losse exploratieve tests wanneer alle benodigde omgevingen beschikbaar zijn.
+Gerichte P0/P1-opdrachten gaan voor periodieke rotatie. Een gequeue'de epicverificatie gaat voor
+losse exploratieve tests wanneer alle benodigde omgevingen beschikbaar zijn.
 
 ## Verloop van één processessie
 
@@ -302,8 +332,8 @@ atomair publiceren en rotatie bijwerken
 
 ### Stap 1 — claimen en omgeving controleren
 
-De module claimt één planbare opdracht en leest exacte versies van epic, stories,
-stories, oplevering en eventueel gebruikerssignaal, controleert de omgeving en registreert
+De module claimt haar vaste batch workitems en leest exacte versies van epic, stories,
+oplevering en eventueel gebruikerssignaal, controleert de omgeving en registreert
 productversie en testaccount. Een onbereikbare omgeving leidt tot **Geblokkeerd**, niet tot een
 productbug.
 
@@ -330,19 +360,16 @@ De criticus:
 - geeft ieder onderzocht gebruikerssignaal een expliciet onderzoeksresultaat;
 - publiceert eigen `Bug`- en `Verification`-entiteiten atomair en voert vervolgcommands idempotent uit.
 
-## Planning en de HKH-backlog
+## Wanneer Kwaliteitsbewaking draait
 
-Een sessie wordt planbaar door:
+Gericht werk wordt gequeue'd door:
 
-- een nieuwe Software Factory-oplevering;
-- een bugfix op **Hertesten**;
-- een epic met status **Controleren**;
-- een nieuw of heropend gebruikerssignaal, of nieuw bewijs bij een eerder onbeslist signaal;
-- een P0/P1-risico of verouderd kwaliteitsbeeld;
-- de dagelijkse kernrouteplanning of testrotatie;
-- lage backlogvoorraad, zodat bekende bevindingen tijdig worden gereproduceerd.
+- Productplanning na een story-, bugfix- of volledige epicoplevering;
+- de product-/overlegmodule na een kwaliteitszorg of relevant gebruikerssignaal.
 
-Kwaliteitsbewaking maakt geen bugs of dekkingsgaten om de backlog kunstmatig tot tien te vullen.
+Daarnaast kan de scheduler een run starten voor dagelijkse kernroutes, een verouderd kwaliteitsbeeld
+of testrotatie. Een queuecommand is een snelle databasebewerking; alleen de latere
+`runProcessSession()` mag agents starten. De backloggrootte speelt hierbij geen rol.
 
 ## Fouten, hervatten en idempotentie
 

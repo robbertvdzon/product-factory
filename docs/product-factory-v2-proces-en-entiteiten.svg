@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1540" viewBox="0 0 2200 1540" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2420" height="1540" viewBox="0 0 2420 1540" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont bovenaan de publieke scheduled functies, commands en queries en daaronder de entiteiten waarvan de module eigenaar is. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont bovenaan de publieke functies en daaronder de entiteiten waarvan de module eigenaar is. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -23,14 +23,14 @@
     </style>
   </defs>
 
-  <rect width="2200" height="1540" fill="#f8fafc"/>
+  <rect width="2420" height="1540" fill="#f8fafc"/>
   <text x="55" y="55" class="title">Product Factory v2 — publieke modulecontracten en eigenaarschap</text>
   <text x="55" y="88" class="subtitle">Boven de scheidslijn staat wat andere onderdelen mogen aanroepen; daaronder staan uitsluitend de eigen entiteiten.</text>
   <path d="M65 125 H155" class="command"/>
   <text x="170" y="130" class="note">command: vraagt de eigenaar om een geldige wijziging</text>
   <path d="M585 125 H675" class="query"/>
   <text x="690" y="130" class="note">query: levert een read-only DTO</text>
-  <text x="1050" y="130" class="note">«scheduled» wordt alleen door de technische scheduler aangeroepen</text>
+  <text x="1050" y="130" class="note">«scheduled/manual» start de enige functie die agents mag starten · max. één run per module</text>
 
   <!-- Stakeholder actor -->
   <circle cx="260" cy="177" r="25" fill="#fef9c3" stroke="#ca8a04" stroke-width="3"/>
@@ -50,7 +50,7 @@
   <text x="80" y="469" class="api">«command» recordStakeholderDirection(...)</text>
   <text x="80" y="495" class="api">«command» submitUserSignal(...)</text>
   <text x="80" y="521" class="api">«command» markUserSignalInReview(...)</text>
-  <text x="80" y="547" class="api">«command» recordUserSignalOutcome(...)</text>
+  <text x="80" y="547" class="api">«command» recordSignalInvestigation(...)</text>
   <text x="80" y="573" class="api">«command» configureTestableProduct(...)</text>
   <text x="80" y="605" class="api">«query» getStakeholder(...)</text>
   <text x="80" y="631" class="api">«query» getProductAssignment(...)</text>
@@ -71,15 +71,14 @@
   <path d="M675 222 V242 H1235 V222" fill="#dbeafe"/>
   <text x="700" y="220" class="module-title">Productontwerp</text>
   <text x="700" y="272" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="700" y="302" class="api">«scheduled» runProcessSession()</text>
+  <text x="700" y="302" class="api">«scheduled/manual» runProcessSession()</text>
   <text x="700" y="334" class="api">«query» getEpic(...) / findAvailableEpics(...)</text>
-  <text x="700" y="360" class="api">«query» findActiveEpic(...)</text>
-  <text x="700" y="386" class="api">«query» findEpicsAwaitingVerification(...)</text>
-  <text x="700" y="418" class="api">«command» claimEpicForPlanning(...)</text>
-  <text x="700" y="444" class="api">«command» markEpicActive(...)</text>
-  <text x="700" y="470" class="api">«command» markEpicReadyForVerification(...)</text>
-  <text x="700" y="496" class="api">«command» recordEpicVerification(...)</text>
-  <text x="700" y="522" class="api">«command» stopEpic(...)</text>
+  <text x="700" y="360" class="api">«query» findActiveEpics(...)</text>
+  <text x="700" y="392" class="api">«command» claimEpicForPlanning(...)</text>
+  <text x="700" y="418" class="api">«command» markEpicActive(...)</text>
+  <text x="700" y="444" class="api">«command» markEpicReadyForVerification(...)</text>
+  <text x="700" y="470" class="api">«command» recordEpicVerification(...)</text>
+  <text x="700" y="496" class="api">«command» stopEpic(...)</text>
   <line x1="700" y1="552" x2="1210" y2="552" class="divider" stroke="#bfdbfe"/>
   <text x="700" y="582" class="section-title">EIGEN ENTITEITEN</text>
   <text x="700" y="615" class="entity">DirectionSnapshot · Epic · ProcessSession</text>
@@ -87,7 +86,7 @@
   <text x="700" y="676" class="section-title">BELANGRIJKE GRENS</text>
   <text x="700" y="707" class="note">Alleen Productontwerp schrijft Epic.</text>
   <text x="700" y="731" class="note">Na claim zijn inhoud, scope en UX van die versie bevroren.</text>
-  <text x="700" y="755" class="note">Commands veranderen alleen de geldige epicstatus.</text>
+  <text x="700" y="755" class="note">Geen queue; een gepubliceerde epic vraagt planning aan.</text>
   <text x="700" y="801" class="note">LearningResult, onderzoek, drafts en agents blijven intern.</text>
 
   <!-- Productplanning -->
@@ -96,44 +95,49 @@
   <path d="M675 932 V952 H1235 V932" fill="#d1fae5"/>
   <text x="700" y="930" class="module-title">Productplanning</text>
   <text x="700" y="982" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="700" y="1012" class="api">«scheduled» runProcessSession()</text>
+  <text x="700" y="1012" class="api">«scheduled/manual» runProcessSession()</text>
   <text x="700" y="1044" class="api">«query» getStory(...) / getBacklog(...)</text>
-  <text x="700" y="1070" class="api">«query» getBacklogSupply(...)</text>
-  <text x="700" y="1102" class="api">«command» markStoryAsDispatched(...)</text>
-  <text x="700" y="1128" class="api">«command» markStoryAsDeveloped(...)</text>
-  <text x="700" y="1154" class="api">«command» recordDispatchFailure(...)</text>
-  <text x="700" y="1180" class="api">«command» requestBugfix(...)</text>
-  <text x="700" y="1206" class="api">«command» requestCompletionWork(...)</text>
+  <text x="700" y="1070" class="api">«query» findPlanningWorkItems(...)</text>
+  <text x="700" y="1096" class="api">«command» requestEpicPlanning(...) / requestBugfix(...)</text>
+  <text x="700" y="1122" class="api">«command» requestEpicGapPlanning(...)</text>
+  <text x="700" y="1148" class="api">«command» requestEpicReprioritization(...)</text>
+  <text x="700" y="1174" class="api">«command» markStoryAsDispatched/Developed(...)</text>
+  <text x="700" y="1200" class="api">«command» recordDispatchFailure(...)</text>
   <line x1="700" y1="1236" x2="1210" y2="1236" class="divider" stroke="#a7f3d0"/>
   <text x="700" y="1266" class="section-title">EIGEN ENTITEITEN</text>
-  <text x="700" y="1299" class="entity">Story · PlanningRequest · ProcessSession</text>
+  <text x="700" y="1299" class="entity">PlanningWorkItem · Story · ProcessSession</text>
   <line x1="700" y1="1328" x2="1210" y2="1328" class="divider" stroke="#a7f3d0"/>
   <text x="700" y="1358" class="section-title">BELANGRIJKE GRENS</text>
   <text x="700" y="1389" class="note">Alleen Productplanning schrijft Story, status en sequenceNumber.</text>
-  <text x="700" y="1413" class="note">Backlog en BacklogSupply zijn queries, geen entiteiten.</text>
-  <text x="700" y="1437" class="note">Commands voor nieuw planwerk starten geen agents.</text>
+  <text x="700" y="1413" class="note">Backlog = alle Story(status != DONE), geordend op sequenceNumber.</text>
+  <text x="700" y="1437" class="note">Queuecommands starten geen agents; lege backlog is geldig.</text>
 
   <!-- Kwaliteitsbewaking -->
+  <g transform="translate(220 0)">
   <rect x="1370" y="180" width="650" height="680" rx="18" fill="#f5f3ff" stroke="#7c3aed" stroke-width="3"/>
   <rect x="1370" y="180" width="650" height="62" rx="18" fill="#ede9fe"/>
   <path d="M1370 222 V242 H2020 V222" fill="#ede9fe"/>
   <text x="1395" y="220" class="module-title">Kwaliteitsbewaking</text>
   <text x="1395" y="272" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="1395" y="302" class="api">«scheduled» runProcessSession()</text>
+  <text x="1395" y="302" class="api">«scheduled/manual» runProcessSession()</text>
   <text x="1395" y="334" class="api">«query» getBug(...)</text>
   <text x="1395" y="360" class="api">«query» findVerifications(...)</text>
-  <text x="1395" y="386" class="api">«query» getQualityOverview(...)</text>
-  <text x="1395" y="418" class="api">«command» linkBugfixStory(...)</text>
-  <line x1="1395" y1="448" x2="1995" y2="448" class="divider" stroke="#ddd6fe"/>
-  <text x="1395" y="478" class="section-title">EIGEN ENTITEITEN</text>
-  <text x="1395" y="511" class="entity">Bug · Verification · ProcessSession</text>
-  <line x1="1395" y1="540" x2="1995" y2="540" class="divider" stroke="#ddd6fe"/>
-  <text x="1395" y="570" class="section-title">BELANGRIJKE GRENS</text>
-  <text x="1395" y="601" class="note">Verification richt zich op STORY, EPIC of USER_SIGNAL.</text>
-  <text x="1395" y="625" class="note">Kwaliteitsbewaking schrijft geen Story, Epic of UserSignal.</text>
-  <text x="1395" y="649" class="note">Zij vraagt vervolgwerk en statuswijzigingen via commands aan.</text>
-  <text x="1395" y="696" class="note">QualityOverview is een berekende query.</text>
-  <text x="1395" y="744" class="note">Testbewijs en verificaties blijven historisch leesbaar.</text>
+  <text x="1395" y="386" class="api">«query» getQualityOverview(...) / findQualityWorkItems(...)</text>
+  <text x="1395" y="418" class="api">«command» requestStoryVerification(...)</text>
+  <text x="1395" y="444" class="api">«command» requestEpicVerification(...)</text>
+  <text x="1395" y="470" class="api">«command» requestBugfixRetest(...)</text>
+  <text x="1395" y="496" class="api">«command» requestSignalInvestigation(...)</text>
+  <text x="1395" y="522" class="api">«command» linkBugfixStory(...)</text>
+  <line x1="1395" y1="552" x2="1995" y2="552" class="divider" stroke="#ddd6fe"/>
+  <text x="1395" y="582" class="section-title">EIGEN ENTITEITEN</text>
+  <text x="1395" y="615" class="entity">QualityWorkItem · Bug · Verification · ProcessSession</text>
+  <line x1="1395" y1="644" x2="1995" y2="644" class="divider" stroke="#ddd6fe"/>
+  <text x="1395" y="674" class="section-title">BELANGRIJKE GRENS</text>
+  <text x="1395" y="705" class="note">Queuecommands bewaren alleen werk; alleen de run start agents.</text>
+  <text x="1395" y="729" class="note">Verification richt zich op STORY, EPIC of USER_SIGNAL.</text>
+  <text x="1395" y="753" class="note">Kwaliteitsbewaking schrijft geen Story, Epic of UserSignal.</text>
+  <text x="1395" y="801" class="note">QualityOverview is een berekende query.</text>
+  </g>
 
   <!-- Besluitenregister -->
   <rect x="55" y="1030" width="525" height="390" rx="18" fill="#fff1f2" stroke="#be123c" stroke-width="3"/>
@@ -152,6 +156,7 @@
   <text x="80" y="1386" class="note">Intrekken of vervangen behoudt de historische inhoud.</text>
 
   <!-- Dispatcher -->
+  <g transform="translate(220 0)">
   <rect x="1370" y="960" width="650" height="380" rx="18" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
   <rect x="1370" y="960" width="650" height="62" rx="18" fill="#ffedd5"/>
   <path d="M1370 1002 V1022 H2020 V1002" fill="#ffedd5"/>
@@ -166,48 +171,59 @@
   <text x="1395" y="1265" class="note">Storyqueries en storycommands van Productplanning.</text>
   <text x="1395" y="1289" class="note">Externe Software Factory API.</text>
   <text x="1395" y="1313" class="note">StoryDeliveryPackage is transport, geen entiteit.</text>
+  </g>
 
   <!-- Software Factory external system -->
+  <g transform="translate(220 0)">
   <rect x="1515" y="1410" width="360" height="100" rx="18" fill="#ffffff" stroke="#ea580c" stroke-width="2.5"/>
   <text x="1540" y="1450" class="module-title">Software Factory</text>
   <text x="1540" y="1480" class="note">extern systeem</text>
+  </g>
 
   <!-- Queries and commands between modules -->
   <path d="M580 390 H675" class="query"/>
   <text x="608" y="378" class="flow">gitUrl</text>
 
-  <path d="M580 600 C620 770 620 1030 675 1070" class="query"/>
+  <path d="M580 600 C620 770 620 1015 675 1044" class="query"/>
   <text x="585" y="835" class="flow">product · richting · gitUrl</text>
 
-  <path d="M580 320 C900 125 1170 125 1370 300" class="query"/>
+  <path d="M580 700 C625 850 625 1100 675 1128" class="command"/>
+  <text x="585" y="965" class="flow">urgente epic prioriteren</text>
+
+  <path d="M580 320 C960 105 1320 105 1590 300" class="query"/>
   <text x="890" y="158" class="flow">ProductAssignmentDetails(gitUrl) · UserSignalDetails · testconfiguratie</text>
 
-  <path d="M860 890 V830" class="command"/>
+  <path d="M820 890 V830" class="command"/>
   <text x="690" y="856" class="flow">epic lifecycle commands</text>
-  <path d="M1050 830 V890" class="query"/>
-  <text x="1065" y="862" class="flow">EpicDetails</text>
+  <path d="M1040 830 V890" class="command"/>
+  <text x="1055" y="858" class="flow">requestEpicPlanning(...)</text>
+  <path d="M1160 830 V890" class="query"/>
+  <text x="1168" y="876" class="flow">EpicDetails</text>
 
-  <path d="M1235 350 H1370" class="query"/>
-  <text x="1254" y="338" class="flow">EpicDetails</text>
-  <path d="M1370 665 H1235" class="command"/>
-  <text x="1246" y="635" class="flow">recordEpic</text>
-  <text x="1246" y="652" class="flow">Verification(...)</text>
+  <path d="M1235 350 H1590" class="query"/>
+  <text x="1415" y="338" class="flow">EpicDetails</text>
+  <path d="M1590 665 H1235" class="command"/>
+  <text x="1370" y="650" class="flow">recordEpicVerification(...)</text>
 
-  <path d="M1370 760 C1315 805 1285 945 1235 1040" class="command"/>
-  <text x="1248" y="875" class="flow">requestBugfix(...)</text>
-  <text x="1248" y="894" class="flow">requestCompletionWork(...)</text>
-  <path d="M1235 980 C1300 900 1320 590 1370 555" class="query"/>
-  <text x="1245" y="790" class="flow">StoryDetails</text>
+  <path d="M1590 760 H1510 V1102 H1235" class="command"/>
+  <text x="1260" y="1068" class="flow">queue naar planning</text>
+  <text x="1260" y="1088" class="flow">requestBugfix / requestEpicGapPlanning</text>
+  <path d="M1235 1044 H1415 V800 H1590" class="query"/>
+  <text x="1435" y="786" class="flow">StoryDetails</text>
 
-  <path d="M1370 1090 H1235" class="command"/>
-  <text x="1244" y="1078" class="flow">story lifecycle commands</text>
-  <path d="M1235 1035 H1370" class="query"/>
-  <text x="1255" y="1023" class="flow">eerste TODO StoryDetails</text>
+  <path d="M1235 1180 H1460 V470 H1590" class="command"/>
+  <text x="1260" y="1146" class="flow">queue naar kwaliteit</text>
+  <text x="1260" y="1166" class="flow">story / epic / bugfix-hertest</text>
 
-  <path d="M1530 1340 V1410" class="command"/>
-  <text x="1377" y="1380" class="flow">StoryDeliveryPackage</text>
-  <path d="M1815 1410 V1340" class="query"/>
-  <text x="1830" y="1380" class="flow">werkstatus</text>
+  <path d="M1590 1250 H1235" class="command"/>
+  <text x="1290" y="1236" class="flow">story lifecycle commands</text>
+  <path d="M1235 1035 H1590" class="query"/>
+  <text x="1365" y="1021" class="flow">eerste TODO StoryDetails</text>
+
+  <path d="M1750 1340 V1410" class="command"/>
+  <text x="1597" y="1380" class="flow">StoryDeliveryPackage</text>
+  <path d="M2035 1410 V1340" class="query"/>
+  <text x="2050" y="1380" class="flow">werkstatus</text>
 
   <!-- Decision commands are summarized to avoid crossing every module -->
   <path d="M320 920 V1030" class="command"/>

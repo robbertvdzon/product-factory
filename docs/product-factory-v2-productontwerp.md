@@ -33,17 +33,19 @@ De enige agentgestuurde ingang is:
 void runProcessSession();
 ```
 
-Alleen de scheduler gebruikt deze functie. De aanroep heeft geen product-ID of epic-ID als argument.
-De module claimt zelf atomair de belangrijkste planbare sessie. Per product kan maximaal één sessie
-van Productontwerp tegelijk actief zijn. Zonder planbaar werk eindigt de functie als succesvolle
-no-op.
+De scheduler of een handmatige UI-/REST-actie kan deze functie starten. De aanroep heeft geen
+product-ID of epic-ID als argument: de module bepaalt zelf de belangrijkste planbare sessie. Er kan
+modulebreed maximaal één ontwerpsessie tegelijk actief zijn. Een tweede handmatige aanroep krijgt
+een `ProcessAlreadyRunning`-fout (bij REST bijvoorbeeld HTTP 409); een botsende scheduler-run wordt
+als overgeslagen geregistreerd. Zonder planbaar werk eindigt de functie als succesvolle no-op.
+Alleen `runProcessSession()` mag ontwerp- of onderzoeksagents starten.
 
 Daarnaast heeft de module een kleine deterministische command- en query-interface:
 
 ```java
 EpicDetails getEpic(EpicId epicId);
 List<EpicDetails> findAvailableEpics(ProductId productId);
-List<EpicDetails> findEpicsAwaitingVerification();
+List<EpicDetails> findActiveEpics(ProductId productId);
 void claimEpicForPlanning(ClaimEpicForPlanningCommand command);
 void markEpicActive(MarkEpicActiveCommand command);
 void markEpicReadyForVerification(MarkEpicReadyForVerificationCommand command);
@@ -69,7 +71,6 @@ domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 | `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | `StakeholderDirectionDetails` | product-/overlegmodule | bindende richting en expliciete correcties |
 | `UserSignalDetails` | productmodule | oorspronkelijke feedback plus actuele status, uitkomst en resultaatkoppelingen |
-| `BacklogSupply` | Productplanning-query | berekende voorraad en of nieuwe beschikbare epics extra urgent zijn |
 | `StoryDetails` | Productplanning-query | wat Software Factory heeft opgeleverd en welke story bij een epic hoort |
 | `VerificationDetails` | Kwaliteitsbewaking-query | of de bedoelde gebruikersverbetering is bereikt en welk bewijs daarbij hoort |
 | `QualityOverview` | Kwaliteitsbewaking-query | berekend beeld van productgezondheid en onderbelichte risicogebieden |
@@ -111,10 +112,15 @@ Alleen Productontwerp schrijft de `Epic`. Productplanning claimt een exacte vers
 de afsluitende uitkomst via `recordEpicVerification(...)`. Geen van beide krijgt toegang tot de
 epicrepository of kan inhoud en UX veranderen.
 
+Na het atomair publiceren van een nieuwe beschikbare epic roept Productontwerp idempotent
+`requestEpicPlanning(epicId, epicVersion, ...)` op Productplanning aan. Dat command start geen
+planner en maakt geen stories: het zet alleen een duurzaam `PlanningWorkItem` met type `PLAN_EPIC`
+in de planningsqueue. Een latere planningsrun pakt het werk op.
+
 `markEpicReadyForVerification(...)` is uitsluitend een gevalideerde statusovergang naar
-**Controleren** (`VERIFYING`). Het command maakt geen testqueue in Productontwerp en start geen
-agents. Kwaliteitsbewaking vindt zulke epics via `findEpicsAwaitingVerification()` tijdens
-`runProcessSession()`.
+**Controleren** (`VERIFYING`). Productplanning roept daarna
+`requestEpicVerification(epicId, epicVersion, ...)` op Kwaliteitsbewaking aan. Ook dat command start
+geen agents, maar plaatst een `QualityWorkItem` in de kwaliteitsqueue.
 
 ## Epiccontract
 
@@ -276,8 +282,8 @@ De module:
 1. claimt één planbare sessie met een database-lock;
 2. leest de exacte inputversies;
 3. controleert eerst of een betrokken epic inmiddels door Productplanning is gekozen;
-4. bepaalt urgentie op basis van nieuwe kennis, kwaliteitssignalen, beschikbare epics en
-   backlogvoorraad;
+4. bepaalt urgentie op basis van nieuwe kennis, kwaliteitssignalen, beschikbare epics en geldende
+   Stakeholderrichting;
 5. kiest één hoofdtaak en een begrensd tijd-/tokenbudget;
 6. controleert toegangsrechten en harde productgrenzen.
 
@@ -292,10 +298,10 @@ originele signalen samen te overschrijven en tegenspraak blijft zichtbaar.
 De UX-ontwerper en technisch verkenner werken vanuit hetzelfde probleem, dezelfde scope en dezelfde
 gewenste uitkomst. Het UX-ontwerp is onderdeel van de epicversie en geen los document zonder eigenaar.
 
-De epic moet klein genoeg zijn om door Productplanning in een beperkt aantal zelfstandig leverbare
-stories te worden verdeeld. Als grove controle verwacht Productontwerp meestal drie tot acht stories.
-Dat is geen harde productregel, maar een waarschuwing wanneer de scope waarschijnlijk te groot of te
-klein is.
+De epic moet scherp genoeg zijn dat Productplanning haar volledig in zelfstandig leverbare stories
+kan verdelen. Het aantal stories is geen ontwerpcriterium: een heldere epic kan twee stories vragen
+of dertig. De scope moet wel één eenduidige gebruikersverbetering vormen en behapbaar blijven voor
+planning, uitvoering en verificatie.
 
 ### Stap 4 — kritiek en atomair publiceren
 
@@ -313,12 +319,13 @@ De Epiccriticus controleert minimaal:
 - dat de epic nog niet door Productplanning is gekozen.
 
 Goedgekeurde output wordt atomair in de eigen entiteiten opgeslagen en daarna wordt de sessiestatus
-afgerond. Query-DTO's worden uit die entiteiten opgebouwd en hebben geen eigen opslag. Betekenisvolle keuzes leveren een
-idempotent registratieverzoek aan het Besluitenregister. Als een gebruikerssignaal is beoordeeld
-zonder dat een epic ontstaat, bevat dat besluit het signaal-ID en de uitkomst. Productontwerp roept
-daarna het passende signaalcommand op de productmodule aan.
+afgerond. Query-DTO's worden uit die entiteiten opgebouwd en hebben geen eigen opslag. Na publicatie
+vraagt Productontwerp via `requestEpicPlanning(...)` idempotent planning voor exact die epicversie
+aan. Betekenisvolle keuzes leveren een idempotent registratieverzoek aan het Besluitenregister. Als
+een gebruikerssignaal is beoordeeld zonder dat een epic ontstaat, bevat dat besluit het signaal-ID
+en de uitkomst. Productontwerp roept daarna het passende signaalcommand op de productmodule aan.
 
-## Planning en de HKH-backlog
+## Wanneer Productontwerp draait
 
 Een sessie wordt planbaar door:
 
@@ -326,12 +333,12 @@ Een sessie wordt planbaar door:
   gebruikerssignaal of signaalstatus;
 - een nieuwe epicverificatie of nieuw intern leerresultaat dat nog om een ontwerpkeuze vraagt;
 - een structureel kwaliteitspatroon als gebruikerssignaal;
-- een periodieke onderzoeks- of epiccontrole;
-- `BacklogSupply.aanvullingNodig = true` terwijl onvoldoende beschikbare epics bestaan.
+- een periodieke onderzoeks- of epiccontrole.
 
-Bij lage backlogvoorraad geeft Productontwerp voorrang aan complete, kansrijke epics die tijdig door
-Productplanning kunnen worden opgepakt. Het maakt geen stories en verlaagt de epickwaliteit niet om
-het getal tien kunstmatig te halen.
+Productontwerp heeft bewust geen inkomende werkqueue. De scheduler of een bevoegde handmatige
+aanroep start een sessie; de module kiest daarna zelf haar ontwerpwerk uit bovenstaande input. De
+toestand van de backlog is geen startsein. Productontwerp maakt uitsluitend complete epics en nooit
+stories.
 
 ## Fouten, hervatten en idempotentie
 
