@@ -3,7 +3,7 @@
 Status: eerste ontwerp van modulegrens en interne werking.
 
 Dit document werkt Productplanning en de technische Software Factory-dispatcher uit. De
-black-boxinterface in [Product Factory v2 — eerste opzet](product-factory-v2-eerste-opzet.md) is
+black-boxinterface in [Product Factory v2 — eerste opzet](eerste-opzet.md) is
 leidend.
 
 ## Verantwoordelijkheid
@@ -126,7 +126,7 @@ product- en UX-informatie.
 `PlanningWorkItem`, `Story`, `ProcessSession` en `DeliveryAttempt` zijn eigendom van
 Productplanning. De backlog is geen entiteit. Een betekenisvolle epickeuze of handmatige
 prioriteitswijziging wordt ook als `DecisionRecord` in het centrale
-[Besluitenregister](product-factory-v2-besluitenregister.md) vastgelegd.
+[Besluitenregister](besluitenregister.md) vastgelegd.
 
 ## Een epic plannen
 

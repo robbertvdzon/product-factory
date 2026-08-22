@@ -3,7 +3,7 @@
 Status: eerste ontwerp van modulegrens en interne werking.
 
 Dit document werkt Kwaliteitsbewaking uit. De black-boxinterface in
-[Product Factory v2 — eerste opzet](product-factory-v2-eerste-opzet.md) is leidend.
+[Product Factory v2 — eerste opzet](eerste-opzet.md) is leidend.
 
 ## Verantwoordelijkheid
 

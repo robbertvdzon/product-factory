@@ -909,7 +909,7 @@ gaan over de modulegrens.
 
 Productontwerp mag een epic herzien zolang Productplanning hem niet heeft gekozen. Een gekozen
 epicversie is bevroren en wordt nooit stilletjes aangepast. De interne werking staat in
-[Productontwerp](product-factory-v2-productontwerp.md).
+[Productontwerp](productontwerp.md).
 
 ## Productplanning als black box
 
@@ -953,7 +953,7 @@ epicstatusovergangen via commands aan Productontwerp. De dispatcher beheert geen
 maar gebruikt `markStoryAsDispatched(...)`, `markStoryAsDeveloped(...)` en
 `recordDispatchFailure(...)`.
 De interne werking en de dispatcher staan in
-[Productplanning](product-factory-v2-productplanning.md).
+[Productplanning](productplanning.md).
 
 ## Kwaliteitsbewaking als black box
 
@@ -991,7 +991,7 @@ claimt een vaste batch `QualityWorkItem`s en mag testagents starten. Queuecomman
 Kwaliteitsbewaking maakt geen stories en bepaalt geen backlogpositie. Zij vraagt bugfixes en
 aanvullend werk via commands aan Productplanning en geeft epic- en signaaluitkomsten via commands aan
 hun eigenaar door. De interne werking staat in
-[Kwaliteitsbewaking](product-factory-v2-kwaliteitsbewaking.md).
+[Kwaliteitsbewaking](kwaliteitsbewaking.md).
 
 ## Hoe de drie processen elkaar in beweging houden
 
@@ -1538,8 +1538,8 @@ De black-boxinterfaces hierboven zijn leidend. Het overkoepelende design beschri
 gegevensstromen; de drie procesdocumenten beschrijven de interne agents, volgorde, parallelle
 stappen, interne entiteiten en sessieregels:
 
-- [Overkoepelend design van processen en publieke entiteiten](product-factory-v2-proces-en-entiteiten-design.md)
-- [Besluitenregister](product-factory-v2-besluitenregister.md)
-- [Productontwerp](product-factory-v2-productontwerp.md)
-- [Productplanning](product-factory-v2-productplanning.md)
-- [Kwaliteitsbewaking](product-factory-v2-kwaliteitsbewaking.md)
+- [Overkoepelend design van processen en publieke entiteiten](processen-en-entiteiten.md)
+- [Besluitenregister](besluitenregister.md)
+- [Productontwerp](productontwerp.md)
+- [Productplanning](productplanning.md)
+- [Kwaliteitsbewaking](kwaliteitsbewaking.md)

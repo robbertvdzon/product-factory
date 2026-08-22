@@ -4,7 +4,7 @@ Dit document beschrijft de modulegrenzen, publieke functies en duurzame entiteit
 een entiteit bezit, is de enige die haar repository en tabellen mag schrijven. Andere modules
 kunnen een betekenisvol command geven of een read-only DTO opvragen.
 
-![Processen, eigenaren en gegevensstromen](product-factory-v2-proces-en-entiteiten.svg)
+![Processen, eigenaren en gegevensstromen](processen-en-entiteiten.svg)
 
 Het diagram gebruikt UML-achtige moduleblokken: bovenaan staan publieke functies en onderaan de
 eigen entiteiten. De scheduler en frontend zijn geen procesmodules en staan daarom niet als blok in
@@ -179,8 +179,8 @@ Iedere run claimt een stabiele batch; nieuw werk wacht tot de volgende run.
 
 ## Gerelateerde documenten
 
-- [Product Factory v2 — eerste opzet](product-factory-v2-eerste-opzet.md)
-- [Besluitenregister](product-factory-v2-besluitenregister.md)
-- [Productontwerp](product-factory-v2-productontwerp.md)
-- [Productplanning](product-factory-v2-productplanning.md)
-- [Kwaliteitsbewaking](product-factory-v2-kwaliteitsbewaking.md)
+- [Product Factory v2 — eerste opzet](eerste-opzet.md)
+- [Besluitenregister](besluitenregister.md)
+- [Productontwerp](productontwerp.md)
+- [Productplanning](productplanning.md)
+- [Kwaliteitsbewaking](kwaliteitsbewaking.md)

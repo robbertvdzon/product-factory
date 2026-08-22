@@ -3,7 +3,7 @@
 Status: eerste ontwerp van modulegrens en interne werking.
 
 Dit document werkt de module Productontwerp uit. De black-boxinterface in
-[Product Factory v2 — eerste opzet](product-factory-v2-eerste-opzet.md) is leidend. Interne namen,
+[Product Factory v2 — eerste opzet](eerste-opzet.md) is leidend. Interne namen,
 agentprompts en taakverdeling kunnen later veranderen zonder gevolgen voor andere modules.
 
 ## Verantwoordelijkheid
@@ -104,7 +104,7 @@ De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Het droo
 zichtbare productrichting, maar geen uitvoerbaar werk. `LearningResult` blijft intern binnen
 Productontwerp. Wanneer daar een concrete keuze uit volgt, laat Productontwerp die keuze als
 `DecisionRecord` vastleggen door het
-[Besluitenregister](product-factory-v2-besluitenregister.md); het volledige leerresultaat wordt niet
+[Besluitenregister](besluitenregister.md); het volledige leerresultaat wordt niet
 gepubliceerd.
 
 Alleen Productontwerp schrijft de `Epic`. Productplanning claimt een exacte versie via
