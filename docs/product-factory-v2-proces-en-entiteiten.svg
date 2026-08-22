@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1380" viewBox="0 0 1800 1380" role="img" aria-labelledby="title desc">
+  <title id="title">Product Factory v2 processen, entiteiteigenaren en gegevensstromen</title>
+  <desc id="desc">Diagram met de modules Productontwerp, Productplanning, Kwaliteitsbewaking en de Software Factory-dispatcher. Iedere module bevat de publieke entiteiten die zij schrijft. Pijlen tonen welke contracten andere modules lezen.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    </marker>
+    <style>
+      .title { font: 700 34px Inter, Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 17px Inter, Arial, sans-serif; fill: #475569; }
+      .box-title { font: 700 23px Inter, Arial, sans-serif; fill: #0f172a; }
+      .function { font: 600 15px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #475569; }
+      .owner-label { font: 700 13px Inter, Arial, sans-serif; letter-spacing: 1px; fill: #64748b; }
+      .entity { font: 500 16px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #172033; }
+      .note { font: 400 14px Inter, Arial, sans-serif; fill: #64748b; }
+      .flow { font: 600 14px Inter, Arial, sans-serif; fill: #334155; paint-order: stroke; stroke: #f8fafc; stroke-width: 5px; stroke-linejoin: round; }
+      .flow-small { font: 600 13px Inter, Arial, sans-serif; fill: #334155; paint-order: stroke; stroke: #f8fafc; stroke-width: 5px; stroke-linejoin: round; }
+      .line { fill: none; stroke: #334155; stroke-width: 2.5; marker-end: url(#arrow); }
+      .blue-line { fill: none; stroke: #2563eb; stroke-width: 3; marker-end: url(#arrowBlue); }
+      .green-line { fill: none; stroke: #059669; stroke-width: 3; marker-end: url(#arrowGreen); }
+      .purple-line { fill: none; stroke: #7c3aed; stroke-width: 3; marker-end: url(#arrowPurple); }
+      .dashed { stroke-dasharray: 9 8; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1380" fill="#f8fafc"/>
+  <text x="60" y="62" class="title">Product Factory v2 — eigenaarschap en publieke gegevensstromen</text>
+  <text x="60" y="94" class="subtitle">Een entiteit wordt door één eigenaar geschreven; pijlen zijn geversioneerde read-only overdrachten via processcontracts.</text>
+
+  <!-- Ondersteunende productmodules -->
+  <rect x="50" y="155" width="365" height="385" rx="18" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+  <rect x="50" y="155" width="365" height="62" rx="18" fill="#e2e8f0"/>
+  <path d="M50 199 V217 H415 V199" fill="#e2e8f0"/>
+  <text x="76" y="193" class="box-title">Product, overleg en inbox</text>
+  <text x="76" y="245" class="owner-label">SCHRIJFT</text>
+  <text x="76" y="280" class="entity">ProductAssignmentView</text>
+  <text x="76" y="316" class="entity">StakeholderDirectionView</text>
+  <text x="76" y="352" class="entity">UserSignalView</text>
+  <text x="76" y="388" class="entity">TestableProductView</text>
+  <line x1="76" y1="417" x2="389" y2="417" stroke="#cbd5e1"/>
+  <text x="76" y="447" class="note">Bron van productgrenzen, menselijke</text>
+  <text x="76" y="469" class="note">richting, signalen en testtoegang.</text>
+  <text x="76" y="507" class="note">Geen intelligent proces.</text>
+
+  <!-- Productontwerp -->
+  <rect x="520" y="155" width="410" height="385" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+  <rect x="520" y="155" width="410" height="74" rx="18" fill="#dbeafe"/>
+  <path d="M520 207 V229 H930 V207" fill="#dbeafe"/>
+  <text x="546" y="190" class="box-title">Productontwerp</text>
+  <text x="546" y="215" class="function">runProcessSession()</text>
+  <text x="546" y="260" class="owner-label">SCHRIJFT</text>
+  <text x="546" y="296" class="entity">DirectionSnapshot</text>
+  <text x="546" y="334" class="entity">EpicDefinitionView</text>
+  <text x="546" y="372" class="entity">LearningResultView</text>
+  <line x1="546" y1="405" x2="904" y2="405" stroke="#bfdbfe"/>
+  <text x="546" y="437" class="note">Onderzoekt de productrichting en maakt</text>
+  <text x="546" y="460" class="note">complete epics inclusief UX. Geen stories.</text>
+  <text x="546" y="500" class="owner-label">LEEST OOK KWALITEITS- EN LEVERINGSSIGNALEN</text>
+
+  <!-- Productplanning -->
+  <rect x="520" y="705" width="410" height="480" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>
+  <rect x="520" y="705" width="410" height="74" rx="18" fill="#d1fae5"/>
+  <path d="M520 757 V779 H930 V757" fill="#d1fae5"/>
+  <text x="546" y="740" class="box-title">Productplanning</text>
+  <text x="546" y="765" class="function">runProcessSession()</text>
+  <text x="546" y="810" class="owner-label">SCHRIJFT</text>
+  <text x="546" y="846" class="entity">EpicExecutionView</text>
+  <text x="546" y="882" class="entity">ProductStoryView</text>
+  <text x="546" y="918" class="entity">PrioritizedBacklogView</text>
+  <text x="546" y="954" class="entity">BacklogItemView *</text>
+  <text x="546" y="990" class="entity">PriorityDecisionView</text>
+  <text x="546" y="1026" class="entity">BacklogSupplyView</text>
+  <line x1="546" y1="1055" x2="904" y2="1055" stroke="#a7f3d0"/>
+  <text x="546" y="1085" class="note">Bevriest één epicversie, maakt stories</text>
+  <text x="546" y="1107" class="note">en bepaalt de backlogvolgorde.</text>
+  <text x="546" y="1146" class="note">* Dispatcher schrijft alleen verzendvelden.</text>
+
+  <!-- Dispatcher -->
+  <rect x="1030" y="805" width="315" height="310" rx="18" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
+  <rect x="1030" y="805" width="315" height="84" rx="18" fill="#ffedd5"/>
+  <path d="M1030 867 V889 H1345 V867" fill="#ffedd5"/>
+  <text x="1054" y="839" class="box-title">SF-dispatcher</text>
+  <text x="1054" y="865" class="function">runDispatchSession()</text>
+  <text x="1054" y="922" class="owner-label">SCHRIJFT</text>
+  <text x="1054" y="958" class="entity">SoftwareFactoryWorkView</text>
+  <text x="1054" y="994" class="entity">DeliveryResultView</text>
+  <line x1="1054" y1="1022" x2="1321" y2="1022" stroke="#fed7aa"/>
+  <text x="1054" y="1052" class="note">Synchroniseert extern werk en</text>
+  <text x="1054" y="1074" class="note">verstuurt maximaal één item.</text>
+
+  <!-- Software Factory -->
+  <rect x="1030" y="1210" width="315" height="105" rx="18" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
+  <text x="1054" y="1252" class="box-title">Software Factory</text>
+  <text x="1054" y="1282" class="note">Externe uitvoering en ruwe werkstatus</text>
+
+  <!-- Kwaliteitsbewaking -->
+  <rect x="1430" y="360" width="325" height="570" rx="18" fill="#f5f3ff" stroke="#7c3aed" stroke-width="3"/>
+  <rect x="1430" y="360" width="325" height="74" rx="18" fill="#ede9fe"/>
+  <path d="M1430 412 V434 H1755 V412" fill="#ede9fe"/>
+  <text x="1454" y="395" class="box-title">Kwaliteitsbewaking</text>
+  <text x="1454" y="420" class="function">runProcessSession()</text>
+  <text x="1454" y="465" class="owner-label">SCHRIJFT</text>
+  <text x="1454" y="501" class="entity">BugView</text>
+  <text x="1454" y="537" class="entity">StoryVerificationView</text>
+  <text x="1454" y="573" class="entity">EpicVerificationView</text>
+  <text x="1454" y="609" class="entity">EpicCompletionGapView</text>
+  <text x="1454" y="645" class="entity">QualityOverviewView</text>
+  <text x="1454" y="681" class="entity">QualitySignalView</text>
+  <line x1="1454" y1="714" x2="1731" y2="714" stroke="#ddd6fe"/>
+  <text x="1454" y="745" class="note">Toetst stories, bugfixes en de</text>
+  <text x="1454" y="767" class="note">complete bevroren epic.</text>
+  <text x="1454" y="807" class="note">Publiceert bewijs en bevindingen;</text>
+  <text x="1454" y="829" class="note">maakt geen stories.</text>
+
+  <!-- Scheduler en bediening -->
+  <rect x="50" y="805" width="365" height="225" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="2" stroke-dasharray="8 7"/>
+  <text x="76" y="845" class="box-title">Scheduler en productbediening</text>
+  <text x="76" y="880" class="owner-label">LEEST</text>
+  <text x="76" y="916" class="entity">ProcessSessionPublication</text>
+  <text x="76" y="951" class="note">Elk intelligent proces maakt alleen zijn</text>
+  <text x="76" y="973" class="note">eigen onveranderlijke sessierecords.</text>
+  <text x="76" y="1005" class="note">Bediening kan ook publieke productviews lezen.</text>
+
+  <!-- Gegevensstromen -->
+  <path d="M415 275 H520" class="blue-line"/>
+  <text x="429" y="262" class="flow-small">opdracht · richting · signalen</text>
+
+  <path d="M330 540 C350 700 420 820 520 820" class="green-line"/>
+  <text x="327" y="659" class="flow-small">opdracht · richting</text>
+
+  <path d="M415 395 C850 90 1350 130 1430 400" class="purple-line"/>
+  <text x="1000" y="165" class="flow-small">testconfiguratie · richting · signalen</text>
+
+  <path d="M725 540 V705" class="green-line"/>
+  <text x="740" y="620" class="flow">EpicDefinitionView</text>
+
+  <path d="M930 330 C1110 250 1280 265 1430 465" class="purple-line"/>
+  <text x="1050" y="283" class="flow">EpicDefinitionView</text>
+
+  <path d="M520 755 C460 730 455 570 520 505" class="blue-line"/>
+  <text x="250" y="590" class="flow-small">EpicExecutionView</text>
+  <text x="250" y="610" class="flow-small">BacklogSupplyView</text>
+
+  <path d="M930 845 C1120 690 1270 610 1430 570" class="purple-line"/>
+  <text x="995" y="696" class="flow-small">epicuitvoering · stories</text>
+  <text x="995" y="716" class="flow-small">backlogitems</text>
+
+  <path d="M1430 700 C1250 720 1090 760 930 815" class="green-line"/>
+  <text x="1080" y="748" class="flow-small">bugs · verificaties · epicgaten</text>
+
+  <path d="M1430 520 C1250 470 1110 455 930 475" class="blue-line"/>
+  <text x="1032" y="446" class="flow-small">epicverificatie · kwaliteitsbeeld</text>
+  <text x="1032" y="466" class="flow-small">kwaliteitssignalen</text>
+
+  <path d="M930 955 H1030" class="line"/>
+  <text x="934" y="940" class="flow-small">backlog · stories</text>
+
+  <path d="M1030 1045 C985 1045 970 1012 930 1012" class="green-line"/>
+  <text x="939" y="1067" class="flow-small">werkstatus · levering</text>
+
+  <path d="M1345 970 C1380 970 1390 850 1430 850" class="purple-line"/>
+  <text x="1320" y="951" class="flow-small">levering</text>
+
+  <path d="M1125 805 C1110 590 1020 520 930 500" class="blue-line"/>
+  <text x="960" y="554" class="flow-small">DeliveryResultView</text>
+
+  <path d="M1187 1115 V1210" class="line"/>
+  <path d="M1215 1210 V1115" class="line"/>
+  <text x="1232" y="1170" class="flow-small">opdracht / status</text>
+
+  <path d="M520 455 C440 520 410 700 350 805" class="line dashed"/>
+  <path d="M520 1110 C475 1080 430 1010 415 975" class="line dashed"/>
+  <path d="M1430 885 C980 1190 590 1140 415 990" class="line dashed"/>
+  <text x="72" y="1070" class="flow-small">gestippeld: ProcessSessionPublication naar scheduler/operations</text>
+
+  <!-- Legenda -->
+  <rect x="50" y="1335" width="14" height="14" rx="3" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="74" y="1347" class="note">Productontwerp</text>
+  <rect x="220" y="1335" width="14" height="14" rx="3" fill="#d1fae5" stroke="#059669"/>
+  <text x="244" y="1347" class="note">Productplanning</text>
+  <rect x="405" y="1335" width="14" height="14" rx="3" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="429" y="1347" class="note">Kwaliteitsbewaking</text>
+  <rect x="620" y="1335" width="14" height="14" rx="3" fill="#ffedd5" stroke="#ea580c"/>
+  <text x="644" y="1347" class="note">Dispatcher</text>
+  <text x="825" y="1347" class="note">De volledige lezerlijst en veldgrenzen staan in de tabel van het design-document.</text>
+</svg>

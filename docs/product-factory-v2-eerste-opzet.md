@@ -1331,9 +1331,11 @@ Deze keuzes moeten eerst in gewone taal beantwoord zijn. Daarna pas maken we het
 
 ## Uitwerking per procesmodule
 
-De black-boxinterfaces hierboven zijn leidend. De interne agents, volgorde, parallelle stappen,
-interne entiteiten en sessieregels staan in drie afzonderlijke documenten:
+De black-boxinterfaces hierboven zijn leidend. Het overkoepelende design beschrijft eigenaarschap en
+gegevensstromen; de drie procesdocumenten beschrijven de interne agents, volgorde, parallelle
+stappen, interne entiteiten en sessieregels:
 
+- [Overkoepelend design van processen en publieke entiteiten](product-factory-v2-proces-en-entiteiten-design.md)
 - [Productontwerp](product-factory-v2-productontwerp.md)
 - [Productplanning](product-factory-v2-productplanning.md)
 - [Kwaliteitsbewaking](product-factory-v2-kwaliteitsbewaking.md)
