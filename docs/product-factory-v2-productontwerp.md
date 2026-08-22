@@ -44,14 +44,17 @@ Zij publiceren alleen gegevens die Productontwerp tijdens een volgende sessie ka
 De procesmodules importeren elkaar niet. Stabiele DTO's, read-only queryports en geversioneerde
 databaseprojecties staan in de technische module `processcontracts`. Productontwerp schrijft
 uitsluitend zijn eigen publicaties en leest alleen publicaties van andere eigenaren.
+Een optionele Git-export is geen input en wordt nooit als productgeheugen gelezen.
 
 ### Input
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
+| `StakeholderProfileView` | product-/overlegmodule | identiteit, contactwijze, rol en beslissingsmandaat van de Stakeholder |
 | `ProductAssignmentView` | productmodule | doelgroep, productdoel, harde grenzen, repository en toegestane toegang |
 | `StakeholderDirectionView` | product-/overlegmodule | bindende richting en expliciete correcties |
-| `UserSignalView` | inbox/productmodule | mogelijke problemen, kansen en observaties |
+| `UserSignalView` | inbox/productmodule | oorspronkelijke feedback, observatie of gebruiksgegeven met bron, context en bewijs |
+| `UserSignalDispositionView` | inbox/productmodule | afgeleide status, bestaande koppelingen en wat al met het signaal is gebeurd |
 | `BacklogSupplyView` | Productplanning | of nieuwe beschikbare epics extra urgent zijn |
 | `EpicExecutionView` | Productplanning | welke exacte epicversies zijn gekozen en dus niet meer gewijzigd mogen worden |
 | `DeliveryResultView` | Software Factory-dispatcher | wat Software Factory werkelijk heeft opgeleverd |
@@ -65,13 +68,18 @@ tweemaal als nieuwe input behandeld.
 Externe onderzoeksbronnen en repository-informatie worden binnen de toegestane productgrenzen door
 de module zelf opgehaald. Ruwe bronnen steken de modulegrens niet over.
 
+Een `UserSignalView` is een onbewerkte aanwijzing en geen opdracht. Productontwerp behoudt de
+originele tekst, maakt eigen onderzoek of productoutput en neemt het signaal-ID daarin als bron op.
+De inbox/productmodule leidt daaruit `UserSignalDispositionView` af; Productontwerp schrijft geen
+status op het oorspronkelijke signaal.
+
 ### Output
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
 | `DirectionSnapshot` | zichtbaar, geversioneerd droombeeld | toekomstverhaal, kernervaringen, obstakels, aannames, bewijsbasis en wijzigingsreden |
-| `EpicDefinitionView` | complete bouwtekening voor één gebruikersverbetering | versie, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's en afhankelijkheden |
-| `LearningResultView` | gevalideerde nieuwe productkennis | conclusie, bron, reikwijdte, geldigheid en effect op droombeeld of toekomstige epics |
+| `EpicDefinitionView` | complete bouwtekening voor één gebruikersverbetering | versie, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's, afhankelijkheden en bron-signaal-ID's |
+| `LearningResultView` | gevalideerde nieuwe productkennis | conclusie, bron, reikwijdte, geldigheid, bron-signaal-ID's en effect op droombeeld of toekomstige epics |
 | `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, gebruikte inputversies, publicatie-ID's, eindstatus en blokkade |
 
 De enige inhoudelijke overdracht naar Productplanning is `EpicDefinitionView`. Het droombeeld en
@@ -135,6 +143,7 @@ De volgende entiteiten blijven binnen de module:
 - `SourceRecord` — vindplaats, datum, brontype en toegangsvoorwaarden;
 - `EvidenceClaim` — bewering met ondersteunende en tegensprekende bronnen;
 - `Hypothesis` — nog onbewezen verklaring of kans;
+- `SignalAssessment` — interne beoordeling van een ongewijzigd gebruikerssignaal;
 - `OpportunityCandidate` — intern kansvoorstel vóór epicvorming;
 - `DirectionDraft` — niet-gepubliceerde droombeeldvariant;
 - `EpicDraft` — epicdefinitie vóór publicatie;
@@ -242,8 +251,8 @@ De module:
 ### Stap 2 — onderzoeken en bewijs vormen
 
 Alle belangrijke beweringen wijzen naar een bron, gebruikerssignaal, leveringsresultaat of
-epicverificatie. Feiten, meningen en hypotheses blijven apart. Duplicaten worden samengevoegd en
-tegenspraak blijft zichtbaar.
+epicverificatie. Feiten, meningen en hypotheses blijven apart. Duplicaten worden gekoppeld zonder de
+originele signalen samen te overschrijven en tegenspraak blijft zichtbaar.
 
 ### Stap 3 — epic en UX ontwerpen
 
@@ -277,7 +286,8 @@ projecties in `processcontracts`, en als laatste de sessiestatus.
 
 Een sessie wordt planbaar door:
 
-- een nieuw of gewijzigd Stakeholder- of gebruikerssignaal;
+- een gewijzigd Stakeholderprofiel of een nieuwe of gewijzigde Stakeholderrichting,
+  gebruikerssignaal of signaalafhandeling;
 - een nieuwe epicverificatie of geldig leerresultaat;
 - een structureel kwaliteitssignaal;
 - een periodieke onderzoeks- of epiccontrole;

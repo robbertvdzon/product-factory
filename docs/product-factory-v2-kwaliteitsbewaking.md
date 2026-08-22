@@ -36,7 +36,7 @@ begrensde testopdracht. Per product kan maximaal één sessie tegelijk actief zi
 periodiek testwerk eindigt de functie als succesvolle no-op.
 
 Andere modules kunnen geen testagent of teststap starten. Een nieuwe oplevering, epic op
-**Controleren** of Stakeholdersignaal wordt duurzaam gepubliceerd en tijdens een volgende sessie
+**Controleren** of gebruikerssignaal wordt duurzaam gepubliceerd en tijdens een volgende sessie
 gelezen.
 
 ## Interface met andere modules en services
@@ -49,14 +49,16 @@ testclients zijn interne adapters.
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
+| `StakeholderProfileView` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter kwaliteitsgrenzen en risico's |
 | `TestableProductView` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
 | `StakeholderDirectionView` | product-/overlegmodule | expliciete kwaliteitsgrenzen en gemelde risico's |
 | `EpicDefinitionView` | Productontwerp | bevroren scope, UX en succescriteria van de door Productplanning gekozen versie |
 | `EpicExecutionView` | Productplanning | exacte versie, stories, voortgang en verzoek om volledige epiccontrole |
-| `ProductStoryView` | Productplanning | acceptatiecriteria en verwacht gedrag per story |
+| `ProductStoryView` | Productplanning | acceptatiecriteria, verwacht gedrag en zelfstandige relevante UX per story |
 | `BacklogItemView` | Productplanning | uitvoeringsstatus en bronkoppeling |
 | `DeliveryResultView` | Software Factory-dispatcher | wat, waar en wanneer moet worden geverifieerd |
-| `UserSignalView` | inbox/productmodule | gemelde problemen en risicogebieden |
+| `UserSignalView` | inbox/productmodule | oorspronkelijke melding met bron, context en bewijs |
+| `UserSignalDispositionView` | inbox/productmodule | wat al met het signaal is gebeurd en aan welke resultaten het is gekoppeld |
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte contractversies
 en exacte geteste omgeving vast.
@@ -65,7 +67,7 @@ en exacte geteste omgeving vast.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `BugView` | aantoonbare bouw- of productafwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst en status |
+| `BugView` | aantoonbare bouw- of productafwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
 | `StoryVerificationView` | oordeel over één concrete story of bugfix | backlogitem, bronversie, omgeving, resultaat, controles, bewijs en blokkade |
 | `EpicVerificationView` | oordeel over de complete gebruikersverbetering | epic-ID en -versie, uitkomst, scope-/UX-dekking, succescriteria, bewijs, gaten en leerresultaat |
 | `EpicCompletionGapView` | gedrag binnen de bevroren epic dat nooit in een story stond | scope- of UX-verwijzing, gebruikersimpact, ontbrekend gedrag en bewijs |
@@ -136,6 +138,7 @@ Een gepubliceerde bug bevat minimaal:
 - screenshot, log, netwerkspoor of ander bewijs;
 - ernst P0, P1, P2 of P3 met reden;
 - relatie met story, epicversie, oplevering en soortgelijke bugs;
+- eventuele bron-gebruikerssignalen;
 - herstelstatus.
 
 De herstelstatus is:
@@ -209,7 +212,7 @@ testrollen verplicht.
 3. **Epic verifiëren** — de complete bevroren gebruikersverbetering controleren.
 4. **Dagelijkse kernroutes testen** — belangrijkste gebruikersresultaten bewaken.
 5. **Kwaliteitsrotatie uitvoeren** — een onderbelicht thema of apparaat onderzoeken.
-6. **Stakeholdersignaal onderzoeken** — een gemeld probleem reproduceren.
+6. **Gebruikerssignaal onderzoeken** — een gemeld probleem reproduceren.
 7. **Patroon analyseren** — verwante bevindingen tot een kwaliteitssignaal vormen.
 
 Nieuwe opleveringen en P0/P1-signalen gaan voor periodieke rotatie. Een epic op **Controleren** gaat
@@ -272,7 +275,7 @@ Een sessie wordt planbaar door:
 - een nieuwe Software Factory-oplevering;
 - een bugfix op **Hertesten**;
 - een epicuitvoering op **Controleren**;
-- een nieuw Stakeholdersignaal;
+- een nieuw of gewijzigd gebruikerssignaal of zijn afhandelstatus;
 - een P0/P1-risico of verouderd kwaliteitsbeeld;
 - de dagelijkse kernrouteplanning of testrotatie;
 - lage backlogvoorraad, zodat bekende bevindingen tijdig worden gereproduceerd.

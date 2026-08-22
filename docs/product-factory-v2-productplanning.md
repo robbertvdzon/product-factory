@@ -49,6 +49,7 @@ Productontwerp of Kwaliteitsbewaking niet rechtstreeks.
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
+| `StakeholderProfileView` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter Stakeholderrichting |
 | `ProductAssignmentView` | productmodule | productidentiteit, grenzen en backlogconfiguratie |
 | `StakeholderDirectionView` | product-/overlegmodule | expliciete epic- en prioriteitsgrenzen |
 | `EpicDefinitionView` | Productontwerp | beschikbare epicversies, gebruikerswaarde, scope, UX en succescriteria |
@@ -63,17 +64,18 @@ Productontwerp of Kwaliteitsbewaking niet rechtstreeks.
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
 | `EpicExecutionView` | uitvoering van één exact bevroren epiccontract | epic-ID, versie, selectiereden, bevriezingsmoment, status, story-ID's en einduitkomst |
-| `ProductStoryView` | zelfstandig uitvoerbaar gedrag binnen de epic | epic-ID en -versie, gedrag, acceptatiecriteria, afhankelijkheden en relevante UX-verwijzingen |
+| `ProductStoryView` | zelfstandig uitvoerbaar gedrag binnen de epic | epic-ID en -versie, gedrag, acceptatiecriteria, afhankelijkheden en volledige relevante UX-momentopname met assets |
 | `PrioritizedBacklogView` | actuele geordende backlog | backlogversie, geordende item-ID's, redenen en aanmaakmoment |
 | `BacklogItemView` | één verzendbare of reeds verzonden opdracht | type, bron-ID en -versie, positie, prioriteitsreden, status en externe referentie |
 | `PriorityDecisionView` | uitlegbare keuze achter epicselectie of backlogvolgorde | keuze, alternatieven, criteria, bronversies en beslisser |
 | `BacklogSupplyView` | voorraadstatus voor scheduler en Productontwerp | aantallen per status, lage grens, streefpeil en `aanvullingNodig` |
+| `StoryDeliveryPackage` | onveranderlijk pakket dat de dispatcher naar Software Factory stuurt | bron-ID's en versies, complete story of bugfix, acceptatiecriteria, UX, attachments, hashes en idempotentiesleutel |
 | `DeliveryResultView` | genormaliseerde terugmelding uit Software Factory | extern ID, backlogitem, status, opleverlocatie, tijdstippen en foutinformatie |
 | `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, gebruikte inputversies, wijzigingen en eindstatus |
 
 Alleen Productplanning schrijft epicuitvoering, productstories, backlogvolgorde en backlogstatus. De
 dispatcher draait binnen dezelfde module en mag uitsluitend leveringsvelden en bijbehorende
-statusovergangen schrijven.
+statusovergangen en het mechanisch afgeleide `StoryDeliveryPackage` schrijven.
 
 ## Een epic kiezen en bevriezen
 
@@ -103,13 +105,18 @@ Een productstory bevat minimaal:
 - waarom dit deel waardevol of noodzakelijk is;
 - duidelijke acceptatiecriteria;
 - relevante hoofd-, lege, laad-, fout- en uitzonderingssituaties;
-- verwijzingen naar het bijbehorende deel van het bevroren UX-ontwerp;
+- een zelfstandige momentopname van het relevante deel van het bevroren UX-ontwerp;
+- gebruikersflow, schermen, componenten, interacties en alle relevante toestanden;
+- responsive gedrag, toegankelijkheid en privacygrenzen;
+- benodigde tekstuele en binaire ontwerpassets met naam, MIME-type, grootte en hash;
 - afhankelijkheden op andere stories of externe voorwaarden;
 - bekende technische grenzen zonder de implementatie voor te schrijven;
 - inhoudelijke status en versie.
 
-Een story is alleen **Uitvoerbaar** wanneer Software Factory haar zonder intern planningsdossier kan
-bouwen en Kwaliteitsbewaking haar zelfstandig kan testen.
+Een story is alleen **Uitvoerbaar** wanneer Software Factory haar zonder epicquery, intern
+planningsdossier, Product Factory-call of Git-workspace kan bouwen en Kwaliteitsbewaking haar
+zelfstandig kan testen. Productplanning selecteert de relevante UX uit de bevroren epic zonder haar
+inhoudelijk te herschrijven.
 
 Een epicgat leidt tot aanvullende stories binnen dezelfde bevroren epic. Productplanning verandert
 daarvoor niet de scope of het UX-ontwerp. Ligt de gewenste verandering buiten die scope, dan maakt
@@ -132,6 +139,12 @@ Een backlogitem heeft minimaal:
 
 De combinatie van product, brontype, bron-ID en bronversie is uniek. Een nieuwere bronversie leidt
 tot herbeoordeling, niet automatisch tot een tweede backlogitem.
+
+Ook een bugfix is pas **Verzendbaar** wanneer de leveringsinhoud zelfstandig compleet is. Naast de
+bug, verwacht gedrag en bewijs legt Productplanning daarom de relevante, bevroren UX-momentopname
+vast wanneer de bug gebruikersgedrag raakt. Bij een bug die aan een eerdere story is gekoppeld komt
+die UX zonder herontwerp uit de betreffende `ProductStoryView`. De dispatcher kopieert dit alleen
+naar het leveringspakket.
 
 Een backlogitem gebruikt:
 
@@ -177,6 +190,7 @@ epicgat wordt door Productplanning in stories vertaald. Kwaliteitsbewaking schri
 - `EpicSelectionAssessment` — vergelijking en selectiereden;
 - `EpicExecution` — bevroren versie, voortgang en einduitkomst;
 - `StoryDraft` — story vóór kritiek en publicatie;
+- `StoryUxSnapshot` — relevante, zelfstandige kopie uit het bevroren epicontwerp;
 - `StoryCoverageMap` — koppeling tussen epicscope/UX en stories;
 - `BacklogCandidateSet` — uitvoerbare stories en bugs;
 - `PriorityAssessment` — vergelijking per prioriteitscriterium;
@@ -184,7 +198,7 @@ epicgat wordt door Productplanning in stories vertaald. Kwaliteitsbewaking schri
 - `Backlog` en `BacklogItem` — actuele uitvoeringstoestand;
 - `PriorityDecision` — auditregel voor een keuze;
 - `SupplyState` — voorraad, lage grens en streefpeil;
-- `DispatchAttempt`, `ExternalWorkLink` en `DeliverySync` — technische koppeling;
+- `StoryDeliveryPackage`, `DispatchAttempt`, `ExternalWorkLink` en `DeliverySync` — technische koppeling;
 - `PlanningMemory` — lessen over slicing, balans en blokkades;
 - `AgentRun` — input, promptversie, output en fout van één agenttaak.
 
@@ -245,10 +259,11 @@ behapbaarheid en productgezondheid.
 
 ### Stap 2 — stories maken
 
-De Storymaker dekt de bevroren scope en UX stap voor stap af. Niet ieder detail hoeft vooraf een
-story te krijgen, maar de eerste bruikbare slice en voldoende vervolgwerk voor een gezonde backlog
-moeten duidelijk zijn. `StoryCoverageMap` maakt zichtbaar welke delen al wel en nog niet door stories
-worden afgedekt.
+De Storymaker dekt de bevroren scope en UX stap voor stap af. Iedere gemaakte story krijgt een
+zelfstandige `StoryUxSnapshot`; een verwijzing naar alleen het epicontwerp is niet voldoende. Niet
+ieder detail hoeft vooraf een story te krijgen, maar de eerste bruikbare slice en voldoende
+vervolgwerk voor een gezonde backlog moeten duidelijk zijn. `StoryCoverageMap` maakt zichtbaar welke
+delen al wel en nog niet door stories worden afgedekt.
 
 ### Stap 3 — prioriteren en vullen
 
@@ -278,12 +293,36 @@ De Planningscriticus controleert:
 - dat exact één onveranderlijke epicversie is gebruikt;
 - dat Productplanning de epicdefinitie of UX niet heeft herschreven;
 - dat stories klein, zelfstandig en testbaar zijn;
+- dat iedere story alle benodigde UX-inhoud en assets bevat zonder concurrerend ontwerp te maken;
 - dat storydekking geen belangrijk deel van scope of UX vergeet;
 - dat bugs de vernieuwing niet zonder reden verdringen;
 - dat alle posities een begrijpelijke reden hebben;
 - dat epic-, story- en backlogstatus consistent zijn.
 
 Goedgekeurde uitvoering, stories, besluiten en backlog worden atomair gepubliceerd.
+
+## StoryDeliveryPackage-contract
+
+Het `StoryDeliveryPackage` is de complete, onveranderlijke grens naar Software Factory. Het wordt in
+de database opgeslagen vóór verzending en bevat minimaal:
+
+- contractversie, pakket-ID, product-ID en idempotentiesleutel;
+- backlogitem-ID, type `PRODUCT_STORY` of `BUGFIX` en exacte bron-ID plus bronversie;
+- epic-ID en bevroren epicversie wanneer die van toepassing zijn;
+- titel, gebruikersdoel, gewenst gedrag, context en acceptatiecriteria;
+- bekende grenzen en afhankelijkheden zonder de technische implementatie voor te schrijven;
+- voor een bugfix: werkelijk gedrag, verwacht gedrag, reproduceerstappen, omgeving, impact en bewijs;
+- de volledige relevante `StoryUxSnapshot` met flow, schermen, toestanden, interacties, responsive
+  gedrag, toegankelijkheid en privacygrenzen;
+- attachments met naam, MIME-type, oorspronkelijke bytegrootte, SHA-256-hash, transportcodering en
+  inhoud;
+- aanmaaktijdstip en een hash over het complete pakket.
+
+Tekst, Markdown, JSON en SVG blijven gewone UTF-8-tekst. Alleen binaire inhoud gebruikt bij een
+JSON-only API `base64`; een aparte begrensde attachment-upload mag later hetzelfde contract
+efficiënter transporteren. Software Factory bevestigt pas acceptatie nadat het complete pakket in de
+eigen storystorage staat. Een URL naar Product Factory of de Git-workspace is nooit de enige drager
+van vereiste inhoud.
 
 ## Software Factory-dispatcher
 
@@ -302,11 +341,17 @@ Iedere dispatchersessie:
 4. markeert extern afgerond werk lokaal als **Opgeleverd**, niet direct als **Afgerond**;
 5. verstuurt niets als Software Factory nog openstaand werk voor het product heeft;
 6. selecteert anders het bovenste afhankelijke-vrije item met status **Verzendbaar**;
-7. maakt precies één Software Factory-story aan met een idempotentiesleutel;
-8. bewaart het externe ID en zet het backlogitem op **Verstuurd**;
-9. publiceert leverings- en voorraadstatus.
+7. vormt zonder inhoudelijke beslissing één onveranderlijk `StoryDeliveryPackage` uit het bronobject;
+8. verstuurt tekst, Markdown, JSON en SVG als tekst en binaire assets als begrensde attachments;
+9. maakt precies één Software Factory-story aan met een idempotentiesleutel;
+10. laat Software Factory het complete pakket in de eigen storystorage vastleggen;
+11. bewaart het externe ID en zet het backlogitem op **Verstuurd**;
+12. publiceert leverings- en voorraadstatus.
 
-De dispatcher kan geen item overslaan, story schrijven, epic kiezen of prioriteit veranderen.
+De dispatcher kan geen item overslaan, story of UX schrijven, epic kiezen of prioriteit veranderen.
+Software Factory leest nooit uit `product-factory-workspace`; een workspacepublicatie is niet nodig
+voor verzending. Voor een JSON-only transport mag een binair attachment Base64 gebruiken, maar de
+database bewaart het oorspronkelijke binaire object en Base64 is geen domein- of opslagformaat.
 
 ## Planning
 
@@ -316,7 +361,7 @@ Een intelligente sessie wordt planbaar door:
 - een lage backlogvoorraad;
 - een nieuwe uitvoerbare bug of een epicgat;
 - een story- of epicverificatie;
-- gewijzigde Stakeholderrichting;
+- een gewijzigd Stakeholderprofiel of gewijzigde Stakeholderrichting;
 - een periodieke herprioritering.
 
 De dispatcher draait vaker en onafhankelijk van de intelligente sessie.
@@ -339,6 +384,7 @@ Een intelligente sessie is klaar wanneer:
 - selectie of vervolgstatus expliciet is vastgelegd;
 - alle nieuwe stories, bugs, epicgaten en verificaties zijn verwerkt of uitgesteld;
 - iedere story naar exact één bevroren epicversie verwijst;
+- iedere story zelfstandig alle relevante UX-inhoud en assets bevat;
 - backlogvolgorde en epicstatus uitlegbaar en consistent zijn;
 - voorraadstatus en `aanvullingNodig` juist zijn;
 - output atomair is opgeslagen;
