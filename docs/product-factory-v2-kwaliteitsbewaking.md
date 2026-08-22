@@ -9,22 +9,23 @@ Dit document werkt Kwaliteitsbewaking uit. De black-boxinterface in
 
 Kwaliteitsbewaking test de werkende applicatie, verifieert losse opleveringen en controleert na de
 laatste story of de volledige bevroren epic de bedoelde gebruikersverbetering heeft bereikt. Zij
-publiceert reproduceerbare bugs, ontbrekende epicdekking en bewijs over de uitkomst.
+publiceert reproduceerbare bugs en duurzame verificaties met bewijs. Ontbrekende epicdekking staat
+in een verificatie en wordt via een command als nieuw planwerk aangevraagd.
 
 De module is eigenaar van:
 
 - teststrategie, testrotatie en dekkingsbeeld;
 - testsessies, observaties en bewijs;
 - bugs, ernst en herstelstatus;
-- story- en epicverificaties;
-- epicgaten en structurele kwaliteitssignalen;
-- onderzoeksresultaten voor gebruikerssignalen;
+- verificaties van stories, epics en gebruikerssignalen;
+- structurele kwaliteitspatronen en hun bewijs;
 - het eigen agent- en procesgeheugen.
 
-Kwaliteitsbewaking maakt geen stories, wijzigt geen epicdefinitie en bepaalt geen backlogvolgorde of
-epicvoortgang.
+Kwaliteitsbewaking maakt geen stories, wijzigt geen epicinhoud en bepaalt geen backlogvolgorde. Zij
+kan alleen via publieke commands een bugfix, aanvullend planwerk, epicuitkomst of signaaluitkomst
+doorgeven aan de module die de betreffende entiteit bezit.
 
-## Publieke procesfunctie
+## Publieke module-interface
 
 De enige agentgestuurde ingang is:
 
@@ -37,28 +38,38 @@ begrensde testopdracht. Per product kan maximaal één sessie tegelijk actief zi
 periodiek testwerk eindigt de functie als succesvolle no-op.
 
 Andere modules kunnen geen testagent of teststap starten. Een nieuwe oplevering, epic op
-**Controleren** of gebruikerssignaal wordt duurzaam gepubliceerd en tijdens een volgende sessie
-gelezen.
+**Controleren** of gebruikerssignaal wordt tijdens een volgende sessie gelezen.
+
+De deterministische publieke functies zijn beperkt tot read-only queries en lifecycle-commands voor
+eigen bugs:
+
+```java
+BugDetails getBug(BugId bugId);
+List<VerificationDetails> findVerifications(VerificationTarget target);
+QualityOverview getQualityOverview(ProductId productId);
+void linkBugfixStory(LinkBugfixStoryCommand command);
+```
+
+`linkBugfixStory(...)` laat Productplanning alleen een story-ID aan een bestaande uitvoerbare bug
+koppelen. Het command controleert bugstatus, versie en idempotentie; Productplanning krijgt geen
+toegang tot de bugrepository.
 
 ## Interface met andere modules en services
 
-Kwaliteitsbewaking gebruikt `processcontracts` voor stabiele DTO's en geversioneerde read-only
-projecties. Zij importeert Productontwerp of Productplanning niet rechtstreeks. Browser-, log- en
-testclients zijn interne adapters.
+Kwaliteitsbewaking gebruikt publieke Spring Modulith-API's en read-only DTO's uit
+`processcontracts`. DTO's zijn geen database-entiteiten. Browser-, log- en testclients zijn interne
+adapters.
 
 ### Input
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
-| `StakeholderProfileView` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter kwaliteitsgrenzen en risico's |
-| `TestableProductView` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
-| `StakeholderDirectionView` | product-/overlegmodule | bindende productgrenzen en correcties die ook tijdens het testen gelden |
-| `EpicDefinitionView` | Productontwerp | bevroren scope, UX en succescriteria van de door Productplanning gekozen versie |
-| `EpicProgressView` | Productplanning | exacte versie, voortgang en verzoek om volledige epiccontrole |
-| `StoryView` | Productplanning | type, storyversie, status, acceptatiecriteria, verwacht gedrag en zelfstandige relevante UX |
-| `DeliveryResultView` | Software Factory-dispatcher | wat, waar en wanneer moet worden geverifieerd |
-| `UserSignalView` | productmodule | oorspronkelijke melding met bron, context en bewijs; `QUALITY_CONCERN` betekent dat de melder extra onderzoek vraagt |
-| `UserSignalDispositionView` | productmodule | wat al met het signaal is gebeurd en aan welke resultaten het is gekoppeld |
+| `StakeholderDetails` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter kwaliteitsgrenzen en risico's |
+| `TestableProductDetails` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
+| `StakeholderDirectionDetails` | product-/overlegmodule | bindende productgrenzen en correcties die ook tijdens het testen gelden |
+| `EpicDetails` | Productontwerp | bevroren scope, UX, succescriteria en status van de geclaimde versie |
+| `StoryDetails` | Productplanning | type, storyversie, status, oplevergegevens, acceptatiecriteria en zelfstandige UX |
+| `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte contractversies
 en exacte geteste omgeving vast.
@@ -67,34 +78,32 @@ en exacte geteste omgeving vast.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `BugView` | aantoonbare bouw- of productafwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
-| `StoryVerificationView` | oordeel over één concrete story of bugfix | story-ID en -versie, oplevering, omgeving, resultaat, controles, bewijs en blokkade |
-| `EpicVerificationView` | oordeel over de complete gebruikersverbetering | epic-ID en -versie, uitkomst, scope-/UX-dekking, succescriteria, bewijs, gaten en productconclusie |
-| `EpicCompletionGapView` | gedrag binnen de bevroren epic dat nooit in een story stond | scope- of UX-verwijzing, gebruikersimpact, ontbrekend gedrag en bewijs |
-| `SignalInvestigationResultView` | zichtbaar resultaat van onderzoek naar één gebruikerssignaal | signaal-ID en -versie, resultaat, uitleg, bewijs, omgeving, eventuele bug- of kwaliteitssignaalkoppeling, processessie en onderzoekstijdstip |
-| `QualityOverviewView` | zichtbaar actueel kwaliteitsbeeld | recente dekking, risico's, open bugs en onderbelichte gebieden |
-| `QualitySignalView` | groter productprobleem voor Productontwerp | patroon, betrokken bevindingen, impact, hypothese en gewenste onderzoeksvraag |
-| `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, inputversies, publicatie-ID's en eindstatus |
+| `BugDetails` | read-only weergave van een aantoonbare afwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
+| `VerificationDetails` | read-only weergave van een story-, epic- of signaalcontrole | doeltype en -versie, uitkomst, omgeving, controles, bewijs, blokkade, ontbrekende dekking en vervolgkoppelingen |
+| `QualityOverview` | berekend queryresultaat, geen duurzame entiteit | recente dekking, risico's, open bugs en onderbelichte gebieden |
+| `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, inputversies, publicatie-ID's en eindstatus |
 
-Kwaliteitsbewaking schrijft `ProcessSessionPublication` uitsluitend voor zijn eigen sessies. De
+Kwaliteitsbewaking schrijft `ProcessSession` uitsluitend voor zijn eigen sessies. De
 scheduler roept alleen de procesfunctie aan; scheduler en frontend wijzigen het sessieresultaat niet.
 
-Alleen Kwaliteitsbewaking schrijft bugs, verificaties, epicgaten, signaalonderzoeksresultaten en
-kwaliteitssignalen. Productplanning verwerkt de uitvoeringsgerichte bevindingen; de productmodule
-verwerkt signaalonderzoeksresultaten. Geen van beide verandert de publicaties van
-Kwaliteitsbewaking.
+Alleen Kwaliteitsbewaking schrijft `Bug` en `Verification`. Zij vraagt Productplanning via
+`requestBugfix(...)` of `requestCompletionWork(...)` om vervolgwerk, Productontwerp via
+`recordEpicVerification(...)` om een epicuitkomst vast te leggen en de productmodule via
+`recordSignalInvestigation(...)` om een gebruikerssignaal bij te werken. Geen ontvangende module
+kan de onderliggende verificatie of het bewijs veranderen.
 
 ## Een kwaliteitszorg uit een overleg
 
 Wanneer de Stakeholder aangeeft dat een onderdeel mogelijk niet goed werkt of extra aandacht nodig
-heeft, registreert de productmodule dit als `UserSignalView`. De optionele categorie
+heeft, registreert de productmodule dit als `UserSignal`. De optionele categorie
 `QUALITY_CONCERN` helpt Kwaliteitsbewaking bij de testagenda, maar maakt van de melding geen opdracht
 met een vooraf bepaald resultaat.
 
 De Stakeholder schrijft dit databaseobject niet rechtstreeks. De frontend of overlegmodule voert een
 command uit op de productmodule; die bewaart de oorspronkelijke melding daarna onveranderlijk.
-Kwaliteitsbewaking leest het signaal en publiceert na onderzoek een eigen
-`SignalInvestigationResultView`. Zij wijzigt `UserSignalView` en `UserSignalDispositionView` nooit.
+Kwaliteitsbewaking leest `UserSignalDetails`, bewaart het onderzoek als `Verification` en roept
+`recordSignalInvestigation(...)` op de productmodule aan. Alleen de productmodule wijzigt status en
+resultaatkoppelingen op `UserSignal`.
 
 Een signaalonderzoeksresultaat bevat minimaal:
 
@@ -102,12 +111,12 @@ Een signaalonderzoeksresultaat bevat minimaal:
 - resultaat **Bevestigde bug**, **Geen probleem gevonden**, **Meer bewijs nodig**, **Duplicaat**,
   **Buiten testscope** of **Kwaliteitspatroon gevonden**;
 - uitleg, uitgevoerde controles, geteste omgeving en bewijs;
-- eventuele koppeling naar `BugView`, `QualitySignalView` of het duplicaatsignaal;
+- eventuele koppeling naar `Bug`, een nieuw `UserSignal` met categorie `QUALITY_PATTERN` of het duplicaatsignaal;
 - processessie-ID en onderzoekstijdstip.
 
-De productmodule leest dit resultaat en publiceert een nieuwe `UserSignalDispositionView`. Daardoor
-kan de frontend tonen wat is onderzocht en wat daaruit kwam, terwijl bronmelding en testbewijs ieder
-hun eigen eigenaar houden. `StakeholderDirectionView` blijft alleen bedoeld voor echte bindende
+Het command zet de actuele signaalstatus en koppelt het verificatie-ID. Daardoor kan de frontend op
+één `UserSignalDetails` tonen wat is onderzocht en wat daaruit kwam, terwijl bronmelding en
+testbewijs ieder hun eigen eigenaar houden. `StakeholderDirectionDetails` blijft alleen bedoeld voor echte bindende
 productrichting, grenzen, correcties en stopbesluiten.
 
 ## Storyverificatie
@@ -123,7 +132,7 @@ Bij **Afgekeurd** publiceert Kwaliteitsbewaking zo nodig een bug. Het herschrijf
 ## Epicverificatie
 
 Alle stories van een epic op `DONE` is alleen het startsein voor de epiccontrole. De
-controle gebruikt exact de door Productplanning bevroren `EpicDefinitionView` en beoordeelt:
+controle gebruikt exact de door Productontwerp bevroren `EpicDetails` en beoordeelt:
 
 - de volledige gebruikersroute, niet alleen losse schermen;
 - alle relevante UX-toestanden en overgangen;
@@ -141,20 +150,21 @@ De uitkomst is:
 - **Niet geslaagd** — alles werkt zoals ontworpen, maar het bedoelde gebruikersresultaat is niet
   bereikt.
 
-Kwaliteitsbewaking sluit de epicvoortgang niet. Productplanning verwerkt deze uitkomst en is de
-enige schrijver van de epicstatus.
+Kwaliteitsbewaking schrijft eerst een onveranderlijke `Verification` en roept daarna
+`recordEpicVerification(...)` op Productontwerp aan. Productontwerp controleert de epicversie en is
+de enige schrijver van de epicstatus.
 
-## Bug, epicgat of nieuwe productkans
+## Bug, ontbrekende dekking of nieuwe productkans
 
 Kwaliteitsbewaking classificeert een ontbrekend of onjuist resultaat vóór publicatie:
 
 | Situatie | Publicatie | Vervolg |
 |---|---|---|
-| Gedrag stond in een uitgevoerde story maar is verkeerd gebouwd | `BugView` | Productplanning neemt een bugfix op |
-| Gedrag viel duidelijk binnen de bevroren epic, maar Productplanning maakte er nooit een story voor | `EpicCompletionGapView` | Productplanning maakt aanvullende stories |
-| Alles is geleverd, maar de gebruikersverbetering is nog niet bewezen | `EpicVerificationView` met **Niet aantoonbaar** | epic blijft op **Controleren** |
-| Alles werkt zoals ontworpen, maar de productaanname blijkt onjuist | `EpicVerificationView` met **Niet geslaagd** en `QualitySignalView` | Productplanning sluit met die uitkomst; Productontwerp leert |
-| Gewenst gedrag valt buiten de bevroren scope | `QualitySignalView` of gebruikerssignaal | Productontwerp kan een vervolgepic maken |
+| Gedrag stond in een uitgevoerde story maar is verkeerd gebouwd | `Bug` plus `Verification` | Kwaliteitsbewaking vraagt Productplanning om een bugfix |
+| Gedrag viel duidelijk binnen de bevroren epic, maar er bestond nooit een story voor | `Verification` met ontbrekende dekking | Kwaliteitsbewaking vraagt Productplanning om aanvullend werk |
+| Alles is geleverd, maar de gebruikersverbetering is nog niet bewezen | `Verification` met **Niet aantoonbaar** | epic blijft op **Controleren** |
+| Alles werkt zoals ontworpen, maar de productaanname blijkt onjuist | `Verification` met **Niet geslaagd** en een `UserSignal` van categorie `QUALITY_PATTERN` | Productontwerp registreert de uitkomst en leert |
+| Gewenst gedrag valt buiten de bevroren scope | `UserSignal` | Productontwerp kan een vervolgepic maken |
 
 Kwaliteitsbewaking maakt in geen van deze gevallen zelf een story.
 
@@ -184,27 +194,21 @@ De herstelstatus is:
 - **Heropend** — de afwijking bestaat nog of is teruggekomen;
 - **Ongeldig** — geen productafwijking, met zichtbare reden.
 
-Kwaliteitsbewaking leidt **Gepland**, **In herstel** en **Hertesten** af uit `StoryView` en
-`DeliveryResultView`, maar blijft zelf de enige schrijver van de bugstatus.
+Productplanning koppelt een bugfixstory via `linkBugfixStory(...)`. Kwaliteitsbewaking kan
+**Gepland**, **In herstel** en **Hertesten** daarna uit `StoryDetails` afleiden en blijft zelf de enige
+schrijver van de duurzame bugstatus.
 
-## Epicgatcontract
+## Ontbrekende epicdekking
 
-Een epicgat bevat minimaal:
-
-- stabiel gat-ID, product-ID, epic-ID en exact epicversienummer;
-- verwijzing naar de bevroren scope, UX-toestand of succesvoorwaarde;
-- welk gedrag ontbreekt;
-- welk gebruikersresultaat daardoor niet wordt bereikt;
-- bewijs dat geen bestaande story dit gedrag afdekt;
-- ernst of blokkerende werking voor epicafsluiting;
-- status **Open**, **In stories verwerkt** of **Opgelost**.
-
-Productplanning maakt de stories. Kwaliteitsbewaking markeert het epicgat pas **Opgelost** nadat het
-ontbrekende gedrag is geleverd en opnieuw gecontroleerd.
+Een dekkingsgat is geen afzonderlijke entiteit meer. Een epicverificatie kan één of meer gestructureerde
+dekkingsgaten bevatten met scope- of UX-verwijzing, gebruikersimpact, ontbrekend gedrag en bewijs.
+Kwaliteitsbewaking roept `requestCompletionWork(...)` aan met het verificatie-ID. Productplanning
+maakt tijdens een processessie de aanvullende stories; een latere verificatie toont of het gat is
+opgelost. Zo blijft het bewijs historisch intact zonder een tweede lifecycle naast epic en story.
 
 ## Interne entiteiten
 
-- `QualitySession` — geclaimde en begrensde processessie;
+- `ProcessSession` — geclaimde en begrensde processessie en haar operationele historie;
 - `TestStrategy` — kwaliteitsdoelen en risicoprioriteiten per product;
 - `TestRotation` — wanneer routes en thema's voor het laatst zijn onderzocht;
 - `TestAgenda` — doelen, omgeving en budget voor één sessie;
@@ -213,9 +217,8 @@ ontbrekende gedrag is geleverd en opnieuw gecontroleerd.
 - `EvidenceArtifact` — screenshot, log, trace of meetresultaat;
 - `BugCandidate` en `Bug` — bevinding en duurzame levenscyclus;
 - `EpicCoverageAssessment` — vergelijking van epic, UX, stories en geleverd gedrag;
-- `EpicCompletionGap` — ontbrekende dekking binnen een bevroren epic;
-- `SignalInvestigationResult` — gevalideerde conclusie over één exacte gebruikerssignaalversie;
-- `StoryVerification` en `EpicVerification` — interne controles vóór publicatie;
+- `VerificationDraft` — story-, epic- of signaalcontrole vóór publicatie;
+- `Verification` — duurzame, onveranderlijke controle met doeltype, uitkomst en bewijs;
 - `QualityPattern` — clustering van verwante bevindingen;
 - `QualityMemory` — lessen over risico's, testaanpak en dekkingsgaten;
 - `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
@@ -231,7 +234,7 @@ Een processessie gebruikt vier vaste agentrollen:
 2. **Functionele tester** — controleert gebruikersroutes, stories, lege toestanden en foutpaden.
 3. **Kwaliteitsspecialist** — rouleert tussen UX-samenhang, toegankelijkheid, responsiviteit,
    performance, beveiliging, privacy en betrouwbaarheid.
-4. **Verificatiecriticus en bugtriager** — reproduceert bevindingen, classificeert bugs/epicgaten,
+4. **Verificatiecriticus en bugtriager** — reproduceert bevindingen, classificeert bugs/dekkingsgaten,
    bepaalt ernst en keurt publieke resultaten goed.
 
 De functionele tester en kwaliteitsspecialist werken parallel op gescheiden testtaken. De criticus
@@ -246,7 +249,7 @@ testrollen verplicht.
 4. **Dagelijkse kernroutes testen** — belangrijkste gebruikersresultaten bewaken.
 5. **Kwaliteitsrotatie uitvoeren** — een onderbelicht thema of apparaat onderzoeken.
 6. **Gebruikerssignaal onderzoeken** — een gemeld probleem reproduceren.
-7. **Patroon analyseren** — verwante bevindingen tot een kwaliteitssignaal vormen.
+7. **Patroon analyseren** — verwante bevindingen als `UserSignal` van categorie `QUALITY_PATTERN` registreren.
 
 Nieuwe opleveringen en P0/P1-signalen gaan voor periodieke rotatie. Een epic op **Controleren** gaat
 voor losse exploratieve tests wanneer alle benodigde omgevingen beschikbaar zijn.
@@ -275,7 +278,7 @@ atomair publiceren en rotatie bijwerken
 
 ### Stap 1 — claimen en omgeving controleren
 
-De module claimt één planbare opdracht, leest exacte versies van epicdefinitie, epicvoortgang,
+De module claimt één planbare opdracht en leest exacte versies van epic, stories,
 stories, oplevering en eventueel gebruikerssignaal, controleert de omgeving en registreert
 productversie en testaccount. Een onbereikbare omgeving leidt tot **Geblokkeerd**, niet tot een
 productbug.
@@ -295,13 +298,13 @@ maar een epiccontrole dekt minimaal de expliciete grenzen uit de epic.
 De criticus:
 
 - reproduceert mogelijke bugs onafhankelijk;
-- controleert of ontbrekend gedrag een bouwfout, epicgat of nieuwe wens is;
+- controleert of ontbrekend gedrag een bouwfout, dekkingsgat of nieuwe wens is;
 - zoekt duplicaten;
 - bepaalt ernst en gebruikersimpact;
 - controleert bewijs op geheimen en persoonsgegevens;
 - geeft het story- of epicoordeel;
 - geeft ieder onderzocht gebruikerssignaal een expliciet onderzoeksresultaat;
-- publiceert eigen objecten en projecties atomair.
+- publiceert eigen `Bug`- en `Verification`-entiteiten atomair en voert vervolgcommands idempotent uit.
 
 ## Planning en de HKH-backlog
 
@@ -309,18 +312,18 @@ Een sessie wordt planbaar door:
 
 - een nieuwe Software Factory-oplevering;
 - een bugfix op **Hertesten**;
-- een epicvoortgang op **Controleren**;
+- een epic met status **Controleren**;
 - een nieuw of heropend gebruikerssignaal, of nieuw bewijs bij een eerder onbeslist signaal;
 - een P0/P1-risico of verouderd kwaliteitsbeeld;
 - de dagelijkse kernrouteplanning of testrotatie;
 - lage backlogvoorraad, zodat bekende bevindingen tijdig worden gereproduceerd.
 
-Kwaliteitsbewaking maakt geen bugs of epicgaten om de backlog kunstmatig tot tien te vullen.
+Kwaliteitsbewaking maakt geen bugs of dekkingsgaten om de backlog kunstmatig tot tien te vullen.
 
 ## Fouten, hervatten en idempotentie
 
 - Een storyverificatie is uniek voor story-ID, storyversie, oplevering en omgeving.
-- Een epicverificatie is uniek voor epicvoortgang, epicversie en geteste productversie.
+- Een epicverificatie is uniek voor epic-ID, epicversie en geteste productversie.
 - Herhaling werkt bewijs bij maar maakt geen duplicaat.
 - Een technische testfout wordt apart geregistreerd en niet als productbug gepubliceerd.
 - Een sessie kan na een verlopen claim worden hervat met dezelfde inputmomentopname.
@@ -333,7 +336,7 @@ Een sessie is klaar wanneer:
 
 - ieder gekozen testgeval een resultaat of expliciete blokkade heeft;
 - iedere publieke bug reproduceerbaar en van bewijs voorzien is;
-- ieder epicgat aantoonbaar binnen de bevroren epic valt en niet door een story wordt gedekt;
+- ieder dekkingsgat aantoonbaar binnen de bevroren epic valt en niet door een story wordt gedekt;
 - iedere verificatie naar exacte epic-, story-, opleverings- en omgevingsversies verwijst;
 - ieder onderzocht gebruikerssignaal naar exact signaal-ID en -versie verwijst en een zichtbaar
   onderzoeksresultaat of expliciete blokkade heeft;

@@ -1,241 +1,200 @@
-# Product Factory v2 — processen en publieke entiteiten
+# Product Factory v2 — processen en entiteiten
 
-Dit document legt de grenzen tussen de vier uitvoerende onderdelen vast. Het is de overkoepelende
-kaart bij de afzonderlijke procesdocumenten en beantwoordt per publiek contract drie vragen:
-
-1. wie maakt de entiteit voor het eerst aan;
-2. wie mag de inhoud of status daarna schrijven;
-3. wie mag de gepubliceerde versie lezen.
+Dit document beschrijft de grenzen tussen de procesmodules, hun publieke functies en de duurzame
+entiteiten. De module die een entiteit bezit, is de enige die haar repository en tabellen mag
+schrijven. Andere modules kunnen wel een betekenisvol command aan de eigenaar geven en de uitkomst
+via een read-only query bekijken.
 
 ![Processen, eigenaren en gegevensstromen](product-factory-v2-proces-en-entiteiten.svg)
 
 ## Ontwerpregels
 
-- Iedere duurzame productentiteit heeft precies één eigenaar.
-- Alleen de eigenaar schrijft de bronentiteit. Andere modules lezen een geversioneerde,
-  read-only projectie via `processcontracts`.
-- Een contractnaam die eindigt op `View` is die publieke projectie. Het is geen tweede
-  schrijfbaar object.
-- Een lezer bewaart hoogstens de bron-ID en gebruikte bronversie bij zijn eigen entiteiten.
-- Een nieuwe publicatie vervangt een eerdere versie niet stilzwijgend; versies en herkomst blijven
-  herleidbaar.
-- Een besluit heeft een expliciete geldigheidsperiode. Intrekken of vervangen sluit het oude besluit
-  met een einddatum, maar herschrijft de oorspronkelijke inhoud niet.
-- Procesmodules importeren elkaars interne code en tabellen niet.
-- De frontend leest actuele en historische productgegevens uit de database.
-
-In de tabel betekent **aanmaken**: de identiteit en eerste versie vormen. **Schrijven** betekent:
-nieuwe versies, inhoud of toegestane statusvelden opslaan. Een module die alleen leest, kan het
-bronobject nooit corrigeren; zij publiceert daarvoor eigen feedback.
+- Iedere duurzame entiteit heeft precies één schrijvende module.
+- Iedere intelligente procesmodule heeft `runProcessSession()` als enige agentgestuurde functie.
+- Een procesmodule mag daarnaast kleine deterministische command- en queryfuncties aanbieden.
+- Een command benoemt een geldige domeinovergang, bijvoorbeeld `claimEpicForPlanning(...)`; een
+  algemene setter als `setEpicStatus(...)` is niet toegestaan.
+- De eigenaar controleert bevoegdheid, verwachte versie, huidige status en idempotentie en schrijft
+  de wijziging in zijn eigen transactie.
+- Een query retourneert een read-only DTO zoals `EpicDetails`. Zo'n DTO is geen tweede entiteit en
+  kan niet worden teruggeschreven.
+- Modules krijgen nooit elkaars repository of interne JPA-entiteit.
+- Historisch bewijs blijft apart waar historie betekenis heeft: besluiten, verificaties,
+  afleverpogingen en processessies worden niet in een actueel statusveld weggepoetst.
+- De frontend leest via dezelfde query-API's en schrijft alleen via commands van de eigenaar.
 
 ## De vier uitvoerende onderdelen
 
-| Onderdeel | Type | Enige geplande ingang | Eigen verantwoordelijkheid | Schrijft nooit |
+| Onderdeel | Geplande ingang | Eigen entiteiten | Publieke commands naast de run | Schrijft nooit |
 |---|---|---|---|---|
-| Productontwerp | intelligent proces | `runProcessSession()` | productrichting onderzoeken, complete epicdefinities inclusief UX en eigen `ProcessSessionPublication` publiceren | stories, backlog, bugs of verificaties |
-| Productplanning | intelligent proces | `runProcessSession()` | een exacte epicversie kiezen en bevriezen, `EpicProgressView`, geordende stories en eigen `ProcessSessionPublication` publiceren | epicinhoud, bugs of kwaliteitsbewijzen |
-| Kwaliteitsbewaking | intelligent proces | `runProcessSession()` | opgeleverd werk en complete epics toetsen en bevindingen plus eigen `ProcessSessionPublication` publiceren | epics, stories of backlogprioriteit |
-| Software Factory-dispatcher | technische adapter binnen Productplanning | `runDispatchSession()` | externe statussen synchroniseren en precies de eerste `TODO`-story versturen wanneer geen werk openstaat | productinhoud, story-inhoud, epicselectie of prioriteit |
+| Productontwerp | `runProcessSession()` | `Epic`, productrichting en intern ontwerpgeheugen | epic claimen, activeren, laten controleren, verificatie-uitkomst registreren of stoppen | stories, bugs, verificaties of signalen |
+| Productplanning | `runProcessSession()` | `Story` en interne planningsverzoeken | story verzonden/ontwikkeld markeren, dispatchfout registreren, bugfix of aanvullend werk aanvragen | epicinhoud, bugs of verificatiebewijs |
+| Kwaliteitsbewaking | `runProcessSession()` | `Bug` en `Verification` | een bugfixstory aan een bug koppelen | epics, stories, signalen of backlogvolgorde |
+| Software Factory-dispatcher | `runDispatchSession()` | geen productentiteiten; alleen `DeliveryAttempt` binnen Productplanning | gebruikt storycommands van Productplanning | story-inhoud, status rechtstreeks, epicselectie of prioriteit |
 
-De scheduler mag deze ingangen starten, maar beslist niet over de inhoud. De processen roepen elkaar
-niet rechtstreeks aan. Ze reageren op gepubliceerde gegevens en hun eigen planningsregels.
+De scheduler geeft geen product-ID of inhoudelijke opdracht mee. De `run...Session()` kiest zelf
+hooguit één planbare sessie en eindigt als succesvolle no-op wanneer niets hoeft te gebeuren. De
+publieke commands starten nooit agents.
+
+## Publieke module-API's
+
+De precieze Java-signatures kunnen bij implementatie worden verfijnd, maar de functionele grens is:
+
+| Eigenaar | Commands | Read-only queries |
+|---|---|---|
+| product-/overlegmodule | `submitUserSignal`, `recordSignalInvestigation`, `linkSignalToEpic`, `recordStakeholderDirection` | `getUserSignal`, `findOpenUserSignals`, `getStakeholder`, `getProductAssignment`, `getTestableProduct` |
+| Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `requestEpicVerification`, `recordEpicVerification`, `stopEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpic` |
+| Productplanning | `markStoryAsDispatched`, `markStoryAsDeveloped`, `recordDispatchFailure`, `requestBugfix`, `requestCompletionWork` | `getStory`, `getBacklog`, `getBacklogSupply` |
+| Kwaliteitsbewaking | `linkBugfixStory` | `getBug`, `findVerifications`, `getQualityOverview` |
+| Besluitenregister | `recordDecision`, `withdrawDecision` | `getDecision`, `findDecisions` |
+
+Een command mag een ID, verwachte versie, bron-ID, actor en idempotentiesleutel aannemen, maar geeft
+geen vrije velden door waarmee de aanroeper de state machine kan omzeilen.
 
 ## De Stakeholder
 
-De Stakeholder is een actor en duurzame productrelatie, geen proces. De product-/overlegmodule
-publiceert een `StakeholderProfileView` zodat duidelijk is wie namens het product richting mag geven,
-hoe die persoon bereikbaar is en voor welke beslissingen menselijke goedkeuring verplicht is.
+De Stakeholder is een actor en duurzame productrelatie, geen proces. De frontend vertaalt haar
+invoer naar een command op de eigenaar.
 
-| Levering door de Stakeholder | Verplicht of mogelijk | Vastlegging | Wat Product Factory ermee doet |
-|---|---|---|---|
-| identiteit, rol, contactwijze en beslissingsmandaat | verplicht bij productstart en bij wijziging | `StakeholderProfileView` | bepaalt wie bevoegd richting of antwoorden kan geven en wanneer overleg nodig is |
-| breed productdoel en harde grenzen | verplicht bij productstart; later alleen bij wezenlijke wijziging | door de Stakeholder bevestigde `ProductAssignmentView` | vormt het vaste kader voor alle processen |
-| expliciete richting, correctie, stopbesluit of antwoord op een overlegvraag | wanneer nodig | `StakeholderDirectionView` | wordt als bindende input binnen het geldige mandaat verwerkt en kan een processessie planbaar maken |
-| gebruikersfeedback, observatie, probleem, kans, risico of verzoek om kwaliteitsonderzoek | optioneel en op ieder moment | `UserSignalView`, eventueel met categorie `QUALITY_CONCERN` | blijft een onbeoordeeld signaal totdat een proces bewijs of een vervolgobject publiceert |
-| gevoelige toegang of extern besluit | alleen wanneer Product Factory dit niet zelfstandig mag regelen | productconfiguratie of beveiligde voorziening; nooit in vrije signaaltekst | heft een concrete blokkade op zonder secrets in procesdocumenten te zetten |
-
-De Stakeholder hoeft geen oplossing, UX, epic, story, bug of backlogpositie te schrijven en sluit
-een epic niet administratief af. Die verantwoordelijkheden blijven bij de betreffende processen.
-
-## Eigenaarschap per publieke entiteit
-
-### Product- en overlegcontracten
-
-Deze contracten komen van ondersteunende modules buiten de drie intelligente processen.
-
-| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
-|---|---|---|---|---|
-| `StakeholderProfileView` | product-/overlegmodule bij registratie van de Stakeholder | product-/overlegmodule na bevestiging door een bevoegde Stakeholder | Productontwerp, Productplanning, Kwaliteitsbewaking en productbediening | identiteit, rol, contactwijze en beslissingsmandaat; bevat geen secrets |
-| `ProductAssignmentView` | productmodule na het aanmaken van een product | productmodule | Productontwerp, Productplanning en productbediening | productidentiteit, doelgroep, doel, harde grenzen, repository, toegang en backlogconfiguratie |
-| `StakeholderDirectionView` | product-/overlegmodule na een bevoegd command van de Stakeholder | product-/overlegmodule | Productontwerp, Productplanning, Kwaliteitsbewaking en productbediening | bindende productgrens, correctie, stopbesluit of opdrachtwijziging met toepassingsgebied; geen kwaliteitsmelding of testresultaat |
-| `UserSignalView` | productmodule na invoer van gebruiker, Stakeholder of toegestane integratie | productmodule; oorspronkelijke inhoud na ontvangst onveranderlijk | Productontwerp, Kwaliteitsbewaking en productbediening | onbeoordeelde feedback, observatie of gebruiksgegeven met bron, context en bewijs; categorie `QUALITY_CONCERN` vraagt aandacht maar schrijft geen uitkomst voor |
-| `UserSignalDispositionView` | productmodule bij ontvangst van het signaal | productmodule, mechanisch afgeleid uit gekoppelde procesresultaten | Productontwerp, Kwaliteitsbewaking, Stakeholder en productbediening | toont nieuw, onderzocht, gekoppeld, duplicaat, onvoldoende bewijs of buiten scope plus bronverwijzingen; wijzigt het signaal niet |
-| `TestableProductView` | productmodule bij het configureren van testtoegang | productmodule | Kwaliteitsbewaking | omgevingen, routes, accounts, databereik en testgrenzen |
-
-### Contract van het Besluitenregister
-
-Het Besluitenregister is een ondersteunende module zonder agents of geplande procesfunctie. De
-bevoegde bronmodule neemt het besluit; het Besluitenregister maakt en beheert de centrale registratie.
-
-| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
-|---|---|---|---|---|
-| `DecisionRecordView` | Besluitenregister na een idempotent registratieverzoek van Productontwerp, Productplanning of product-/overlegmodule | Besluitenregister; inhoud na registratie onveranderlijk, alleen levenscyclusvelden mogen door het register worden gesloten | productmodule, Productontwerp, Productplanning, Kwaliteitsbewaking, Stakeholder en productbediening | betekenisvolle keuze met `decisionKey`, onderbouwing, alternatieven, bronversies, beslisser, toepassingsgebied, `validFrom`, optionele `validUntil`, status en vervangingsrelaties; geen ruwe agentredenering |
-
-Bij een vervangend besluit maakt het register het nieuwe record en zet het in dezelfde transactie de
-einddatum, status **Vervangen** en `replacedByDecisionId` op het oude record. Bij intrekking zonder
-vervanging krijgt het oude besluit status **Ingetrokken**, een einddatum en reden. Historische inhoud
-blijft leesbaar. De volledige interface en regels staan in het
-[Besluitenregister](product-factory-v2-besluitenregister.md).
-
-### Contracten van Productontwerp
-
-| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
-|---|---|---|---|---|
-| `DirectionSnapshot` | Productontwerp | Productontwerp | Productontwerp, Stakeholder en productbediening | geversioneerd droombeeld; geen uitvoerbare opdracht voor Productplanning |
-| `EpicDefinitionView` | Productontwerp | Productontwerp | Productplanning, Kwaliteitsbewaking, Productontwerp en productbediening | complete gebruikersverbetering met scope, bewijs, UX, succescriteria en bron-signaal-ID's; een door Productplanning gekozen versie blijft voor altijd bevroren |
-
-`LearningResult` is een interne entiteit van Productontwerp en heeft geen publieke `View`. Alleen een
-concrete epic, droombeeldversie of betekenisvolle keuze in `DecisionRecordView` verlaat de module.
-
-### Contracten van Productplanning
-
-| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
-|---|---|---|---|---|
-| `EpicProgressView` | Productplanning bij selectie van een epicversie | Productplanning | Productontwerp, Kwaliteitsbewaking, Productplanning en productbediening | verwijst naar exact één bevroren epicversie en bewaart uitsluitend selectie, voortgang, verificatiemomenten en einduitkomst; bevat geen kopie van epicinhoud of UX |
-| `StoryView` | Productplanning als productstory of als bugfixstory voor exact één `BugView` | Productplanning; dispatcher binnen dezelfde module alleen voor externe referentie, tijdstippen en `TODO` → `IN_PROGRESS` → `DONE` | Kwaliteitsbewaking, Software Factory-dispatcher, Productplanning en productbediening | zelfstandig uitvoerbare productstory of bugfix met volledige relevante UX, `sequenceNumber` en drie statussen; de backlog is de query op alle stories die niet `DONE` zijn |
-| `BacklogSupplyView` | Productplanning-queryprojectie uit `StoryView` | geen duurzame schrijver; bij iedere query berekend | Productontwerp, Software Factory-dispatcher, Productplanning en productbediening | aantallen per storystatus, lage grens, streefpeil en `aanvullingNodig`; `TODO` is de klaarliggende voorraad |
-
-### Contracten van de Software Factory-dispatcher
-
-De dispatcher zit technisch in de module Productplanning, maar heeft hieronder een smalle,
-afzonderlijke schrijfbevoegdheid. Hij verandert nooit de betekenis of prioriteit van werk.
-
-| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
-|---|---|---|---|---|
-| `SoftwareFactoryWorkView` | Software Factory-dispatcher op basis van extern Software Factory-werk | Software Factory-dispatcher | Productplanning en productbediening | genormaliseerde externe werkstatus; de externe Software Factory blijft bron van de ruwe status |
-| `StoryDeliveryPackage` | Software Factory-dispatcher uit exact één `TODO`-story en haar versie | Software Factory-dispatcher; na vorming onveranderlijk en uitsluitend mechanisch afgeleid | Software Factory, Software Factory-dispatcher, Productplanning en productbediening | volledige productstory of bugfixstory met acceptatiecriteria, UX, attachments, hashes en idempotentiesleutel; bevat geen nieuwe productbeslissingen |
-| `DeliveryResultView` | Software Factory-dispatcher zodra extern werk is opgeleverd of gewijzigd | Software Factory-dispatcher | Productplanning, Kwaliteitsbewaking en Productontwerp | genormaliseerde oplevering met extern ID, story-ID en -versie, status, locatie, tijdstippen en foutinformatie |
-
-### Contracten van Kwaliteitsbewaking
-
-| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
-|---|---|---|---|---|
-| `BugView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productplanning, Kwaliteitsbewaking en productbediening | aantoonbare afwijking met verwacht en werkelijk gedrag, reproduceerstappen, bewijs, impact, ernst en eventuele bron-signaal-ID's |
-| `StoryVerificationView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productplanning, Kwaliteitsbewaking en productbediening | bewijs en oordeel over één story of bugfix; Productplanning verwerkt het oordeel maar wijzigt het niet |
-| `EpicVerificationView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productplanning, Productontwerp, Kwaliteitsbewaking en productbediening | oordeel over de hele bevroren epic: geslaagd, onvolledig, niet aantoonbaar, geblokkeerd of niet geslaagd |
-| `EpicCompletionGapView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productplanning, Kwaliteitsbewaking en productbediening | gedrag binnen de bevroren scope of UX waarvoor nooit een story bestond; Productplanning maakt zo nodig aanvullende stories |
-| `SignalInvestigationResultView` | Kwaliteitsbewaking na onderzoek van een exacte gebruikerssignaalversie | Kwaliteitsbewaking; na publicatie onveranderlijk | productmodule, Kwaliteitsbewaking en productbediening | resultaat **Bevestigde bug**, **Geen probleem gevonden**, **Meer bewijs nodig**, **Duplicaat**, **Buiten testscope** of **Kwaliteitspatroon gevonden**, met uitleg, bewijs en eventuele vervolgkoppeling |
-| `QualityOverviewView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productontwerp, Kwaliteitsbewaking, Stakeholder en productbediening | actueel beeld van dekking, open bugs, risico's en onderbelichte gebieden |
-| `QualitySignalView` | Kwaliteitsbewaking | Kwaliteitsbewaking | Productontwerp, Kwaliteitsbewaking en productbediening | terugkerend patroon of onjuiste productaanname dat nieuw onderzoek kan rechtvaardigen |
-
-### Gedeeld operationeel contract
-
-| Publiek contract | Aanmaker | Schrijver/eigenaar | Lezers | Betekenis en schrijfgrens |
-|---|---|---|---|---|
-| `ProcessSessionPublication` | Productontwerp, Productplanning of Kwaliteitsbewaking voor de eigen sessie | het proces dat de betreffende sessie uitvoerde; na publicatie onveranderlijk | eigen proces, scheduler, operations en productbediening | operationele vastlegging van sessie-ID, product-ID, inputversies, publicaties, eindstatus en blokkade; geen productwaarheid |
-
-`ProcessSessionPublication` is één technisch contract, maar ieder record heeft precies één
-proces als eigenaar. Een proces mag nooit de sessieregistratie van een ander proces schrijven.
-
-De scheduler maakt dit record niet. Na een scheduler-aanroep claimt het intelligente proces zelf een
-opdracht, maakt het zijn interne sessie aan en publiceert het bij afronding het resultaat. De
-dispatcher bewaart zijn eigen technische `DispatchAttempt` binnen Productplanning en gebruikt niet
-dit intelligente-processessiecontract.
-
-## Scheduler
-
-De scheduler is een technische klok en geen eigenaar van productentiteiten. Hij:
-
-- roept de drie functies `runProcessSession()` en `runDispatchSession()` op hun eigen ritme aan;
-- geeft geen product-ID, opdracht of inhoudelijke keuze mee;
-- mag `ProcessSessionPublication` lezen voor monitoring en technische retry;
-- schrijft geen procesresultaten, productstatus, backlog of verificatie.
-
-Een aangeroepen proces bepaalt zelf of werk planbaar is, claimt hooguit één opdracht en eindigt als
-succesvolle no-op wanneer niets hoeft te gebeuren.
-
-## Frontend als leesbare databaseweergave
-
-Met **productbediening** in de tabellen bedoelen we de frontend plus haar eigen read-only
-application-API. Zij mag alle publieke productentiteiten, relaties, versies en herkomst uit de
-database lezen en in gewone producttaal tonen. Zij schrijft nooit rechtstreeks in procesaggregates;
-een gebruikersactie loopt via de application service van de eigenaar.
-
-De frontend toont minimaal Stakeholder en mandaat, productopdracht, signalen en afhandeling,
-droombeeld, epics en UX, epicvoortgang, stories, berekende backlog, bugs, verificaties, kwaliteit, actuele en
-historische besluiten, processessies en leveringen. Waar nuttig biedt de frontend versiehistorie en
-vergelijking tussen twee databaseversies.
-
-De frontend kan dus wel een overleg starten, een gebruikerssignaal indienen of een bevestigde
-Stakeholderrichting laten vastleggen. Dat zijn commands naar respectievelijk de overleg- of
-productmodule; de frontend wordt daardoor niet zelf de schrijver van die entiteiten. **Inbox** is
-alleen de naam van het frontendscherm waarop signalen en hun afhandeling zichtbaar zijn.
-
-## Gegevensstromen per onderdeel
-
-| Producent | Gepubliceerde gegevens | Consument |
+| Levering door de Stakeholder | Vastlegging | Betekenis |
 |---|---|---|
-| Stakeholder | profielgegevens, bevestigde productopdracht, richting, antwoorden en gebruikerssignalen | product-/overlegmodule via commands |
-| product-/overlegmodule | betekenisvolle Stakeholderbesluiten en hun geldigheid | Besluitenregister |
-| product-/overlegmodule | Stakeholderprofiel, productopdracht, Stakeholderrichting, gebruikerssignalen en afhandeling | Productontwerp |
-| product-/overlegmodule | Stakeholderprofiel, productopdracht en Stakeholderrichting | Productplanning |
-| product-/overlegmodule | Stakeholderprofiel, testconfiguratie, `UserSignalView` en `UserSignalDispositionView` | Kwaliteitsbewaking |
-| Productontwerp | epicdefinitie | Productplanning en Kwaliteitsbewaking |
-| Productontwerp | betekenisvolle ontwerp-, epic- en signaalbesluiten | Besluitenregister |
-| Productplanning | epicvoortgang en berekende backlogvoorraad | Productontwerp |
-| Productplanning | epicvoortgang en geordende `StoryView`-objecten | Kwaliteitsbewaking |
-| Productplanning | betekenisvolle epicselecties, prioriteitskeuzes en epicafsluitingen | Besluitenregister |
-| Productplanning | `TODO`-stories geordend op `sequenceNumber` | Software Factory-dispatcher |
-| Software Factory-dispatcher | volledig `StoryDeliveryPackage`, inclusief UX en attachments | Software Factory |
-| Software Factory-dispatcher | externe werkstatus en opleverresultaat | Productplanning |
-| Software Factory-dispatcher | opleverresultaat | Kwaliteitsbewaking en Productontwerp |
-| Kwaliteitsbewaking | bugs, storyverificaties, epicverificaties en epicgaten | Productplanning |
-| Kwaliteitsbewaking | epicverificaties, kwaliteitsbeeld en kwaliteitssignalen | Productontwerp |
-| Kwaliteitsbewaking | `SignalInvestigationResultView` | productmodule, die de signaalafhandeling bijwerkt |
-| productmodule | bijgewerkte `UserSignalDispositionView` | Kwaliteitsbewaking, Productontwerp, Stakeholder en productbediening |
-| Besluitenregister | actuele en historische `DecisionRecordView`-objecten | productbediening; productmodule voor gekoppelde signaalafhandeling |
-| ieder intelligent proces | eigen sessiepublicatie | scheduler, operations en productbediening |
+| identiteit, rol, contactwijze en beslissingsmandaat | `Stakeholder` | bepaalt wie bevoegd richting of antwoorden kan geven |
+| productdoel en harde grenzen | `ProductAssignment` | vormt het vaste kader voor de processen |
+| bindende richting, correctie of stopbesluit | `StakeholderDirection` en eventueel `DecisionRecord` | is binnen het mandaat verplichte context |
+| feedback, observatie, probleem, kans, risico of kwaliteitszorg | `UserSignal`, eventueel categorie `QUALITY_CONCERN` | is onbeoordeelde input totdat een proces haar onderzoekt |
+| testomgevingen en toegestane toegang | `TestableProductConfiguration` | maakt gecontroleerd testen mogelijk; secrets staan in een beveiligde voorziening |
 
-## Belangrijke levenscyclusregels
+De Stakeholder schrijft geen epic, story, bug, verificatie of backlogpositie.
 
-1. Productontwerp kan een nog niet gekozen epicdefinitie als een nieuwe versie publiceren.
-2. Productplanning kiest exact één versie en maakt daarvoor `EpicProgressView` aan. Vanaf dat
-   moment verandert niemand die epicversie.
-3. Alleen Productplanning maakt `StoryView`-objecten: productstories uit een epic en bugfixstories uit
-   een bug. Iedere story bevat een zelfstandige momentopname van alle relevante UX-inhoud en assets.
-4. De backlog is geen entiteit: het is de lijst stories met status anders dan `DONE`, geordend op
-   `sequenceNumber`. Alleen als Software Factory geen open werk heeft, verstuurt de dispatcher de
-   eerste `TODO`-story en zet haar op `IN_PROGRESS`; na oplevering wordt zij `DONE`.
-5. Kwaliteitsbewaking publiceert bevindingen. Zij repareert geen bronobjecten en maakt geen stories.
-6. Productplanning verwerkt verificaties: een echt bouwdefect wordt een bugfix; een gemist onderdeel
-   uit de bevroren epic wordt een aanvullende story op basis van een epicgat.
-7. Pas een geslaagde `EpicVerificationView` laat Productplanning de epicvoortgang als **Geslaagd**
-   afsluiten. Alle stories opgeleverd hebben is op zichzelf niet genoeg.
-8. Een `UserSignalView` blijft ongewijzigd. Kwaliteitsbewaking publiceert een apart
-   `SignalInvestigationResultView`; Productontwerp verwijst vanuit epics of geregistreerde
-   signaalbesluiten naar gebruikte signalen. De productmodule leidt daaruit een nieuwe
-   `UserSignalDispositionView` af.
-9. Een besluit blijft inhoudelijk ongewijzigd. Intrekking of vervanging geeft het oude besluit een
-   einddatum en zichtbare relatie naar de levenscyclusaanleiding of het nieuwe besluit.
+## Duurzame entiteiten en eigenaarschap
+
+In de tabel betekent **schrijven** altijd via de interne repository van de eigenaar. Genoemde andere
+modules gebruiken uitsluitend het publieke command; zij schrijven de entiteit nooit rechtstreeks.
+
+| Entiteit | Aanmaker en eigenaar | Wie mag een wijziging aanvragen | Lezers | Betekenis en belangrijke status |
+|---|---|---|---|---|
+| `Product` | productmodule | bevoegde productbediening | alle processen en frontend | productidentiteit en configuratie |
+| `Stakeholder` | product-/overlegmodule | bevoegde Stakeholder of beheerder | alle processen en frontend | identiteit, contact en mandaat |
+| `ProductAssignment` | productmodule | bevoegde Stakeholder | Productontwerp, Productplanning en frontend | doelgroep, productdoel en harde grenzen |
+| `StakeholderDirection` | product-/overlegmodule | bevoegde Stakeholder | alle processen en frontend | bindende richting met toepassingsgebied en geldigheid |
+| `TestableProductConfiguration` | productmodule | bevoegde Stakeholder of beheerder | Kwaliteitsbewaking | omgeving, routes, accounts, databereik en testgrenzen |
+| `UserSignal` | productmodule | gebruiker/Stakeholder mag indienen; Productontwerp en Kwaliteitsbewaking mogen een verwerkingsuitkomst registreren | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | onveranderlijke broninhoud plus status `NEW`, `IN_REVIEW`, `PROCESSED`, `NEEDS_EVIDENCE`, `DUPLICATE`, `OUT_OF_SCOPE` of `DISMISSED`, en links naar verificatie, epic, bug of besluit |
+| `DirectionSnapshot` | Productontwerp | niemand buiten Productontwerp | Productontwerp, Stakeholder en frontend | geversioneerde verre productrichting; geen uitvoerbaar werk |
+| `Epic` | Productontwerp | Productplanning mag claimen/activeren/controleren; Kwaliteitsbewaking mag een verificatie-uitkomst registreren via Productontwerp | Productontwerp, Productplanning, Kwaliteitsbewaking en frontend | complete gebruikersverbetering met versie, scope, UX en status `AVAILABLE`, `IN_PLANNING`, `ACTIVE`, `VERIFYING`, `COMPLETED`, `NOT_SUCCESSFUL`, `STOPPED`, `SUPERSEDED` of `WITHDRAWN` |
+| `Story` | Productplanning | dispatcher mag dispatch/oplevering melden; Kwaliteitsbewaking mag alleen nieuw planwerk aanvragen | Productplanning, dispatcher, Kwaliteitsbewaking en frontend | zelfstandige productstory of bugfix met UX, `sequenceNumber`, status `TODO`, `IN_PROGRESS` of `DONE`, externe referentie en oplevertijdstip |
+| `Bug` | Kwaliteitsbewaking | Productplanning mag een bugfixstory koppelen | Kwaliteitsbewaking, Productplanning en frontend | reproduceerbare afwijking, bewijs, ernst en herstelstatus |
+| `Verification` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | Kwaliteitsbewaking, Productontwerp, Productplanning en frontend | controle van doeltype `STORY`, `EPIC` of `USER_SIGNAL`, met exacte doelversie, uitkomst, bewijs, dekkingsgaten en vervolgkoppelingen |
+| `DecisionRecord` | Besluitenregister | bevoegde bronmodule mag registreren, intrekken of vervangen | alle processen, Stakeholder en frontend | betekenisvol besluit met geldigheid, onderbouwing en vervangingsrelaties |
+| `ProcessSession` | het intelligente proces van die sessie | niemand buiten de eigenaar | scheduler, operations en frontend | inputversies, agentuitvoering, publicaties, eindstatus en blokkade |
+| `DeliveryAttempt` | dispatcher binnen Productplanning | dispatcher via interne application service | Productplanning, operations en frontend | onveranderlijke poging, response, fout en retryhistorie; actuele leverstatus staat op `Story` |
+
+Interne objecten zoals `LearningResult`, drafts, agentruns, onderzoeksdossiers en testobservaties
+steken de modulegrens niet over, behalve als bronverwijzing vanuit een publieke entiteit.
+
+## Read-only en transportcontracten
+
+Deze contracten steken de modulegrens over, maar zijn geen entiteit en hebben geen tabel of
+schrijver. De producent bouwt bij een query of overdracht een momentopname uit zijn eigen gegevens.
+
+| Contract | Producent | Lezers/ontvangers | Betekenis |
+|---|---|---|---|
+| `StakeholderDetails` | product-/overlegmodule uit `Stakeholder` | alle processen en frontend | identiteit en mandaat |
+| `ProductAssignmentDetails` | productmodule uit `ProductAssignment` | Productontwerp, Productplanning en frontend | productdoel en grenzen |
+| `StakeholderDirectionDetails` | product-/overlegmodule uit `StakeholderDirection` | alle processen en frontend | geldende bindende richting |
+| `TestableProductDetails` | productmodule uit `TestableProductConfiguration` | Kwaliteitsbewaking | veilige testconfiguratie zonder secrets |
+| `UserSignalDetails` | productmodule uit `UserSignal` | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | bronmelding, actuele status, uitkomst en koppelingen |
+| `EpicDetails` | Productontwerp uit `Epic` | Productplanning, Kwaliteitsbewaking en frontend | inhoud, UX, versie en status; read-only |
+| `StoryDetails` | Productplanning uit `Story` | dispatcher, Kwaliteitsbewaking en frontend | story-inhoud, volgorde, status en oplevervelden; read-only |
+| `BugDetails` | Kwaliteitsbewaking uit `Bug` | Productplanning en frontend | bug, bewijs, ernst en herstelstatus |
+| `VerificationDetails` | Kwaliteitsbewaking uit `Verification` | Productontwerp, Productplanning en frontend | doel, uitkomst, bewijs en dekkingsgaten |
+| `BacklogSupply` | Productplanning-query uit `Story` | Productontwerp, Productplanning, schedulerbediening en frontend | berekende aantallen, lage grens, streefpeil en `aanvullingNodig` |
+| `QualityOverview` | Kwaliteitsbewaking-query uit bugs en verificaties | Productontwerp, Stakeholder en frontend | berekend actueel kwaliteitsbeeld |
+| `DecisionDetails` | Besluitenregister uit `DecisionRecord` | alle processen, Stakeholder en frontend | actueel of historisch besluit met geldigheid |
+| `ProcessSessionDetails` | betreffende procesmodule uit `ProcessSession` | scheduler, operations en frontend | operationele sessiestatus en historie |
+| `SoftwareFactoryWork` | dispatcheradapter uit externe Software Factory-status | dispatcher | tijdelijk integratieantwoord; niet duurzaam in Product Factory |
+| `StoryDeliveryPackage` | dispatcher uit één exacte `StoryDetails` | Software Factory | volledige, onveranderlijke story met UX, assets, hashes en idempotentiesleutel |
+
+## Wat uit het oude model verdwijnt
+
+| Oude constructie | Nieuwe vorm |
+|---|---|
+| `EpicDefinitionView` + `EpicProgressView` | één `Epic`; `EpicDetails` is alleen het read-only query-DTO |
+| `UserSignalView` + `UserSignalDispositionView` | één `UserSignal` met onveranderlijke melding, actuele status en resultaatlinks |
+| `StoryView` als publieke entiteit | één `Story`; `StoryDetails` is alleen het query-DTO |
+| `StoryVerificationView`, `EpicVerificationView`, `SignalInvestigationResultView` | één `Verification` met een doeltype |
+| `EpicCompletionGapView` | gestructureerd dekkingsgat binnen een epicverificatie plus `requestCompletionWork(...)` |
+| `QualitySignalView` | nieuw `UserSignal` met categorie `QUALITY_PATTERN` en links naar bewijs |
+| `DeliveryResultView` | actuele velden op `Story`; historie in `DeliveryAttempt` |
+| `SoftwareFactoryWorkView` | tijdelijk antwoord van de externe adapter; geen duurzame Product Factory-entiteit |
+| `BacklogSupplyView` en `QualityOverviewView` | berekende queryresultaten `BacklogSupply` en `QualityOverview` |
+
+`StoryDeliveryPackage`, `EpicDetails`, `StoryDetails`, `BugDetails`, `VerificationDetails` en andere
+`...Details`-objecten zijn overdrachtsobjecten. Ze hebben geen eigen tabel en geen schrijver.
+
+## Backlog en levering
+
+De backlog is geen entiteit. Zij is de query op alle stories die nog niet `DONE` zijn:
+
+```sql
+select * from story
+where product_id = :productId and status <> 'DONE'
+order by sequence_number
+```
+
+Wanneer Software Factory geen open werk heeft, vraagt de dispatcher de eerste `TODO`-story op. Na
+succesvolle externe creatie roept hij `markStoryAsDispatched(...)` aan; Productplanning controleert
+de storyversie en zet `TODO` naar `IN_PROGRESS`. Als Software Factory oplevering meldt, gebruikt de
+dispatcher `markStoryAsDeveloped(...)`; Productplanning zet `IN_PROGRESS` naar `DONE` en bewaart
+externe referentie, locatie en tijdstip. Iedere poging wordt als `DeliveryAttempt` vastgelegd.
+
+`DONE` betekent ontwikkeld en opgeleverd, niet door Kwaliteitsbewaking goedgekeurd. Een afkeuring
+laat de oorspronkelijke story `DONE`; Kwaliteitsbewaking maakt een `Bug` en vraagt via
+`requestBugfix(...)` een nieuwe bugfixstory aan.
+
+## Belangrijke levenscycli
+
+1. Productontwerp publiceert een complete epic met status `AVAILABLE`.
+2. Productplanning kiest een versie en roept `claimEpicForPlanning(...)` aan. Productontwerp zet de
+   epic atomair op `IN_PLANNING`; inhoud en UX van die versie zijn daarna bevroren.
+3. Productplanning maakt en ordent stories en roept `markEpicActive(...)` aan.
+4. De dispatcher verwerkt steeds de eerste `TODO`-story via storycommands van Productplanning.
+5. Kwaliteitsbewaking maakt onveranderlijke verificaties. Voor een bug of ontbrekende dekking vraagt
+   zij via Productplanning nieuw planwerk aan.
+6. Als alle bekende epicstories `DONE` zijn, vraagt Productplanning via Productontwerp epiccontrole
+   aan. Kwaliteitsbewaking registreert de verificatie en geeft haar ID en uitkomst via
+   `recordEpicVerification(...)` aan Productontwerp.
+7. Productontwerp is de enige schrijver van de uiteindelijke epicstatus.
+8. Een signaalonderzoek wordt een `Verification`; via `recordSignalInvestigation(...)` actualiseert
+   de productmodule status en koppelingen op hetzelfde `UserSignal`.
+9. Een ingetrokken of vervangen besluit behoudt zijn inhoud en krijgt een einddatum en relatie naar
+   de opvolger.
+
+## Scheduler en frontend
+
+De scheduler roept alleen `runProcessSession()` en `runDispatchSession()` aan. Hij schrijft geen
+productstatus en gebruikt `ProcessSession` uitsluitend voor monitoring en retry.
+
+De frontend toont Product, Stakeholder, signalen met actuele status, droombeeld, epics met status en
+UX, stories en berekende backlog, bugs, verificaties, kwaliteitsoverzicht, besluiten,
+processessies en afleverpogingen. Een gebruikersactie wordt een command op de eigenaar; de frontend
+krijgt geen repositorytoegang. **Inbox** is alleen de schermnaam voor signalen en hun afhandeling.
 
 ## Technische vertaling naar Spring Modulith
 
-- `processcontracts` bevat uitsluitend stabiele DTO's, contractversies en read-only queryports.
-- Iedere eigenaar beheert zijn eigen aggregates, repositories, transacties en publicaties.
-- Alleen het Besluitenregister schrijft besluitrecords. Bronmodules leveren idempotente commands of
-  application events en krijgen geen toegang tot de besluitenrepository.
-- Een procesmodule krijgt geen repository van een andere procesmodule geïnjecteerd.
-- De database mag fysiek gedeeld zijn, maar tabellen en schrijftransacties zijn logisch per module
-  afgeschermd.
-- De dispatcher krijgt binnen Productplanning een smalle application service voor externe
-  storyvelden en de drie toegestane statusovergangen; hij krijgt geen vrije repositorytoegang.
+- Iedere eigenaar implementeert een application port met alleen de genoemde commands en queries.
+- De stabiele owner-specifieke portinterfaces, command-DTO's en read-only `...Details`-DTO's staan in
+  het neutrale `processcontracts`; implementaties en productlogica blijven in de eigenaarsmodule.
+- Waar geen direct antwoord nodig is, mag dezelfde overgang via een duurzaam application event lopen.
+- Iedere eigenaar beheert eigen aggregates, repositories en transacties, ook in één fysieke database.
+- Geen procesmodule importeert de implementatie, interne packages of JPA-entiteiten van een andere
+  procesmodule; daardoor ontstaan geen cyclische Spring Modulith-codeafhankelijkheden.
+- Iedere commandhandler controleert actor/bronmodule, verwachte versie, huidige status en
+  idempotentiesleutel.
+- Overgangen binnen één aggregate zijn atomair. Een keten over modules is idempotent en herstelbaar;
+  hij doet niet alsof één database-transactie meerdere module-aggregates bezit.
 - Tekst, Markdown, JSON en SVG blijven tekst in `StoryDeliveryPackage`; binaire assets krijgen een
   begrensd attachment met MIME-type, grootte en hash en mogen alleen voor JSON-transport Base64 zijn.
-- Software Factory slaat het complete leveringspakket bij acceptatie in de eigen storystorage op.
-- De frontend gebruikt read models uit de database voor actuele en historische human-readable
-  schermen.
-- Overdrachten zijn idempotent op bron-ID plus bronversie. Een consument mag dezelfde versie niet
-  tweemaal als nieuw werk behandelen.
+- De Software Factory bewaart bij acceptatie het complete leveringspakket in haar eigen storystorage.
 
 ## Gerelateerde documenten
 

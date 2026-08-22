@@ -8,23 +8,24 @@ leidend.
 
 ## Verantwoordelijkheid
 
-Productplanning kiest uit de beschikbare epicdefinities de beste volgende gebruikersverbetering,
-bevriest het exacte versienummer, verdeelt die epic in kleine stories en ordent alle nog niet
+Productplanning kiest uit de beschikbare epics de beste volgende gebruikersverbetering, claimt het
+exacte versienummer bij Productontwerp, verdeelt die epic in kleine stories en ordent alle nog niet
 afgeronde stories met een `sequenceNumber`. Voor HKH staan normaal ongeveer tien stories met status
 `TODO` klaar. Een story is een productstory of een bugfix.
 
 De module is eigenaar van:
 
-- epicselectie en epicvoortgang;
+- epicselectie en de opdrachten waarmee de epicstatus bij Productontwerp wordt bijgewerkt;
 - stories, storytype, status en `sequenceNumber`;
 - prioriteitsbeoordelingen, onderbouwingen en de gebruikte bronversies;
-- de backlogvoorraad en `aanvullingNodig`;
-- de koppeling met Software Factory en de uitvoeringsstatus;
+- de berekening van backlogvoorraad en `aanvullingNodig`;
+- stories en hun koppeling met Software Factory;
 - het eigen agent- en procesgeheugen.
 
-Productplanning wijzigt geen epicdefinitie, UX-ontwerp, bug of verificatieresultaat.
+Productplanning wijzigt geen epicinhoud, UX-ontwerp, bug of verificatieresultaat. Zij gebruikt voor
+toegestane wijzigingen commands van de module die de betreffende entiteit bezit.
 
-## Publieke procesfunctie
+## Publieke module-interface
 
 De enige intelligente uitvoerende ingang is:
 
@@ -39,48 +40,60 @@ verificatie moet worden verwerkt. Zonder planbaar werk eindigt de functie als su
 De functie verstuurt niets naar Software Factory. Verzending en statussynchronisatie zijn technisch
 werk van de dispatcher en staan buiten de agentgestuurde processessie.
 
+Daarnaast biedt Productplanning deterministische commands en read-only queries:
+
+```java
+StoryDetails getStory(StoryId storyId);
+List<StoryDetails> getBacklog(ProductId productId);
+BacklogSupply getBacklogSupply(ProductId productId);
+void markStoryAsDispatched(MarkStoryAsDispatchedCommand command);
+void markStoryAsDeveloped(MarkStoryAsDevelopedCommand command);
+void recordDispatchFailure(RecordDispatchFailureCommand command);
+void requestBugfix(RequestBugfixCommand command);
+void requestCompletionWork(RequestCompletionWorkCommand command);
+```
+
+De dispatcher gebruikt de eerste drie schrijfcommands. Kwaliteitsbewaking kan met een bug- of
+epicverificatie-ID nieuw planwerk aanvragen, maar kan geen storytekst, status of volgorde schrijven.
+De module valideert iedere overgang, verwachte storyversie en idempotentiesleutel.
+
 ## Interface met andere modules en services
 
-Productplanning gebruikt `processcontracts` voor geversioneerde read-only projecties. Het importeert
-Productontwerp of Kwaliteitsbewaking niet rechtstreeks.
+Productplanning gebruikt de publieke command- en query-API's van andere Spring Modulith-modules.
+Read-only DTO's staan in `processcontracts` en zijn geen eigen database-entiteiten.
 
 ### Input
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
-| `StakeholderProfileView` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter Stakeholderrichting |
-| `ProductAssignmentView` | productmodule | productidentiteit, grenzen en backlogconfiguratie |
-| `StakeholderDirectionView` | product-/overlegmodule | expliciete epic- en prioriteitsgrenzen |
-| `EpicDefinitionView` | Productontwerp | beschikbare epicversies, gebruikerswaarde, scope, UX en succescriteria |
-| `BugView` | Kwaliteitsbewaking | uitvoerbare bugfixkandidaat inclusief ernst en bewijs |
-| `EpicCompletionGapView` | Kwaliteitsbewaking | gedrag binnen de bevroren epic waarvoor aanvullende stories nodig zijn |
-| `StoryVerificationView` | Kwaliteitsbewaking | of een productstory of bugfix is goedgekeurd |
-| `EpicVerificationView` | Kwaliteitsbewaking | of de volledige epic geslaagd, onvolledig, niet aantoonbaar, geblokkeerd of niet geslaagd is |
-| `SoftwareFactoryWorkView` | dispatcher | externe status van eerder verzonden werk |
+| `StakeholderDetails` | product-/overlegmodule | identiteit, rol en beslissingsmandaat achter Stakeholderrichting |
+| `ProductAssignmentDetails` | productmodule | productidentiteit, grenzen en backlogconfiguratie |
+| `StakeholderDirectionDetails` | product-/overlegmodule | expliciete epic- en prioriteitsgrenzen |
+| `EpicDetails` | Productontwerp | beschikbare of geclaimde epicversie, status, gebruikerswaarde, scope, UX en succescriteria |
+| `BugDetails` | Kwaliteitsbewaking | uitvoerbare bugfixkandidaat inclusief ernst en bewijs |
+| `VerificationDetails` | Kwaliteitsbewaking | story- of epicuitkomst, bewijs en eventueel ontbrekende dekking |
+| `SoftwareFactoryWork` | dispatcheradapter | actuele externe status van eerder verzonden werk; tijdelijk integratiegegeven |
 
 ### Output
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `EpicProgressView` | voortgang van één exact bevroren epiccontract | epic-ID, epicversie, selectiereden, bevriezingsmoment, status, verificatiemomenten en einduitkomst; bevat geen kopie van de epicinhoud |
-| `StoryView` | zelfstandig uitvoerbare productstory of bugfix en tegelijk een geordend onderdeel van de berekende backlog | type, bronrelaties, epicversie indien van toepassing, gedrag, acceptatiecriteria, UX, `sequenceNumber`, status en externe referentie |
-| `BacklogSupplyView` | berekende voorraadprojectie, geen duurzame entiteit | aantallen `TODO`, `IN_PROGRESS` en `DONE`, lage grens, streefpeil en `aanvullingNodig` |
+| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, status en externe referentie |
+| `BacklogSupply` | berekend queryresultaat, geen duurzame entiteit | aantallen `TODO`, `IN_PROGRESS` en `DONE`, lage grens, streefpeil en `aanvullingNodig` |
 | `StoryDeliveryPackage` | onveranderlijk pakket dat de dispatcher naar Software Factory stuurt | bron-ID's en versies, complete story of bugfix, acceptatiecriteria, UX, attachments, hashes en idempotentiesleutel |
-| `DeliveryResultView` | genormaliseerde terugmelding uit Software Factory | extern ID, story-ID en -versie, status, opleverlocatie, tijdstippen en foutinformatie |
-| `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, gebruikte inputversies, wijzigingen en eindstatus |
+| `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, gebruikte inputversies, wijzigingen en eindstatus |
 
-Productplanning schrijft `ProcessSessionPublication` uitsluitend voor zijn eigen intelligente
+Productplanning schrijft `ProcessSession` uitsluitend voor zijn eigen intelligente
 sessies. De scheduler en frontend schrijven dit record niet. De dispatcher bewaart afzonderlijke
 technische `DispatchAttempt`-records binnen Productplanning.
 
-Alleen Productplanning schrijft `EpicProgressView`, story-inhoud en `sequenceNumber`. De dispatcher
-draait binnen dezelfde module en mag via een smalle application service uitsluitend de storyvelden
-voor externe referentie, leveringstijdstippen en de overgangen `TODO` → `IN_PROGRESS` → `DONE`
-schrijven. `BacklogSupplyView` wordt alleen uit stories berekend en heeft geen eigen tabel of
-schrijver.
+Alleen Productplanning schrijft `Story`, story-inhoud en `sequenceNumber`. De dispatcher heeft geen
+repositorytoegang en gebruikt uitsluitend `markStoryAsDispatched(...)`,
+`markStoryAsDeveloped(...)` en `recordDispatchFailure(...)`. `BacklogSupply` wordt bij iedere query
+uit stories berekend en heeft geen eigen tabel of schrijver.
 
 Een betekenisvolle epicselectie, prioriteitsregel, afwijking van de normale volgorde of
-epicafsluiting wordt als `DecisionRecordView` door het centrale
+epicafsluiting wordt als `DecisionRecord` door het centrale
 [Besluitenregister](product-factory-v2-besluitenregister.md) vastgelegd. Productplanning levert het
 registratieverzoek met keuze, alternatieven, criteria en bronversies; het Besluitenregister is
 eigenaar van het publieke besluitrecord. Kleine mechanische verschuivingen door een afgerond item
@@ -88,7 +101,7 @@ zijn geen nieuw productbesluit.
 
 ## Een epic kiezen en bevriezen
 
-Productplanning kiest alleen een `EpicDefinitionView` met status **Beschikbaar**. De keuze legt vast:
+Productplanning kiest alleen `EpicDetails` met status **Beschikbaar**. De keuze legt vast:
 
 - exact epic-ID en versienummer;
 - waarom deze epic voor alternatieven gaat;
@@ -96,17 +109,17 @@ Productplanning kiest alleen een `EpicDefinitionView` met status **Beschikbaar**
 - relevante afhankelijkheden en bekende risico's;
 - wie of welke agentrol het besluit nam.
 
-Het aanmaken van `EpicProgressView` bevriest de gekozen epicversie. Productplanning kopieert de
-epicdefinitie niet en wijzigt haar niet. Alle stories en latere verificaties verwijzen naar exact
-dezelfde versie.
+Productplanning roept `claimEpicForPlanning(...)` op Productontwerp aan. Dat command controleert en
+bevriest de gekozen epicversie atomair en zet haar op **In planning**. Productplanning kopieert de
+epic niet en alle stories en latere verificaties verwijzen naar exact dezelfde versie.
 
-Normaal heeft een product maximaal één actieve epicvoortgang. Een nieuwe epic wordt pas gekozen als
+Normaal heeft een product maximaal één actieve epic. Een nieuwe epic wordt pas gekozen als
 de vorige **Geslaagd**, **Niet geslaagd** of **Gestopt** is. Voorraad kan al worden voorbereid uit de
 actieve epic, maar Productplanning schrijft niet ver vooruit voor nog niet gekozen epics.
 
 ## Storycontract en backlog
 
-Een `StoryView` bevat minimaal:
+Een `Story` bevat minimaal:
 
 - stabiel story-ID en product-ID;
 - type `PRODUCT_STORY` of `BUGFIX`;
@@ -131,7 +144,7 @@ planningsdossier of Product Factory-call kan bouwen en Kwaliteitsbewaking haar
 zelfstandig kan testen. Productplanning selecteert de relevante UX uit de bevroren epic zonder haar
 inhoudelijk te herschrijven.
 
-Een epicgat leidt tot aanvullende productstories binnen dezelfde bevroren epic. Productplanning verandert
+Een dekkingsgat uit een verificatie leidt tot aanvullende productstories binnen dezelfde bevroren epic. Productplanning verandert
 daarvoor niet de scope of het UX-ontwerp. Ligt de gewenste verandering buiten die scope, dan maakt
 Productplanning geen story maar wacht zij op een nieuwe epic van Productontwerp.
 
@@ -151,7 +164,7 @@ komen niet meer in de backlogquery voor.
 Ook een bugfixstory is pas `TODO` wanneer de leveringsinhoud zelfstandig compleet is. Naast de
 bug, verwacht gedrag en bewijs legt Productplanning daarom de relevante, bevroren UX-momentopname
 vast wanneer de bug gebruikersgedrag raakt. Bij een bug die aan een eerdere story is gekoppeld komt
-die UX zonder herontwerp uit de betreffende `StoryView`. De dispatcher kopieert dit alleen
+die UX zonder herontwerp uit de betreffende `StoryDetails`. De dispatcher kopieert dit alleen
 naar het leveringspakket.
 
 De drie storystatussen betekenen precies:
@@ -160,14 +173,14 @@ De drie storystatussen betekenen precies:
 - `IN_PROGRESS` — door de dispatcher naar Software Factory gestuurd en daar nog open;
 - `DONE` — Software Factory heeft de story opgeleverd.
 
-`SoftwareFactoryWorkView` en `DeliveryResultView` bewaren de fijnere externe status, blokkades en
-foutinformatie. Een afgekeurde oplevering zet de oorspronkelijke story niet terug: zij blijft
+De actuele externe referentie en oplevering staan op `Story`; afzonderlijke `DeliveryAttempt`-records
+bewaren fouten en retryhistorie. Een afgekeurde oplevering zet de oorspronkelijke story niet terug: zij blijft
 `DONE` en Kwaliteitsbewaking publiceert een bug, waarna Productplanning een nieuwe bugfixstory met
 status `TODO` kan maken.
 
-## Epicvoortgang en afsluiting
+## Epicstatus en afsluiting
 
-Een `EpicProgressView` gebruikt:
+De door Productontwerp beheerde `Epic` gebruikt:
 
 - **Geselecteerd** — exact epic-ID en versienummer zijn gekozen en bevroren;
 - **Stories maken** — de epic wordt in uitvoerbaar werk verdeeld;
@@ -177,40 +190,39 @@ Een `EpicProgressView` gebruikt:
 - **Niet geslaagd** — alles is geleverd, maar het bedoelde gebruikersresultaat is niet bereikt;
 - **Gestopt** — bewust niet verder, met reden.
 
-Productplanning zet een epic pas op **Controleren** wanneer alle bekende stories `DONE` zijn. Een
-`EpicVerificationView` bepaalt daarna het vervolg:
+Productplanning roept `requestEpicVerification(...)` pas aan wanneer alle bekende stories `DONE`
+zijn. Een `VerificationDetails` bepaalt daarna het vervolg:
 
 | Uitkomst | Actie van Productplanning |
 |---|---|
-| **Geslaagd** | epicvoortgang afsluiten als **Geslaagd** |
-| **Onvolledig** met epicgaten | aanvullende stories maken en terug naar **Actief** |
+| **Geslaagd** | Productontwerp registreert via zijn command de epic als **Geslaagd** |
+| **Onvolledig** met dekkingsgaten | aanvullende stories maken en terug naar **Actief** |
 | **Niet aantoonbaar** | op **Controleren** blijven en wachten op aanvullend bewijs |
 | **Geblokkeerd** | blokkade zichtbaar opslaan en later opnieuw laten controleren |
-| **Niet geslaagd** | afsluiten als **Niet geslaagd**; Productontwerp leest de epicverificatie en verwerkt de conclusie intern |
+| **Niet geslaagd** | Productontwerp registreert via zijn command **Niet geslaagd** en verwerkt de conclusie intern |
 
 Een bouwfout wordt door Kwaliteitsbewaking als bug gepubliceerd en wordt een bugfixstory in de
-backlog. Een epicgat wordt door Productplanning in stories vertaald. Kwaliteitsbewaking schrijft zelf
+backlog. Een dekkingsgat wordt door Productplanning in stories vertaald. Kwaliteitsbewaking schrijft zelf
 geen stories.
-Hoort de bug bij de actieve epic, dan verwijst de bugfixstory ook naar die bevroren epicversie en
-blijft of gaat `EpicProgressView` terug naar **Actief** totdat de fix `DONE` en opnieuw gecontroleerd
-is.
+Hoort de bug bij de actieve epic, dan verwijst de bugfixstory ook naar die bevroren epicversie.
+Productplanning roept `markEpicActive(...)` aan totdat de fix `DONE` en opnieuw gecontroleerd is.
 
 ## Interne entiteiten
 
-- `PlanningSession` — de geclaimde intelligente processessie;
+- `ProcessSession` — de geclaimde intelligente processessie en haar operationele historie;
 - `EpicCandidateSet` — beschikbare epicversies voor vergelijking;
 - `EpicSelectionAssessment` — vergelijking en selectiereden;
-- `EpicProgress` — verwijzing naar de bevroren versie, voortgang en einduitkomst;
 - `StoryDraft` — story vóór kritiek en publicatie;
 - `StoryUxSnapshot` — relevante, zelfstandige kopie uit het bevroren epicontwerp;
 - `StoryCoverageMap` — koppeling tussen epicscope/UX en stories;
 - `StoryCandidateSet` — uitvoerbare productstories en bugs die bugfixstories kunnen worden;
+- `PlanningRequest` — idempotent, duurzaam verzoek voor een bugfix of ontbrekende epicdekking dat een volgende processessie planbaar maakt;
 - `PriorityAssessment` — vergelijking per prioriteitscriterium;
 - `StoryOrderDraft` — voorgestelde `sequenceNumber`-volgorde vóór kritiek;
 - `Story` — inhoud, type, volgorde en de drie statussen;
 - `DecisionDraft` — interne onderbouwing vóór registratie van een betekenisvolle keuze in het Besluitenregister;
-- `SupplyState` — voorraad, lage grens en streefpeil;
-- `StoryDeliveryPackage`, `DispatchAttempt`, `ExternalWorkLink` en `DeliverySync` — technische koppeling;
+- `SupplyPolicy` — lage grens en streefpeil; de actuele voorraad wordt berekend;
+- `StoryDeliveryPackage`, `DeliveryAttempt` en `ExternalWorkLink` — technische koppeling en historie;
 - `PlanningMemory` — lessen over slicing, balans en blokkades;
 - `AgentRun` — input, promptversie, output en fout van één agenttaak.
 
@@ -219,7 +231,7 @@ is.
 De intelligente processessie gebruikt vier vaste agentrollen:
 
 1. **Epicplanner** — vergelijkt beschikbare epics en kiest de exacte volgende versie.
-2. **Storymaker** — verdeelt de bevroren epic of een epicgat in kleine productstories.
+2. **Storymaker** — verdeelt de bevroren epic of bewezen ontbrekende dekking in kleine productstories.
 3. **Backlogplanner** — combineert productstories en bugfixstories en bepaalt hun `sequenceNumber`.
 4. **Planningscriticus** — controleert epicdekking, storygrootte, afhankelijkheden, balans en redenen.
 
@@ -231,10 +243,10 @@ Backlogplanner die ordent.
 ## Soorten processessies
 
 1. **Epic kiezen** — beschikbare epicversies vergelijken en één versie bevriezen.
-2. **Stories maken** — de gekozen epic of een epicgat in uitvoerbaar werk verdelen.
+2. **Stories maken** — de gekozen epic of ontbrekende dekking in uitvoerbaar werk verdelen.
 3. **Backlog aanvullen** — nieuwe productstories en bugfixstories op `TODO` opnemen tot het streefpeil.
 4. **Herprioriteren** — de volgorde aanpassen op basis van nieuw bewijs of urgentie.
-5. **Resultaat verwerken** — story- en epicverificaties in epicvoortgang en vervolgwerk verwerken.
+5. **Resultaat verwerken** — story- en epicverificaties in statuscommands en vervolgwerk verwerken.
 
 Een sessie kiest één hoofdsoort. Een eerste sessie mag na epicselectie de minimaal nodige eerste
 stories maken, maar schrijft niet automatisch de hele toekomst vooruit.
@@ -259,13 +271,13 @@ Planningscriticus controleert geheel
           akkoord of herstel
                  │
                  ▼
-publiceer epicvoortgang + stories
+claim epic + publiceer stories
 ```
 
 ### Stap 1 — invoer en selectie
 
 De module claimt één product, zet alle bronversies vast, verwerkt intrekkingen en verificaties en
-controleert of al een epicvoortgang actief is. Zonder actieve epic vergelijkt de Epicplanner de
+controleert via Productontwerp of al een epic actief is. Zonder actieve epic vergelijkt de Epicplanner de
 beschikbare epicdefinities op gebruikerswaarde, productdoel, bewijs, risico, afhankelijkheden,
 behapbaarheid en productgezondheid.
 
@@ -295,7 +307,7 @@ Voor HKH gelden aanvankelijk:
 - streefpeil: tien `TODO`-stories;
 - maximaal één extern openstaand item.
 
-De berekende `BacklogSupplyView.aanvullingNodig` wordt waar bij vier of minder `TODO`-stories en pas
+De berekende `BacklogSupply.aanvullingNodig` wordt waar bij vier of minder `TODO`-stories en pas
 weer onwaar bij tien. `IN_PROGRESS` telt niet mee als klaarliggende voorraad. Productplanning
 verzint geen werk om het getal tien te halen.
 
@@ -312,7 +324,8 @@ De Planningscriticus controleert:
 - dat alle posities een begrijpelijke reden hebben;
 - dat epicstatus, storystatus en `sequenceNumber` consistent zijn.
 
-Goedgekeurde epicvoortgang en stories worden atomair gepubliceerd. Betekenisvolle keuzes
+De epicclaim en goedgekeurde stories worden idempotent gepubliceerd. De eigen storytransactie is
+atomair; het epiccommand gebruikt een idempotentiesleutel zodat herstel na een tussenfout veilig is. Betekenisvolle keuzes
 worden met een idempotent registratieverzoek aan het Besluitenregister aangeboden.
 
 ## StoryDeliveryPackage-contract
@@ -350,17 +363,17 @@ Iedere dispatchersessie:
 
 1. claimt één product voor synchronisatie;
 2. haalt open of recent gewijzigde Software Factory-items op;
-3. werkt externe status en tijdstippen bij;
-4. zet een extern opgeleverde story lokaal van `IN_PROGRESS` op `DONE` en publiceert
-   `DeliveryResultView` voor Kwaliteitsbewaking;
+3. registreert iedere externe response als `DeliveryAttempt`;
+4. roept voor een extern opgeleverde story `markStoryAsDeveloped(...)` aan, waarna Productplanning
+   `IN_PROGRESS` naar `DONE` zet en oplevervelden op `Story` bewaart;
 5. verstuurt niets als Software Factory nog openstaand werk voor het product heeft;
 6. selecteert anders de afhankelijke-vrije `TODO`-story met het laagste `sequenceNumber`;
 7. vormt zonder inhoudelijke beslissing één onveranderlijk `StoryDeliveryPackage` uit die story;
 8. verstuurt tekst, Markdown, JSON en SVG als tekst en binaire assets als begrensde attachments;
 9. maakt precies één Software Factory-story aan met een idempotentiesleutel;
 10. laat Software Factory het complete pakket in de eigen storystorage vastleggen;
-11. bewaart het externe ID en zet de story op `IN_PROGRESS`;
-12. publiceert leveringsstatus en de opnieuw berekende voorraadprojectie.
+11. roept `markStoryAsDispatched(...)` aan om extern ID en `IN_PROGRESS` door Productplanning te laten opslaan;
+12. stelt leveringsstatus en berekende `BacklogSupply` via queries beschikbaar.
 
 De dispatcher kan geen story overslaan, story-inhoud of UX schrijven, epic kiezen of prioriteit
 veranderen.
@@ -373,7 +386,7 @@ Een intelligente sessie wordt planbaar door:
 
 - een nieuwe of gewijzigde beschikbare epicdefinitie;
 - een lage backlogvoorraad;
-- een nieuwe uitvoerbare bug of een epicgat;
+- een nieuwe uitvoerbare bug of een verificatie met ontbrekende dekking;
 - een story- of epicverificatie;
 - een gewijzigd Stakeholderprofiel of gewijzigde Stakeholderrichting;
 - een periodieke herprioritering.
@@ -390,7 +403,7 @@ De dispatcher draait vaker en onafhankelijk van de intelligente sessie.
 - Een synchronisatiefout verandert de laatst bekende externe status niet, maar markeert haar als
   mogelijk verouderd.
 - Een extern geblokkeerde story blijft `IN_PROGRESS`; de blokkade staat zichtbaar in
-  `SoftwareFactoryWorkView` totdat Software Factory haar afrondt of de koppeling expliciet wordt
+  de actuele `SoftwareFactoryWork` totdat Software Factory haar afrondt of de koppeling expliciet wordt
   hersteld.
 
 ## Wanneer een processessie klaar is
@@ -398,7 +411,7 @@ De dispatcher draait vaker en onafhankelijk van de intelligente sessie.
 Een intelligente sessie is klaar wanneer:
 
 - selectie of vervolgstatus expliciet is vastgelegd;
-- alle nieuwe stories, bugs, epicgaten en verificaties zijn verwerkt of uitgesteld;
+- alle nieuwe stories, bugs, dekkingsgaten en verificaties zijn verwerkt of uitgesteld;
 - iedere productstory naar exact één bevroren epicversie verwijst en iedere bugfixstory naar exact
   één bugversie;
 - iedere story zelfstandig alle relevante UX-inhoud en assets bevat;

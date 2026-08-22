@@ -193,18 +193,12 @@ De oorspronkelijke melding, bron, gebruikscontext en eventueel bewijs blijven on
 Een gebruikerssignaal is nog geen besluit, bug, epic of story. Kwaliteitsbewaking kan na verificatie
 een bug publiceren; Productontwerp kan er een epic of een geregistreerd ontwerpbesluit aan koppelen.
 
-De productmodule publiceert daarnaast de afhandelstatus. Daarin is zichtbaar of het signaal
-nieuw of onderzocht is en of het is gekoppeld aan een bug, kwaliteitssignaal, besluit of epic,
-een duplicaat is, buiten de productgrenzen valt of onvoldoende bewijs heeft. Procesmodules wijzigen
-het oorspronkelijke signaal niet; de afhandelstatus wordt afgeleid uit hun gepubliceerde resultaten
-en de daarin opgenomen bronverwijzingen.
-
-Wanneer Kwaliteitsbewaking een gebruikerssignaal onderzoekt, publiceert zij een afzonderlijk
-`SignalInvestigationResultView`. Daarin staat bijvoorbeeld **Bevestigde bug**, **Geen probleem
-gevonden**, **Meer bewijs nodig**, **Duplicaat**, **Buiten testscope** of **Kwaliteitspatroon
-gevonden**, met uitleg en bewijs. De productmodule verwerkt dat resultaat vervolgens in
-`UserSignalDispositionView`. Zo kan de tester zichtbaar maken wat er met een melding is gebeurd
-zonder de oorspronkelijke woorden van de melder te herschrijven.
+Status en afhandeling staan op hetzelfde `UserSignal`. De oorspronkelijke melding blijft
+onveranderlijk, maar de productmodule kan via betekenisvolle commands status, uitkomst en links naar
+een verificatie, bug, besluit of epic bijwerken. Kwaliteitsbewaking bewaart haar onderzoek en bewijs
+apart als `Verification` en roept daarna `recordSignalInvestigation(...)` op de productmodule aan.
+Zo kan de tester zichtbaar maken wat er met een melding is gebeurd zonder de oorspronkelijke woorden
+van de melder te herschrijven of rechtstreeks in de signaaltabel te schrijven.
 
 ### Epic
 
@@ -229,22 +223,20 @@ Een epic beschrijft:
 Productontwerp maakt de epic zo duidelijk en behapbaar dat Productplanning hem zonder intern
 onderzoeksdossier in kleine stories kan verdelen. Productontwerp maakt die stories niet zelf.
 
-Iedere epicversie is onveranderlijk. Zolang Productplanning een epic nog niet heeft gekozen, mag
+Iedere gepubliceerde epicversie is inhoudelijk onveranderlijk. Zolang Productplanning een epic nog niet heeft gekozen, mag
 Productontwerp een nieuwe versie publiceren en de vorige vervangen. Zodra Productplanning een exact
 epic-ID en versienummer kiest, wordt die versie bevroren. Nieuwe inzichten veranderen de gekozen
 versie niet, maar leiden tot een vervolgepic of een expliciet voorstel om de uitvoering te stoppen en
 een andere epic te kiezen.
 
-### Epicvoortgang
+### Epicstatus
 
-De epicdefinitie en de voortgang zijn twee verschillende dingen:
-
-- **Epicdefinitie** — inhoud, scope, UX en succescriteria; eigendom van Productontwerp;
-- **Epicvoortgang** — verwijzing naar de gekozen epicversie, selectie, voortgang,
-  verificatiemomenten en eindstatus; eigendom van Productplanning.
-
-Voor de gebruiker mogen die samen als één epic worden getoond. In de database heeft ieder deel
-precies één schrijvende module. `EpicProgressView` kopieert de epicinhoud en UX niet.
+Inhoud en voortgang staan op één `Epic`, waarvan Productontwerp eigenaar is. Productplanning kan een
+beschikbare versie via `claimEpicForPlanning(...)` atomair claimen en later via expliciete commands
+**Actief** of **Controleren** laten worden. Kwaliteitsbewaking kan met
+`recordEpicVerification(...)` een onveranderlijk verificatieresultaat laten verwerken. Alleen
+Productontwerp schrijft de epic en geen enkele publieke functie kan scope of UX van een geclaimde
+versie veranderen.
 
 ### Story
 
@@ -269,14 +261,15 @@ rechtstreeks als bugfix worden uitgevoerd en hoeft niet kunstmatig een epic te w
 Als meerdere bugs samen één groter probleem laten zien, kan daar wel een epic uit ontstaan. De losse
 symptomen worden dan niet eindeloos één voor één bestreden.
 
-### Epicgat
+### Ontbrekende epicdekking
 
-Een epicgat betekent dat gedrag duidelijk binnen de bevroren scope of het UX-ontwerp van een epic
-valt, maar nooit in een story is opgenomen. Kwaliteitsbewaking publiceert dan een epicgat en geen bug.
-Productplanning maakt er één of meer aanvullende stories voor.
+Wanneer gedrag duidelijk binnen de bevroren scope of UX valt maar nooit in een story is opgenomen,
+legt Kwaliteitsbewaking dat als dekkingsgat in de epicverificatie vast. Via
+`requestCompletionWork(...)` vraagt zij Productplanning om aanvullende stories. Het gat is geen
+aparte entiteit met een eigen lifecycle.
 
 Ontbrekend gedrag is wel een bug wanneer het in een uitgevoerde story was afgesproken maar niet goed
-is gebouwd. Een nieuwe wens buiten de bevroren scope is geen epicgat en geen bug; Productontwerp kan
+is gebouwd. Een nieuwe wens buiten de bevroren scope is geen dekkingsgat en geen bug; Productontwerp kan
 daar een vervolgepic van maken.
 
 ### Backlog
@@ -288,10 +281,10 @@ Een kleine verbetering die geen bug is, wordt als productstory binnen een passen
 mogelijke epic uitgewerkt. Daardoor hoeft de interface tussen de processen geen derde soort
 uitvoerbaar werk te kennen.
 
-Productplanning is eigenaar van story-inhoud en volgorde. De dispatcher binnen dezelfde module zet
-een story van `TODO` naar `IN_PROGRESS` wanneer hij haar verstuurt en naar `DONE` wanneer Software
-Factory haar heeft opgeleverd. Een gevonden afwijking heropent de oude story niet; zij leidt via een
-bug tot een nieuwe bugfixstory.
+Productplanning is eigenaar van story-inhoud, volgorde en status. De dispatcher gebruikt
+`markStoryAsDispatched(...)` na verzending en `markStoryAsDeveloped(...)` na oplevering; alleen de
+commandhandler van Productplanning zet `TODO` naar `IN_PROGRESS` of `IN_PROGRESS` naar `DONE`. Een
+gevonden afwijking heropent de oude story niet; zij leidt via een bug tot een nieuwe bugfixstory.
 
 Wanneer de dispatcher de eerste `TODO`-story verstuurt, maakt hij mechanisch een onveranderlijk
 `StoryDeliveryPackage`. Dat pakket bevat de volledige productstory of bugfixstory, bron-ID's en
@@ -488,7 +481,7 @@ Iedere module is voor de andere modules een black box: zij kennen alleen de gepu
 data-interface en weten niets van agents, prompts, stappen, scores of interne tabellen van een
 andere module.
 
-Iedere procesmodule heeft precies één uitvoerende ingang:
+Iedere procesmodule heeft precies één agentgestuurde ingang:
 
 ```java
 void runProcessSession();
@@ -496,27 +489,32 @@ void runProcessSession();
 
 Een scheduler roept deze functie aan. Eén aanroep claimt atomair hooguit één product waarvoor werk
 nodig is en voert daarvoor één begrensde processessie uit. Is er niets te doen, dan eindigt de
-aanroep als succesvolle no-op. Andere modules kunnen een proces niet starten en kunnen geen interne
-stappen aanroepen.
+aanroep als succesvolle no-op. Andere modules kunnen geen agents of interne stappen starten.
+
+Naast de runfunctie mag een module een kleine deterministische application-API aanbieden. Die bevat
+read-only queries en betekenisvolle commands zoals `claimEpicForPlanning(...)`,
+`markStoryAsDeveloped(...)` en `recordSignalInvestigation(...)`. Een command start geen agents en
+geeft geen vrije schrijftoegang: de eigenaar controleert bevoegdheid, versie, huidige status en
+idempotentie en schrijft uitsluitend zijn eigen entiteit.
 
 De modules delen fysiek één database, maar niet één vrij toegankelijk datamodel. Iedere entiteit
-heeft precies één schrijvende module. Andere modules lezen alleen de gepubliceerde velden via een
-Spring Modulith-interface. Zij schrijven nooit rechtstreeks in de tabellen van een andere module.
+heeft precies één schrijvende module. Andere modules lezen via read-only DTO's en vragen een
+toegestane wijziging alleen via de publieke Spring Modulith-interface van de eigenaar aan. Zij
+schrijven nooit rechtstreeks in de tabellen van een andere module.
 Interne entiteiten en repositories blijven buiten de named interface.
 
-Omdat de informatiestroom terugkoppelingen bevat, zouden directe Java-afhankelijkheden tussen de
-drie procesmodules cycli veroorzaken. Daarom staan alleen de stabiele DTO's en read-only queryports
-in een neutrale technische module `processcontracts`. Iedere eigenaar publiceert daarin een
-geversioneerde databaseprojectie van zijn output. Alle procesmodules mogen `processcontracts`
-gebruiken, maar mogen elkaar niet importeren. `processcontracts` bevat geen productlogica en is geen
-procesmodule.
+Stabiele owner-specifieke portinterfaces, command-DTO's en read-only query-DTO's staan in het
+neutrale `processcontracts`; de eigenaar implementeert de port. Interne JPA-entiteiten, repositories
+en agents staan daar nooit. Een DTO zoals `EpicDetails` is geen tweede database-entiteit. Waar geen
+direct antwoord nodig is, kan een duurzaam application event dezelfde overgang aanvragen. Zo
+ontstaan geen cyclische Spring Modulith-codeafhankelijkheden.
 
 ```text
 Productontwerp
 complete epicdefinitie + UX
             │
             ▼
-Productplanning ◀──── bugs, epicgaten en verificaties ──── Kwaliteitsbewaking
+Productplanning ◀──── bugs, verificaties en planverzoeken ── Kwaliteitsbewaking
             │
             │ zelfvoorzienende stories op sequenceNumber
             ▼
@@ -526,14 +524,15 @@ Software Factory-dispatcher
      Software Factory
 ```
 
-De processen communiceren dus niet met elkaars gedrag. Zij reageren tijdens hun volgende geplande
-sessie op duurzaam opgeslagen gegevens die een andere module heeft gepubliceerd.
+De intelligente processen reageren tijdens hun volgende geplande sessie op duurzaam opgeslagen
+gegevens. Deterministische lifecycle-overgangen mogen direct via de publieke module-API lopen.
 
 De **Software Factory-dispatcher** is geen vierde productproces. Het is een eenvoudige geplande
 adapter binnen Productplanning. Hij gebruikt geen agents en neemt geen productbesluiten. Hij verwerkt
 eerst de status van eerder verzonden stories. Wanneer Software Factory voor een product geen
 openstaande story meer heeft, verstuurt hij precies de `TODO`-story met het laagste `sequenceNumber`,
-zet die op `IN_PROGRESS` en bewaart het externe Software Factory-ID. Na oplevering wordt zij `DONE`.
+roept `markStoryAsDispatched(...)` aan en bewaart het externe Software Factory-ID. Na oplevering
+roept hij `markStoryAsDeveloped(...)` aan. Alleen Productplanning verandert de storystatus.
 Software Factory krijgt alle inhoud en UX in het leveringspakket en kan daarmee zelfstandig verder.
 
 ### Scheduler, processessies en frontend
@@ -543,10 +542,10 @@ De scheduler en frontend zijn verschillende technische onderdelen:
 - de **scheduler** roept op een vast ritme de drie functies `runProcessSession()` en de functie
   `runDispatchSession()` aan; hij kiest geen product, taak, epic of story;
 - ieder intelligent proces claimt na zo'n aanroep zelf een opdracht, maakt zijn eigen processessie
-  aan en schrijft na afloop zijn eigen onveranderlijke `ProcessSessionPublication`;
+  aan en schrijft na afloop zijn eigen onveranderlijke `ProcessSession`;
 - de scheduler mag sessieresultaten lezen voor monitoring en een technische retry, maar schrijft
   geen sessiepublicatie;
-- de **frontend** leest publieke databaseviews om actuele toestand en historie te tonen;
+- de **frontend** gebruikt publieke read-only queries om actuele toestand en historie te tonen;
 - een actie in de frontend wordt als command naar de application service van de eigenaarsmodule
   gestuurd en is geen rechtstreekse databasewijziging.
 
@@ -561,8 +560,8 @@ alleen de uitvoering van een stap; hij is nooit de enige plek waar actuele produ
 
 De hoofdregel is:
 
-> Eén module schrijft een entiteit. Andere modules lezen een gepubliceerde, geversioneerde weergave
-> en bewaren alleen een verwijzing naar de bron.
+> Eén module schrijft een entiteit. Andere modules lezen een read-only weergave en kunnen alleen via
+> een betekenisvol command aan de eigenaar vragen om een geldige overgang uit te voeren.
 
 Daardoor kan een proces stoppen en later verdergaan zonder dat een andere module zijn interne
 toestand hoeft te begrijpen.
@@ -571,9 +570,9 @@ toestand hoeft te begrijpen.
 
 | Proces | Gepubliceerde input | Eigen duurzame output | Betekenis voor andere modules |
 |---|---|---|---|
-| Productontwerp | productopdracht, Stakeholderrichting, backlogvoorraad, epicresultaten en kwaliteits- en gebruikerssignalen | droombeeld, complete geversioneerde epicdefinities met UX en registraties van betekenisvolle ontwerpbesluiten | welke gebruikersverbeteringen beschikbaar zijn om op te pakken |
-| Productplanning | beschikbare epicversies, uitvoerbare bugs, epicgaten, verificaties, productgrenzen en Software Factory-status | epicvoortgang en zelfvoorzienende product- en bugfixstories met `sequenceNumber` en drie statussen | welke circa tien `TODO`-stories in welke volgorde klaarstaan |
-| Kwaliteitsbewaking | testbare productconfiguratie, bevroren epicversie, stories, opleveringen en eerdere bugs | bugs, story- en epicverificaties, epicgaten, kwaliteitsbeeld en kwaliteitssignalen | wat aantoonbaar werkt, ontbreekt of verkeerd is gebouwd |
+| Productontwerp | productopdracht, Stakeholderrichting, berekende backlogvoorraad, verificaties en gebruikerssignalen | droombeeld en complete geversioneerde `Epic`-entiteiten met UX en status | welke gebruikersverbeteringen beschikbaar of actief zijn |
+| Productplanning | beschikbare epics, uitvoerbare bugs, verificaties, planverzoeken en productgrenzen | zelfvoorzienende `Story`-entiteiten met `sequenceNumber`, drie statussen en leveringsvelden | welke circa tien `TODO`-stories in welke volgorde klaarstaan |
+| Kwaliteitsbewaking | testconfiguratie, bevroren epic, stories en eerdere bugs | `Bug` en onveranderlijke `Verification` voor story, epic of gebruikerssignaal | wat aantoonbaar werkt, ontbreekt of verkeerd is gebouwd |
 
 ### De overdrachtskaart
 
@@ -583,12 +582,12 @@ productopdracht + signalen + leren
                  ▼
           Productontwerp
                  │
-      epicdefinitie + UX + versie
+          Epic + UX + versie
                  │
                  ▼
-         Productplanning ◀──── bugs + epicgaten + verificaties
+         Productplanning ◀──── bugs + verificaties + planverzoeken
                  │                         ▲
-     geordende StoryView-lijst              │
+       geordende Story-lijst                │
                  │                         │
                  ▼                         │
      Software Factory-dispatcher           │
@@ -608,16 +607,16 @@ productopdracht + signalen + leren
 ```
 
 Onderzoeksvragen, antwoorden en kansvoorstellen blijven intern binnen Productontwerp. Een lage
-backlogvoorraad maakt alle drie de processen opnieuw planbaar; Productplanning roept de andere
-processen niet rechtstreeks aan.
+backlogvoorraad maakt processen opnieuw planbaar. Alleen deterministische commands lopen direct;
+agentwerk wacht altijd op de volgende scheduler-run.
 
 ### Twee soorten status
 
 Er zijn twee soorten status die niet met elkaar verward mogen worden.
 
 **Inhoudelijke productstatus** hoort bij een duurzaam productobject en wordt alleen door de eigenaar
-geschreven. Voorbeelden zijn de epicdefinitie van Productontwerp, epicvoortgang en storystatus van
-Productplanning en de bug- en verificatiestatus van Kwaliteitsbewaking. Deze status blijft
+geschreven. Voorbeelden zijn de epicstatus van Productontwerp, de storystatus van Productplanning
+en de bugstatus van Kwaliteitsbewaking. Deze status blijft
 bestaan wanneer geen enkel proces draait.
 
 **Operationele processtatus** vertelt alleen wat de automatisering op dit moment doet. Per proces
@@ -645,32 +644,25 @@ De processen publiceren minimaal de volgende objecten:
 - **Productdoel en harde grenzen** — de vaste opdracht waar alle processen hun keuzes aan toetsen;
 - **Stakeholderrichting** — een expliciete aanwijzing, correctie of grens van de Stakeholder, met
   datum, reden en toepassingsgebied;
-- **Gebruikerssignaal** — oorspronkelijke feedback, observatie of gebruiksgegeven met bron, context
-  en bewijs, zonder er al een oplossing of conclusie van te maken;
-- **Signaalafhandeling** — afgeleide status en verwijzingen die tonen wat met een gebruikerssignaal
-  is gebeurd, zonder het oorspronkelijke signaal te wijzigen;
+- **Gebruikerssignaal** — oorspronkelijke feedback met bron en bewijs, plus actuele status,
+  verwerkingsuitkomst en links naar verificatie, bug, besluit of epic; de broninhoud blijft ongewijzigd;
 - **Droombeeld** — de actuele verre richting van Productontwerp, zichtbaar voor de
   Stakeholder maar geen overdracht naar een ander proces;
-- **Epicdefinitie** — een geversioneerde gewenste gebruikersverbetering met scope, bewijs, UX en
-  succescriteria, geschreven door Productontwerp;
-- **Epicvoortgang** — verwijzing naar de door Productplanning gekozen en bevroren epicversie met
-  voortgang, verificatiemomenten en eindstatus;
+- **Epic** — een geversioneerde gewenste gebruikersverbetering met scope, bewijs, UX, succescriteria
+  en status, uitsluitend geschreven door Productontwerp;
 - **Story** — een zelfvoorzienende productstory of bugfixstory met type, `sequenceNumber`, status
   `TODO`, `IN_PROGRESS` of `DONE`, acceptatiecriteria en alle relevante UX en assets;
 - **Bug** — een reproduceerbare afwijking met bewijs, ernst en herstelstatus;
-- **Epicgat** — ontbrekend gedrag dat wel binnen een bevroren epic viel, maar niet in een story is
-  opgenomen;
-- **Backlogvoorraad** — een berekende projectie van het aantal stories per status en of nieuwe
+- **Backlogvoorraad** — een berekend queryresultaat van het aantal stories per status en of nieuwe
   `TODO`-stories nodig zijn; geen duurzame backlogentiteit;
 - **Besluit** — een betekenisvolle keuze met onderbouwing, alternatieven, bronversies,
   toepassingsgebied, ingangsdatum en optionele einddatum of vervangingsrelatie;
-- **Opleverresultaat** — wat Software Factory heeft teruggegeven en waar het is uitgevoerd;
+- **Afleverpoging** — onveranderlijke technische historie van verzending, response, fout en retry;
 - **Storyleveringspakket** — de onveranderlijke, volledige JSON-overdracht van één story of bugfix
   naar Software Factory, inclusief UX en attachments;
-- **Storyverificatie** — het bewijs van Kwaliteitsbewaking dat een oplevering wel of niet werkt;
-- **Epicverificatie** — het bewijs of de complete gebruikersverbetering van de bevroren epic is
-  bereikt;
-- **Kwaliteitssignaal** — een structureel patroon dat Productontwerp kan onderzoeken;
+- **Verificatie** — onveranderlijk bewijs over een story, epic of gebruikerssignaal; een epiccontrole
+  kan daarin ontbrekende dekking vastleggen;
+- **Kwaliteitspatroon** — een `UserSignal` met categorie `QUALITY_PATTERN` dat Productontwerp kan onderzoeken;
 - **Overleg** — agenda, deelnemers, berichten, geraadpleegde bronnen, status en gekoppelde objecten;
 - **Overleguitkomst** — notulen met besluiten, open vragen, acties en expliciete geheugenwijzigingen;
 - **Productgeheugen** — gedeelde actuele feiten en richting voor de processen; besluiten hebben een
@@ -688,12 +680,13 @@ Een overdracht tussen processen is pas compleet wanneer:
 2. de bron en aanleiding zichtbaar zijn;
 3. precies één module eigenaar en schrijver van het object is;
 4. de publieke versie en herkomst expliciet zijn;
-5. een volgende module de informatie via een read-only interface kan ophalen;
+5. een volgende module de informatie read-only kan ophalen en alleen via een command een geldige
+   statusovergang aan de eigenaar kan vragen;
 6. het producerende proces niet hoeft te blijven draaien om de informatie te behouden.
 
-Een overdracht kan ook teruggaan. Als Kwaliteitsbewaking meerdere verwante bugs ziet, publiceert zij
-naast de losse bugs een structureel kwaliteitssignaal voor Productontwerp. Zo ontstaat terugkoppeling
-zonder dat verantwoordelijkheden door elkaar gaan lopen.
+Een overdracht kan ook teruggaan. Als Kwaliteitsbewaking meerdere verwante bugs ziet, registreert zij
+via de productmodule een `UserSignal` met categorie `QUALITY_PATTERN`. Zo ontstaat terugkoppeling
+zonder gedeeld schrijverschap.
 
 ## Database en frontend
 
@@ -754,7 +747,7 @@ gelden:
 - de herkomst, geldigheid en reikwijdte van ieder kennisitem.
 
 Betekenisvolle keuzes staan niet als vrije geheugenregel in Productgeheugen, maar als
-`DecisionRecordView` in het Besluitenregister. Een intern leerresultaat wordt pas gedeelde
+`DecisionRecord` in het Besluitenregister. Een intern leerresultaat wordt pas gedeelde
 productwaarheid wanneer het leidt tot een concreet publiek productobject, een productregel of een
 geregistreerd besluit.
 
@@ -829,13 +822,13 @@ doorwerking is een expliciete, controleerbare wijziging. Een overleg kan zo tege
 gekozen epic in Productontwerp bijsturen, een prioriteitsgrens voor Productplanning vastleggen en een
 gebruikerssignaal voor Kwaliteitsbewaking opleveren.
 
-Voor Kwaliteitsbewaking kan een overleg een `UserSignalView` opleveren wanneer de Stakeholder meldt
+Voor Kwaliteitsbewaking kan een overleg een `UserSignal` opleveren wanneer de Stakeholder meldt
 dat iets mogelijk niet goed werkt of nadrukkelijk onderzocht moet worden. Zo'n melding kan worden
 gecategoriseerd als `QUALITY_CONCERN` en bevat de oorspronkelijke observatie, het betrokken
 productgebied, gewenste aandacht, urgentie, context, eventueel bewijs en het bronoverleg-ID. Het is
 nog geen bewezen bug en schrijft het testresultaat niet voor.
 
-`StakeholderDirectionView` blijft gereserveerd voor echte productrichting: een bindende grens,
+`StakeholderDirection` blijft gereserveerd voor echte productrichting: een bindende grens,
 correctie, stopbesluit of wijziging van de opdracht binnen het mandaat. Extra aandacht vragen voor
 een mogelijk kwaliteitsprobleem is een signaal en geen aparte richtingsoort.
 
@@ -847,8 +840,9 @@ complete, behapbare epicdefinities met UX publiceren. Productontwerp maakt geen 
 Onderzoek, bewijs, kansvoorstellen, UX-verkenning, technische verkenning en epicvorming zijn interne
 onderdelen van dezelfde module. Andere modules zien alleen het gekozen epicresultaat.
 
-**Uitvoering:** alleen de scheduler roept `runProcessSession()` aan. De module kiest zelf het product
-en de interne onderzoeks- of epictaak die op dat moment de meeste waarde heeft.
+**Uitvoering:** alleen de scheduler roept de agentgestuurde `runProcessSession()` aan. De module kiest
+zelf het product en de interne onderzoeks- of epictaak. Publieke commands kunnen uitsluitend de
+status van een epic volgens de vaste lifecycle veranderen; ze starten geen ontwerpwerk.
 
 ### Inputinterface
 
@@ -857,10 +851,10 @@ en de interne onderzoeks- of epictaak die op dat moment de meeste waarde heeft.
 | Stakeholderprofiel | product-/overlegmodule | wie richting mag geven, hoe overleg plaatsvindt en waar het beslissingsmandaat eindigt |
 | Productopdracht | productmodule; bevestigd door de Stakeholder | doelgroep, productdoel, harde grenzen, repository en producttoegang |
 | Stakeholderrichting | overleg/productmodule | actuele correcties en expliciete beslissingen |
-| Backlogvoorraad en epicvoortgang | Productplanning | of nieuwe epics nodig zijn en welke epicversies al bevroren zijn |
-| Leverings- en epicverificatie | Productplanning en Kwaliteitsbewaking | wat eerdere epics werkelijk hebben opgeleverd |
-| Kwaliteitsbeeld en kwaliteitssignaal | Kwaliteitsbewaking | structurele problemen die een nieuwe epic kunnen rechtvaardigen |
-| Gebruikerssignaal en afhandeling | productmodule | oorspronkelijke feedback, observatie of gebruiksgegeven plus wat er al mee is gebeurd |
+| Berekende backlogvoorraad | Productplanning-query | of nieuwe epics nodig zijn |
+| Stories en verificaties | Productplanning en Kwaliteitsbewaking | wat eerdere epics werkelijk hebben opgeleverd |
+| Berekend kwaliteitsbeeld | Kwaliteitsbewaking-query | structurele problemen die een nieuwe epic kunnen rechtvaardigen |
+| Gebruikerssignaal | productmodule | oorspronkelijke feedback plus actuele status en resultaatkoppelingen |
 
 Externe bronnen worden tijdens een sessie opgehaald en intern als bronregistratie opgeslagen. Ruwe
 bronnen, onderzoeksdossiers, hypotheses en kansvoorstellen steken de modulegrens niet over.
@@ -870,10 +864,10 @@ bronnen, onderzoeksdossiers, hypotheses en kansvoorstellen steken de modulegrens
 | Gegeven | Betekenis |
 |---|---|
 | Droombeeld | geversioneerd beeld van hoe het product zijn opdracht op lange termijn uitzonderlijk goed kan vervullen; zichtbaar voor de Stakeholder |
-| Epicdefinitie | geversioneerde, behapbare gebruikersverbetering met eenduidige scope, bewijs, compleet UX-ontwerp, risico's en succescriteria |
+| Epic | geversioneerde, behapbare gebruikersverbetering met status, eenduidige scope, bewijs, compleet UX-ontwerp, risico's en succescriteria |
 | Besluitregistratie | betekenisvolle ontwerpkeuze met korte onderbouwing, alternatieven, bronversies en geldigheid voor het centrale Besluitenregister |
 
-De enige inhoudelijke overdracht van Productontwerp naar Productplanning is de epicdefinitie. Het
+De enige inhoudelijke overdracht van Productontwerp naar Productplanning is de epic. Het
 droombeeld is zichtbare productrichting, geen uitvoerbaar werk. Leerresultaten en onderzoeksdossiers
 blijven intern bij Productontwerp; alleen hun concrete publieke gevolg en eventuele besluitregistratie
 gaan over de modulegrens.
@@ -888,26 +882,26 @@ epicversie is bevroren en wordt nooit stilletjes aangepast. De interne werking s
 verdelen en voor ieder actief product ongeveer tien geprioriteerde `TODO`-stories klaarzetten. Een
 story is een productstory of bugfixstory.
 
-**Uitvoering:** alleen de scheduler roept `runProcessSession()` aan. De sessie vult en herordent de
-backlog, maar verstuurt zelf niets naar Software Factory.
+**Uitvoering:** alleen de scheduler roept de agentgestuurde `runProcessSession()` aan. De sessie vult
+en herordent de backlog, maar verstuurt zelf niets naar Software Factory. De dispatcher gebruikt
+deterministische storycommands voor verzending en oplevering.
 
 ### Inputinterface
 
 | Gegeven | Eigenaar en herkomst | Betekenis voor Productplanning |
 |---|---|---|
 | Stakeholderprofiel | product-/overlegmodule | geldig beslissingsmandaat en contactcontext achter Stakeholderrichting |
-| Beschikbare epicdefinitie | Productontwerp | kandidaat om als exacte, bevroren versie te kiezen en in stories te verdelen |
+| Beschikbare epic | Productontwerp | kandidaat om via `claimEpicForPlanning(...)` als exacte versie te bevriezen en in stories te verdelen |
 | Uitvoerbare bug | Kwaliteitsbewaking | bron voor een complete bugfixstory, inclusief ernst en bewijs |
-| Epicgat | Kwaliteitsbewaking | ontbrekend gedrag binnen de bevroren epic waarvoor aanvullende stories nodig zijn |
+| Verificatie en planverzoek | Kwaliteitsbewaking | bewezen bug of ontbrekende epicdekking waarvoor vervolgwerk nodig is |
 | Productopdracht en Stakeholderrichting | productmodule | grenzen en expliciete prioriteitsaanwijzingen |
-| Leveringsstatus | Software Factory-dispatcher | of een eerder verzonden item nog open, opgeleverd of geblokkeerd is |
-| Story- en epicverificatie | Kwaliteitsbewaking | of werk afgerond is en of de hele epic geslaagd kan worden afgesloten |
+| Story met leveringsvelden | Productplanning zelf, bijgewerkt via dispatchercommands | of een eerder verzonden item nog open, opgeleverd of geblokkeerd is |
+| Verificatie | Kwaliteitsbewaking | of werk goed is en of de hele epic geslaagd kan worden afgesloten |
 
 ### Outputinterface
 
 | Gegeven | Betekenis |
 |---|---|
-| Epicvoortgang | verwijzing naar gekozen epic-ID en versie, bevriezingsmoment, voortgang, verificatiemomenten en eindstatus |
 | Story | complete productstory of bugfixstory met `sequenceNumber`, status `TODO`, `IN_PROGRESS` of `DONE`, acceptatiecriteria en relevante UX en assets |
 | Backlog | berekende lijst van alle stories die niet `DONE` zijn, geordend op `sequenceNumber`; geen aparte entiteit |
 | Besluitregistratie | betekenisvolle epic-, prioriteits- of afsluitkeuze voor het centrale Besluitenregister |
@@ -918,9 +912,10 @@ of lager komt, wordt de berekende `aanvullingNodig` waar. De drie processen herk
 volgende geplande aanroep als planbare aanleiding. De grens en het streefpeil zijn
 productconfiguratie; HKH start met vier en tien.
 
-Productplanning is de enige schrijver van epicvoortgang, story-inhoud en `sequenceNumber`. De
-dispatcher binnen dezelfde module beheert alleen de toegestane externe storyvelden en
-statusovergangen.
+Productplanning is de enige schrijver van `Story`, story-inhoud en `sequenceNumber`. Zij vraagt
+epicstatusovergangen via commands aan Productontwerp. De dispatcher beheert geen story rechtstreeks,
+maar gebruikt `markStoryAsDispatched(...)`, `markStoryAsDeveloped(...)` en
+`recordDispatchFailure(...)`.
 De interne werking en de dispatcher staan in
 [Productplanning](product-factory-v2-productplanning.md).
 
@@ -929,8 +924,8 @@ De interne werking en de dispatcher staan in
 **Doel:** de werkende applicatie voortdurend onderzoeken, losse opleveringen verifiëren en na de
 laatste story vaststellen of de complete bevroren epic de bedoelde gebruikersverbetering bereikt.
 
-**Uitvoering:** alleen de scheduler roept `runProcessSession()` aan. De module kiest zelf één product
-en een begrensde testsessie op basis van opleveringen, risico en testrotatie.
+**Uitvoering:** alleen de scheduler roept de agentgestuurde `runProcessSession()` aan. De module kiest
+zelf één product en een begrensde testsessie. Publieke commands starten geen tests.
 
 ### Inputinterface
 
@@ -939,36 +934,34 @@ en een begrensde testsessie op basis van opleveringen, risico en testrotatie.
 | Stakeholderprofiel | product-/overlegmodule | wie kwaliteitsgrenzen en gemelde risico's bevoegd mag verduidelijken |
 | Stakeholderrichting | overleg/productmodule | bindende productgrens, correctie, stopbesluit of opdrachtwijziging; een kwaliteitszorg is een gebruikerssignaal |
 | Testbare productconfiguratie | productmodule | URL's, toegestane accounts, routes en testgrenzen |
-| Oplevering en externe storyreferentie | Software Factory-dispatcher | wat nieuw of gewijzigd is en waar het getest kan worden |
-| Bevroren epicdefinitie en UX | Productontwerp via de door Productplanning gekozen versie | scope, complete gebruikersroute en succescriteria |
-| Stories en epicvoortgang | Productplanning | verwacht gedrag, storytype en wanneer een volledige epiccontrole nodig is |
+| Story met oplevering en externe referentie | Productplanning | wat nieuw of gewijzigd is en waar het getest kan worden |
+| Bevroren epic en UX | Productontwerp | scope, complete gebruikersroute, succescriteria en wanneer epiccontrole nodig is |
+| Stories | Productplanning | verwacht gedrag en storytype |
 | Bestaande bugs | Kwaliteitsbewaking zelf | wat moet worden hergetest en welke patronen al bekend zijn |
-| Gebruikerssignaal en afhandeling | productmodule | oorspronkelijke melding, context, bewijs en wat er al mee is gebeurd |
+| Gebruikerssignaal | productmodule | oorspronkelijke melding, context, bewijs, status en resultaatkoppelingen |
 
 ### Outputinterface
 
 | Gegeven | Betekenis |
 |---|---|
 | Bug | reproduceerbare afwijking met verwacht en werkelijk gedrag, bewijs, impact, ernst en herstelstatus |
-| Storyverificatie | oordeel met bewijs over een productstory of bugfix: geslaagd, afgekeurd of geblokkeerd |
-| Epicverificatie | oordeel of de volledige epic geslaagd, onvolledig, niet aantoonbaar, geblokkeerd of niet geslaagd is |
-| Epicgat | gedrag uit de bevroren scope of UX waarvoor Productplanning nooit een story maakte |
-| Signaalonderzoeksresultaat | zichtbaar oordeel over een onderzocht gebruikerssignaal, met uitleg, bewijs en eventuele koppeling naar bug of kwaliteitspatroon |
-| Kwaliteitsbeeld | actuele samenvatting van dekking, belangrijke risico's en recent onderzochte gebieden |
-| Kwaliteitssignaal | structureel patroon of onjuiste productaanname die Productontwerp kan onderzoeken |
+| Verificatie | onveranderlijk oordeel met bewijs over een story, epic of gebruikerssignaal; kan ontbrekende epicdekking bevatten |
+| Kwaliteitsbeeld | berekende samenvatting van dekking, belangrijke risico's en recent onderzochte gebieden |
 
-Kwaliteitsbewaking maakt geen stories en bepaalt geen backlogpositie. Productplanning verwerkt bugs,
-epicgaten en epicverificaties. De interne werking staat in
+Kwaliteitsbewaking maakt geen stories en bepaalt geen backlogpositie. Zij vraagt bugfixes en
+aanvullend werk via commands aan Productplanning en geeft epic- en signaaluitkomsten via commands aan
+hun eigenaar door. De interne werking staat in
 [Kwaliteitsbewaking](product-factory-v2-kwaliteitsbewaking.md).
 
 ## Hoe de drie processen elkaar in beweging houden
 
-De processen vormen geen synchrone keten en roepen elkaar niet aan. Iedere module leest tijdens een
-geplande sessie de nieuwste gepubliceerde gegevens:
+Agentgestuurde processessies vormen geen synchrone keten. Iedere module leest tijdens een geplande
+sessie de nieuwste gegevens. Deterministische commands kunnen wel direct een geldige statusovergang
+bij de eigenaar uitvoeren:
 
 - Productontwerp kan intern nieuw onderzoek naar een complete epic laten doorstromen;
 - Productplanning kan via de backlogvoorraad zichtbaar maken dat nieuwe epics of stories nodig zijn;
-- Kwaliteitsbewaking kan een bug, epicgat of structureel productprobleem vinden;
+- Kwaliteitsbewaking kan een bug, dekkingsgat of structureel productprobleem vinden;
 - opgeleverde stories kunnen het droombeeld of de epicvolgorde veranderen;
 - Productontwerp verwerkt de uitkomst van een afgeronde epic intern als leerresultaat en registreert
   alleen een besluit wanneer daar een concrete keuze uit volgt.
@@ -1073,7 +1066,7 @@ alle niet-afgeronde stories de berekende backlog:
 
 ```text
 Productontwerp ──→ bevroren epic ──→ Productplanning ──→ productstories ──┐
-                                                                          ├─→ StoryView[]
+                                                                          ├─→ Story[]
 Kwaliteitsbewaking ─────────────────────→ bugs ──→ Productplanning ───────┘
                                                                                │
                                                                                ▼
@@ -1086,13 +1079,13 @@ Kwaliteitsbewaking ────────────────────�
 De dispatcher synchroniseert eerst eerder verstuurd werk. Alleen wanneer Software Factory voor het
 product geen openstaande story heeft, verstuurt hij precies de `TODO`-story met het laagste
 `sequenceNumber` als volledig `StoryDeliveryPackage`. Hij kan geen story overslaan, de volgorde
-wijzigen of UX aanvullen. De volgende geplande processessie verwerkt de duurzaam opgeslagen
-leverings- en verificatieresultaten.
+wijzigen of UX aanvullen. Hij gebruikt alleen de publieke storycommands van Productplanning. De
+volgende geplande processessie verwerkt stories en duurzaam opgeslagen verificaties.
 
 ## Wanneer een epic klaar is
 
-Alle stories op `DONE` betekent nog niet automatisch dat de epic geslaagd is. Productplanning
-zet de epicvoortgang dan op **Controleren**. Kwaliteitsbewaking controleert daarna het geheel tegen
+Alle stories op `DONE` betekent nog niet automatisch dat de epic geslaagd is. Productplanning roept
+`requestEpicVerification(...)` op Productontwerp aan. Kwaliteitsbewaking controleert daarna het geheel tegen
 de bevroren scope, het UX-ontwerp en de succescriteria.
 
 Kwaliteitsbewaking publiceert één van deze uitkomsten:
@@ -1105,19 +1098,19 @@ Kwaliteitsbewaking publiceert één van deze uitkomsten:
 - **Niet geslaagd** — alles werkt zoals ontworpen, maar het bedoelde gebruikersresultaat is niet
   bereikt.
 
-Productplanning is de enige schrijver van de epicvoortgang en verwerkt dit oordeel:
+Kwaliteitsbewaking bewaart het oordeel als `Verification`; Productontwerp is de enige schrijver van
+de epicstatus en verwerkt het via `recordEpicVerification(...)`:
 
-- bij **Geslaagd** sluit zij de epicvoortgang als **Geslaagd** af;
+- bij **Geslaagd** sluit Productontwerp de epic als **Geslaagd** af;
 - bij een echte bouwfout maakt zij een nieuwe bugfixstory op `TODO`;
-- bij een epicgat maakt zij aanvullende stories binnen dezelfde bevroren epic;
+- bij een dekkingsgat vraagt Kwaliteitsbewaking aanvullende stories aan binnen dezelfde bevroren epic;
 - bij **Niet aantoonbaar** blijft de epic op **Controleren**;
-- bij **Niet geslaagd** sluit zij de uitvoering met die uitkomst; Productontwerp leest de
-  epicverificatie en verwerkt de conclusie intern;
+- bij **Niet geslaagd** registreert Productontwerp die uitkomst en verwerkt de conclusie intern;
 - een moeilijk herstelbare richtingswijziging stopt de oude uitvoering en begint alleen via een
   nieuw gekozen epic-ID of een nieuwe epicversie.
 
-Kwaliteitsbewaking schrijft dus geen stories en sluit de epic niet administratief. Zij levert het
-inhoudelijke bewijs; Productplanning verwerkt de status.
+Kwaliteitsbewaking schrijft dus geen stories of epics. Zij levert het inhoudelijke bewijs en vraagt
+de eigenaar via een command om het vervolg; de eigenaar valideert en schrijft zijn eigen entiteit.
 
 ## Wat de Stakeholder doet en wat agents doen
 
@@ -1203,10 +1196,10 @@ Hier zie je in één oogopslag:
 ### 2. Inbox
 
 Hier staan nieuwe feedback, observaties, ideeën en onderzoeksinzichten. Per gebruikerssignaal blijven
-de oorspronkelijke tekst, bron, context en bijlagen zichtbaar, samen met een afzonderlijke
-  afhandelstatus en koppelingen naar onderzoek, besluit, epic, bug of kwaliteitssignaal. Je kunt
+de oorspronkelijke tekst, bron, context en bijlagen zichtbaar, samen met de actuele status en
+koppelingen naar verificatie, besluit, epic of bug. Je kunt
 signalen bekijken en een onderzoeksverzoek indienen. De productmodule registreert het signaal en
-werkt de afhandelstatus bij op basis van gepubliceerde procesresultaten; het Inbox-scherm schrijft
+werkt status en koppelingen bij via haar commands; het Inbox-scherm schrijft
 niet rechtstreeks in de database. Bugs komen vanuit Kwaliteitsbewaking in de aparte
 productgezondheidslijst.
 
@@ -1240,12 +1233,12 @@ Overleggen en geheugen hoeven geen extra hoofdscherm te worden. Vanuit Product e
 Stakeholder een overleg openen of starten. Een aparte secundaire weergave toont alle overleggen en de
 geschiedenis van agent-, proces- en productgeheugen, inclusief vervangen en ingetrokken items.
 
-## Eenvoudige statussen voor epicvoortgang en stories
+## Eenvoudige statussen voor epics en stories
 
-Productplanning beheert de epicvoortgang en stories. Een `EpicProgressView` gebruikt:
+Productontwerp beheert de epic; Productplanning beheert stories. Een `Epic` gebruikt:
 
-- **Geselecteerd** — een exact epic-ID en versienummer zijn gekozen en bevroren;
-- **Stories maken** — Productplanning deelt de epic in uitvoerbaar werk;
+- **Beschikbaar** — Productplanning mag deze complete versie kiezen;
+- **In planning** — een exact epic-ID en versienummer zijn geclaimd en bevroren;
 - **Actief** — één of meer stories worden uitgevoerd;
 - **Controleren** — alle geplande stories zijn klaar en Kwaliteitsbewaking controleert het geheel;
 - **Geslaagd** — de bedoelde gebruikersverbetering is bewezen;
@@ -1258,9 +1251,9 @@ Stories gebruiken precies drie statussen:
 - `IN_PROGRESS` — naar Software Factory gestuurd en daar nog open;
 - `DONE` — door Software Factory opgeleverd.
 
-De backlog is de query op stories die niet `DONE` zijn. Blokkades en fijnere externe statussen staan
-in `SoftwareFactoryWorkView`; verificatie staat in `StoryVerificationView`. Een bug houdt daarnaast
-zijn eigen herstelstatus in Kwaliteitsbewaking.
+De backlog is de query op stories die niet `DONE` zijn. Actuele externe velden staan op `Story` en
+retryhistorie in `DeliveryAttempt`; inhoudelijk testbewijs staat in `Verification`. Een bug houdt
+daarnaast zijn eigen herstelstatus in Kwaliteitsbewaking.
 
 ## Regels die versie 2 eenvoudig houden
 
@@ -1293,14 +1286,15 @@ zijn eigen herstelstatus in Kwaliteitsbewaking.
     maken.
 26. Iedere intelligente procesmodule heeft alleen `runProcessSession()` als agentgestuurde ingang;
     de dispatcher is een afzonderlijke technische adapter zonder productlogica.
-27. Iedere gepubliceerde entiteit heeft precies één schrijvende module.
-28. Andere modules lezen gegevens alleen via de gepubliceerde Spring Modulith-interface.
+27. Iedere duurzame entiteit heeft precies één schrijvende module.
+28. Andere modules lezen via read-only queries en vragen wijzigingen alleen via betekenisvolle
+    commands aan de eigenaar; algemene setters en repositorytoegang zijn verboden.
 29. De dispatcher neemt geen productbesluiten en verstuurt alleen de eerste `TODO`-story op `sequenceNumber`.
 30. Als HKH vier of minder `TODO`-stories heeft, worden nieuwe processessies planbaar gemaakt.
 31. Productontwerp mag een niet-gekozen epic herzien, maar nooit een gekozen epicversie wijzigen.
 32. Alle stories afgerond is niet hetzelfde als een geslaagde epic.
-33. Kwaliteitsbewaking maakt bugs en epicgaten, maar geen stories.
-34. Alleen Productplanning verandert de epicvoortgang en sluit haar na inhoudelijke verificatie af.
+33. Kwaliteitsbewaking maakt bugs en verificaties, maar geen stories of aparte epicgaten.
+34. Alleen Productontwerp verandert de epicstatus en sluit haar na inhoudelijke verificatie af.
 35. Interne leerresultaten blijven bij Productontwerp; betekenisvolle keuzes staan met begin-,
     eind- en vervangingsrelaties in het Besluitenregister.
 
@@ -1360,14 +1354,14 @@ niet iedere mogelijke bron of vorm van automatisering te ondersteunen.
 
 ### Minimaal voor Productplanning
 
-1. één exact epic-ID en versienummer kiezen en bevriezen;
+1. één exact epic-ID en versienummer kiezen en via `claimEpicForPlanning(...)` bevriezen;
 2. de gekozen epic in kleine, testbare en zelfstandige productstories verdelen, met relevante UX en
    ontwerpassets in iedere story;
-3. productstories, bugs en epicgaten verwerken zonder de epicdefinitie te wijzigen;
+3. productstories, bugs en dekkingsgaten uit verificaties verwerken zonder de epic te wijzigen;
 4. ongeveer tien `TODO`-stories met een uitlegbaar `sequenceNumber` onderhouden;
 5. bij vier of minder `TODO`-stories de berekende `aanvullingNodig` publiceren;
-6. story- en epicverificaties in epicvoortgang en vervolgwerk verwerken;
-7. een epic alleen als **Geslaagd** afsluiten na een geslaagde epicverificatie;
+6. verificaties in vervolgwerk en gevalideerde epiccommands verwerken;
+7. Productontwerp een epic alleen als **Geslaagd** laten afsluiten na een geslaagde verificatie;
 8. via de eenvoudige dispatcher precies één story tegelijk naar Software Factory sturen.
 
 ### Minimaal voor Kwaliteitsbewaking
@@ -1377,9 +1371,9 @@ niet iedere mogelijke bron of vorm van automatisering te ondersteunen.
 3. een reproduceerbare bug met bewijs en voorgestelde ernst maken;
 4. bugs als uitvoerbare input voor Productplanning publiceren;
 5. na alle stories de complete epic tegen scope, UX en succescriteria controleren;
-6. een epicgat publiceren wanneer gedrag binnen de epic nooit in een story is opgenomen;
+6. ontbrekende epicdekking in de epicverificatie vastleggen en aanvullend planwerk aanvragen;
 7. een epic als **Geslaagd**, **Onvolledig**, **Niet aantoonbaar**, **Geblokkeerd** of **Niet geslaagd** beoordelen;
-8. patronen en onjuiste productaannames als kwaliteitssignaal naar Productontwerp sturen.
+8. patronen en onjuiste productaannames als `UserSignal` met categorie `QUALITY_PATTERN` registreren.
 
 ### Minimaal voor de Software Factory-dispatcher
 
@@ -1392,10 +1386,10 @@ niet iedere mogelijke bron of vorm van automatisering te ondersteunen.
 
 ### Minimaal voor de frontend
 
-1. alle actuele en historische productentiteiten vanuit de database leesbaar tonen;
-2. per gebruikerssignaal de oorspronkelijke inhoud en afzonderlijke afhandelstatus tonen;
+1. alle actuele en historische productentiteiten via read-only queries leesbaar tonen;
+2. per gebruikerssignaal de oorspronkelijke inhoud, actuele status en resultaatkoppelingen tonen;
 3. relevante versies en herkomst zichtbaar maken en waar nuttig vergelijken;
-4. wijzigingen uitsluitend via de application service van de eigenaarsmodule laten lopen.
+4. wijzigingen uitsluitend via betekenisvolle commands van de eigenaarsmodule laten lopen.
 
 ### Minimaal voor overleggen en geheugen
 

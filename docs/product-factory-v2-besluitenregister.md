@@ -8,7 +8,7 @@ of een andere bevoegde eigenaar neemt het besluit en levert daarna een registrat
 
 Het Besluitenregister is geen vierde intelligent proces. Het heeft geen agents, geen scheduler en
 geen `runProcessSession()`. Het is een ondersteunende Spring Modulith-module met gewone application
-commands, eigen tabellen in dezelfde fysieke productdatabase en een read-only projectie voor de
+commands, eigen tabellen in dezelfde fysieke productdatabase en read-only queries voor de
 frontend.
 
 ## Wat wel en niet een besluit is
@@ -46,9 +46,9 @@ Procesmodules krijgen geen repository van het Besluitenregister. Zij leveren een
 gepubliceerd application event met een idempotentiesleutel. Alleen het Besluitenregister vormt en
 schrijft het duurzame besluitrecord.
 
-De publieke leesinterface is `DecisionRecordView`. Andere processen gebruiken dit generieke record
+De publieke leesinterface retourneert `DecisionDetails`. Dit DTO is geen tweede entiteit. Andere processen gebruiken dit generieke record
 niet als vervanging van hun inhoudelijke contracten. Productplanning blijft bijvoorbeeld
-`EpicDefinitionView` lezen en niet een besluittekst interpreteren om een epic te bouwen. Het
+`EpicDetails` lezen en niet een besluittekst interpreteren om een epic te bouwen. Het
 besluitenregister is primair voor audit, uitleg, de frontend en de afhandeling van expliciet aan een
 gebruikerssignaal gekoppelde ontwerpbesluiten.
 
@@ -101,12 +101,13 @@ besluit en herschrijft de historische registratie niet stilletjes.
 
 `LearningResult` blijft een interne entiteit van Productontwerp. Het kan onderzoek, hypotheses,
 tegenspraak en uitgebreide conclusies bevatten. Alleen wanneer daar een concrete keuze uit volgt,
-registreert Productontwerp een `DecisionRecordView` met een korte onderbouwing en verwijzingen naar
+registreert Productontwerp een `DecisionRecord` met een korte onderbouwing en verwijzingen naar
 de interne bronregistratie of publieke bewijsentiteiten.
 
 Als Productontwerp een gebruikerssignaal beoordeelt maar geen epic maakt, registreert het een besluit
-met soort **Signaalbeoordeling** en het signaal-ID. De productmodule kan daarmee
-`UserSignalDispositionView` actualiseren. Het volledige interne leerresultaat wordt niet publiek.
+met soort **Signaalbeoordeling** en het signaal-ID. Productontwerp roept daarna een command op de
+productmodule aan om de status en besluitkoppeling op `UserSignal` te actualiseren. Het volledige
+interne leerresultaat wordt niet publiek.
 
 ## Eigenaarschap en lezen
 
@@ -114,7 +115,7 @@ met soort **Signaalbeoordeling** en het signaal-ID. De productmodule kan daarmee
 |---|---|
 | Bronmodule of bevoegde Stakeholder via productbediening | neemt het besluit en levert inhoud, onderbouwing, bronnen en geldigheid aan |
 | Besluitenregister | maakt het besluitrecord, bewaakt idempotentie, geldigheidsperioden, intrekking en vervanging |
-| Frontend | leest actieve en historische `DecisionRecordView`-objecten en toont waarom en wanneer een besluit gold |
+| Frontend | leest actieve en historische `DecisionDetails`-objecten en toont waarom en wanneer een besluit gold |
 | Procesmodules | blijven hun specifieke procescontracten lezen; zij mogen relevante besluiten tonen of als gecontroleerde context gebruiken, maar niet als ongetypeerde opdracht uitvoeren |
 
 De frontend biedt per product een chronologische besluitenlijst en toont bij ieder betrokken object
@@ -133,6 +134,6 @@ bronnen.
   geen geplande processessie voor nodig.
 - Historische besluiten worden nooit fysiek verwijderd om een actuele projectie eenvoudiger te
   maken.
-- Een `DecisionRecordView` bevat geen geheime prompts, verborgen chain-of-thought, tokens of secrets.
+- `DecisionDetails` bevat geen geheime prompts, verborgen chain-of-thought, tokens of secrets.
 - Inhoudelijke productentiteiten blijven de bron voor uitvoering; het besluit verwijst ernaar en
   kopieert ze niet volledig.

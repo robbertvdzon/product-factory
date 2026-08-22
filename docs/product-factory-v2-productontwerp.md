@@ -12,18 +12,20 @@ Productontwerp onderzoekt hoe een product zijn opdracht beter kan vervullen en z
 om in complete, behapbare epicdefinities. Iedere epic bevat een eenduidige gebruikersverbetering,
 duidelijke scope, bewijs, een volledig actueel UX-ontwerp en succescriteria.
 
-Productontwerp maakt geen stories, beheert geen backlog en verandert geen epicvoortgang. De module
-levert de bouwtekening; Productplanning kiest een exacte versie en maakt daar uitvoerbaar werk van.
+Productontwerp maakt geen stories en beheert geen backlog. De module is eigenaar van de complete
+`Epic`: inhoud, UX, versie en levenscyclusstatus. Productplanning en Kwaliteitsbewaking kunnen de
+epicstatus alleen via betekenisvolle commands van Productontwerp veranderen; zij krijgen nooit
+schrijftoegang tot de epic of haar repository.
 
 De module is eigenaar van:
 
 - het actuele droombeeld en zijn versies;
 - onderzoeksdossiers, bronnen, bewijsclaims en interne kansvoorstellen;
-- epicdefinities, versies, scope, UX-ontwerp en succescriteria;
+- epics, versies, scope, UX-ontwerp, succescriteria en epicstatus;
 - leerresultaten over productrichting en gebruikerswaarde;
 - het eigen agent- en procesgeheugen.
 
-## Publieke procesfunctie
+## Publieke module-interface
 
 De enige agentgestuurde ingang is:
 
@@ -36,30 +38,40 @@ De module claimt zelf atomair de belangrijkste planbare sessie. Per product kan 
 van Productontwerp tegelijk actief zijn. Zonder planbaar werk eindigt de functie als succesvolle
 no-op.
 
-Andere modules kunnen geen onderzoek starten, geen UX-stap aanroepen en geen epic laten herschrijven.
-Zij publiceren alleen gegevens die Productontwerp tijdens een volgende sessie kan lezen.
+Daarnaast heeft de module een kleine deterministische command- en query-interface:
+
+```java
+EpicDetails getEpic(EpicId epicId);
+List<EpicDetails> findAvailableEpics(ProductId productId);
+void claimEpicForPlanning(ClaimEpicForPlanningCommand command);
+void markEpicActive(MarkEpicActiveCommand command);
+void requestEpicVerification(RequestEpicVerificationCommand command);
+void recordEpicVerification(RecordEpicVerificationCommand command);
+void stopEpic(StopEpicCommand command);
+```
+
+Deze functies starten geen agents. Ze valideren bevoegdheid, verwachte versie en toegestane
+statusovergang en schrijven de wijziging atomair op de eigen `Epic`. Andere modules kunnen geen
+onderzoek of UX-stap starten en kunnen epicinhoud nooit via deze interface herschrijven.
 
 ## Interface met andere modules en services
 
-De procesmodules importeren elkaar niet. Stabiele DTO's, read-only queryports en geversioneerde
-databaseprojecties staan in de technische module `processcontracts`. Productontwerp schrijft
-uitsluitend zijn eigen publicaties en leest alleen publicaties van andere eigenaren.
+Procesmodules gebruiken alleen elkaars publieke Spring Modulith-API. Queries leveren read-only DTO's
+uit `processcontracts`; een DTO is geen tweede database-entiteit. Commands drukken een concrete
+domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 
 ### Input
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
-| `StakeholderProfileView` | product-/overlegmodule | identiteit, contactwijze, rol en beslissingsmandaat van de Stakeholder |
-| `ProductAssignmentView` | productmodule | doelgroep, productdoel, harde grenzen, repository en toegestane toegang |
-| `StakeholderDirectionView` | product-/overlegmodule | bindende richting en expliciete correcties |
-| `UserSignalView` | productmodule | oorspronkelijke feedback, observatie of gebruiksgegeven met bron, context en bewijs |
-| `UserSignalDispositionView` | productmodule | afgeleide status, bestaande koppelingen en wat al met het signaal is gebeurd |
-| `BacklogSupplyView` | Productplanning | of nieuwe beschikbare epics extra urgent zijn |
-| `EpicProgressView` | Productplanning | welke exacte epicversies zijn gekozen en dus niet meer gewijzigd mogen worden |
-| `DeliveryResultView` | Software Factory-dispatcher | wat Software Factory werkelijk heeft opgeleverd |
-| `EpicVerificationView` | Kwaliteitsbewaking | of de bedoelde gebruikersverbetering is bereikt |
-| `QualitySignalView` | Kwaliteitsbewaking | terugkerende problemen en onjuiste productaannames |
-| `QualityOverviewView` | Kwaliteitsbewaking | productgezondheid en onderbelichte risicogebieden |
+| `StakeholderDetails` | product-/overlegmodule | identiteit, contactwijze, rol en beslissingsmandaat van de Stakeholder |
+| `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en toegestane toegang |
+| `StakeholderDirectionDetails` | product-/overlegmodule | bindende richting en expliciete correcties |
+| `UserSignalDetails` | productmodule | oorspronkelijke feedback plus actuele status, uitkomst en resultaatkoppelingen |
+| `BacklogSupply` | Productplanning-query | berekende voorraad en of nieuwe beschikbare epics extra urgent zijn |
+| `StoryDetails` | Productplanning-query | wat Software Factory heeft opgeleverd en welke story bij een epic hoort |
+| `VerificationDetails` | Kwaliteitsbewaking-query | of de bedoelde gebruikersverbetering is bereikt en welk bewijs daarbij hoort |
+| `QualityOverview` | Kwaliteitsbewaking-query | berekend beeld van productgezondheid en onderbelichte risicogebieden |
 
 Voor iedere gelezen publicatie worden bron-ID en bronversie vastgelegd. Dezelfde versie wordt niet
 tweemaal als nieuwe input behandeld.
@@ -67,32 +79,33 @@ tweemaal als nieuwe input behandeld.
 Externe onderzoeksbronnen en repository-informatie worden binnen de toegestane productgrenzen door
 de module zelf opgehaald. Ruwe bronnen steken de modulegrens niet over.
 
-Een `UserSignalView` is een onbewerkte aanwijzing en geen opdracht. Productontwerp behoudt de
-originele tekst, maakt eigen onderzoek of productoutput en neemt het signaal-ID daarin als bron op.
-De productmodule leidt daaruit `UserSignalDispositionView` af; Productontwerp schrijft geen
-status op het oorspronkelijke signaal.
+Een `UserSignalDetails` is een aanwijzing en geen opdracht. De oorspronkelijke tekst blijft
+onveranderlijk; status, verwerkingsuitkomst en koppelingen staan op dezelfde `UserSignal`. Als
+Productontwerp een signaal verwerkt, roept het daarvoor een betekenisvol command op de productmodule
+aan. Het krijgt nooit directe schrijftoegang tot het signaal.
 
 ### Output
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
 | `DirectionSnapshot` | zichtbaar, geversioneerd droombeeld | toekomstverhaal, kernervaringen, obstakels, aannames, bewijsbasis en wijzigingsreden |
-| `EpicDefinitionView` | complete bouwtekening voor één gebruikersverbetering | versie, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's, afhankelijkheden en bron-signaal-ID's |
-| `ProcessSessionPublication` | operationeel resultaat van de sessie | sessie-ID, product-ID, gebruikte inputversies, publicatie-ID's, eindstatus en blokkade |
+| `EpicDetails` | read-only weergave van één complete gebruikersverbetering | versie, status, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's, afhankelijkheden en bron-signaal-ID's |
+| `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, gebruikte inputversies, publicatie-ID's, eindstatus en blokkade |
 
-Productontwerp schrijft `ProcessSessionPublication` uitsluitend voor zijn eigen sessies. De scheduler
+Productontwerp schrijft `ProcessSession` uitsluitend voor zijn eigen sessies. De scheduler
 roept de procesfunctie aan en de frontend leest het resultaat, maar geen van beide schrijft dit record.
 
-De enige inhoudelijke overdracht naar Productplanning is `EpicDefinitionView`. Het droombeeld is
+De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Het droombeeld is
 zichtbare productrichting, maar geen uitvoerbaar werk. `LearningResult` blijft intern binnen
 Productontwerp. Wanneer daar een concrete keuze uit volgt, laat Productontwerp die keuze als
-`DecisionRecordView` vastleggen door het
+`DecisionRecord` vastleggen door het
 [Besluitenregister](product-factory-v2-besluitenregister.md); het volledige leerresultaat wordt niet
 gepubliceerd.
 
-Alleen Productontwerp schrijft de epicdefinitie. Productplanning kiest een exacte gepubliceerde
-versie, maar wijzigt de inhoud niet. Kwaliteitsbewaking gebruikt diezelfde versie als contract voor
-de latere epiccontrole.
+Alleen Productontwerp schrijft de `Epic`. Productplanning claimt een exacte versie via
+`claimEpicForPlanning(...)`; dat command bevriest die versie atomair. Kwaliteitsbewaking registreert
+de afsluitende uitkomst via `recordEpicVerification(...)`. Geen van beide krijgt toegang tot de
+epicrepository of kan inhoud en UX veranderen.
 
 ## Epiccontract
 
@@ -118,15 +131,15 @@ is geen vooraf geschreven backlog.
 
 ## Versies en bevriezing
 
-Iedere `EpicDefinitionView` is na publicatie onveranderlijk.
+Iedere gepubliceerde epicversie is inhoudelijk onveranderlijk.
 
-Zolang er geen `EpicProgressView` naar een epic verwijst, mag Productontwerp:
+Zolang de epicstatus **Beschikbaar** is, mag Productontwerp:
 
 - een nieuwe versie publiceren;
 - de vorige versie als **Vervangen** markeren;
 - een beschikbare epic intrekken met een zichtbare reden.
 
-Zodra Productplanning een exact epic-ID en versienummer heeft gekozen:
+Zodra `claimEpicForPlanning(...)` een exact epic-ID en versienummer heeft gekozen:
 
 - wordt die versie het vaste uitvoerings- en testcontract;
 - mag Productontwerp geen nieuwe versie van dezelfde gekozen epic publiceren;
@@ -135,14 +148,16 @@ Zodra Productplanning een exact epic-ID en versienummer heeft gekozen:
 - kan een vervangende richting alleen via een nieuw gekozen epic-ID of een vooraf gepubliceerde,
   nog niet gekozen epicversie lopen.
 
-De module controleert deze regel vóór iedere publicatie tegen `EpicProgressView`. Zo kan een
-langlopende ontwerpsessie niet alsnog een inmiddels gekozen epic overschrijven.
+De module controleert deze regel en het verwachte versienummer in dezelfde transactie op de `Epic`.
+Zo kan een langlopende ontwerpsessie niet alsnog een inmiddels geclaimde epic overschrijven.
 
-## Interne entiteiten
+## Duurzame en interne entiteiten
 
 De volgende entiteiten blijven binnen de module:
 
-- `ProductDesignSession` — de geclaimde, begrensde uitvoering;
+- `Epic` — gepubliceerde gebruikersverbetering, inhoudelijke versie en levenscyclusstatus;
+- `DirectionSnapshot` — geversioneerde productrichting;
+- `ProcessSession` — de geclaimde, begrensde uitvoering en haar operationele historie;
 - `SessionAgenda` — gekozen ontwerp- of onderzoekstaak en budget;
 - `ResearchDossier` — één onderzoeksvraag met voortgang en conclusie;
 - `SourceRecord` — vindplaats, datum, brontype en toegangsvoorwaarden;
@@ -160,21 +175,22 @@ De volgende entiteiten blijven binnen de module:
 - `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
 
 Onderzoeksvragen, kansvoorstellen, leerresultaten en conceptontwerpen zijn interne objecten. Alleen
-het gevalideerde droombeeld en de epicdefinitie worden als inhoudelijke procesoutput gepubliceerd.
+het gevalideerde droombeeld en de `Epic` worden als inhoudelijke procesoutput gepubliceerd.
 Een betekenisvolle keuze wordt daarnaast in het Besluitenregister vastgelegd zonder het interne
 onderzoeksdossier te kopiëren.
 
-## Interne levenscyclus van een epicdefinitie
+## Levenscyclus van een epic
 
 - **Concept** — alleen intern zichtbaar;
 - **Onderzoeken** — probleem, bewijs en alternatieven worden onderzocht;
 - **Ontwerpen** — scope, UX, techniek en succescriteria worden uitgewerkt;
-- **Beschikbaar** — complete versie die Productplanning mag kiezen;
+- **Beschikbaar** — complete versie die Productplanning mag claimen;
+- **In planning** — exact deze versie is geclaimd en wordt in stories verdeeld;
+- **Actief** — één of meer stories of bugfixes worden uitgevoerd;
+- **Controleren** — alle bekende stories zijn geleverd en de hele verbetering wordt getoetst;
+- **Geslaagd**, **Niet geslaagd** of **Gestopt** — eindstatus met reden en eventuele verificatie-ID;
 - **Vervangen** — er is vóór selectie een nieuwere versie gepubliceerd;
 - **Ingetrokken** — bewust niet meer beschikbaar, met reden.
-
-**Geselecteerd**, **Actief**, **Controleren** en eindstatussen horen niet bij de epicdefinitie. Die
-staan op de epicvoortgang van Productplanning.
 
 ## Agents
 
@@ -201,7 +217,7 @@ De module kiest precies één hoofdsoort per aanroep:
 2. **Kans onderzoeken** — een signaal of hypothese tot een beslisbare kandidaat maken.
 3. **Epic ontwerpen** — probleem, scope, UX, techniek en succescriteria uitwerken.
 4. **Epic herzien** — alleen een nog niet gekozen epic als nieuwe versie publiceren.
-5. **Resultaat verwerken** — epicverificatie of kwaliteitssignaal in nieuwe productkennis of een
+5. **Resultaat verwerken** — epicverificatie of kwaliteitspatroon in nieuwe productkennis of een
    vervolgepic verwerken.
 
 Een sessie begint niet onbeperkt aan een tweede groot onderwerp. Open werk wordt duurzaam bewaard
@@ -287,22 +303,22 @@ De Epiccriticus controleert minimaal:
 - afwezigheid van vooraf geschreven stories;
 - dat de epic nog niet door Productplanning is gekozen.
 
-Goedgekeurde output wordt atomair opgeslagen: eerst de eigen entiteiten, daarna de geversioneerde
-projecties in `processcontracts`, en als laatste de sessiestatus. Betekenisvolle keuzes leveren een
+Goedgekeurde output wordt atomair in de eigen entiteiten opgeslagen en daarna wordt de sessiestatus
+afgerond. Query-DTO's worden uit die entiteiten opgebouwd en hebben geen eigen opslag. Betekenisvolle keuzes leveren een
 idempotent registratieverzoek aan het Besluitenregister. Als een gebruikerssignaal is beoordeeld
-zonder dat een epic ontstaat, bevat dat besluit het signaal-ID en de uitkomst zodat de productmodule
-de afhandeling kan actualiseren.
+zonder dat een epic ontstaat, bevat dat besluit het signaal-ID en de uitkomst. Productontwerp roept
+daarna het passende signaalcommand op de productmodule aan.
 
 ## Planning en de HKH-backlog
 
 Een sessie wordt planbaar door:
 
 - een gewijzigd Stakeholderprofiel of een nieuwe of gewijzigde Stakeholderrichting,
-  gebruikerssignaal of signaalafhandeling;
+  gebruikerssignaal of signaalstatus;
 - een nieuwe epicverificatie of nieuw intern leerresultaat dat nog om een ontwerpkeuze vraagt;
-- een structureel kwaliteitssignaal;
+- een structureel kwaliteitspatroon als gebruikerssignaal;
 - een periodieke onderzoeks- of epiccontrole;
-- `BacklogSupplyView.aanvullingNodig = true` terwijl onvoldoende beschikbare epics bestaan.
+- `BacklogSupply.aanvullingNodig = true` terwijl onvoldoende beschikbare epics bestaan.
 
 Bij lage backlogvoorraad geeft Productontwerp voorrang aan complete, kansrijke epics die tijdig door
 Productplanning kunnen worden opgepakt. Het maakt geen stories en verlaagt de epickwaliteit niet om
