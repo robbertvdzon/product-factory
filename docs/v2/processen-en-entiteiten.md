@@ -25,6 +25,8 @@ actor.
 - De eigenaar controleert bevoegdheid, bronversie, huidige status en idempotentie.
 - Modules krijgen nooit elkaars repository of interne JPA-entiteit.
 - De frontend gebruikt dezelfde publieke API's en krijgt geen repositorytoegang.
+- De runtime geeft iedere agent uitsluitend het actuele geheugen van haar vertrouwde eigen rol.
+  Agentgeheugen is append-only versieerbaar en geen vervanging voor publieke productwaarheid.
 
 ## De vier uitvoerende onderdelen
 
@@ -46,6 +48,7 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 | Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
 | Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `linkBugfixStory` | `getBug`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems` |
 | Besluitenregister | `createDecision`, `reviseDecision`, `withdrawDecision`, `supersedeDecisions` | `getDecisions(productId, validAt?)`, `getDecisionArchive(productId)` |
+| Agentgeheugen | `addAgentMemory`, `replaceAgentMemory`, `retractAgentMemory` | `getActiveMemory(context)`, `getMemoryAt(productId, role, validAt)`, `getMemoryHistory(productId, role, itemId)` |
 
 Een command mag ID's, verwachte versies, bron, actor en idempotentiesleutel aannemen, maar geen
 vrije velden waarmee de aanroeper de state machine kan omzeilen.
@@ -70,6 +73,7 @@ uiteindelijk leidend. De Factory handelt zelfstandig binnen de `ProductAssignmen
 | beschikbare epic intrekken of actieve epic annuleren | direct UI-command op Productontwerp | `withdrawEpic(...)` of `cancelEpic(...)`, met bron en reden |
 | overleg, vragen en antwoorden | `Meeting` | bewaart de bespreking en maakt expliciete doorwerking controleerbaar |
 | testomgevingen en toegestane toegang | `TestableProductConfiguration` | maakt gecontroleerd testen mogelijk |
+| geheugen voor een agentrol toevoegen, corrigeren of intrekken | `AgentMemoryItem` via een direct UI-command | append-only wijziging met actor en reden; een volgende agenttaak van die rol leest de nieuwe versie |
 
 De Stakeholder schrijft geen epic, story, bug, verificatie of backlogpositie.
 
@@ -111,13 +115,16 @@ nooit rechtstreeks in de tabel.
 | `QualitySnapshot` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | Productontwerp, Stakeholder en frontend | aantoonbaar kwaliteitsbeeld na één afgeronde niet-lege kwaliteitssessie; vormt samen met eerdere snapshots de historie |
 | `Decision` | Besluitenregister | notulenagent voor de Stakeholder of bevoegde Factorymodule mag aanmaken, herzien, intrekken of vervangen | alle processen via geldige snapshot; Stakeholder en frontend ook via archief | stabiele identiteit, `origin`, state `ACTIVE`, `WITHDRAWN` of `SUPERSEDED`, historie en eventuele opvolger |
 | `DecisionDetails` | Besluitenregister binnen één `Decision` | uitsluitend via revise-, withdraw- of supersedecommand | via `DecisionDto` of `DecisionHistoryDto` | één versie met ID, `validFrom`, `validUntil` en alleen de besluittekst |
+| `AgentMemoryItem` | Agentgeheugen | uitsluitend de eigen agentrol of de Stakeholder; product en rol worden door vertrouwde code bepaald | alleen de eigen agentrol; Stakeholder en frontend ook voor beheer | stabiele herinneringslijn per product en agentrol; actuele versie of ingetrokken |
+| `AgentMemoryVersion` | Agentgeheugen binnen één `AgentMemoryItem` | via add- of replacecommand; na opslag onveranderlijk | eigen agentrol ziet alleen actueel; Stakeholder en frontend zien ook historie | append-only titel en inhoud met voorganger, actor, reden en geldigheidsperiode |
+| `AgentMemoryRetraction` | Agentgeheugen binnen één `AgentMemoryItem` | eigen agentrol of Stakeholder via retractcommand | Stakeholder, frontend en audit | append-only tombstone die een geheugenlijn vanaf dat moment intrekt |
 | `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde uitvoering, inputversies, publicaties, eindstatus en blokkade |
 | `DeliveryAttempt` | dispatcher binnen Productplanning | dispatcher via interne service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
-Interne analyses, concepten, agentuitvoer en implementatiespecifiek geheugen steken de modulegrens
-niet over. Alleen een afzonderlijke grote, blijvende Factorykeuze binnen de productopdracht en
-geldige besluiten kan een `Decision` worden; gewone conclusies en proceskeuzes niet. Welke interne
-objecten Productontwerp gebruikt, verschilt tussen de MVP en de uitgebreide implementatie.
+Interne analyses, concepten en agentuitvoer steken de modulegrens niet over. Permanent rolgeheugen
+gaat uitsluitend via Agentgeheugen en is alleen leesbaar voor de eigen rol. Alleen een afzonderlijke
+grote, blijvende Factorykeuze binnen de productopdracht en geldige besluiten kan een `Decision`
+worden; gewone conclusies, geheugenlessen en proceskeuzes niet.
 
 ## Read-only en transportcontracten
 
@@ -139,6 +146,8 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `QualityWorkItemDetails` | Kwaliteitsbewaking uit `QualityWorkItem` | operations en frontend | testopdracht, doelversie, status, claim, resultaat en fout |
 | `DecisionDto` | Besluitenregister uit de versie die op `validAt` geldig is | alle processen, Stakeholder en normale frontend | platte actuele of historische momentopname; geen andere versies en geen op dat moment ongeldige besluiten |
 | `DecisionHistoryDto` | Besluitenregister uit `Decision` plus alle `DecisionDetails` | uitsluitend frontend en audit | actieve, ingetrokken en vervangen besluiten, alle versies, reden en opvolgingsrelatie |
+| `AgentMemoryItemDetails` | Agentgeheugen uit de actuele versie | uitsluitend de bijbehorende agentrol; Stakeholder en frontend ook voor beheer | actueel geheugenitem met exacte versie, titel, inhoud, actor en reden |
+| `AgentMemoryVersionDetails` | Agentgeheugen uit de volledige versielijn | uitsluitend Stakeholder, frontend en audit | versie, status `ACTIVE`, `SUPERSEDED` of `RETRACTED`, geldigheid, actor en reden |
 | `ProcessSessionDetails` | betreffende procesmodule | operations en frontend | operationele sessiestatus en historie |
 | `SoftwareFactoryWork` | externe adapter | dispatcher | tijdelijk extern integratieantwoord |
 | `StoryDeliveryPackage` | dispatcher uit één `StoryDetails` | Software Factory | volledige, onveranderlijke story met UX, assets, hashes en idempotentiesleutel |
@@ -225,6 +234,7 @@ historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar word
 - [Besluitenregister](besluitenregister.md)
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Frontend](frontend.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)

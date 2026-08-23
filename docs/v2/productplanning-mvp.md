@@ -17,7 +17,8 @@ geen agent.
 - De agent levert de complete storyset voor een gekozen epic, niet alleen de eerstvolgende stories.
 - De agent maakt ook de volledige productbrede volgorde van alle `TODO`-stories.
 - Gewone applicatiecode claimt, valideert, schrijft en roept modulecommands aan.
-- Er is geen apart planningsgeheugen en er zijn geen gespecialiseerde agents of duurzame drafts.
+- Er is geen extra intern planningsgeheugen en er zijn geen gespecialiseerde agents of duurzame
+  drafts; de Planner gebruikt wel het centrale geheugen van haar eigen agentrol.
 
 Meerdere epics mogen tegelijk actief zijn en gericht werk voor verschillende epics wordt in
 dezelfde run verwerkt. Een urgente epic kan dus tussendoor worden geclaimd zonder een andere actieve
@@ -56,6 +57,11 @@ Agentcontext en tijdelijk planconcept mogen volgens het bewaarbeleid aan de proc
 gekoppeld voor diagnose. Zij zijn geen publieke entiteiten en vormen geen zelfstandig
 planningsgeheugen.
 
+Het permanente geheugen van de rol `PLANNER_MVP` staat in
+[Agentgeheugen](agentgeheugen.md). De runtime voegt alleen de actuele items van deze rol aan de
+agenttaak toe en registreert de exact gelezen versies. De Planner kan geen geheugen van een andere
+rol opvragen.
+
 ## Verloop van één processessie
 
 ```text
@@ -84,11 +90,11 @@ atomair publiceren en workitems afronden
 
 Applicatiecode claimt de modulebrede run en alle op dat moment `PENDING` workitems. Daarna leest zij
 één vaste momentopname van beschikbare epics, bestaande open stories, productopdracht, geldige
-besluiten en exacte bug- en verificatiebronnen.
+besluiten, exacte bug- en verificatiebronnen en het actuele geheugen van `PLANNER_MVP`.
 
 Git, acceptatie en veilige productie-informatie worden alleen toegevoegd als zij nodig zijn om
-bestaande routes, schermen of technische grenzen te begrijpen. Alle gebruikte versies en de
-eventuele commit-SHA komen op de processessie.
+bestaande routes, schermen of technische grenzen te begrijpen. Alle gebruikte bron- en
+geheugenversies en de eventuele commit-SHA komen op de processessie.
 
 ### Stap 2 — werk beoordelen en epic claimen
 
@@ -146,7 +152,7 @@ de dispatcher niet.
 - geen aparte Epicplanner, Storymaker, Backlogplanner of Planningscriticus;
 - geen parallelle agents; dezelfde Planner verwerkt eventueel meerdere epics sequentieel;
 - geen duurzame candidate sets, coverage maps of order drafts;
-- geen apart intern planningsgeheugen;
+- geen extra intern planningsgeheugen naast het centrale geheugen van de eigen agentrol;
 - geen tweede agent die storydekking of prioritering beoordeelt;
 - geen kunstmatig voorraadniveau of backlogmaximum.
 
@@ -178,4 +184,5 @@ welke gespecialiseerde rol als eerste nodig is.
 - [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Productontwerp-API](productontwerp.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

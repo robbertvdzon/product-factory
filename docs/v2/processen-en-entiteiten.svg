@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2420" height="1540" viewBox="0 0 2420 1540" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2420" height="1900" viewBox="0 0 2420 1900" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont bovenaan de publieke functies en daaronder de publieke entiteiten waarvan de module eigenaar is. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont bovenaan de publieke functies en daaronder de publieke entiteiten waarvan de module eigenaar is. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -23,7 +23,7 @@
     </style>
   </defs>
 
-  <rect width="2420" height="1540" fill="#f8fafc"/>
+  <rect width="2420" height="1900" fill="#f8fafc"/>
   <text x="55" y="55" class="title">Product Factory v2 — publieke modulecontracten en eigenaarschap</text>
   <text x="55" y="88" class="subtitle">Boven de scheidslijn staat wat andere onderdelen mogen aanroepen; daaronder staan uitsluitend de eigen publieke entiteiten.</text>
   <path d="M65 125 H155" class="command"/>
@@ -230,4 +230,33 @@
   <text x="335" y="980" class="flow">create / revise / withdraw / supersede</text>
   <text x="80" y="1448" class="note">De getoonde module-interface is leidend.</text>
   <text x="80" y="1470" class="note">Niet iedere toegestane relatie heeft een pijl.</text>
+
+  <!-- Agentgeheugen supporting module -->
+  <rect x="55" y="1580" width="2310" height="270" rx="18" fill="#f0fdfa" stroke="#0f766e" stroke-width="3"/>
+  <rect x="55" y="1580" width="2310" height="62" rx="18" fill="#ccfbf1"/>
+  <path d="M55 1622 V1642 H2365 V1622" fill="#ccfbf1"/>
+  <text x="80" y="1620" class="module-title">Agentgeheugen — ondersteunende module, geen proces</text>
+  <text x="80" y="1672" class="section-title">PUBLIEKE INTERFACE</text>
+  <text x="80" y="1702" class="api">«query» getActiveMemory(AgentExecutionContext)</text>
+  <text x="80" y="1728" class="api" style="font-size:12px">«query» getMemoryAt(...) / getMemoryHistory(...)</text>
+  <text x="790" y="1702" class="api" style="font-size:12px">«command» addAgentMemory(...) / replaceAgentMemory(...) / retractAgentMemory(...)</text>
+  <text x="790" y="1728" class="note">Agent: alleen eigen rol · Stakeholder: alle rollen van het eigen product</text>
+  <line x1="80" y1="1760" x2="2340" y2="1760" class="divider" stroke="#99f6e4"/>
+  <text x="80" y="1790" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
+  <text x="80" y="1823" class="entity">AgentMemoryItem · AgentMemoryVersion · AgentMemoryRetraction</text>
+  <text x="1120" y="1790" class="section-title">BELANGRIJKE GRENS</text>
+  <text x="1120" y="1820" class="note">De runtime bepaalt productId en AgentRoleKey; een agent kiest die nooit zelf.</text>
+  <text x="1120" y="1843" class="note">Vervangen en intrekken zijn append-only; exact gelezen versies staan op de agentrun.</text>
+
+  <!-- Own-role memory queries and Stakeholder management -->
+  <path d="M450 1580 H600 V850 H580" class="query"/>
+  <text x="315" y="1532" class="flow">alleen geheugen van de eigen overlegrol</text>
+  <path d="M700 1580 H625 V790 H675" class="query"/>
+  <text x="405" y="1555" class="flow">alleen geheugen van de eigen ontwerp-rol</text>
+  <path d="M955 1580 V1480" class="query"/>
+  <text x="970" y="1540" class="flow">alleen eigen planning-rol</text>
+  <path d="M2200 1580 H2325 V790 H2240" class="query"/>
+  <text x="2020" y="1555" class="flow">alleen eigen kwaliteitsrol</text>
+  <path d="M225 260 H25 V1715 H55" class="command"/>
+  <text x="72" y="1560" class="flow">Stakeholder beheert ieder rolgeheugen via de UI</text>
 </svg>

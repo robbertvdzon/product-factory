@@ -9,7 +9,7 @@ volgende implementaties gebruiken hetzelfde contract:
 - [Kwaliteitsbewaking — MVP](kwaliteitsbewaking-mvp.md): één Tester-agent voert de volledige
   kwaliteitssessie uit;
 - [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md): vier
-  gespecialiseerde rollen, parallel testen, testrotatie en duurzaam kwaliteitsgeheugen.
+  gespecialiseerde rollen, parallel testen, testrotatie en leren per agentrol.
 
 ## Verantwoordelijkheid
 
@@ -98,9 +98,12 @@ adapters.
 | `StoryDetails` | Productplanning | type, storyversie, status, oplevergegevens, acceptatiecriteria en zelfstandige UX |
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
 | `QualityWorkItem` | Kwaliteitsbewaking | duurzame gerichte testopdracht die de run claimt |
+| `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
 
-De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte contractversies
-en exacte geteste omgeving vast.
+De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte
+contractversies, exact gelezen geheugenversies en exacte geteste omgeving vast. Permanent leren
+loopt uitsluitend via de publieke API van [Agentgeheugen](agentgeheugen.md); een agent leest en
+wijzigt alleen geheugen van haar eigen vertrouwd geconfigureerde rol.
 
 Kwaliteitsbewaking mag de publieke Git-URL uit de productopdracht uitchecken en code, tests en
 documentatie read-only gebruiken voor testselectie, regressierisico en uitleg. Zij commit en pusht
@@ -316,6 +319,8 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - iedere verificatie exacte doel-, opleverings-, omgevings- en bronversies bevat;
 - ontbrekende epicdekking binnen de bevroren scope wordt bewezen;
 - ieder gebruikerssignaalonderzoek een expliciete uitkomst of blokkade krijgt;
+- de runtime iedere agent alleen het actuele geheugen van haar eigen rol geeft en de exact gelezen
+  geheugenversies vastlegt;
 - publieke output pas na contract-, privacy- en geheimencontrole verschijnt;
 - iedere sessie waarin daadwerkelijk is getest precies één nieuwe onveranderlijke
   `QualitySnapshot` maakt;
@@ -343,4 +348,5 @@ Een inhoudelijke sessie is klaar wanneer:
 - [Productontwerp-API](productontwerp.md)
 - [Productplanning-API](productplanning.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

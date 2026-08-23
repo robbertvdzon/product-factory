@@ -46,6 +46,7 @@ werkdocumenten, prompts en agentadministratie horen hier niet bij.
 | `Verification` | Onveranderlijk bewijs en een oordeel over een story, epic of gebruikerssignaal. |
 | `QualitySnapshot` | Een onveranderlijke momentopname van de aantoonbare productkwaliteit na een kwaliteitssessie. |
 | `Meeting` | Een overleg met de Stakeholder, inclusief agenda, gesprek en gecontroleerde uitkomst. |
+| `AgentMemoryItem` | Een permanente, versieerbare herinnering van precies één agentrol binnen dit product. |
 
 De **backlog** is geen apart object. Het is de lijst van stories met status `TODO` of
 `IN_PROGRESS`, geordend op `sequenceNumber`.
@@ -105,6 +106,10 @@ botsing wordt overgeslagen en geregistreerd.
 De Software Factory-dispatcher is het vierde uitvoerende onderdeel, maar geen intelligent proces. Hij
 gebruikt geen agents en neemt geen productbesluiten.
 
+Het Agentgeheugen is een ondersteunende module en geen vijfde proces. Iedere agentrol leest bij een
+taak uitsluitend haar eigen actuele geheugen. De Stakeholder kan alle rolgeheugens via de UI
+bekijken en corrigeren.
+
 Naast een processessie mogen modules snelle publieke commands en read-only queries aanbieden. Een
 command zoals `requestEpicVerification(...)` start geen agent: het bewaart alleen werk in de queue
 van de ontvangende module. Een latere `runProcessSession()` pakt dat werk op.
@@ -129,6 +134,7 @@ doet.
 | Huidig kwaliteitsbeeld en historie | Queries op `QualitySnapshot`s | Aantoonbare kwaliteit, risico's en ontwikkeling door de tijd. |
 | Huidige code en documentatie | Read-only checkout van `ProductAssignment.gitUrl` | Hoe het product er nu voorstaat. |
 | Acceptatie- en eventueel productieomgeving | Read-only `TestableProductConfiguration` | Hoe het product nu werkelijk werkt en aanvoelt; productie alleen binnen veilige grenzen. |
+| Eigen actueel rolgeheugen | Automatisch via Agentgeheugen en de vertrouwde agentrol | Permanente lessen van precies de uitgevoerde Productontwerp-rol; nooit geheugen van een andere rol. |
 
 ### Output
 
@@ -162,6 +168,7 @@ ontbreken, is de run een geldige no-op.
 | Bestaande `Story`s | Eigen database | Reeds gepland, verzonden en opgeleverd werk. |
 | Huidige code en documentatie | Read-only checkout van de publieke Git-URL | Context voor een realistische storiesplitsing. |
 | Acceptatie- en eventueel productieomgeving | Read-only `TestableProductConfiguration` | Bestaande gebruikersroutes, schermen en gedrag; productie alleen binnen veilige grenzen. |
+| Eigen actueel rolgeheugen | Automatisch via Agentgeheugen en de vertrouwde agentrol | Permanente planningslessen van precies de uitgevoerde rol. |
 
 ### Output
 
@@ -194,6 +201,7 @@ eigen `QualityWorkItem`-queue. Een queuecommand start nooit onmiddellijk een tes
 | Bevroren `Epic` met UX | Read-only query op Productontwerp | De volledige bedoeling die na alle stories moet worden gecontroleerd. |
 | `UserSignal` | Read-only query op de productmodule | De oorspronkelijke zorg of observatie die onderzocht moet worden. |
 | Huidige code en documentatie | Read-only checkout van de publieke Git-URL | Informatie over risico's en relevante tests; geen bewijs van werkend gedrag. |
+| Eigen actueel rolgeheugen | Automatisch via Agentgeheugen en de vertrouwde agentrol | Permanente testlessen van precies de uitgevoerde kwaliteitsrol. |
 
 ### Output
 
@@ -297,11 +305,16 @@ betekenisvolle commands. Niemand schrijft rechtstreeks in de tabellen van een an
 
 De frontend maakt dezelfde databasegegevens begrijpelijk voor mensen.
 
+Agentgeheugen staat eveneens in de database, maar is context voor één agentrol en geen alternatieve
+productwaarheid. Iedere agentrun legt vast welke exacte geheugenversies zij heeft gelezen. De
+Stakeholder kan actuele items via de UI toevoegen, vervangen en intrekken en kan met een peildatum
+zien wat een rol vroeger onthield.
+
 De publieke productrepository blijft wel de waarheid over de huidige code, tests en
 productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen de Git-URL uit de
 `ProductAssignment` tijdens een sessie read-only uitchecken. Zij committen of pushen niets.
 
-## Zes hoofdregels
+## Zeven hoofdregels
 
 1. De Stakeholder is de klant en diens expliciete richting is leidend.
 2. Productontwerp maakt complete epics met UX, maar geen stories.
@@ -309,6 +322,8 @@ productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen
 4. Kwaliteitsbewaking levert bewijs en bugs, maar maakt geen stories en wijzigt geen epics.
 5. Alleen `runProcessSession()` mag agents starten; requests zetten alleen duurzaam queuewerk klaar.
 6. Iedere entiteit heeft één eigenaar en andere modules wijzigen haar alleen via publieke commands.
+7. Iedere agentrol leest uitsluitend haar eigen actuele, versieerbare geheugen; de Stakeholder mag
+   dat geheugen via de UI corrigeren.
 
 ## Detaildocumenten
 
@@ -316,6 +331,7 @@ productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen
 - [Besluitenregister](besluitenregister.md)
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Frontend](frontend.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)

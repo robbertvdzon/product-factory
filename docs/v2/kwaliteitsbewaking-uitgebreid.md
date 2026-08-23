@@ -5,7 +5,7 @@ Status: doelontwerp voor een latere uitgebreide implementatie.
 Deze implementatie gebruikt exact de publieke
 [Kwaliteitsbewaking-API](kwaliteitsbewaking.md). Zij breidt de
 [MVP](kwaliteitsbewaking-mvp.md) intern uit met gespecialiseerde rollen, parallelle testtaken,
-risicogestuurde testrotatie, onafhankelijke kritiek en duurzaam kwaliteitsgeheugen.
+risicogestuurde testrotatie, onafhankelijke kritiek en permanent geheugen per agentrol.
 
 ## Interne entiteiten
 
@@ -21,7 +21,6 @@ Naast de publieke module-entiteiten kan de uitgebreide implementatie gebruiken:
 - `EpicCoverageAssessment` — vergelijking van epic, UX, stories en geleverd gedrag;
 - `VerificationDraft` — story-, epic- of signaalcontrole vóór publicatie;
 - `QualityPattern` — clustering van verwante bevindingen;
-- `QualityMemory` — lessen over risico's, testaanpak en dekkingsgaten;
 - `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
 
 Ruwe observaties en interne beoordelingen steken de modulegrens niet over. Alleen gevalideerde
@@ -40,6 +39,12 @@ Een processessie kan vier vaste agentrollen gebruiken:
 
 Alleen `runProcessSession()` mag deze agents starten. Niet iedere kleine storycontrole gebruikt alle
 rollen. Bij een complete epicverificatie zijn beide uitvoerende testrollen en de criticus verplicht.
+
+Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. De runtime
+leidt de vaste `AgentRoleKey` uit vertrouwde configuratie af en geeft een agent alleen actuele items
+van die rol. De Testcoördinator kan dus niet het geheugen van de Functionele tester,
+Kwaliteitsspecialist of Verificatiecriticus lezen. Rollen delen alleen de expliciete sessie-input,
+agenda, observaties en handoffs.
 
 ## Soorten processessies
 
@@ -132,8 +137,9 @@ Goedgekeurde `Bug`s en `Verification`s worden atomair en geversioneerd opgeslage
 module de betekenisvolle vervolgcommands uit het publieke contract idempotent aan.
 
 Na een sessie waarin daadwerkelijk is getest bouwt gewone code precies één `QualitySnapshot` uit de
-gevalideerde publieke gegevens. Vervolgens werkt de module `TestRotation` en eventueel
-`QualityMemory` bij. Interne rotatie of geheugen verandert nooit oude snapshots.
+gevalideerde publieke gegevens. Vervolgens werkt de module `TestRotation` bij. Een rol kan na
+succesvolle validatie via gewone applicatiecode een geheugenactie voor haar eigen rol laten
+uitvoeren. Rotatie of rolgeheugen verandert nooit oude snapshots.
 
 ## Testrotatie en intern leren
 
@@ -147,13 +153,16 @@ rouleren over:
 - performance en betrouwbaarheid;
 - foutafhandeling en herstelgedrag.
 
-Terugkerende bugs, dekkingsgaten en testblokkades kunnen een intern `QualityPattern` en lessen in
-`QualityMemory` opleveren. Alleen wanneer een patroon productbetekenis heeft, registreert de module
-via de productmodule een zichtbaar `UserSignal` van categorie `QUALITY_PATTERN`.
+Terugkerende bugs, dekkingsgaten en testblokkades kunnen een intern `QualityPattern` en een voorstel
+voor toevoegen, vervangen of intrekken van geheugen voor de betrokken eigen rol opleveren. Gewone
+code valideert dat voorstel en schrijft het via Agentgeheugen. Andere testrollen kunnen dit geheugen
+niet lezen. Alleen wanneer een patroon productbetekenis heeft, registreert de module via de
+productmodule een zichtbaar `UserSignal` van categorie `QUALITY_PATTERN`.
 
 ## Parallelisatie en publicatiegrens
 
-- Parallelle agents werken altijd op dezelfde vaste inputmomentopname.
+- Parallelle agents werken altijd op dezelfde vaste publieke inputmomentopname en ieder met alleen
+  het eigen rolgeheugen.
 - Zij schrijven alleen ruwe observaties en bewijs, nooit publieke conclusies.
 - De criticus is de enige interne rol die publicatie mag voorstellen.
 - Gewone code valideert daarna nog contract, versies, privacy en idempotentie.
@@ -178,7 +187,8 @@ Een uitgebreide kwaliteitssessie is klaar wanneer:
 - iedere verificatie naar exacte bron-, opleverings- en omgevingsversies verwijst;
 - ieder gebruikerssignaalonderzoek een zichtbare uitkomst of blokkade heeft;
 - de criticus alle publieke concepten heeft beoordeeld;
-- testrotatie en intern kwaliteitsgeheugen zijn bijgewerkt;
+- testrotatie en eventuele gevalideerde geheugenacties voor de betrokken eigen rollen zijn
+  bijgewerkt;
 - precies één nieuwe snapshot is opgeslagen na werkelijk testwerk;
 - publicaties en vervolgcommands atomair of idempotent herstelbaar zijn.
 
@@ -189,4 +199,5 @@ Een uitgebreide kwaliteitssessie is klaar wanneer:
 - [Productontwerp-API](productontwerp.md)
 - [Productplanning-API](productplanning.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

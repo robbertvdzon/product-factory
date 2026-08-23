@@ -109,6 +109,7 @@ Productplanning gebruikt alleen publieke Spring Modulith-API's. Read-only DTO's 
 | `BugDetails` | Kwaliteitsbewaking | uitvoerbare bug inclusief ernst, bewijs en versie |
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor ontbrekend gedrag binnen een bevroren epic |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, accounts en toegangsgrenzen |
+| `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
 
 Tijdens een inhoudelijke sessie mag Productplanning de publieke Git-URL uitchecken en broncode,
 tests en documentatie read-only bekijken. Zij commit en pusht nooit. De bekeken commit-SHA kan als
@@ -130,8 +131,10 @@ kwaliteitsoordeel.
 | `ProcessSession` | opgeslagen operationele historie van de intelligente run | geclaimde workitems, inputversies, publicaties, eindstatus en blokkade |
 | `QualityWorkItem` bij Kwaliteitsbewaking | downstream effect van een verificatiecommand; Kwaliteitsbewaking maakt en bezit dit object | type, exact doel-ID en -versie, bron, prioriteit en idempotentiesleutel |
 
-Operations en frontend lezen de sessie via `ProcessSessionDetails`. Interne analyses, concepten,
-agentuitvoer en implementatiespecifiek geheugen steken de modulegrens niet over.
+Operations en frontend lezen de sessie via `ProcessSessionDetails`. Interne analyses, concepten en
+agentuitvoer steken de modulegrens niet over. Permanent leren loopt uitsluitend via de publieke API
+van [Agentgeheugen](agentgeheugen.md): een agent kan alleen geheugen van zijn eigen rol lezen en
+wijzigen.
 
 Na storyoplevering vraagt Productplanning via `requestStoryVerification(...)`,
 `requestBugfixRetest(...)` of `requestEpicVerification(...)` aan Kwaliteitsbewaking om werk klaar te
@@ -252,6 +255,8 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - iedere story het volledige Storycontract volgt;
 - epic- en bugbronversies exact vastliggen;
 - `sequenceNumber`s productbreed consistent en uniek zijn;
+- de runtime iedere agent alleen het actuele geheugen van haar vertrouwd geconfigureerde eigen rol
+  geeft en de exact gelezen geheugenversies vastlegt;
 - publicatie en definitieve ordening atomair gebeuren;
 - de dispatcher via de beschreven commands kan leveren zonder interne planningskennis.
 
@@ -262,4 +267,5 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Productontwerp-API](productontwerp.md)
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

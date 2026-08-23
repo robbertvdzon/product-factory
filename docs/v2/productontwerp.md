@@ -8,7 +8,7 @@ stappen. Daardoor kunnen de volgende implementaties hetzelfde contract gebruiken
 
 - [Productontwerp — MVP](productontwerp-mvp.md): één agent en zo weinig mogelijk interne werking;
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md): gespecialiseerde
-  agents, onderzoek en duurzaam intern leergeheugen.
+  agents, onderzoek en leren per agentrol.
 
 De MVP kan later door de uitgebreide implementatie worden vervangen zonder Productplanning,
 Kwaliteitsbewaking, de frontend of het datacontract aan te passen.
@@ -75,6 +75,7 @@ domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 | `VerificationDetails` | Kwaliteitsbewaking-query | of de bedoelde gebruikersverbetering is bereikt en welk bewijs daarbij hoort |
 | `QualitySnapshotDetails` | Kwaliteitsbewaking-query | huidig kwaliteitsbeeld en historische ontwikkeling van dekking, bugs, risico's en verificaties |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, testaccounts en toegangsgrenzen |
+| `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
 
 Voor iedere gebruikte publicatie legt de module bron-ID en bronversie vast. Dezelfde versie wordt
 niet tweemaal als nieuwe input behandeld.
@@ -100,8 +101,10 @@ productmodule en krijgt nooit directe schrijftoegang tot het signaal.
 | `ProcessSession` | opgeslagen operationele historie van de sessie | sessie-ID, eventueel product-ID, gebruikte inputversies, publicatie-ID's, eindstatus en blokkade |
 
 De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Interne analyses,
-concepten, agentuitvoer en implementatiespecifiek geheugen steken de modulegrens niet over.
-Operations en frontend lezen de sessie via het read-only `ProcessSessionDetails`-contract.
+concepten en agentuitvoer steken de modulegrens niet over. Permanent leren loopt uitsluitend via
+de publieke API van [Agentgeheugen](agentgeheugen.md): een agent kan alleen geheugen van zijn eigen
+rol lezen en wijzigen. Operations en frontend lezen de sessie via het read-only
+`ProcessSessionDetails`-contract.
 
 Alleen wanneer tijdens Productontwerp een afzonderlijke grote, blijvende keuze ontstaat die
 meerdere toekomstige processessies begrenst, kan de module binnen de productopdracht en geldige
@@ -220,6 +223,9 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - geen stories in Productontwerp worden gemaakt;
 - een gekozen epicversie nooit inhoudelijk verandert;
 - alle modulegrenscommunicatie via publieke queries en commands loopt;
+- de runtime de agentrol uit vertrouwde configuratie afleidt en iedere agent alleen het actuele
+  geheugen van die eigen rol geeft;
+- iedere agenttaak vastlegt welke exacte geheugenversies zij heeft gelezen;
 - output atomair en geversioneerd beschikbaar komt;
 - de operationele sessiestatus wordt opgeslagen.
 
@@ -227,5 +233,6 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Overzicht](overzicht.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

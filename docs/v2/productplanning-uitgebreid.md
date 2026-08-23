@@ -4,7 +4,7 @@ Status: doelontwerp voor een latere uitgebreide implementatie.
 
 Deze implementatie gebruikt exact de publieke [Productplanning-API](productplanning.md). Zij breidt
 de [MVP](productplanning-mvp.md) intern uit met gespecialiseerde rollen, parallelle voorbereiding,
-duurzaam planningsgeheugen en een afzonderlijke kritiekstap. De
+permanent geheugen per agentrol en een afzonderlijke kritiekstap. De
 [Software Factory-dispatcher](software-factory-dispatcher.md) blijft dezelfde deterministische
 adapter.
 
@@ -18,7 +18,6 @@ Naast de publieke module-entiteiten kan de uitgebreide implementatie gebruiken:
 - `StoryCoverageMap` — relatie tussen epicscope, succescriteria en conceptstories;
 - `StoryCandidateSet` en `PriorityAssessment` — vergelijking van bestaand en nieuw werk;
 - `StoryOrderDraft` — voorgestelde productbrede `TODO`-volgorde;
-- `PlanningMemory` — lessen over slicing, balans, afhankelijkheden en blokkades;
 - `AgentRun` — input, promptversie, output en fout van één agenttaak.
 
 Deze objecten steken de modulegrens niet over. Alleen `Story`, `PlanningWorkItem`, `ProcessSession`
@@ -37,6 +36,11 @@ Een inhoudelijke run kan vier vaste agentrollen gebruiken:
 
 Alleen `runProcessSession()` mag deze agents starten. Niet iedere run hoeft alle rollen te gebruiken:
 een zuivere herprioritering kan bijvoorbeeld zonder Storymaker.
+
+Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. De runtime
+leidt de vaste `AgentRoleKey` uit vertrouwde configuratie af en geeft een agent alleen actuele items
+van die rol. De Epicplanner leest dus niet het geheugen van de Storymaker, Backlogplanner of
+Planningscriticus. Rollen delen werk alleen via expliciete concepten en handoffs binnen de sessie.
 
 ## Verloop van één processessie
 
@@ -127,9 +131,12 @@ eigen schedule en wordt niet door de agents gestart.
 
 ## Intern leren
 
-De uitgebreide implementatie kan terugkerende patronen over te grote stories, afhankelijkheden,
-afwijzingen door Software Factory en dekkingsfouten als `PlanningMemory` bewaren. Dit geheugen helpt
-latere agents, maar verandert nooit zelfstandig een epic, bug, besluit of reeds verzonden story.
+Een rol kan na succesvolle validatie een geheugenactie voor haar eigen rol voorstellen. Zo kan de
+Storymaker een les over te grote stories bewaren en de Backlogplanner een les over
+afhankelijkheden. Gewone applicatiecode valideert en schrijft toevoegen, vervangen of intrekken via
+Agentgeheugen. Geen rol kan deze lessen in het geheugen van een andere rol plaatsen of lezen.
+
+Rolgeheugen verandert nooit zelfstandig een epic, bug, besluit of reeds verzonden story.
 
 Alle informatie die Software Factory nodig heeft, blijft in de gepubliceerde story staan. Het
 interne geheugen is dus geen verborgen uitvoeringscontract.
@@ -143,7 +150,8 @@ inhoudelijke afwijzing maakt een `REPAIR_STORY`-workitem voor een latere intelli
 
 ## Hervatten en interne idempotentie
 
-- Iedere agenttaak verwijst naar dezelfde vaste inputmomentopname.
+- Iedere agenttaak verwijst naar dezelfde vaste inputmomentopname en naar de exact gelezen
+  geheugenversies van haar eigen rol.
 - Parallelle agents schrijven alleen concepten; nooit rechtstreeks publieke stories.
 - Gedeeltelijke concepten kunnen worden hervat, maar zijn geen productwaarheid.
 - Een inmiddels gewijzigde of niet meer geldige bronversie blokkeert publicatie.
@@ -168,4 +176,5 @@ Een uitgebreide planningsrun is klaar wanneer:
 - [Productplanning — MVP](productplanning-mvp.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Productontwerp-API](productontwerp.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

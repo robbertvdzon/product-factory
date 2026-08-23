@@ -58,6 +58,11 @@ De agentcontext, het tijdelijke epicconcept en technische modelresponse mogen vo
 processessie worden gekoppeld volgens het geldende privacy- en bewaarbeleid. Zij zijn geen publieke
 productentiteiten en worden niet als zelfstandig productgeheugen gebruikt.
 
+Het permanente geheugen van de rol `PRODUCT_DESIGNER_MVP` staat niet in Productontwerp, maar in de
+gedeelde module [Agentgeheugen](agentgeheugen.md). De runtime voegt vóór de agenttaak alleen de
+actuele items van deze rol toe en registreert de exact gelezen geheugenversies. De agent kan geen
+andere rolnaam of ander rolgeheugen kiezen.
+
 ## Verloop van één processessie
 
 ```text
@@ -103,8 +108,9 @@ De sessie leest één vaste momentopname van:
 - het huidige kwaliteitsbeeld en zo nodig de historie;
 - Git-code en documentatie wanneer die nodig zijn om de huidige situatie te begrijpen;
 - acceptatie en eventueel veilige, read-only productie-informatie.
+- het actuele geheugen van de rol `PRODUCT_DESIGNER_MVP`.
 
-Alle bron-ID's, versies en de gelezen commit-SHA worden bij de processessie vastgelegd.
+Alle bron-ID's, geheugenversies en de gelezen commit-SHA worden bij de processessie vastgelegd.
 
 ### Stap 3 — één agent uitvoeren
 
@@ -152,7 +158,7 @@ de `AVAILABLE` epic.
 - geen droombeeld of geversioneerde verre productrichting;
 - geen markt-, gebruikers- en toekomstonderzoek door aparte agents;
 - geen onderzoeksdossiers, hypotheses of bewijsclaims als duurzame entiteiten;
-- geen apart intern leergeheugen;
+- geen extra intern leergeheugen naast het centrale geheugen van de eigen agentrol;
 - geen parallelle agenttaken;
 - geen UX-agent, technisch verkenner of Epiccriticus;
 - geen meerdere soorten ontwerpsessies;
@@ -178,4 +184,5 @@ extra agentrol wordt niet alleen toegevoegd omdat die conceptueel aantrekkelijk 
 
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

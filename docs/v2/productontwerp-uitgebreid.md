@@ -4,7 +4,7 @@ Status: doelontwerp voor een latere uitgebreide implementatie.
 
 Deze implementatie gebruikt exact de publieke [Productontwerp-API](productontwerp.md). Zij breidt de
 [MVP](productontwerp-mvp.md) intern uit met gespecialiseerd onderzoek, meerdere agentrollen en
-duurzaam productontwerpgeheugen. Andere modules zien alleen dezelfde `EpicDetails`, commands,
+permanent geheugen per agentrol. Andere modules zien alleen dezelfde `EpicDetails`, commands,
 queries en `ProcessSessionDetails`.
 
 ## Interne productverkenning
@@ -46,7 +46,6 @@ Naast `Epic` en `ProcessSession` kan de uitgebreide implementatie deze interne o
 - `UxDesign` — gebruikersroutes, toestanden, ontwerpassets en open vragen;
 - `TechnicalExploration` — haalbaarheid, afhankelijkheden en risico's;
 - `EpicReadinessAssessment` — controle of een epic overdraagbaar en behapbaar is;
-- `ProductDesignMemory` — gedeelde lessen over onderzoek, UX en productkeuzes;
 - `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
 
 Deze objecten steken de modulegrens niet over. Alleen een complete `Epic` is inhoudelijke output.
@@ -69,6 +68,12 @@ Een volledige processessie kan zeven vaste agentrollen gebruiken:
 Niet iedere sessie start alle rollen. Een kleine herziening van een beschikbare epic kan volstaan
 met de leider, UX-ontwerper, technisch verkenner en criticus. Een nieuwe productrichting kan alle
 rollen gebruiken. Alleen `runProcessSession()` mag deze agents starten.
+
+Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. Vóór een
+agenttaak leidt de runtime de vaste `AgentRoleKey` uit vertrouwde configuratie af en voegt zij alleen
+de actuele items van die rol toe. De Productontwerpleider kan dus niet het geheugen van de
+UX-ontwerper lezen, en omgekeerd. Samenwerking verloopt via de expliciete sessie-input en
+agenthandoffs, niet via gedeeld geheugen.
 
 ## Soorten processessies
 
@@ -185,10 +190,17 @@ Meerdere leerresultaten kunnen een nieuwe `DirectionSnapshot`, een nieuwe kans o
 voeden. Zij zijn niet zichtbaar voor andere modules of de gewone frontend. De relevante onderbouwing
 van een gepubliceerde epic wordt wel in die epic opgenomen.
 
+Een agentrol kan na succesvolle validatie daarnaast een geheugenactie voor haar eigen rol
+voorstellen: toevoegen, vervangen of intrekken. Gewone applicatiecode valideert en schrijft die
+actie via Agentgeheugen. Andere agentrollen krijgen het item niet te zien. `LearningResult` blijft
+interne onderzoeksinhoud; `AgentMemoryItem` is een korte, herbruikbare werkwijze of les voor één
+rol en vervangt nooit een epic, productopdracht of besluit.
+
 ## Hervatten en interne idempotentie
 
 - Interne concepten kunnen na een fout worden hervat, maar zijn geen productwaarheid.
-- Iedere agenttaak verwijst naar de vaste inputmomentopname en promptversie.
+- Iedere agenttaak verwijst naar de vaste inputmomentopname, promptversie en exact gelezen
+  geheugenversies van de eigen rol.
 - Een verlopen claim kan met dezelfde input veilig opnieuw worden opgepakt.
 - Een wijziging van input tijdens de sessie wordt in een volgende sessie verwerkt.
 - Een inmiddels geclaimde epicversie wordt nooit alsnog overschreven.
@@ -211,4 +223,5 @@ Een uitgebreide sessie is klaar wanneer:
 
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

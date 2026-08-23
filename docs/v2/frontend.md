@@ -28,11 +28,32 @@ Het hoofdscherm laat in één oogopslag zien:
 - recente verificaties en belangrijke kwaliteitsrisico's;
 - nieuwe en open gebruikerssignalen;
 - geldige besluiten;
+- agentrollen met geheugen dat aandacht of correctie nodig heeft;
 - aangevraagde of open overleggen.
 
-Interne analyses, concepten, agentuitvoer en implementatiespecifiek geheugen staan hier niet. De
-frontend blijft daardoor gelijk wanneer Productontwerp van de MVP naar de uitgebreide implementatie
-overstapt.
+Interne analyses, concepten en agentuitvoer staan hier niet. Permanent rolgeheugen is wel zichtbaar
+in het aparte beheerscherm, omdat de Stakeholder dit moet kunnen controleren en corrigeren.
+
+## Agentgeheugen
+
+Het scherm **Agentgeheugen** groepeert geheugen per proces en stabiele agentrol. Een rol ziet nooit
+het geheugen van een andere rol, maar de Stakeholder mag binnen het eigen product alle rollen
+beheren.
+
+Per rol toont de frontend:
+
+- de weergavenaam en stabiele rolesleutel;
+- alle actuele geheugenitems;
+- gebruikt en beschikbaar contextbudget;
+- toevoegen, vervangen en intrekken met een verplichte reden;
+- een peildatum om de toen actieve set te reconstrueren;
+- de volledige append-only versiegeschiedenis;
+- actor, wijzigingsreden en geldigheidsperiode;
+- welke processessies een exacte geheugenversie hebben gelezen.
+
+Vervangen overschrijft de oude inhoud niet en intrekken verwijdert geen historie. Commands bevatten
+de verwachte actuele versie, zodat een gelijktijdige wijziging als conflict zichtbaar wordt. De
+frontend schrijft nooit rechtstreeks in de geheugentabellen.
 
 ## Inbox
 
@@ -91,6 +112,7 @@ Snelle acties mogen ook rechtstreeks het juiste command aanbieden, bijvoorbeeld:
 - een urgente epic laten herprioriteren;
 - een beschikbare epic intrekken of een actieve epic annuleren;
 - een processessie handmatig starten.
+- geheugen van een gekozen agentrol toevoegen, vervangen of intrekken.
 
 Een handmatige `runProcessSession()` geeft een duidelijke fout als in die module al een run actief
 is.
@@ -112,3 +134,4 @@ van een epic, story, bug of verificatie.
 - [Overzicht](overzicht.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
 - [Overleggen met de Stakeholder](overleggen.md)
+- [Agentgeheugen](agentgeheugen.md)

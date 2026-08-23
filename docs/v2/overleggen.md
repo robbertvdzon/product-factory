@@ -62,6 +62,12 @@ Een overleg hoeft niet te wachten op een actieve processessie. Agents worden all
 de daarvoor bedoelde overlegafhandeling; het overleg start nooit stilletjes agents in een van de
 drie productprocessen.
 
+De gespreksagent, notulenagent en iedere deelnemende procesrol hebben elk een eigen stabiele
+`AgentRoleKey`. Voor iedere agenttaak voegt de runtime alleen het actuele geheugen van die exacte
+rol toe en legt zij de gelezen versie-ID's vast. Ook in een overleg kunnen agents dus nooit het
+geheugen van een andere rol lezen. Informatie die zij tijdens het gesprek moeten delen, staat in de
+expliciete meetingcontext en niet in gedeeld permanent geheugen.
+
 ## Afsluiten en doorwerken
 
 Bij afsluiting maakt de notulenagent een leesbare samenvatting met besproken onderwerpen,
@@ -75,6 +81,7 @@ iedere expliciete uitkomst:
 | grote, blijvende keuze | command op het Besluitenregister | geversioneerd Stakeholderbesluit |
 | epic intrekken of actieve epic annuleren | `withdrawEpic(...)` of `cancelEpic(...)` | directe actie op Productontwerp, met meeting-ID en reden |
 | epic prioriteren of andere normale procesactie | command op de eigenaarsmodule | gewone procesactie, geen besluit |
+| expliciet iets voor een agentrol onthouden, corrigeren of vergeten | command op Agentgeheugen namens de Stakeholder | append-only `ADD`, `REPLACE` of `RETRACT`; de overlegagent is alleen registrator |
 
 Iedere doorwerking bewaart de bron-`Meeting` en een idempotentiesleutel. Als een command mislukt,
 blijft zichtbaar welke uitkomst nog niet verwerkt is; het transcript wordt niet opnieuw
@@ -101,3 +108,4 @@ andere normale processtap is geen besluit.
 - [Processen en entiteiten](processen-en-entiteiten.md)
 - [Besluitenregister](besluitenregister.md)
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
+- [Agentgeheugen](agentgeheugen.md)

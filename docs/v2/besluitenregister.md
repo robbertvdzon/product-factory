@@ -30,7 +30,7 @@ Het gewone proces volgen is geen besluit. Dit zijn daarom geen besluiten:
 - een bug of epic tijdelijk voorrang geven;
 - stories ordenen of een backlogitem dispatchen;
 - een verificatie-uitkomst, gebruikerssignaal of normale statusovergang verwerken;
-- interne analyse, bewijs, hypotheses, agentuitvoer of implementatiespecifiek geheugen bewaren.
+- interne analyse, bewijs, hypotheses, agentuitvoer of een les voor `AgentMemoryItem` bewaren.
 
 Deze gegevens blijven bij hun inhoudelijke eigenaar. Zo blijft het Besluitenregister klein en bevat
 het alleen keuzes die echt richtinggevend zijn.
@@ -243,4 +243,5 @@ dezelfde revise-, withdraw- of supersedecommands laten uitvoeren.
 
 - [Overzicht](overzicht.md)
 - [Overleggen met de Stakeholder](overleggen.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

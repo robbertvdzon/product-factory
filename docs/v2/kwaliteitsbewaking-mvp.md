@@ -19,8 +19,8 @@ vervolgcommands uit.
   gereproduceerd voordat hij publiceerbaar is.
 - Gewone code controleert contracten, bronversies, secrets en persoonsgegevens.
 - Iedere niet-lege testsessie publiceert precies één nieuwe `QualitySnapshot`.
-- Er is geen duurzaam intern testgeheugen, geen slimme testrotatie en geen verzameling interne
-  teststrategie-entiteiten.
+- Er is geen extra intern testgeheugen, geen slimme testrotatie en geen verzameling interne
+  teststrategie-entiteiten; de Tester gebruikt wel het centrale geheugen van haar eigen agentrol.
 
 ## Agent
 
@@ -59,6 +59,11 @@ De MVP bewaart binnen Kwaliteitsbewaking alleen:
 Screenshots, logs, traces en andere bewijsassets worden met veilige metadata aan de betreffende bug
 of verificatie gekoppeld. Zij vormen geen afzonderlijk publiek productobject.
 
+Het permanente geheugen van de rol `TESTER_MVP` staat in
+[Agentgeheugen](agentgeheugen.md). De runtime voegt alleen de actuele items van deze rol aan de
+agenttaak toe en registreert de exact gelezen geheugenversies. De Tester kan geen geheugen van een
+andere rol opvragen.
+
 ## Verloop van één processessie
 
 ```text
@@ -84,7 +89,8 @@ atomair publiceren + vervolgcommands + QualitySnapshot
 
 Applicatiecode claimt de modulebrede run en alle `PENDING` workitems uit de vaste startmomentopname.
 Daarna leest zij per opdracht de exacte epic-, story-, bug-, opleverings- en signaalversies plus
-`TestableProductDetails`.
+`TestableProductDetails` en het actuele geheugen van `TESTER_MVP`. De processessie legt de exacte
+bron- en geheugenversies vast.
 
 De Tester controleert bereikbaarheid, geteste productversie en accountgrenzen vóór inhoudelijk
 testen. Een onbereikbare omgeving of ontbrekende toegang maakt het workitem `BLOCKED` en wordt nooit
@@ -161,7 +167,7 @@ geen snapshot.
 - geen onafhankelijk tweede-agentonderzoek van een mogelijke bug;
 - geen duurzame `TestStrategy`, `TestRotation`, `TestAgenda` of `TestCase`;
 - geen duurzame ruwe `TestObservation`s, coverage assessments of verification drafts;
-- geen zelflerend `QualityMemory`;
+- geen extra interne geheugenentiteit naast het centrale geheugen van de eigen agentrol;
 - geen intelligente kwaliteitsrotatie over thema's, apparaten en productgebieden;
 - geen aparte patroonanalyse-agent.
 
@@ -198,4 +204,5 @@ bepalen welke uitgebreide rol als eerste nodig is.
 - [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md)
 - [Productplanning-API](productplanning.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
+- [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

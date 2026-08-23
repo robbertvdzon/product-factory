@@ -6,6 +6,7 @@ De Software Factory-dispatcher stuurt steeds de eerste uitvoerbare story naar So
 verwerkt externe opleverstatussen. Hij is een apart uitvoerend onderdeel met een eigen schedule en
 dit eigen document, maar blijft technisch een eenvoudige adapter binnen de module Productplanning.
 Hij is geen intelligente procesmodule, gebruikt geen AI-agents en bezit geen productlogica.
+Daarom heeft hij geen `AgentRoleKey` en leest of schrijft hij geen Agentgeheugen.
 
 ## Verantwoordelijkheid
 
@@ -160,6 +161,7 @@ externe story aangemaakt.
 ## Invarianten
 
 - De dispatcher gebruikt nooit agents.
+- De dispatcher gebruikt geen Agentgeheugen.
 - Voor een product staat normaal maximaal één Software Factory-story extern open.
 - Alleen een afhankelijke-vrije `TODO`-story kan worden verstuurd.
 - Het laagste geldige `sequenceNumber` bepaalt de keuze.
