@@ -62,8 +62,9 @@ werken. Na de verhuizing bestaat geen map `docs/v2` meer.
 7. Maak vóór de verwijdering een herkenbare tag `v1-final`, tenzij die al bestaat.
 8. Maak vóór databasewerk een laatste gevalideerde v1-databasebackup. Git bewaart database-inhoud
    en niet-gecommitte secrets niet.
-9. Iedere push naar `main` moet bouwen, veilig starten en automatisch naar acceptatie en productie
-   kunnen doorstromen. Een tussenversie mag leeg zijn, maar niet kapot of onbeveiligd.
+9. Stappen 0 tot en met 8 bouwen en verifiëren lokaal en in CI, maar deployen niets naar OpenShift.
+   Stap 9 doet de eerste bewuste, handmatige deployment naar acceptatie en daarna productie. Pas
+   stap 10 automatiseert deze doorstroom voor volgende pushes naar `main`.
 10. Noem de nieuwe applicatie en de nieuwe modules overal gewoon `product-factory`.
 
 ## Technische v1-lessen die behouden blijven
@@ -102,7 +103,6 @@ inhoud ongewijzigd correct blijft; de uitvoerende agent moet ze tijdens dit plan
 | `deploy/seal-secrets.sh` | behouden en aanpassen aan de nieuwe verplichte sleutels |
 | `docker-compose.yml` | behouden als lokale composition root en volledig herschrijven |
 | `quality/detekt.yml` | behouden wanneer de nieuwe backend Kotlin gebruikt |
-| `tools/verify` | behouden als één lokale volledige verificatie-ingang en herschrijven |
 | `product-factory` | behouden als eenvoudige lokale CLI en herschrijven |
 | frontend-Nginxconfiguratie | cache-, security- en SPA-patronen behouden of gelijkwaardig opnieuw bouwen |
 | lokale worker-LaunchAgent | alleen het installatie-, restart- en logconcept behouden; workercontract herschrijven |
@@ -110,9 +110,10 @@ inhoud ongewijzigd correct blijft; de uitvoerende agent moet ze tijdens dit plan
 Verwijder uiteindelijk alle oude domeinmodules, oude frontendimplementatie, oude backendproxy,
 oude workspacecode, oude agentworkerimplementatie, oude Flywaymigraties, oude functionele tests,
 `docs/stories`, `docs/stories/worklog`, `docs/factory`, oude architectuurplannen en alle overige
-v1-documentatie. Verwijder ook de v1-specifieke `.factory`-verificatie en Docker Engine-runner en
-gegenereerde mappen zoals `target`, `build`, `.dart_tool` en `work` uit de nieuwe uitgangssituatie,
-maar raak `secrets.env` niet.
+v1-documentatie. Verwijder ook de volledige map `.factory`, `tools/verify`, de v1-specifieke Docker
+Engine-runner en gegenereerde mappen zoals `target`, `build`, `.dart_tool` en `work` uit de nieuwe
+uitgangssituatie, maar raak `secrets.env` niet. Voeg later alleen een nieuwe centrale
+verificatie-ingang toe wanneer daar een concrete behoefte voor bestaat.
 
 ## Beoogde eerste oplevering
 
@@ -132,7 +133,9 @@ eigenschappen:
 ## Uitvoeringsvolgorde
 
 Voer onderstaande stappen in volgorde uit. Rond per stap de genoemde verificatie af voordat de
-volgende stap begint. Houd `main` bij iedere push bouwbaar en veilig.
+volgende stap begint. Houd `main` bij iedere push bouwbaar. Tijdens stappen 0 tot en met 8 blijft
+automatische deployment uit en wordt de gedeeltelijk opgebouwde applicatie niet naar OpenShift
+gestuurd.
 
 ### Stap 0 — Leg de uitgangssituatie vast
 
@@ -163,6 +166,8 @@ door Git gevolgd en de actieve routes en images zijn genoteerd zonder secretwaar
 8. Maak een nieuwe lege Flutter-webapp of een gelijkwaardig nieuw frontendproject; kopieer geen
    oude widgets of domeinschermen.
 9. Voeg een eenvoudige backendroute en een leeg maar herkenbaar frontendscherm toe.
+10. Schakel de oude automatische imagepromotie en deployment uit voordat de eerste opschoningscommit
+    wordt gepusht. Laat bestaande OpenShift-resources ongemoeid totdat stap 9 ze bewust vervangt.
 
 Gebruik geen `v1`, `v2`, `legacy` of `new` in de definitieve modulenamen.
 
@@ -291,6 +296,9 @@ presentatie- en testpatronen over. Voor deze eerste technische versie gelden all
 4. Toon omgeving en frontend- en backendversie op het beheerscherm.
 5. Toon in acceptatie op iedere pagina de afgesproken banner.
 6. Test de nieuw ontworpen schermlogica en interacties zonder een v1-testsuite na te bouwen.
+7. De kern blijft bruikbaar op een viewport van 320 CSS-pixels en bij 200% tekstvergroting. Op
+   bredere schermen gebruikt de applicatieschil de beschikbare schermruimte in plaats van de hele
+   interface in een smalle mobiele kolom te houden.
 
 **Verificatie:** frontendanalyse, gerichte tests en de releasebuild zijn groen zonder echte externe
 calls.
@@ -375,11 +383,14 @@ mutaties en productie weigert mock-, reset- en seedfunctionaliteit.
 11. Verwijder de oude workspace-initcontainer en oude publieke runtime-route als zij niet meer nodig
     zijn.
 12. Een PR-previewoverlay is geen onderdeel van release `0.1.0`; voeg die pas later gericht toe.
+13. Deploy eerst handmatig naar acceptatie en voer daar de rooktests uit. Promoveer daarna bewust
+    exact dezelfde image-digests handmatig naar productie. Activeer in deze stap nog geen
+    automatische deployment vanaf `main`.
 
 **Verificatie:** `kubectl kustomize` rendert beide overlays, policychecks vinden geen plaintext
 secrets of rootcontainer, probes worden gezond en beide omgevingen tonen de juiste identiteit.
 
-### Stap 10 — Bouw CI/CD opnieuw
+### Stap 10 — Automatiseer CI/CD na de eerste deployment
 
 1. Houd GitHub Actions-permissies minimaal.
 2. Gebruik concurrencygroepen en annuleer verouderde verificatieruns.
@@ -401,6 +412,9 @@ secrets of rootcontainer, probes worden gezond en beide omgevingen tonen de juis
 7. Zorg dat automatische GitOps-imagepincommits niet een oneindige workflowlus veroorzaken.
 8. Maak zichtbaar welke functionele commit een deploymentcommit promoveert.
 9. Controleer na rollout concrete podimages, routes en health.
+
+Activeer deze automatische deploymentflow pas nadat de handmatige deployments en rooktests uit
+stap 9 zijn geslaagd. Vanaf dat moment doorloopt een geslaagde wijziging op `main` deze flow.
 
 Functionele onvolledigheid blokkeert productie niet. Een mislukte build, test, authenticatiecheck,
 securitycheck of deploymentrooktest blokkeert productie wel.
@@ -474,6 +488,8 @@ De technische fundering is pas klaar wanneer al het volgende aantoonbaar waar is
 - productieauthenticatie werkt en faalt gesloten;
 - acceptatieauthenticatie staat zichtbaar en uitsluitend daar uit;
 - frontendcachegedrag toont na deployment zonder handmatig cachelegen de nieuwste versie;
+- de kern van de frontend werkt op 320 CSS-pixels en bij 200% tekstvergroting en gebruikt op brede
+  schermen de beschikbare ruimte;
 - frontend en backend tonen omgeving, applicatieversie, commit en buildtijd;
 - acceptatie en productie draaien exact de bedoelde image-digests;
 - healthchecks, logs, metrics, correlation-ids en timeouts werken;

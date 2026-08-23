@@ -28,7 +28,12 @@ aanroepen. De precieze Testbedgrens staat in
 
 ## Buildstraat
 
-Een wijziging op `main` doorloopt een eenvoudige, betrouwbare buildstraat:
+Tijdens de bouw van de technische fundering deployen stappen 0 tot en met 8 niets naar OpenShift.
+De eerste deployment gebeurt in stap 9 van het implementatieplan bewust en handmatig: eerst naar
+acceptatie en na geslaagde rooktests met exact dezelfde image-digests naar productie. Pas in stap 10
+wordt de automatische deploymentflow geactiveerd.
+
+Daarna doorloopt een wijziging op `main` de volgende eenvoudige buildstraat:
 
 1. bouw de volledige Maven-reactor en voer de backendtests uit;
 2. controleer de Spring Modulith-grenzen binnen implementatiemodules;
