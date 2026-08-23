@@ -7,6 +7,10 @@ De module bewaart taken en uitvoeringspogingen duurzaam, deelt werk uit aan een 
 voortgang en resultaten. De worker op de laptop onderhoudt geen blijvende WebSocketverbinding meer,
 maar haalt werk via beveiligde HTTPS long polling op.
 
+De capability bestaat uit een Maven-API en één implementatiemodule. Andere implementaties gebruiken
+uitsluitend de API; alleen de main-module neemt `ai-execution-impl` op. Eventuele interne Spring
+Modulith-delen blijven volledig binnen die implementatie.
+
 De module is volledig generiek. Zij kent geen Productontwerper, Planner, Tester, overlegrol, epic,
 story of andere productbetekenis. De aanroeper levert een complete, onveranderlijke taak met alle
 benodigde data, de gekozen provider, het gekozen model en het verwachte uitvoercontract.
@@ -439,6 +443,7 @@ proces, agentjob of vervolgstap starten.
 - [Frontend](frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productplanning-API](productplanning.md)
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)

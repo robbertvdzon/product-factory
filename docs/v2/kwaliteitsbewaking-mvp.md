@@ -8,6 +8,9 @@ bedient de toegestane testmiddelen, beoordeelt wat hij aantreft en levert gestru
 voor bugs en verificaties. Gewone applicatiecode claimt werk, valideert output, publiceert en voert
 vervolgcommands uit.
 
+Zij wordt gebouwd als `quality-impl-mvp`. De ene main-module neemt dit artifact of de uitgebreide
+variant op, nooit beide.
+
 ## Uitgangspunten
 
 - Eén processessie gebruikt één agentrol: **Tester**.
@@ -214,4 +217,5 @@ bepalen welke uitgebreide rol als eerste nodig is.
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

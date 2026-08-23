@@ -11,7 +11,9 @@ stappen. Daardoor kunnen de volgende implementaties hetzelfde contract gebruiken
   agents, onderzoek en leren per agentrol.
 
 De MVP kan later door de uitgebreide implementatie worden vervangen zonder Productplanning,
-Kwaliteitsbewaking, de frontend of het datacontract aan te passen.
+Kwaliteitsbewaking, de frontend of het datacontract aan te passen. Beide zijn afzonderlijke Maven-
+implementatiemodules van dezelfde `product-design-api`; de main-module neemt bij build-time exact
+één van beide op.
 
 ## Verantwoordelijkheid
 
@@ -62,9 +64,11 @@ schrijftoegang tot epicinhoud of UX.
 
 ## Interface met andere modules en services
 
-Procesmodules gebruiken alleen elkaars publieke Spring Modulith-API. Queries leveren read-only DTO's
-uit `processcontracts`; een DTO is geen tweede database-entiteit. Commands drukken een concrete
-domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
+Procesmodules gebruiken alleen de publieke Maven-API-module van een andere capability. Queries
+leveren read-only DTO's uit de betreffende `*-api`-module; een DTO is geen tweede
+database-entiteit. Commands drukken een concrete domeinovergang uit. Productontwerp schrijft
+uitsluitend zijn eigen tabellen. Spring Modulith structureert alleen de binnenkant van de gekozen
+Productontwerp-implementatie.
 
 ### Input
 
@@ -106,7 +110,7 @@ productmodule en krijgt nooit directe schrijftoegang tot het signaal.
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
 | `EpicDetails` | read-only weergave van één complete gebruikersverbetering | versie, status, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's, afhankelijkheden en bron-signaal-ID's |
-| `ProcessSession` | opgeslagen operationele historie van de sessie | sessie-ID, eventueel product-ID, gebruikte inputversies, AI-taak-ID's, publicatie-ID's, wacht- of eindstatus en blokkade |
+| `ProcessSession` | opgeslagen operationele historie van de sessie | sessie-ID, product-ID, implementatie-ID en -versie, gebruikte inputversies, AI-taak-ID's, publicatie-ID's, wacht- of eindstatus en blokkade |
 
 De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Interne analyses,
 concepten en agentuitvoer steken de modulegrens niet over. Permanent leren loopt uitsluitend via
@@ -224,6 +228,9 @@ De toestand van de backlog is geen startsein. Als er niets zinvols te doen is, i
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
+- zij dezelfde `product-design-api` implementeert en andere capabilities alleen via hun API-module
+  gebruikt;
+- iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
 - alleen `runProcessSession()` voor Productontwerp nieuwe AI-taken aanvraagt;
 - maximaal één uitvoering tegelijk loopt; een wachtende logische sessie houdt geen lock vast;
 - iedere gepubliceerde epic aan het volledige Epiccontract voldoet;
@@ -245,5 +252,6 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Overzicht](overzicht.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

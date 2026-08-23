@@ -264,7 +264,7 @@ productlogica en beheert geen eigen productentiteiten.
 |---|---|
 | `StoryDeliveryPackage` | Volledige momentopname van de story met alle benodigde UX en assets. |
 | Storycommands | Meldingen `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)` aan Productplanning. |
-| `DeliveryAttempt` | Technische historie binnen Productplanning van verzending, response, fout en retry. |
+| `DeliveryAttempt` | Technische historie van de Software Factory-dispatcher over verzending, response, fout en retry. |
 
 De dispatcher verstuurt niets zolang Software Factory voor dat product nog een openstaande story
 heeft. Software Factory hoeft de productrepository niet te lezen: alle inhoud en UX staan in het
@@ -347,6 +347,24 @@ De publieke productrepository blijft wel de waarheid over de huidige code, tests
 productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen de Git-URL uit de
 `ProductAssignment` tijdens een sessie read-only uitchecken. Zij committen of pushen niets.
 
+## Technische moduleopbouw
+
+Maven vormt de harde grens tussen capabilities. Iedere capability heeft een kleine API-module en
+een implementatiemodule. Een implementatie mag haar eigen API en API-modules van andere
+capabilities gebruiken, maar nooit een andere implementatiemodule. Alleen de ene uitvoerbare
+`product-factory-app` kent implementatie-artifacts.
+
+Productontwerp, Productplanning en Kwaliteitsbewaking kunnen een MVP- en uitgebreide implementatie
+hebben. De main-module kiest tijdens de build exact één implementatie per capability; er bestaat
+geen runtime-toggle en twee varianten schrijven nooit tegelijk dezelfde productdata. Spring
+Modulith wordt uitsluitend binnen een implementatiemodule gebruikt om haar interne functionele
+delen te structureren en te testen. De API-modules gebruiken geen Spring Modulith.
+
+Iedere processessie bewaart haar `implementationId` en `implementationVersion`. Zolang terugkeer
+naar de MVP ondersteund wordt, blijven publieke objecten en het duurzame schema compatibel en zijn
+migraties additief. De volledige keuze staat in
+[Maven en Spring Modulith](maven-en-spring-modulith.md).
+
 ## Integratie- en acceptatietesten
 
 De acceptatieomgeving gebruikt echte Product Factory-modules, contracts, queues en statusmachines,
@@ -365,7 +383,7 @@ gedaan. Opstartcontroles weigeren in acceptatie echte AI-providers, een echt Sof
 Factory-endpoint, externe schrijftokens, productie-URL's en ingeschakelde achtergrondschedules.
 Details staan in [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
 
-## Negen hoofdregels
+## Tien hoofdregels
 
 1. De Stakeholder is de klant en diens expliciete richting is leidend.
 2. Productontwerp maakt complete epics met UX, maar geen stories.
@@ -380,6 +398,8 @@ Details staan in [Integratie- en acceptatietesten](integratie-en-acceptatieteste
    bevroren provider en model.
 9. Gemiste worker-heartbeats leiden eerst tot een hersteltermijn; retries zijn met leases en fencing
    beschermd tegen oude workers.
+10. Maven bewaakt de harde API/implementatiegrenzen; de ene main-build kiest exact één implementatie
+    per capability en Spring Modulith blijft binnen die implementatie.
 
 ## Detaildocumenten
 
@@ -389,6 +409,7 @@ Details staan in [Integratie- en acceptatietesten](integratie-en-acceptatieteste
 - [Frontend](frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)

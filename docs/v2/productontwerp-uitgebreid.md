@@ -7,6 +7,9 @@ Deze implementatie gebruikt exact de publieke [Productontwerp-API](productontwer
 permanent geheugen per agentrol. Andere modules zien alleen dezelfde `EpicDetails`, commands,
 queries en `ProcessSessionDetails`.
 
+Zij wordt gebouwd als `product-design-impl-advanced`. Spring Modulith bewaakt de hieronder
+beschreven interne delen; de main-module neemt dit artifact of de MVP op, nooit beide.
+
 ## Interne productverkenning
 
 Productontwerp wacht niet alleen op een kant-en-klare vraag. Tijdens een sessie kan de module zelf
@@ -230,4 +233,5 @@ Een uitgebreide sessie is klaar wanneer:
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

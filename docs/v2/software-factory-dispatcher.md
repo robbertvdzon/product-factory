@@ -4,8 +4,9 @@ Status: eerste ontwerp van de technische adapter en zijn contract.
 
 De Software Factory-dispatcher stuurt steeds de eerste uitvoerbare story naar Software Factory en
 verwerkt externe opleverstatussen. Hij is een apart uitvoerend onderdeel met een eigen schedule en
-dit eigen document, maar blijft technisch een eenvoudige adapter binnen de module Productplanning.
-Hij is geen intelligente procesmodule, gebruikt geen AI-agents en bezit geen productlogica.
+een eigen Maven-API/implementatiemodule. Zijn implementatie gebruikt uitsluitend
+`product-planning-api` en andere benodigde API-modules; zij kent geen planningsimplementatie. Hij is
+geen intelligente procesmodule, gebruikt geen AI-agents en bezit geen productlogica.
 Daarom heeft hij geen `AgentRoleKey`, leest of schrijft hij geen Agentgeheugen en vraagt hij geen
 `AiTask` aan.
 
@@ -52,14 +53,14 @@ Software Factory nodig heeft, moet al zelfstandig in de story staan.
 | Contract of effect | Eigenaar | Betekenis |
 |---|---|---|
 | `StoryDeliveryPackage` | tijdelijk transportobject van de dispatcher | volledige, onveranderlijke story voor Software Factory |
-| `DeliveryAttempt` | dispatcher binnen Productplanning | technische historie van request, response, fout, retry en idempotentiesleutel |
+| `DeliveryAttempt` | Software Factory-dispatcher | technische historie van request, response, fout, retry en idempotentiesleutel |
 | `markStoryAsDispatched(...)` | Productplanning | leg extern ID vast en zet de story atomair op `IN_PROGRESS` |
 | `markStoryAsDeveloped(...)` | Productplanning | leg oplevering vast en zet de story atomair op `DONE` |
 | `REPAIR_STORY` | Productplanning | intern `PlanningWorkItem` na definitieve inhoudelijke pakketafwijzing |
 
-De dispatcher schrijft niet rechtstreeks in `Story` of `PlanningWorkItem`. De adapterservice mag
-binnen Productplanning een `DeliveryAttempt` opslaan, maar inhoudelijke veranderingen lopen via de
-normale domeinservices en hun invarianten.
+De dispatcher schrijft niet rechtstreeks in `Story` of `PlanningWorkItem`. Zijn implementatiemodule
+is de enige schrijver van `DeliveryAttempt`; inhoudelijke veranderingen lopen via de publieke
+Productplanning-commands en hun invarianten.
 
 ## StoryDeliveryPackage
 
@@ -164,6 +165,7 @@ externe story aangemaakt.
 - De dispatcher gebruikt nooit agents.
 - De dispatcher gebruikt geen Agentgeheugen.
 - De dispatcher gebruikt AI-uitvoering niet.
+- De dispatcherimplementation gebruikt Productplanning uitsluitend via `product-planning-api`.
 - Voor een product staat normaal maximaal één Software Factory-story extern open.
 - Alleen een afhankelijke-vrije `TODO`-story kan worden verstuurd.
 - Het laagste geldige `sequenceNumber` bepaalt de keuze.
@@ -198,3 +200,4 @@ een externe story afronden of de volgende call laten mislukken. De daaropvolgend
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)

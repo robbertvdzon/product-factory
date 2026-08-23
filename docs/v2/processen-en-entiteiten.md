@@ -41,7 +41,7 @@ actor.
 | Productontwerp | `runProcessSession()` | `Epic` | epicstatuscommands uitvoeren; planning ontdekt beschikbare epics zelf |
 | Productplanning | `runProcessSession()` | `PlanningWorkItem`, `Story` | beschikbare epics kiezen, gericht planwerk verwerken en zo nodig epicverificatie aanvragen |
 | Kwaliteitsbewaking | `runProcessSession()` | `QualityWorkItem`, `Bug`, `Verification`, `QualitySnapshot` | testverzoeken queueën, resultaten publiceren en kwaliteitshistorie vastleggen |
-| Software Factory-dispatcher | `runDispatchSession()` | geen productentiteit; `DeliveryAttempt` binnen Productplanning | externe status synchroniseren en steeds de eerste uitvoerbare `TODO`-story versturen |
+| Software Factory-dispatcher | `runDispatchSession()` | geen productentiteit; eigen technisch `DeliveryAttempt` | externe status synchroniseren en steeds de eerste uitvoerbare `TODO`-story versturen |
 
 De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een geldige no-op.
 
@@ -131,8 +131,8 @@ nooit rechtstreeks in de tabel.
 | `AiTaskAttempt` | AI-uitvoering | bevoegde worker claimt en meldt heartbeat, progress, afronding of fout via commands | AI-uitvoering, operations en frontend | één uitvoeringspoging met worker, lease, hersteltermijn en fencing token |
 | `AiTaskResult` | AI-uitvoering | bevoegde worker mag met het actuele fencing token één resultaat aanbieden | alleen aanvragende module, operations en frontend | onveranderlijk technisch gevalideerd resultaat; de procesmodule valideert de productbetekenis |
 | `AiWorkerSession` | AI-uitvoering | worker opent en reconcileert zijn sessie | operations en frontend | worker-ID, bootsessie, provider-capabilities, capaciteit en laatste heartbeat; geen agentrollen |
-| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde uitvoering, inputversies, AI-taak-ID's, publicaties, status inclusief `WAITING_FOR_AI` en blokkade |
-| `DeliveryAttempt` | dispatcher binnen Productplanning | dispatcher via interne service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
+| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde uitvoering, implementatie-ID en -versie, inputversies, AI-taak-ID's, publicaties, status inclusief `WAITING_FOR_AI` en blokkade |
+| `DeliveryAttempt` | Software Factory-dispatcher | dispatcher via eigen service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
 Interne analyses, concepten en agentuitvoer steken de modulegrens niet over. Permanent rolgeheugen
 gaat uitsluitend via Agentgeheugen en is alleen leesbaar voor de eigen rol. Alleen een afzonderlijke
@@ -164,7 +164,8 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `AiJobConfigurationDetails` | Algemene instellingen | procesmodules en frontend | actuele provider, model en versie voor één opaque jobkey |
 | `AiTaskDetails` | AI-uitvoering uit `AiTask` en actuele attempt | aanvragende module, operations en frontend | taakstatus, provider/model-snapshot, attempt, lease, veilige voortgang en fout |
 | `AiTaskResultDetails` | AI-uitvoering uit `AiTaskResult` | uitsluitend de aanvragende module; operations binnen privacygrenzen | technisch gevalideerde opaque output en artifactreferenties |
-| `ProcessSessionDetails` | betreffende procesmodule | operations en frontend | operationele sessiestatus en historie |
+| `ProcessSessionDetails` | betreffende procesmodule | operations en frontend | operationele sessiestatus, implementatie-ID en -versie en historie |
+| `ImplementationManifestDetails` | buildmetadata van `product-factory-app` | operations, frontend en Test Control API | gekozen artifact, variant, versie en broncommit per capability; read-only en geen database-entiteit |
 | `SoftwareFactoryWork` | externe adapter | dispatcher | tijdelijk extern integratieantwoord |
 | `StoryDeliveryPackage` | dispatcher uit één `StoryDetails` | Software Factory | volledige, onveranderlijke story met UX, assets, hashes en idempotentiesleutel |
 
@@ -244,12 +245,21 @@ gekozen epic zet Productontwerp haar op `CANCELLED` en vraagt Productplanning di
 stories op `CANCELLED` te zetten; `IN_PROGRESS` loopt normaal af. Een `NOT_SUCCESSFUL` epic blijft
 historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar wordt niet heropend.
 
-## Technische vertaling naar Spring Modulith
+## Technische vertaling naar Maven en Spring Modulith
 
-- Iedere eigenaar implementeert een application port met alleen de genoemde commands en queries.
-- Stabiele portinterfaces, command-DTO's en read-only DTO's staan in `processcontracts`; logica en
-  JPA-entiteiten blijven in de eigenaarsmodule.
-- Iedere eigenaar beheert eigen aggregates, repositories en transacties, ook in één fysieke database.
+- Iedere capability heeft een Maven-API-module met alleen de genoemde commands, queries en
+  read-only DTO's; zij bevat geen Spring Modulith, persistence of concrete beans.
+- Iedere implementatiemodule implementeert haar eigen API en gebruikt andere capabilities
+  uitsluitend via hun API-module.
+- Alleen de ene `product-factory-app` heeft dependencies op implementatiemodules en neemt bij
+  build-time exact één implementatie per capability op.
+- Spring Modulith structureert en verifieert uitsluitend de interne functionele delen van een
+  implementatiemodule; het vervangt de harde Maven-grens niet.
+- Iedere eigenaar beheert in haar gekozen implementatie eigen aggregates, repositories en
+  transacties, ook in één fysieke database.
+- MVP en uitgebreid gebruiken hetzelfde publieke contract en een terugwaarts compatibel duurzaam
+  schema zolang terugschakelen ondersteund wordt.
+- Iedere processessie bewaart de exacte implementatie-ID en -versie die haar heeft gemaakt.
 - Queue-inserts en commandketens over modules zijn idempotent en herstelbaar; ze doen niet alsof één
   transactie meerdere module-aggregates bezit.
 - Een unieke actieve-run-constraint per procesmodule voorkomt gelijktijdige agentsessies.
@@ -267,6 +277,7 @@ historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar word
 - [Frontend](frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)

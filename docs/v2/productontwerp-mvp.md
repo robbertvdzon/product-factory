@@ -6,6 +6,9 @@ Deze implementatie gebruikt exact de publieke [Productontwerp-API](productontwer
 bewust klein: één algemene AI-agent doet het inhoudelijke ontwerpwerk. Er is geen droombeeld, geen
 zelfstandig onderzoeksproces en geen groep gespecialiseerde agents.
 
+Zij wordt gebouwd als `product-design-impl-mvp`. De ene main-module neemt dit artifact of de
+uitgebreide variant op, nooit beide.
+
 Het doel van de MVP is eerst betrouwbaar complete epics te maken. Pas wanneer de praktijk een
 concreet tekort laat zien, hoeft een onderdeel uit de
 [uitgebreide implementatie](productontwerp-uitgebreid.md) te worden toegevoegd.
@@ -199,4 +202,5 @@ extra agentrol wordt niet alleen toegevoegd omdat die conceptueel aantrekkelijk 
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

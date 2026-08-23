@@ -7,6 +7,9 @@ algemene Planner-agent kiest epics, maakt stories, verwerkt herstelwerk en bepaa
 De vaste [Software Factory-dispatcher](software-factory-dispatcher.md) staat hier los van en gebruikt
 geen agent.
 
+Zij wordt gebouwd als `product-planning-impl-mvp`. De ene main-module neemt dit artifact of de
+uitgebreide variant op, nooit beide.
+
 ## Uitgangspunten
 
 - Eén processessie gebruikt één agentrol: **Planner**.
@@ -203,4 +206,5 @@ welke gespecialiseerde rol als eerste nodig is.
 - [Productontwerp-API](productontwerp.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

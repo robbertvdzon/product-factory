@@ -4,7 +4,8 @@ Status: eerste ontwerp van ondersteunende module en publieke interface.
 
 Het Besluitenregister bewaart alleen grote, blijvende productbesluiten. Het is geen proceslogboek en
 neemt zelf geen besluiten. Het heeft geen agents, scheduler of `runProcessSession()` en is een
-ondersteunende Spring Modulith-module met eigen tabellen en publieke commands en queries.
+ondersteunende capability met een Maven-API en implementatiemodule. Alleen de implementatie mag
+intern Spring Modulith gebruiken en bezit de tabellen achter de publieke commands en queries.
 
 ## Wat een besluit is
 
@@ -245,3 +246,4 @@ dezelfde revise-, withdraw- of supersedecommands laten uitvoeren.
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)

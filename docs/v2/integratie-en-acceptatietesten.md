@@ -20,7 +20,7 @@ explicieter en beter via de UI bestuurbaar dan een verzameling losse HTTP-stubs.
 
 | Afhankelijkheid | Integratietest | Acceptatie | Productie |
 |---|---|---|---|
-| Product Factory-modules | echte modules in hetzelfde Modulith | echte gedeployde modules | echte modules |
+| Product Factory-modules | echte Maven-implementaties met hun interne Modulith-structuur | één echte appbuild met gekozen implementaties | één echte appbuild met gekozen implementaties |
 | database | nieuwe in-memory database per test of testsuite | in-memory database, opnieuw te vullen via reset | duurzame ondersteunde productiedatabase |
 | AI-uitvoering | echte AI-module, queue, leases en worker-API | echte AI-module, queue, leases en worker-API | echte AI-module |
 | AI-provider | `MockAiWorker` uit Testbed | `MockAiWorker` uit Testbed | laptopworker met toegestane echte provider |
@@ -252,7 +252,7 @@ synthetische data zonder authenticatie gaat.
 
 Het scherm bevat:
 
-- actieve dataset-, scenario- en Testbed-versie;
+- actieve dataset-, scenario-, Testbed- en `ImplementationManifest`-versie;
 - knop **Reset naar beginsituatie**;
 - lijst met beschreven vaste scenario's en hun verwachte resultaat;
 - knop om een scenario te activeren;
@@ -287,6 +287,23 @@ Een integratietest gebruikt dezelfde scenariofixtures en volgt steeds deze vorm:
 Tests mogen nooit rechtstreeks een gewenste eindstatus in een moduletabel zetten wanneer juist de
 flow naar die status wordt getest. Testbed verandert alleen zijn eigen externe toestand; Product
 Factory moet zelf reageren.
+
+## MVP en uitgebreid na elkaar vergelijken
+
+Acceptatie draait maar één `product-factory-app` tegelijk. Een variantvergelijking gebeurt daarom
+sequentieel en niet met twee schrijvers op dezelfde database:
+
+1. deploy de appbuild met de MVP-implementatie;
+2. reset naar een vastgelegde dataset- en scenarioversie;
+3. voer de gekozen UI-scenario's uit en exporteer resultaten en operationele metingen;
+4. deploy de appbuild met de uitgebreide implementatie;
+5. reset naar exact dezelfde dataset- en scenarioversie;
+6. voer dezelfde scenario's uit en vergelijk de exports.
+
+De UI toont bij iedere run het `ImplementationManifest` en iedere `ProcessSession` bewaart haar
+implementatie-ID en -versie. Daardoor kan een resultaat nooit per ongeluk aan de verkeerde variant
+worden toegeschreven. De uitgebreide implementatie wordt niet automatisch definitief: een volgende
+build kan opnieuw de MVP selecteren wanneer die aantoonbaar beter werkt.
 
 ## Contract- en scenariobeheer
 
@@ -336,3 +353,4 @@ acceptatiedata en zijn nooit een voorwaarde om de veilige acceptatieomgeving te 
 - [AI-uitvoering](ai-uitvoering.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)

@@ -135,6 +135,8 @@ is.
 
 Technische gebruikers kunnen apart zien:
 
+- het `ImplementationManifest` van de actieve build met gekozen artifact, variant, versie en
+  broncommit per capability;
 - de eigen `ProcessSession`s van iedere intelligente module;
 - `PlanningWorkItem`s en `QualityWorkItem`s met status en fout;
 - `AiTask`s met aanvrager, provider, model, configuratieversie, status en attemptnummer;
@@ -155,7 +157,7 @@ de Product Factory-database.
 
 De tester kan hier:
 
-- de actieve dataset-, scenario- en Testbed-versie zien;
+- de actieve dataset-, scenario-, Testbed- en implementatieversies zien;
 - de omgeving resetten naar vaste initiële testdata;
 - een beschreven AI- of Software Factory-scenario activeren;
 - expliciete externe stappen uitvoeren, zoals een mockworker laten slapen of hervatten, een externe
@@ -177,4 +179,5 @@ productie.
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)

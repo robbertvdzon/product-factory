@@ -8,6 +8,9 @@ permanent geheugen per agentrol en een afzonderlijke kritiekstap. De
 [Software Factory-dispatcher](software-factory-dispatcher.md) blijft dezelfde deterministische
 adapter.
 
+Zij wordt gebouwd als `product-planning-impl-advanced`. Spring Modulith bewaakt de hieronder
+beschreven interne delen; de main-module neemt dit artifact of de MVP op, nooit beide.
+
 ## Interne entiteiten
 
 Naast de publieke module-entiteiten kan de uitgebreide implementatie gebruiken:
@@ -183,4 +186,5 @@ Een uitgebreide planningsrun is klaar wanneer:
 - [Productontwerp-API](productontwerp.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

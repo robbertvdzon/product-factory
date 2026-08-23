@@ -7,6 +7,9 @@ Deze implementatie gebruikt exact de publieke
 [MVP](kwaliteitsbewaking-mvp.md) intern uit met gespecialiseerde rollen, parallelle testtaken,
 risicogestuurde testrotatie, onafhankelijke kritiek en permanent geheugen per agentrol.
 
+Zij wordt gebouwd als `quality-impl-advanced`. Spring Modulith bewaakt de hieronder beschreven
+interne delen; de main-module neemt dit artifact of de MVP op, nooit beide.
+
 ## Interne entiteiten
 
 Naast de publieke module-entiteiten kan de uitgebreide implementatie gebruiken:
@@ -207,4 +210,5 @@ Een uitgebreide kwaliteitssessie is klaar wanneer:
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

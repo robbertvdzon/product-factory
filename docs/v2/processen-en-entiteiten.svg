@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2420" height="2280" viewBox="0 0 2420 2280" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont bovenaan de publieke functies en daaronder de publieke entiteiten waarvan de module eigenaar is. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering kent geen rollen en distribueert complete taken via een databasequeue aan een laptop- of mockworker. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont de Maven-API van een capability en de publieke entiteiten van de tijdens de build gekozen implementatie; interne Spring Modulith-modules zijn verborgen. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering kent geen rollen en distribueert complete taken via een databasequeue aan een laptop- of mockworker. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -25,7 +25,7 @@
 
   <rect width="2420" height="2280" fill="#f8fafc"/>
   <text x="55" y="55" class="title">Product Factory v2 — publieke modulecontracten en eigenaarschap</text>
-  <text x="55" y="88" class="subtitle">Boven de scheidslijn staat wat andere onderdelen mogen aanroepen; daaronder staan uitsluitend de eigen publieke entiteiten.</text>
+  <text x="55" y="88" class="subtitle">Elk blok toont de Maven-API en publieke entiteiten van de gekozen implementatie; interne Spring Modulith-modules blijven verborgen.</text>
   <path d="M65 125 H155" class="command"/>
   <text x="170" y="130" class="note">command: vraagt de eigenaar om een geldige wijziging</text>
   <path d="M585 125 H675" class="query"/>

@@ -11,6 +11,9 @@ volgende implementaties gebruiken hetzelfde contract:
 - [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md): vier
   gespecialiseerde rollen, parallel testen, testrotatie en leren per agentrol.
 
+Beide zijn afzonderlijke Maven-implementatiemodules van dezelfde `quality-api`. De main-module
+neemt bij build-time exact één implementatie op.
+
 ## Verantwoordelijkheid
 
 Kwaliteitsbewaking test de werkende applicatie, verifieert losse opleveringen en controleert na de
@@ -84,9 +87,9 @@ Kwaliteitsbewaking; Productontwerp bevat geen testqueue.
 
 ## Interface met andere modules en services
 
-Kwaliteitsbewaking gebruikt publieke Spring Modulith-API's en read-only DTO's uit
-`processcontracts`. DTO's zijn geen database-entiteiten. Browser-, log- en testclients zijn interne
-adapters.
+Kwaliteitsbewaking gebruikt publieke Maven-API-modules en hun read-only DTO's. DTO's zijn geen
+database-entiteiten. Browser-, log- en testclients zijn interne adapters. Spring Modulith
+structureert alleen de binnenkant van de gekozen Kwaliteitsbewaking-implementatie.
 
 ### Input
 
@@ -126,7 +129,7 @@ de verificatie vast welke commit is bekeken en welke productversie werkelijk is 
 | `VerificationDetails` | read-only weergave van een story-, epic- of signaalcontrole | doeltype en -versie, uitkomst, omgeving, controles, bewijs, blokkade, ontbrekende dekking en vervolgkoppelingen |
 | `QualitySnapshotDetails` | read-only kwaliteitsbeeld en historie | tijdstip, omgeving, productversie, onderzochte gebieden, dekking, open bugs per ernst, verificatie-uitkomsten, risico's en bron-ID's |
 | `QualityWorkItemDetails` | read-only inzicht in de kwaliteitsqueue | type, doelversie, status, claim, resultaat en fout; geen wijzigbaar requestobject |
-| `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, inputversies, AI-taak-ID's, publicatie-ID's en wacht- of eindstatus |
+| `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, implementatie-ID en -versie, inputversies, AI-taak-ID's, publicatie-ID's en wacht- of eindstatus |
 | `PlanningWorkItem` bij Productplanning | downstream effect van een gericht herstelcommand; Productplanning maakt en bezit dit object | type bugfix of epicgat, exact bron-ID en -versie, bewijsreferentie en idempotentiesleutel |
 
 Kwaliteitsbewaking schrijft `ProcessSession` uitsluitend voor zijn eigen sessies. De
@@ -318,6 +321,9 @@ of een periodieke kwaliteitscontrole. Een queuecommand is een snelle databasebew
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
+- zij dezelfde `quality-api` implementeert en andere capabilities alleen via hun API-module
+  gebruikt;
+- iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
 - alleen `runProcessSession()` voor Kwaliteitsbewaking nieuwe AI-taken aanvraagt;
 - maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
 - ieder geclaimd workitem `DONE`, `BLOCKED` of `FAILED` wordt;
@@ -358,4 +364,5 @@ Een inhoudelijke sessie is klaar wanneer:
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

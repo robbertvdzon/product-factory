@@ -12,8 +12,8 @@ implementaties gebruiken daarom hetzelfde contract:
   gespecialiseerde rollen met parallelle voorbereiding en een aparte criticus.
 
 De technische [Software Factory-dispatcher](software-factory-dispatcher.md) heeft een eigen
-document. Hij blijft binnen Productplanning, maar staat los van de intelligente implementatie en
-gebruikt nooit agents.
+document en eigen Maven-API/implementatiegrens. Hij gebruikt `product-planning-api`, staat los van
+de gekozen intelligente planningsimplementatie en gebruikt nooit agents.
 
 ## Verantwoordelijkheid
 
@@ -96,8 +96,9 @@ opdracht maken door idempotentie nooit twee workitems.
 
 ## Interface met andere modules en services
 
-Productplanning gebruikt alleen publieke Spring Modulith-API's. Read-only DTO's staan in
-`processcontracts` en zijn geen eigen database-entiteiten.
+Productplanning gebruikt alleen publieke Maven-API-modules. Read-only DTO's staan in de
+betreffende `*-api`-module en zijn geen eigen database-entiteiten. Spring Modulith structureert
+alleen de binnenkant van de gekozen Productplanning-implementatie.
 
 ### Input
 
@@ -135,7 +136,7 @@ kwaliteitsoordeel.
 | `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, status en externe referentie |
 | backlogquery | alle uitvoerbare of reeds verzonden stories in volgorde | `StoryDetails` met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | read-only inzicht in de planningsqueue | type, bron, status, claim, resultaat en fout |
-| `ProcessSession` | opgeslagen operationele historie van de intelligente run | geclaimde workitems, inputversies, AI-taak-ID's, publicaties, wacht- of eindstatus en blokkade |
+| `ProcessSession` | opgeslagen operationele historie van de intelligente run | implementatie-ID en -versie, geclaimde workitems, inputversies, AI-taak-ID's, publicaties, wacht- of eindstatus en blokkade |
 | `QualityWorkItem` bij Kwaliteitsbewaking | downstream effect van een verificatiecommand; Kwaliteitsbewaking maakt en bezit dit object | type, exact doel-ID en -versie, bron, prioriteit en idempotentiesleutel |
 
 Operations en frontend lezen de sessie via `ProcessSessionDetails`. Interne analyses, concepten en
@@ -255,6 +256,9 @@ planningsagent.
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
+- zij dezelfde `product-planning-api` implementeert en andere capabilities alleen via hun
+  API-module gebruikt;
+- iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
 - alleen `runProcessSession()` voor Productplanning nieuwe AI-taken aanvraagt;
 - maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
 - ieder geclaimd workitem eindigt als `DONE`, `BLOCKED` of `FAILED`;
@@ -277,4 +281,5 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
