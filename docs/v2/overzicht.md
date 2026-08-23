@@ -139,7 +139,8 @@ doet.
 Productontwerp mag een beschikbare epic nog verbeteren. Zodra Productplanning een exacte epicversie
 kiest, wordt die versie bevroren en niet meer aangepast.
 
-Onderzoeksvragen, bronnen, tussenresultaten en concepten blijven intern binnen Productontwerp.
+Interne analyses, bronnen, concepten en agentuitvoer blijven binnen Productontwerp. Welke interne
+werkwijze de module gebruikt, is niet zichtbaar voor de andere modules.
 
 ## Productplanning als black box
 
@@ -315,6 +316,8 @@ productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen
 - [Besluitenregister](besluitenregister.md)
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Frontend](frontend.md)
-- [Productontwerp](productontwerp.md)
+- [Productontwerp-API](productontwerp.md)
+- [Productontwerp — MVP](productontwerp-mvp.md)
+- [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
 - [Productplanning](productplanning.md)
 - [Kwaliteitsbewaking](kwaliteitsbewaking.md)

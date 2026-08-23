@@ -76,8 +76,8 @@ De Stakeholder schrijft geen epic, story, bug, verificatie of backlogpositie.
 ## Besluiten als aparte modulegrens
 
 Het Besluitenregister bevat alleen grote, blijvende keuzes die meerdere toekomstige processessies
-begrenzen. Een droombeeld, epic, epicstatus, backlogvolgorde, bugprioriteit of andere normale
-processtap is geen besluit.
+begrenzen. Een interne productverkenning, epic, epicstatus, backlogvolgorde, bugprioriteit of andere
+normale processtap is geen besluit.
 
 Een Stakeholderbesluit ontstaat in een overleg; de notulenagent registreert het namens de
 Stakeholder. Een Factorybesluit moet passen binnen de productopdracht en geldige besluiten en is
@@ -111,14 +111,13 @@ nooit rechtstreeks in de tabel.
 | `QualitySnapshot` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | Productontwerp, Stakeholder en frontend | aantoonbaar kwaliteitsbeeld na één afgeronde niet-lege kwaliteitssessie; vormt samen met eerdere snapshots de historie |
 | `Decision` | Besluitenregister | notulenagent voor de Stakeholder of bevoegde Factorymodule mag aanmaken, herzien, intrekken of vervangen | alle processen via geldige snapshot; Stakeholder en frontend ook via archief | stabiele identiteit, `origin`, state `ACTIVE`, `WITHDRAWN` of `SUPERSEDED`, historie en eventuele opvolger |
 | `DecisionDetails` | Besluitenregister binnen één `Decision` | uitsluitend via revise-, withdraw- of supersedecommand | via `DecisionDto` of `DecisionHistoryDto` | één versie met ID, `validFrom`, `validUntil` en alleen de besluittekst |
-| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde batch, inputversies, agentruns, publicaties, eindstatus en blokkade |
+| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde uitvoering, inputversies, publicaties, eindstatus en blokkade |
 | `DeliveryAttempt` | dispatcher binnen Productplanning | dispatcher via interne service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
-Interne objecten zoals `LearningResult`, drafts, agentruns, onderzoeksdossiers en testobservaties
-steken de modulegrens niet over. Alleen een afzonderlijke grote, blijvende Factorykeuze binnen de
-productopdracht en geldige besluiten kan een `Decision` worden; gewone conclusies en
-proceskeuzes niet. `DirectionSnapshot`, droombeelden en leerresultaten blijven intern bij
-Productontwerp.
+Interne analyses, concepten, agentuitvoer en implementatiespecifiek geheugen steken de modulegrens
+niet over. Alleen een afzonderlijke grote, blijvende Factorykeuze binnen de productopdracht en
+geldige besluiten kan een `Decision` worden; gewone conclusies en proceskeuzes niet. Welke interne
+objecten Productontwerp gebruikt, verschilt tussen de MVP en de uitgebreide implementatie.
 
 ## Read-only en transportcontracten
 
@@ -226,6 +225,8 @@ historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar word
 - [Besluitenregister](besluitenregister.md)
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Frontend](frontend.md)
-- [Productontwerp](productontwerp.md)
+- [Productontwerp-API](productontwerp.md)
+- [Productontwerp — MVP](productontwerp-mvp.md)
+- [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
 - [Productplanning](productplanning.md)
 - [Kwaliteitsbewaking](kwaliteitsbewaking.md)

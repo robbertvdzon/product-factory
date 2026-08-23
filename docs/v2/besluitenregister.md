@@ -24,13 +24,13 @@ belangrijke doelgroepbeperking.
 
 Het gewone proces volgen is geen besluit. Dit zijn daarom geen besluiten:
 
-- een droombeeld maken of aanpassen;
+- een interne productrichting verkennen of aanpassen;
 - een epic maken, herzien, kiezen, activeren, verifiëren of afsluiten;
 - een epic in stories verdelen;
 - een bug of epic tijdelijk voorrang geven;
 - stories ordenen of een backlogitem dispatchen;
 - een verificatie-uitkomst, gebruikerssignaal of normale statusovergang verwerken;
-- intern onderzoek, bewijs, hypotheses, agentredeneringen of leerresultaten bewaren.
+- interne analyse, bewijs, hypotheses, agentuitvoer of implementatiespecifiek geheugen bewaren.
 
 Deze gegevens blijven bij hun inhoudelijke eigenaar. Zo blijft het Besluitenregister klein en bevat
 het alleen keuzes die echt richtinggevend zijn.

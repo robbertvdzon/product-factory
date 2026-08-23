@@ -85,7 +85,7 @@
   <text x="700" y="707" class="note">Alleen Productontwerp schrijft Epic.</text>
   <text x="700" y="731" class="note">Na claim zijn inhoud, scope en UX van die versie bevroren.</text>
   <text x="700" y="755" class="note">Geen queue; planning ontdekt AVAILABLE epics zelf.</text>
-  <text x="700" y="801" class="note">Droombeeld, leren, onderzoek, drafts en agents blijven intern.</text>
+  <text x="700" y="801" class="note">Interne werkwijze verschilt per implementatie en blijft verborgen.</text>
 
   <!-- Productplanning -->
   <rect x="675" y="890" width="560" height="590" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>

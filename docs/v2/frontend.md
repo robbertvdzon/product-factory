@@ -30,7 +30,9 @@ Het hoofdscherm laat in één oogopslag zien:
 - geldige besluiten;
 - aangevraagde of open overleggen.
 
-Interne droombeelden, onderzoeksdossiers en leerresultaten van Productontwerp staan hier niet.
+Interne analyses, concepten, agentuitvoer en implementatiespecifiek geheugen staan hier niet. De
+frontend blijft daardoor gelijk wanneer Productontwerp van de MVP naar de uitgebreide implementatie
+overstapt.
 
 ## Inbox
 
