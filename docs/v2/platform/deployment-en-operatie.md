@@ -211,7 +211,7 @@ Na iedere omgevingsrollout wordt minimaal gecontroleerd:
 
 - [Overzicht](../overzicht.md)
 - [Technische basis](technische-basis.md)
-- [Implementatieplan voor de nieuwe technische fundering](implementatieplan-technische-fundering.md)
+- [Stap 1 — Technische fundering](../stappenplannen/01-technische-fundering.md)
 - [Frontend](../stakeholder/frontend.md)
 - [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)

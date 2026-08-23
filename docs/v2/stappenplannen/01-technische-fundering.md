@@ -1,4 +1,4 @@
-# Implementatieplan: nieuwe technische fundering
+# Stap 1 — Technische fundering
 
 ## Doel en status van dit document
 
@@ -34,11 +34,11 @@ De nieuwe technische basis moet aansluiten op de al beschreven architectuur. Dez
 blijven behouden en zijn normatief waar zij de technische fundering raken:
 
 - [Overzicht](../overzicht.md)
-- [Technische basis](technische-basis.md)
-- [Deployment en operatie](deployment-en-operatie.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
+- [Technische basis](../platform/technische-basis.md)
+- [Deployment en operatie](../platform/deployment-en-operatie.md)
+- [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)
 - [Frontend](../stakeholder/frontend.md)
-- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
+- [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
 - [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)
 - [Agentgeheugen](../gedeelde-modules/agentgeheugen.md)
 
@@ -77,10 +77,10 @@ De oude code is geen contract. Alleen deze technische lessen worden opnieuw geï
 - een eenvoudige deployment- en beheerbasis, plus productieauthenticatie, frontendcachegedrag en
   zichtbare versie-informatie.
 
-De blijvende contracten staan in [Technische basis](technische-basis.md),
-[Deployment en operatie](deployment-en-operatie.md) en [Frontend](../stakeholder/frontend.md). Het testbed was al
+De blijvende contracten staan in [Technische basis](../platform/technische-basis.md),
+[Deployment en operatie](../platform/deployment-en-operatie.md) en [Frontend](../stakeholder/frontend.md). Het testbed was al
 onderdeel van de nieuwe architectuur en staat in
-[Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
+[Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md).
 
 Dit plan neemt uit v1 bewust geen revision- of worktree-attestatie, oude status- en
 afhankelijkheidsmodellen, aanvullende agentbeveiligingsconstructies of oude frontendwidgets,
@@ -161,7 +161,7 @@ door Git gevolgd en de actieve routes en images zijn genoteerd zonder secretwaar
 4. Behoud de in de bewaartabel genoemde technische bestanden als werkmateriaal.
 5. Maak een nieuwe root-Mavenreactor op Java 21, Kotlin en Spring Boot.
 6. Pas vanaf het begin het API-/implementatiemodulepatroon uit
-   [Maven en Spring Modulith](maven-en-spring-modulith.md) toe.
+   [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md) toe.
 7. Maak één main-module als enige Spring Boot composition root.
 8. Maak een nieuwe lege Flutter-webapp of een gelijkwaardig nieuw frontendproject; kopieer geen
    oude widgets of domeinschermen.
@@ -348,7 +348,7 @@ persoonsgegevens getoond en een gesimuleerde nieuwere build levert precies één
 
 ### Stap 8 — Maak Product Factory Testbed voor acceptatie
 
-Volg [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
+Volg [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md).
 
 1. Start acceptatie met in-memory database en een vaste synthetische catalogus.
 2. Schakel automatische schedules standaard uit.
@@ -499,18 +499,9 @@ De technische fundering is pas klaar wanneer al het volgende aantoonbaar waar is
 - een volgende agent kan vanuit de nieuwe documentatie de eerste functionele module bouwen zonder
   oude documentatie of chatcontext nodig te hebben.
 
-## Wat bewust na release 0.1.0 komt
+## Vervolg
 
-Na deze technische release worden de functionele capabilities afzonderlijk gebouwd:
-
-1. Besluitenregister en overleggen;
-2. Agentgeheugen en algemene AI-instellingen;
-3. AI-uitvoering en laptopworker;
-4. Productontwerp met de MVP-implementatie;
-5. Productplanning met de MVP-implementatie;
-6. Kwaliteitsbewaking met de MVP-implementatie;
-7. Software Factory-dispatcher;
-8. uitgebreide implementaties naast de MVP-implementaties, geselecteerd via de main-module.
-
-Deze volgorde is geen toestemming om die functionele onderdelen tijdens de technische fundering al
-half te implementeren. Release `0.1.0` moet klein, schoon en volledig technisch zijn.
+Na deze technische release volgt de incrementele MVP-route uit het
+[overzicht van de stappenplannen](README.md). Deze stap implementeert geen functionele capability
+vooruit. Iedere volgende stap wordt afzonderlijk afgerond, getest en naar acceptatie en productie
+gedeployed.

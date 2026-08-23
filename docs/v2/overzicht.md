@@ -409,7 +409,11 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 - [Maven en Spring Modulith](platform/maven-en-spring-modulith.md)
 - [Deployment en operatie](platform/deployment-en-operatie.md)
 - [Integratie- en acceptatietesten](platform/integratie-en-acceptatietesten.md)
-- [Implementatieplan voor de nieuwe technische fundering](platform/implementatieplan-technische-fundering.md)
+
+### Stappenplannen
+
+- [Overzicht van de implementatiestappen](stappenplannen/README.md)
+- [Stap 1 — Technische fundering](stappenplannen/01-technische-fundering.md)
 
 ### Gedeelde modules
 

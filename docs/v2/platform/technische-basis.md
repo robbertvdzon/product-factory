@@ -2,7 +2,7 @@
 
 Dit document beschrijft de blijvende technische contracten voor de nieuwe Product Factory. Het is
 geen uitvoeringsplan en bevat geen proces-, agent- of productlogica. De concrete bouwvolgorde staat
-in [Implementatieplan voor de nieuwe technische fundering](implementatieplan-technische-fundering.md).
+in [Stap 1 — Technische fundering](../stappenplannen/01-technische-fundering.md).
 
 De nieuwe applicatie heet in code, configuratie en gebruikersinterface gewoon **Product Factory**.
 `v2` is geen onderdeel van Maven-artifactnamen, packages, URLs, modulenamen of schermteksten. Alleen
@@ -160,7 +160,7 @@ testdocumenten blijven zelfstandig normatief voor hun eigen onderwerp.
 ## Gerelateerde documenten
 
 - [Overzicht](../overzicht.md)
-- [Implementatieplan voor de nieuwe technische fundering](implementatieplan-technische-fundering.md)
+- [Stap 1 — Technische fundering](../stappenplannen/01-technische-fundering.md)
 - [Deployment en operatie](deployment-en-operatie.md)
 - [Frontend](../stakeholder/frontend.md)
 - [Maven en Spring Modulith](maven-en-spring-modulith.md)
