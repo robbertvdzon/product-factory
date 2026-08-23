@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: product-factory
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      serviceAccountName: postgres
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+        seLinuxOptions: {type: spc_t}
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: postgres
+          # SCLOrg images are prepared for OpenShift's arbitrary runtime UID.
+          image: quay.io/sclorg/postgresql-16-c9s:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            runAsNonRoot: true
+          env:
+            - {name: POSTGRESQL_DATABASE, value: productfactory}
+            - {name: POSTGRESQL_USER, value: productfactory}
+            - name: POSTGRESQL_PASSWORD
+              valueFrom: {secretKeyRef: {name: product-factory-secrets, key: PF_DB_PASSWORD}}
+          ports: [{containerPort: 5432}]
+          readinessProbe: {exec: {command: [pg_isready, -U, productfactory]}, initialDelaySeconds: 5, periodSeconds: 5}
+          volumeMounts: [{name: data, mountPath: /var/lib/pgsql/data}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: postgres-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: product-factory
+spec:
+  type: NodePort
+  selector: {app: postgres}
+  ports: [{port: 5432, targetPort: 5432, nodePort: 30432}]

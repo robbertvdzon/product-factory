@@ -1,0 +1,222 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: product-factory-acceptance
+resources:
+- ../../base
+- acceptance-secret.yaml
+  # De SealedSecret is versleuteld voor de productienamespace en kan niet door de acceptance-namespace
+  # ontsleuteld worden. acceptance-secret.yaml levert dezelfde secretnaam met vaste, niet-gevoelige
+  # wegwerpwaarden. Zelfde aanpak als deploy/overlays/preview/kustomization.yaml.
+  # De acceptatieomgeving is een standing, niet-wegwerpbare omgeving, maar heeft geen productieverkeer;
+  # 1Gi is ruim voldoende voor de geseede demodata.
+  # Vaste hostnamen voor de standing acceptatieomgeving (geen ArgoCD-templating nodig, er is maar één
+  # instantie).
+      # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+      # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+      # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+    # Zelfde reden als preview: een onderzoeker moet het mock-agent-bridge-controle-endpoint kunnen
+    # aanroepen; Redirect veroorzaakt een oneindige HTTPS-redirect-loop omdat Cloudflare de router
+    # cluster-intern altijd via HTTP benadert.
+patches:
+- patch: |-
+    $patch: delete
+    apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: product-factory-secrets
+  target:
+    group: bitnami.com
+    kind: SealedSecret
+    name: product-factory-secrets
+    version: v1alpha1
+- patch: |-
+    - op: replace
+      path: /spec/resources/requests/storage
+      value: 1Gi
+  target:
+    kind: PersistentVolumeClaim
+    name: postgres-data
+    version: v1
+- patch: |-
+    - op: replace
+      path: /spec/type
+      value: ClusterIP
+    - op: remove
+      path: /spec/ports/0/nodePort
+  target:
+    kind: Service
+    name: postgres
+    version: v1
+- patch: |-
+    - op: replace
+      path: /spec/host
+      value: product-factory-acceptance.vdzonsoftware.nl
+  target:
+    group: route.openshift.io
+    kind: Route
+    name: dashboard-frontend
+    version: v1
+- patch: |-
+    - op: replace
+      path: /spec/host
+      value: product-factory-api-acceptance.vdzonsoftware.nl
+  target:
+    group: route.openshift.io
+    kind: Route
+    name: dashboard-backend
+    version: v1
+- patch: |-
+    - op: replace
+      path: /spec/host
+      value: product-factory-runtime-acceptance.vdzonsoftware.nl
+  target:
+    group: route.openshift.io
+    kind: Route
+    name: runtime
+    version: v1
+- patch: |-
+    - op: replace
+      path: /data/PF_PUBLIC_RUNTIME_URL
+      value: https://product-factory-runtime-acceptance.vdzonsoftware.nl
+  target:
+    kind: ConfigMap
+    name: product-factory-config
+    version: v1
+- patch: |-
+    - op: add
+      path: /spec/template/spec/containers/0/env
+      value:
+        - name: PF_DASHBOARD_ORIGIN
+          value: 'https://product-factory-acceptance.vdzonsoftware.nl'
+  target:
+    group: apps
+    kind: Deployment
+    name: dashboard-backend
+    version: v1
+images:
+- name: ghcr.io/robbertvdzon/product-factory-dashboard-frontend
+  newName: ghcr.io/robbertvdzon/product-factory-dashboard-frontend
+  newTag: sha-98412192c3cd5b804a3802bdde6d8a1d51067352-acceptance

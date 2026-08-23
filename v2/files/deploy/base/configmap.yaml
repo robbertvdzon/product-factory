@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-factory-config
+  namespace: product-factory
+data:
+  PF_DB_URL: jdbc:postgresql://postgres:5432/productfactory
+  PF_DB_USERNAME: productfactory
+  PF_RUNTIME_BASE_URL: http://runtime:8080
+  PF_PUBLIC_RUNTIME_URL: https://product-factory-runtime.vdzonsoftware.nl
+  PF_AGENT_BRIDGE_BASE_URL: http://dashboard-backend:8081
+  PF_AGENT_BRIDGE_POLL_INTERVAL: PT2S
+  PF_WORKSPACE_PATH: /workspace
+  PF_WORKSPACE_REPOSITORY: https://github.com/robbertvdzon/product-factory-workspace.git
+  PF_WORKSPACE_MAIN_BRANCH: main
+  PF_WORKSPACE_REMOTE_PUBLICATION: "true"
+  PF_SOFTWARE_FACTORY_BASE_URL: http://softwarefactory-dashboard-backend.software-factory.svc.cluster.local
+  PF_AUTONOMY_ENABLED: "true"
+  PF_AUTONOMY_POLL_DELAY: PT1M
+  PF_ROADMAP_ENABLED: "true"
+  PF_ROADMAP_POLL_DELAY: PT1M
+  PF_ROADMAP_V2_PARALLELISM: "4"
+  PF_ROADMAP_V2_MAX_ATTEMPTS: "2"
+  PF_ROADMAP_V2_MAX_CONCEPTS: "2"
+  PF_DASHBOARD_AUTH_REQUIRED: "true"
+  PF_DASHBOARD_ORIGIN: https://product-factory.vdzonsoftware.nl

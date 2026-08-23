@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: dashboard-backend, namespace: product-factory}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: dashboard-backend}}
+  template:
+    metadata: {labels: {app: dashboard-backend}}
+    spec:
+      containers:
+        - name: dashboard-backend
+          image: ghcr.io/robbertvdzon/product-factory-dashboard-backend:sha-9331e65439718907f3c60a0f8d40f1bc3d0fc82b
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef: {name: product-factory-config}
+            - secretRef: {name: product-factory-secrets}
+          ports: [{containerPort: 8081}]
+          readinessProbe: {httpGet: {path: /actuator/health, port: 8081}, initialDelaySeconds: 10, periodSeconds: 10}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: dashboard-backend, namespace: product-factory}
+spec:
+  selector: {app: dashboard-backend}
+  ports: [{port: 8081, targetPort: 8081}]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata: {name: dashboard-backend, namespace: product-factory}
+spec:
+  host: product-factory-api.vdzonsoftware.nl
+  to: {kind: Service, name: dashboard-backend}
+  port: {targetPort: 8081}
+  tls: {termination: edge, insecureEdgeTerminationPolicy: Allow}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: dashboard-frontend, namespace: product-factory}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: dashboard-frontend}}
+  template:
+    metadata: {labels: {app: dashboard-frontend}}
+    spec:
+      containers:
+        - name: dashboard-frontend
+          image: ghcr.io/robbertvdzon/product-factory-dashboard-frontend:sha-98412192c3cd5b804a3802bdde6d8a1d51067352
+          imagePullPolicy: Always
+          ports: [{containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /, port: 8080}, initialDelaySeconds: 5, periodSeconds: 10}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: dashboard-frontend, namespace: product-factory}
+spec:
+  selector: {app: dashboard-frontend}
+  ports: [{port: 8080, targetPort: 8080}]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata: {name: dashboard-frontend, namespace: product-factory}
+spec:
+  host: product-factory.vdzonsoftware.nl
+  to: {kind: Service, name: dashboard-frontend}
+  port: {targetPort: 8080}
+  tls: {termination: edge, insecureEdgeTerminationPolicy: Allow}

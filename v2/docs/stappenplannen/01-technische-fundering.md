@@ -42,9 +42,10 @@ blijven behouden en zijn normatief waar zij de technische fundering raken:
 - [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)
 - [Agentgeheugen](../gedeelde-modules/agentgeheugen.md)
 
-Tijdens de opschoning wordt de volledige inhoud van de huidige map `docs/v2` naar `docs` verplaatst.
+Tijdens de opschoning wordt de volledige inhoud van de huidige map `v2/docs` naar `docs` verplaatst.
 Omdat alle documenten gezamenlijk verhuizen, moeten relatieve links tussen deze documenten blijven
-werken. Na de verhuizing bestaat geen map `docs/v2` meer.
+werken. De technische overnamebestanden staan tijdelijk in `v2/files`. Na de verhuizing en het
+onderbrengen van die bestanden op hun definitieve plek bestaat geen map `v2` meer.
 
 ## Hoofdregels voor de vervanging
 
@@ -88,24 +89,31 @@ schermindelingen en testsuites over. Nieuwe functionele modules krijgen later hu
 
 ## Te behouden bestanden en patronen
 
-Bewaar deze bestanden tijdens de eerste opschoningsstap. `Behouden` betekent niet dat hun huidige
-inhoud ongewijzigd correct blijft; de uitvoerende agent moet ze tijdens dit plan actualiseren.
+De map `v2/files` bevat gecontroleerde kopieën van technische v1-bestanden die als invoer voor de
+nieuwbouw dienen. De actieve originelen blijven tijdens de voorbereiding op hun huidige plaats.
+Gebruik vanaf de opschoning uitsluitend de kopieën hieronder als overnamebron. `Behouden` betekent
+niet dat hun inhoud ongewijzigd correct blijft; de uitvoerende agent moet ze tijdens dit plan
+actualiseren en naar hun definitieve plek verplaatsen.
 
 | Pad | Actie |
 |---|---|
 | `secrets.env` | op zijn huidige plaats behouden; nooit tonen of committen |
-| `secrets.env.example` | behouden en aanpassen aan het nieuwe secretcontract |
-| `properties.default.env` | behouden en volledig herschrijven voor de nieuwe defaults |
-| `docs/v2/**` | behouden en gezamenlijk naar `docs/**` verplaatsen |
-| `.gitignore`, `.dockerignore` | behouden en opschonen |
-| `.github/workflows/**` | structuur behouden; modulepaden, images en deploymentflow herschrijven |
-| `deploy/**` | bruikbare Kustomize-, OpenShift-, Sealed Secret- en backuppatronen behouden |
-| `deploy/seal-secrets.sh` | behouden en aanpassen aan de nieuwe verplichte sleutels |
-| `docker-compose.yml` | behouden als lokale composition root en volledig herschrijven |
-| `quality/detekt.yml` | behouden wanneer de nieuwe backend Kotlin gebruikt |
-| `product-factory` | behouden als eenvoudige lokale CLI en herschrijven |
-| frontend-Nginxconfiguratie | cache-, security- en SPA-patronen behouden of gelijkwaardig opnieuw bouwen |
-| lokale worker-LaunchAgent | alleen het installatie-, restart- en logconcept behouden; workercontract herschrijven |
+| `v2/files/secrets.env.example` | naar de root verplaatsen en aanpassen aan het nieuwe secretcontract |
+| `v2/files/properties.default.env` | naar de root verplaatsen en volledig herschrijven voor de nieuwe defaults |
+| `v2/docs/**` | behouden en gezamenlijk naar `docs/**` verplaatsen |
+| `v2/files/.gitignore`, `v2/files/.dockerignore` | naar de root verplaatsen en opschonen |
+| `v2/files/.github/workflows/**` | structuur behouden; modulepaden, images en deploymentflow herschrijven |
+| `v2/files/deploy/**` | bruikbare Kustomize-, OpenShift-, Sealed Secret- en backuppatronen behouden |
+| `v2/files/deploy/seal-secrets.sh` | behouden en aanpassen aan de nieuwe verplichte sleutels |
+| `v2/files/docker-compose.yml` | als lokale composition root volledig herschrijven |
+| `v2/files/quality/detekt.yml` | behouden wanneer de nieuwe backend Kotlin gebruikt |
+| `v2/files/product-factory` | als eenvoudige lokale CLI herschrijven |
+| `v2/files/dashboard-frontend/nginx.conf` | cache-, security- en SPA-patronen behouden of gelijkwaardig opnieuw bouwen |
+| `v2/files/tools/agent-worker-launchagent` | alleen het installatie-, restart- en logconcept behouden; workercontract herschrijven |
+
+De volledige herkomst en bestemming staan in [`v2/files/README.md`](../../files/README.md). Breng
+wijzigingen niet parallel aan in de actieve v1-bron en de overnamekopie. Alleen een bewust
+vastgelegde actualisatie van de overnamekopie voorkomt onduidelijkheid over welke versie leidend is.
 
 Verwijder uiteindelijk alle oude domeinmodules, oude frontendimplementatie, oude backendproxy,
 oude workspacecode, oude agentworkerimplementatie, oude Flywaymigraties, oude functionele tests,
@@ -155,10 +163,11 @@ door Git gevolgd en de actieve routes en images zijn genoteerd zonder secretwaar
 
 ### Stap 1 — Maak een schone, definitieve repositorystructuur
 
-1. Verplaats alle documenten uit `docs/v2` naar `docs` en herstel relatieve links.
+1. Verplaats alle documenten uit `v2/docs` naar `docs` en herstel relatieve links.
 2. Verwijder alle overige oude documentatie.
 3. Verwijder de oude functionele broncode, tests, migraties en workspaceonderdelen.
-4. Behoud de in de bewaartabel genoemde technische bestanden als werkmateriaal.
+4. Breng de in de bewaartabel genoemde kopieën uit `v2/files` naar hun definitieve paden, werk ze
+   daar bij en verwijder daarna de tijdelijke map `v2`.
 5. Maak een nieuwe root-Mavenreactor op Java 21, Kotlin en Spring Boot.
 6. Pas vanaf het begin het API-/implementatiemodulepatroon uit
    [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md) toe.

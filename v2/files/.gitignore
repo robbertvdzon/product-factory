@@ -1,0 +1,11 @@
+.idea/
+.DS_Store
+target/
+**/target/
+.dart_tool/
+build/
+**/build/
+properties.env
+secrets.env
+workspace-checkout/
+work/

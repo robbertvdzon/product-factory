@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: productfactory
+      POSTGRES_USER: productfactory
+      POSTGRES_PASSWORD: ${PF_DB_PASSWORD:?PF_DB_PASSWORD is required}
+    ports: ["5436:5432"]
+    volumes: [product-factory-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U productfactory"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  runtime:
+    build:
+      context: .
+      dockerfile: productfactory/Dockerfile
+    environment:
+      PF_DB_URL: jdbc:postgresql://postgres:5432/productfactory
+      PF_DB_USERNAME: productfactory
+      PF_DB_PASSWORD: ${PF_DB_PASSWORD:?PF_DB_PASSWORD is required}
+      PF_WORKSPACE_PATH: /workspace
+      PF_WORKSPACE_REPOSITORY: ${PF_WORKSPACE_REPOSITORY:-git@github.com:robbertvdzon/product-factory-workspace.git}
+      PF_WORKSPACE_REMOTE_PUBLICATION: "false"
+      PF_AGENT_BRIDGE_BASE_URL: http://dashboard-backend:8081
+      PF_AGENT_WORKER_TOKEN: ${PF_AGENT_WORKER_TOKEN:?PF_AGENT_WORKER_TOKEN is required}
+    volumes:
+      - ../product-factory-workspace:/workspace
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: {condition: service_healthy}
+  dashboard-backend:
+    build:
+      context: .
+      dockerfile: dashboard-backend/Dockerfile
+    environment:
+      PF_RUNTIME_BASE_URL: http://runtime:8080
+      PF_DASHBOARD_AUTH_REQUIRED: ${PF_DASHBOARD_AUTH_REQUIRED:-false}
+      PF_GOOGLE_CLIENT_ID: ${PF_GOOGLE_CLIENT_ID:-}
+      PF_ADMIN_EMAILS: ${PF_ADMIN_EMAILS:-}
+      PF_AGENT_WORKER_TOKEN: ${PF_AGENT_WORKER_TOKEN:-}
+    ports: ["8081:8081"]
+    depends_on: [runtime]
+  dashboard-frontend:
+    build:
+      context: dashboard-frontend
+      args:
+        API_BASE_URL: http://localhost:8081
+        GOOGLE_CLIENT_ID: ${PF_GOOGLE_CLIENT_ID:-}
+    ports: ["8082:8080"]
+    depends_on: [dashboard-backend]
+volumes:
+  product-factory-db:
