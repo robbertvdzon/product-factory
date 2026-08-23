@@ -1,0 +1,559 @@
+# Implementatieplan: nieuwe technische fundering
+
+## Doel en status van dit document
+
+Dit document is de zelfstandige uitvoeropdracht voor het vervangen van de huidige Product Factory
+door een volledig nieuwe implementatie. Een uitvoerende agent moet dit document volledig lezen
+voordat hij bestanden verwijdert of nieuwe code schrijft. Context uit een eerder gesprek is niet
+nodig.
+
+De eerste oplevering heet functioneel gewoon **Product Factory**. Gebruik `v2` niet in Maven-
+artifactnamen, Java- of Kotlin-packages, URLs, schermteksten, documentnamen of modulenamen. Alleen
+een technisch geïsoleerde overgangsdatabase of PVC mag tijdelijk `_v2` bevatten.
+
+De eerste oplevering bevat nog geen Productontwerp, Productplanning, Kwaliteitsbewaking,
+Software Factory-dispatcher of AI-proceslogica. Zij levert eerst de volledige technische fundering:
+
+- nieuwe repository- en Maven-structuur;
+- configuratie en secrets;
+- productie- en acceptatiedatabase;
+- backend- en frontendauthenticatie;
+- een minimale maar bruikbare frontend;
+- frontendcache- en versieregels;
+- containers, builds, tests en deployments;
+- lokale ontwikkeling, acceptatie en productie;
+- health, logging, metrics, backups en herstel.
+
+Functioneel onvolledige releases mogen rechtstreeks naar productie. Een release mag echter nooit
+onveilig zijn, secrets lekken, een onbeschermde productie-API aanbieden of de oude database
+destructief aanpassen.
+
+## Normatieve architectuur voor later
+
+De nieuwe technische basis moet aansluiten op de al beschreven architectuur. Deze documenten
+blijven behouden en zijn normatief waar zij de technische fundering raken:
+
+- [Overzicht](overzicht.md)
+- [Maven en Spring Modulith](maven-en-spring-modulith.md)
+- [Frontend](frontend.md)
+- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
+- [AI-uitvoering](ai-uitvoering.md)
+- [Agentgeheugen](agentgeheugen.md)
+
+Tijdens de opschoning wordt de volledige inhoud van de huidige map `docs/v2` naar `docs` verplaatst.
+Omdat alle documenten gezamenlijk verhuizen, moeten relatieve links tussen deze documenten blijven
+werken. Na de verhuizing bestaat geen map `docs/v2` meer.
+
+## Hoofdregels voor de vervanging
+
+1. Hergebruik geen v1-domeincode, v1-datamodel, v1-Flywaymigraties, v1-agentprompts,
+   v1-productflows of v1-functionele documentatie.
+2. Infra mag als bewezen patroon worden behouden of herschreven: secretbeheer, CI/CD, containers,
+   OpenShift, caching, authenticatie, healthchecks en backups.
+3. Houd `secrets.env` in de repositoryroot. Het bestand is gitignored en wordt geleidelijk
+   aangepast; verwijder het niet tijdens de opschoning.
+4. Gebruik nooit `git clean -fdx` of een brede verwijderopdracht die gitignored bestanden kan
+   wissen. Verwijder uitsluitend expliciet gecontroleerde paden.
+5. Toon of commit nooit waarden uit `secrets.env`.
+6. De Git-geschiedenis bewaart v1-code en oude documentatie. Houd daarom geen tijdelijke kopie van
+   v1 in een `temp`, `old`, `legacy` of `v1`-map.
+7. Maak vóór de verwijdering een herkenbare tag `v1-final`, tenzij die al bestaat.
+8. Maak vóór databasewerk een laatste gevalideerde v1-databasebackup. Git bewaart database-inhoud
+   en niet-gecommitte secrets niet.
+9. Iedere push naar `main` moet bouwen, veilig starten en automatisch naar acceptatie en productie
+   kunnen doorstromen. Een tussenversie mag leeg zijn, maar niet kapot of onbeveiligd.
+10. Noem de nieuwe applicatie en de nieuwe modules overal gewoon `product-factory`.
+
+## V1-kennis die als technische eis behouden blijft
+
+De volgende lessen uit v1 zijn waardevol, maar moeten opnieuw en onafhankelijk worden
+geïmplementeerd. De oude code is geen contract.
+
+### Configuratie en secrets
+
+- De lokale configuratielagen zijn, van lage naar hoge prioriteit:
+  `properties.default.env`, `properties.env`, `secrets.env` en proces-environmentvariabelen.
+- Alleen environmentvariabelen met de gekozen Product Factory-prefix worden als applicatieconfig
+  ingelezen.
+- Productie gebruikt Sealed Secrets. Het lokale onversleutelde bronbestand wordt nooit gecommit.
+- Het seal-script valideert alle verplichte sleutels, gebruikt tijdelijke bestanden met beperkte
+  rechten en verwijdert die ook bij fouten.
+- Een secretwijziging verandert niet automatisch de podtemplate. De deploymentprocedure moet
+  daarom een gecontroleerde rollout ondersteunen.
+- Lokale, acceptatie- en productiecredentials zijn verschillend.
+
+### Builds en deployments
+
+- CI controleert backend, frontend, tests en daadwerkelijk gebouwde containerimages.
+- Een overgeslagen verplichte controle is niet groen.
+- Testbewijs hoort bij exact dezelfde Git-revisie en worktree-inhoud als de gebouwde image.
+- Frontendtoolchain, CI-toolchain, Dockerbuild en lockfile moeten compatibele versies gebruiken.
+- Images krijgen een immutable Git-SHA-tag of digest. Een deployment verwijst niet alleen naar een
+  mutable tag zoals `main`.
+- Controleer na een deployment zowel Argo CD-status als de concrete image die de pod werkelijk
+  draait; alleen `Synced` is onvoldoende bewijs.
+- Containers worden multi-stage gebouwd en draaien als een niet-rootgebruiker.
+
+### Database en herstel
+
+- Productiemigraties falen gesloten. Productiedata wordt nooit automatisch opgeschoond na een
+  Flyway-validatiefout.
+- Een eventueel destructief herstel voor een wegwerpomgeving moet de effectieve JDBC-target en de
+  toegestane schema's controleren; alleen een omgevingsvlag is onvoldoende.
+- Backups worden eerst naar een tijdelijk bestand geschreven, daarna met `pg_restore --list`
+  gevalideerd en pas vervolgens definitief gemaakt.
+- Iedere backup krijgt een SHA-256-checksum en een bewaartermijn.
+- Een backup is pas bruikbaar nadat een restoretest werkelijk is uitgevoerd.
+
+### Betrouwbare status en asynchroon werk
+
+- Gebruik stabiele IDs en idempotentiesleutels; gebruik nooit tijdelijke lijstposities als
+  duurzame verwijzing.
+- Een terminale status wordt niet stilzwijgend door een later event overschreven.
+- Een statusovergang en bijbehorende provenance of resultaatpublicatie zijn atomair, of aantoonbaar
+  idempotent herstelbaar.
+- Gelijktijdige starts worden met een databaseconstraint of lock geserialiseerd wanneer maximaal
+  één actieve run is toegestaan.
+- Duurzame wachtrij- en runstatus staat in de database. Een procesrestart mag geen werk vergeten en
+  een dubbel event mag geen dubbele externe actie veroorzaken.
+- Grote binaire resultaten gaan via een mediareferentie; stop geen base64-inhoud in prompts,
+  commandoregelargumenten, events of handoffs.
+
+### Agent- en integratieveiligheid
+
+- Repository-, web-, geheugen- en externe service-inhoud is onvertrouwde data en kan nooit
+  systeeminstructies overschrijven.
+- Een AI-worker ontvangt alleen de noodzakelijke gegevens en een kleine allowlist van
+  environmentvariabelen. Database-, cluster-, GitHub- en andere niet-benodigde credentials worden
+  niet doorgegeven.
+- Externe mutaties worden door de eigenaarmodule uitgevoerd, niet rechtstreeks door een AI-agent.
+- Acceptatie gebruikt dezelfde publieke interfaces als productie, maar met stateful mocks.
+
+### Frontend en toegankelijkheid
+
+- Status wordt nooit alleen met kleur gecommuniceerd.
+- Toetsenbordfocus is zichtbaar. Dialogen houden focus vast en geven hem bij sluiten terug aan de
+  opener.
+- Belangrijke bediening werkt met toetsenbord en schermlezersemantiek.
+- De UI blijft bruikbaar op 320 CSS-pixels en bij 200% tekstvergroting zonder horizontale
+  paginascroll.
+- Een bron die nog laadt of is mislukt wordt niet als een misleidende nul of lege lijst getoond.
+- Technische JSON kan beschikbaar zijn, maar is nooit de primaire gebruikersweergave.
+- Productie, acceptatie en lokale ontwikkeling zijn visueel herkenbaar.
+
+## Te behouden bestanden en patronen
+
+Bewaar deze bestanden tijdens de eerste opschoningsstap. `Behouden` betekent niet dat hun huidige
+inhoud ongewijzigd correct blijft; de uitvoerende agent moet ze tijdens dit plan actualiseren.
+
+| Pad | Actie |
+|---|---|
+| `secrets.env` | op zijn huidige plaats behouden; nooit tonen of committen |
+| `secrets.env.example` | behouden en aanpassen aan het nieuwe secretcontract |
+| `properties.default.env` | behouden en volledig herschrijven voor de nieuwe defaults |
+| `docs/v2/**` | behouden en gezamenlijk naar `docs/**` verplaatsen |
+| `.gitignore`, `.dockerignore` | behouden en opschonen |
+| `.github/workflows/**` | structuur behouden; modulepaden, images en deploymentflow herschrijven |
+| `deploy/**` | bruikbare Kustomize-, OpenShift-, Sealed Secret- en backuppatronen behouden |
+| `deploy/seal-secrets.sh` | behouden en aanpassen aan de nieuwe verplichte sleutels |
+| `docker-compose.yml` | behouden als lokale composition root en volledig herschrijven |
+| `quality/detekt.yml` | behouden wanneer de nieuwe backend Kotlin gebruikt |
+| `.factory/verification.yaml` | het revisiongebonden verificatiecontract behouden en herschrijven |
+| `.factory/docker_engine_build.py` en test | behouden als een agent zonder Docker-CLI images moet kunnen bouwen |
+| `tools/verify` | behouden als één lokale volledige verificatie-ingang en herschrijven |
+| `product-factory` | behouden als eenvoudige lokale CLI en herschrijven |
+| frontend-Nginxconfiguratie | cache-, security- en SPA-patronen behouden of gelijkwaardig opnieuw bouwen |
+| lokale worker-LaunchAgent | alleen het installatie-, restart- en logconcept behouden; workercontract herschrijven |
+
+Verwijder uiteindelijk alle oude domeinmodules, oude frontendimplementatie, oude backendproxy,
+oude workspacecode, oude agentworkerimplementatie, oude Flywaymigraties, oude functionele tests,
+`docs/stories`, `docs/stories/worklog`, `docs/factory`, oude architectuurplannen en alle overige
+v1-documentatie. Verwijder ook gegenereerde mappen zoals `target`, `build`, `.dart_tool` en `work` uit
+de nieuwe uitgangssituatie, maar raak `secrets.env` niet.
+
+## Beoogde eerste oplevering
+
+De eerste technische release gebruikt versienummer `0.1.0` en heeft zichtbaar de volgende
+eigenschappen:
+
+- `https://product-factory.vdzonsoftware.nl` toont de nieuwe frontend;
+- productie vereist Google-login;
+- acceptatie is bereikbaar zonder login en toont op iedere pagina een duidelijke banner;
+- de backend draait als één Spring Boot-applicatie;
+- de frontend gebruikt alleen de publieke backend-API;
+- productie gebruikt een nieuwe PostgreSQL-database;
+- acceptatie gebruikt een resetbare in-memory database met vaste synthetische gegevens;
+- het beheer-/informatiescherm toont frontend-, backend-, Git- en omgevingsidentiteit;
+- er is nog geen functionele procesmodule actief.
+
+## Uitvoeringsvolgorde
+
+Voer onderstaande stappen in volgorde uit. Rond per stap de genoemde verificatie af voordat de
+volgende stap begint. Houd `main` bij iedere push bouwbaar en veilig.
+
+### Stap 0 — Leg de uitgangssituatie vast
+
+1. Controleer dat de worktree schoon is en gelijkloopt met `origin/main`.
+2. Noteer de huidige commit en de concrete productie-images.
+3. Maak en push, indien nog afwezig, de tag `v1-final`.
+4. Maak een custom-format backup van de v1-productiedatabase.
+5. Valideer de backup met `pg_restore --list` en maak een SHA-256-checksum.
+6. Controleer dat `secrets.env` bestaat, gitignored is en bestandsrechten `0600` heeft.
+7. Maak buiten de repository een versleutelde reservekopie van `secrets.env`; leg geen waarde vast
+   in logs of documentatie.
+8. Inventariseer welke huidige Cloudflare-, Argo CD- en OpenShiftobjecten de productie- en
+   acceptatiehostnamen bedienen.
+
+**Verificatie:** tag is naar de bedoelde commit te herleiden, backup is leesbaar, secrets zijn niet
+door Git gevolgd en de actieve routes en images zijn genoteerd zonder secretwaarden.
+
+### Stap 1 — Maak een schone, definitieve repositorystructuur
+
+1. Verplaats alle documenten uit `docs/v2` naar `docs` en herstel relatieve links.
+2. Verwijder alle overige oude documentatie.
+3. Verwijder de oude functionele broncode, tests, migraties en workspaceonderdelen.
+4. Behoud de in de bewaartabel genoemde technische bestanden als werkmateriaal.
+5. Maak een nieuwe root-Mavenreactor op Java 21, Kotlin en Spring Boot.
+6. Pas vanaf het begin het API-/implementatiemodulepatroon uit
+   [Maven en Spring Modulith](maven-en-spring-modulith.md) toe.
+7. Maak één main-module als enige Spring Boot composition root.
+8. Maak een nieuwe lege Flutter-webapp of een gelijkwaardig nieuw frontendproject; kopieer geen
+   oude widgets of domeinschermen.
+9. Voeg een eenvoudige backendroute en een leeg maar herkenbaar frontendscherm toe.
+
+Gebruik geen `v1`, `v2`, `legacy` of `new` in de definitieve modulenamen.
+
+**Verificatie:** Maven bouwt de nieuwe reactor, de frontend analyseert en bouwt, er bestaan geen
+oude domeinpackages of migraties meer en alle behouden documenten zijn bereikbaar.
+
+### Stap 2 — Bouw configuratie en secretbeheer opnieuw
+
+1. Implementeer en test de configuratieprioriteit:
+   defaults, lokale overrides, lokale secrets en daarna procesenvironment.
+2. Definieer één actuele lijst met geheime en niet-geheime instellingen.
+3. Houd niet-geheime defaults in `properties.default.env`.
+4. Houd lokale secretwaarden uitsluitend in `secrets.env`.
+5. Actualiseer `secrets.env.example` met toelichting en veilige voorbeelden, nooit echte waarden.
+6. Pas `deploy/seal-secrets.sh` aan:
+   - gesloten lijst verplichte secretkeys;
+   - fail-closed validatie op ontbrekende waarden;
+   - tijdelijke bestanden via `mktemp` en rechten `0600`;
+   - cleanup via trap;
+   - alleen het Sealed Secret als output.
+7. Gebruik afzonderlijke waarden voor lokaal, acceptatie en productie.
+8. Laat productie bij ontbrekende auth- of databaseconfiguratie stoppen in plaats van onveilig
+   terugvallen.
+
+Begin minimaal met:
+
+- database-URL, gebruiker en wachtwoord;
+- Google client-id;
+- toegestane stakeholder-e-mailadressen;
+- sessieondertekeningssleutel;
+- omgeving en publieke URLs.
+
+AI-worker- en Software Factory-secrets worden pas actief wanneer die modules worden gebouwd, maar
+mogen alvast als lege, niet-verplichte placeholders gedocumenteerd worden.
+
+**Verificatie:** configuratieprioriteit heeft tests, productie faalt bij ontbrekende verplichte
+waarden, acceptatie bevat geen productiesecrets en een gerenderd manifest toont geen plaintext
+secretwaarden.
+
+### Stap 3 — Richt de databases in
+
+#### Productie
+
+1. Provision een nieuwe PostgreSQL-database `productfactory_v2` met gebruiker
+   `productfactory_v2`, een nieuw wachtwoord en een nieuwe PVC.
+2. Gebruik binnen deze aparte database het normale schema `public`; kopieer geen v1-schema of
+   Flywayhistory.
+3. Start de nieuwe Flywayreeks bij `V1`.
+4. Maak alleen tabellen die de technische fundering werkelijk gebruikt. Voeg geen lege tabellen
+   voor toekomstige processen toe.
+5. Configureer een begrensde connectionpool en duidelijke connectie- en querytimeouts.
+6. Voeg een database-healthindicator toe.
+7. Houd de oude database en PVC tijdens deze fase onaangeraakt. Verwijder ze pas in een afzonderlijke,
+   later expliciet goedgekeurde opruimactie.
+
+#### Acceptatie en integratietests
+
+1. Gebruik een nieuwe in-memory database per test of acceptatiestart.
+2. Voer dezelfde relevante Flywaymigraties uit.
+3. Seed vaste, versieerbare, synthetische data transactioneel en idempotent.
+4. Maak seedbotsingen zichtbaar en overschrijf geen onverwachte bestaande records.
+5. Voeg daarnaast een PostgreSQL-migratiesmoketest met Testcontainers toe, zodat H2-compatibiliteit
+   geen vals vertrouwen geeft over productie.
+
+#### Backup en restore
+
+1. Pas de bestaande backup-CronJob aan naar de nieuwe database en een nieuwe backupdirectory.
+2. Schrijf eerst tijdelijk, valideer de dump, maak checksum en rename daarna atomair.
+3. Stel een gedocumenteerde bewaartermijn in.
+4. Voer vóór afronding een echte restore uit naar een tijdelijke database en controleer inhoud en
+   Flywaystatus.
+
+**Verificatie:** een lege productieachtige database migreert vanaf nul, acceptatie start herhaalbaar,
+de PostgreSQL-smoketest slaagt en een backup kan werkelijk worden teruggezet.
+
+### Stap 4 — Implementeer authenticatie end-to-end
+
+#### Backend
+
+1. Ontvang een Google ID-token via `POST /api/auth/google`.
+2. Valideer handtekening via de officiële Google JWK-set, issuer, audience, verloopdatum en
+   `email_verified`.
+3. Controleer het e-mailadres tegen een expliciete, gesloten allowlist.
+4. Maak na geldige login een eigen begrensde Product Factory-sessie.
+5. Bewaar de sessie bij voorkeur in een `Secure`, `HttpOnly`, `SameSite` cookie. Sta de lokale
+   niet-secure variant alleen in het expliciete lokale profiel toe.
+6. Beveilig alle muterende en gegevensroutes standaard. Alleen login-, logout-, health- en beperkte
+   versie-informatie zijn publiek.
+7. Controleer bij cookieauthenticatie toegestane origins en bescherm mutaties tegen CSRF.
+8. Log geen Google-token, sessietoken of volledig persoonlijk profiel.
+9. Implementeer logout, sessieverloop en een uniforme `401`/`403`-response.
+
+#### Frontend
+
+1. Toon Google-login in productie.
+2. Wissel het Google-token via de backend om voor de eigen sessie.
+3. Bepaal de sessiestatus voordat beschermde schermen worden getoond.
+4. Handel verlopen sessies en logout begrijpelijk af.
+5. Laat de centrale API-client credentials en fouten consistent verwerken.
+6. Zet authenticatie in acceptatie expliciet uit en toon daar op iedere pagina de banner
+   **Acceptatie — synthetische tijdelijke data — authenticatie uit**.
+
+**Verificatie:** tests dekken geldige login, verkeerde audience, verlopen token, niet-geverifieerde
+e-mail, niet-toegestane e-mail, verlopen sessie, logout, CSRF/origin en productie die niet met
+uitgeschakelde auth kan starten.
+
+### Stap 5 — Bouw de minimale frontendfundering
+
+Maak een nieuwe frontend met alleen:
+
+- login en logout;
+- applicatieschil en navigatie;
+- een lege productpagina;
+- een technisch informatie-/beheerscherm;
+- centrale API-client;
+- consistente loading-, empty- en errorstates;
+- zichtbare omgevingsaanduiding;
+- toegankelijke foutmeldingen.
+
+Pas vanaf het begin deze regels toe:
+
+1. Bedienbare elementen hebben zichtbare focus en bruikbare schermlezersemantiek.
+2. Dialogen hebben een gesloten focuslus, sluiten met Escape en herstellen openerfocus.
+3. Betekenis wordt niet alleen met kleur overgebracht; test minimaal WCAG AA-contrast.
+4. De kern blijft bruikbaar op 320 CSS-pixels en bij 200% tekstvergroting.
+5. Loading, fout en werkelijk lege data zijn verschillende presentatietoestanden.
+6. UI-teksten zijn Nederlands; technische identifiers en ruwe JSON staan niet primair in beeld.
+7. Unit-tests dekken pure presentatielogica; widgettests dekken interactie en semantiek; een echte
+   browser-DOM-test dekt gedrag dat Flutter-widgettests niet bewijzen.
+
+**Verificatie:** frontendtests, analyse, releasebuild, toetsenbordtests, semantiektests en een smalle
+viewporttest zijn groen zonder echte externe calls.
+
+### Stap 6 — Voorkom verouderde frontendversies
+
+Implementeer het bewezen cachemodel opnieuw:
+
+1. Bouw Flutter zonder PWA-service worker.
+2. Serveer op het oude pad `/flutter_service_worker.js` tijdelijk een no-store kill-switch die oude
+   caches verwijdert en de service worker uitschrijft.
+3. Geef JavaScript- en CSS-assets een inhoudshash in de bestandsnaam.
+4. Serveer gehashte assets met een lange immutable cacheheader.
+5. Serveer `index.html`, bootstrapbestanden, manifest, serviceworkerpad en versiegegevens met
+   `no-cache` of `no-store`, passend bij hun functie.
+6. Behoud SPA-fallback zonder vaste bestanden abusievelijk als `index.html` te cachen.
+7. Voeg passende securityheaders toe, waaronder minimaal content-type-, frame- en referrerbeleid;
+   stem CSP expliciet af op Google-login en de eigen API.
+8. Test twee opeenvolgende builds met verschillende inhoud: een browser die eerst build A bezocht
+   moet zonder cachelegen build B kunnen laden.
+
+**Verificatie:** Nginxconfiguratietest, containerbuild en echte browsertest bewijzen headers,
+serviceworkeropruiming en het laden van de nieuwste build.
+
+### Stap 7 — Voeg versie- en omgevingsidentiteit toe
+
+Leg per build vast:
+
+- `applicationVersion`, aanvankelijk `0.1.0`;
+- volledige Git-revisie;
+- UTC-buildtijd;
+- omgeving `local`, `acceptance` of `production`;
+- frontend- en backendbuildidentiteit;
+- later het actieve implementatiemanifest.
+
+1. Geef de backend een beperkte publieke `/api/version`-route.
+2. Genereer voor de frontend versie-informatie tijdens de imagebuild; lees geen Gitrepository in de
+   draaiende container.
+3. Valideer buildwaarden gesloten en toon ontbrekende of ongeldige waarden als `Onbekend`.
+4. Toon in Beheer frontendversie, backendversie, commit, buildtijd en omgeving.
+5. Controleer periodiek een niet-gecachete versiebron. Toon bij verschil een melding
+   **Nieuwe versie beschikbaar — vernieuwen**; voorkom reloadloops.
+6. Toon een duidelijke fout als frontend en backend aantoonbaar incompatibele API-versies gebruiken.
+
+**Verificatie:** tests dekken geldige en ongeldige buildmetadata, er worden geen secrets of
+persoonsgegevens getoond en een gesimuleerde nieuwere build levert precies één vernieuwmelding.
+
+### Stap 8 — Maak Product Factory Testbed voor acceptatie
+
+Volg [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
+
+1. Start acceptatie met in-memory database en een vaste synthetische catalogus.
+2. Schakel automatische schedules standaard uit.
+3. Schakel authenticatie expliciet uit en toon de acceptatiebanner overal.
+4. Gebruik `MockAiWorker` en `MockSoftwareFactory` via dezelfde publieke contracten als productie.
+5. Laat Testbed nooit rechtstreeks in moduletabellen schrijven.
+6. Maak reset en scenariokeuze alleen in acceptatie beschikbaar; productie registreert deze
+   endpoints en beans niet.
+7. Blokkeer uitgaande mutaties naar echte AI- of Software Factory-services vanuit acceptatie.
+8. Publieke Gitrepositories mogen later read-only worden gebruikt.
+9. Voeg scenario's toe voor succes, vertraging, timeout, crash/leaseverlies, foutresultaat,
+   idempotente herhaling en herstel.
+
+In deze technische release mogen de domeinscenario's nog minimaal zijn. De Testbed-infrastructuur,
+omgevingisolatie en productieblokkades moeten wel volledig bestaan.
+
+**Verificatie:** acceptatie kan worden gereset, bevat herkenbare testdata, doet geen echte externe
+mutaties en productie weigert mock-, reset- en seedfunctionaliteit.
+
+### Stap 9 — Bouw containers en OpenShiftdeployments
+
+1. Maak multi-stage Dockerfiles voor backend en frontend.
+2. Pin basistoolchains op gecontroleerde versies of digests.
+3. Draai containers als niet-root en drop onnodige Linux-capabilities.
+4. Voeg startup-, readiness- en livenessprobes toe met verschillende betekenissen.
+5. Voeg CPU- en geheugenrequests en -limieten toe.
+6. Ondersteun graceful shutdown en een bruikbare termination grace period.
+7. Maak een Kustomize-base en uitsluitend de eerste overlays `acceptance` en `production`.
+8. Productie gebruikt de nieuwe PostgreSQL-PVC en Sealed Secrets.
+9. Acceptatie gebruikt in-memory opslag en vaste niet-productieconfiguratie.
+10. Behoud de bestaande gebruikers- en API-hostnamen waar mogelijk.
+11. Verwijder de oude workspace-initcontainer en oude publieke runtime-route als zij niet meer nodig
+    zijn.
+12. Een PR-previewoverlay is geen onderdeel van release `0.1.0`; voeg die pas later gericht toe.
+
+**Verificatie:** `kubectl kustomize` rendert beide overlays, policychecks vinden geen plaintext
+secrets of rootcontainer, probes worden gezond en beide omgevingen tonen de juiste identiteit.
+
+### Stap 10 — Bouw CI/CD opnieuw
+
+1. Houd GitHub Actions-permissies minimaal.
+2. Gebruik concurrencygroepen en annuleer verouderde verificatieruns.
+3. Laat een padfilter alleen werk overslaan wanneer een stabiele aggregatiejob fail-closed bewijst
+   dat alle vereiste componenten `success` of terecht `skipped` zijn.
+4. Draai minimaal:
+   - volledige Maven `verify`;
+   - Spring Modulith-grenstests;
+   - Detekt;
+   - frontendanalyse en -tests;
+   - browser-DOM-test;
+   - frontend- en backendreleasebuild;
+   - PostgreSQL-migratiesmoketest;
+   - containerbuilds;
+   - Kustomize-rendercontrole.
+5. Publiceer images onder `sha-<volledige-commit>` en eventueel aanvullend een mutable gemakstag;
+   deploy nooit uitsluitend op de mutable tag.
+6. Deploy een geslaagde `main` eerst naar acceptatie, voer rooktests uit en promoveer daarna exact
+   dezelfde image-digests naar productie.
+7. Zorg dat automatische GitOps-imagepincommits niet een oneindige workflowlus veroorzaken.
+8. Maak zichtbaar welke functionele commit een deploymentcommit promoveert.
+9. Controleer na rollout concrete podimages, routes en health.
+
+Functionele onvolledigheid blokkeert productie niet. Een mislukte build, test, authenticatiecheck,
+securitycheck of deploymentrooktest blokkeert productie wel.
+
+**Verificatie:** een gewone wijziging op `main` bouwt één set immutable images, zet die eerst op
+acceptatie en daarna op productie, en beide omgevingen rapporteren exact dezelfde bronrevisie.
+
+### Stap 11 — Voeg operationele basisvoorzieningen toe
+
+1. Gebruik gestructureerde logging zonder secrets, tokens, prompts of volledige gevoelige payloads.
+2. Geef ieder inkomend verzoek en ieder later asynchroon werk een correlation-id.
+3. Gebruik `Instant` en UTC in backend en database; lokaliseer alleen in de gebruikersweergave.
+4. Publiceer health, info en begrensde metrics voor intern gebruik.
+5. Meet minimaal verzoekduur, fouten, databasepool, authenticatiefouten en deploymentidentiteit.
+6. Geef externe HTTP-calls expliciete connectie-, request- en totale timeouts.
+7. Gebruik consistente, veilige foutresponses met een traceerbare foutcode.
+8. Documenteer starten, stoppen, configureren, secrets roteren, deployen, backup en restore.
+9. Voeg een productie-rooktest toe die geen gegevens muteert.
+
+**Verificatie:** een fout is via correlation-id terug te vinden, gevoelige waarden ontbreken in
+logs, health onderscheidt startup/readiness/liveness en het runbook is door een nieuwe agent zonder
+chatcontext uitvoerbaar.
+
+### Stap 12 — Eindcontrole en opruiming
+
+1. Zoek repositorybreed naar oude packages, modulenamen, workspaceverwijzingen, v1-agentrollen,
+   oude databaseobjecten en oude URLs.
+2. Zoek buiten de technisch toegestane database-/PVC-naam naar resterende teksten `v1`, `v2`,
+   `legacy`, `shadow` en `workspace` en beoordeel iedere treffer.
+3. Controleer dat geen oud document meer normatief of bereikbaar vanuit de nieuwe documentatie is.
+4. Controleer dat `secrets.env` nog bestaat, ongewijzigd gitignored is en niet in een diff voorkomt.
+5. Draai het volledige lokale en CI-vangnet.
+6. Voer acceptatie- en productie-rooktests uit.
+7. Controleer een echte login op productie en uitgeschakelde auth plus banner op acceptatie.
+8. Voer de tweebuild-cachetest en database-restoretest uit.
+9. Controleer concrete images, Git-revisies, Flywayversies, routes en health.
+10. Werk dit document bij met feitelijke afwijkingen en bewijs, maar zet implementatiedetails niet in
+    het overzichtsdocument wanneer zij in een gericht technisch document horen.
+
+## Aanbevolen commitgrenzen
+
+Gebruik kleine, samenhangende en steeds bouwbare commits. Een logische indeling is:
+
+1. `docs: add executable technical foundation plan`
+2. `chore: replace v1 repository structure`
+3. `feat: add configuration and database foundation`
+4. `feat: add secure authentication`
+5. `feat: add frontend shell caching and build identity`
+6. `test: add acceptance testbed foundation`
+7. `deploy: add acceptance and production environments`
+8. `ci: verify build and promote immutable images`
+9. `ops: add health metrics backup and restore runbook`
+
+Een uitvoerende agent mag grenzen combineren wanneer dat nodig is om `main` bouwbaar en productie
+veilig te houden. Push nooit een commit die de oude beveiliging verwijdert terwijl de vervangende
+beveiliging nog ontbreekt, tenzij de publieke route op infrastructuurniveau aantoonbaar afgesloten
+blijft.
+
+## Definitie van klaar voor release 0.1.0
+
+De technische fundering is pas klaar wanneer al het volgende aantoonbaar waar is:
+
+- v1-code, v1-migraties en v1-documentatie zijn uit de actuele branch verwijderd;
+- `secrets.env` is behouden, gitignored en niet gelekt;
+- de nieuwe applicatie gebruikt nergens functionele `v2`-namen;
+- alle nieuwe documenten staan rechtstreeks onder `docs`;
+- Maven-, Modulith-, Kotlin- en frontendchecks zijn groen;
+- backend- en frontendcontainers zijn immutable gebouwd en draaien als niet-root;
+- productie gebruikt de nieuwe PostgreSQL-database en een nieuwe credential;
+- acceptatie gebruikt uitsluitend resetbare synthetische in-memory data;
+- productieauthenticatie werkt en faalt gesloten;
+- acceptatieauthenticatie staat zichtbaar en uitsluitend daar uit;
+- frontendcachegedrag toont na deployment zonder handmatig cachelegen de nieuwste versie;
+- frontend en backend tonen omgeving, applicatieversie, commit en buildtijd;
+- acceptatie en productie draaien exact de bedoelde image-digests;
+- healthchecks, logs, metrics, correlation-ids en timeouts werken;
+- een productiebackup is gevalideerd en succesvol teruggezet in een tijdelijke database;
+- productie registreert geen Testbed-, mock-, reset- of seedvoorzieningen;
+- er bestaan nog geen functionele procesimplementaties of half afgemaakte v1-compatibiliteitslagen;
+- een volgende agent kan vanuit de nieuwe documentatie de eerste functionele module bouwen zonder
+  oude documentatie of chatcontext nodig te hebben.
+
+## Wat bewust na release 0.1.0 komt
+
+Na deze technische release worden de functionele capabilities afzonderlijk gebouwd:
+
+1. Besluitenregister en overleggen;
+2. Agentgeheugen en algemene AI-instellingen;
+3. AI-uitvoering en laptopworker;
+4. Productontwerp met de MVP-implementatie;
+5. Productplanning met de MVP-implementatie;
+6. Kwaliteitsbewaking met de MVP-implementatie;
+7. Software Factory-dispatcher;
+8. uitgebreide implementaties naast de MVP-implementaties, geselecteerd via de main-module.
+
+Deze volgorde is geen toestemming om die functionele onderdelen tijdens de technische fundering al
+half te implementeren. Release `0.1.0` moet klein, schoon en volledig technisch zijn.

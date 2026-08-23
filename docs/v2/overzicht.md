@@ -403,6 +403,7 @@ Details staan in [Integratie- en acceptatietesten](integratie-en-acceptatieteste
 
 ## Detaildocumenten
 
+- [Implementatieplan voor de nieuwe technische fundering](implementatieplan-technische-fundering.md)
 - [Processen, publieke interfaces en entiteiten](processen-en-entiteiten.md)
 - [Besluitenregister](besluitenregister.md)
 - [Overleggen met de Stakeholder](overleggen.md)
