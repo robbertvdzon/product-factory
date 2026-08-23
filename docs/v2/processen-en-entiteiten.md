@@ -208,6 +208,13 @@ agenttaken in. Een laptop- of mockworker claimt taken via HTTPS, niet via direct
 Gemiste heartbeats maken een attempt eerst `SUSPECTED`; pas na de hersteltermijn wordt zij verlaten
 en kan de taak met een nieuw fencing token opnieuw worden aangeboden.
 
+Product Factory Testbed is geen productmodule en bezit geen productentiteiten. In integratietests en
+acceptatie gedraagt `MockAiWorker` zich via de echte worker-API als externe worker en implementeert
+`MockSoftwareFactory` het echte dispatchercontract. Zij beheren alleen hun eigen tijdelijke
+scenariotoestand en schrijven nooit rechtstreeks in een moduleaggregate. De in-memory
+acceptatiedatabase wordt gevuld door testfixture-contributors binnen de modules die eigenaar van de
+betrokken data zijn.
+
 Dispatchfouten blijven intern bij de dispatcher. Tijdelijke transportfouten krijgen een
 `DeliveryAttempt`, idempotentiecontrole en retry met backoff. Configuratie- of autorisatiefouten
 worden operationeel geblokkeerd. Alleen een definitieve inhoudelijke afwijzing door Software
@@ -260,6 +267,7 @@ historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar word
 - [Frontend](frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)

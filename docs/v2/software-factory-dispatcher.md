@@ -172,6 +172,24 @@ externe story aangemaakt.
 - Iedere externe poging heeft een `DeliveryAttempt` en een stabiele idempotentiesleutel.
 - De dispatcher wijzigt geen productinhoud en neemt geen besluit.
 
+## Integratie- en acceptatietesten
+
+Integratietests en acceptatie gebruiken `MockSoftwareFactory` uit Product Factory Testbed. Deze
+stateful simulator implementeert hetzelfde versioned externe contract als de echte Software
+Factory. De dispatcher bevat geen testvertakking en gebruikt alleen een ander geconfigureerd
+endpoint.
+
+De simulator ondersteunt minimaal storyaanmaak, idempotente herhaling, open werk, statusverloop,
+oplevering, uitvoeringsvragen, tijdelijke transportfouten, een verloren response na geslaagde
+aanmaak en definitieve pakketafwijzing. Alleen de echte dispatcher vertaalt deze antwoorden naar
+`DeliveryAttempt`s, storystatussen en eventueel `REPAIR_STORY`; de simulator schrijft nooit direct
+in Productplanning.
+
+Op acceptatie kan een tester via het aparte acceptatiescherm een scenario kiezen en bijvoorbeeld
+een externe story afronden of de volgende call laten mislukken. De daaropvolgende
+`runDispatchSession()` wordt bewust via de gewone UI gestart. Zie
+[Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
+
 ## Gerelateerde documenten
 
 - [Productplanning-API](productplanning.md)
@@ -179,3 +197,4 @@ externe story aangemaakt.
 - [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
+- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)

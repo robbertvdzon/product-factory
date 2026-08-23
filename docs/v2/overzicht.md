@@ -347,6 +347,24 @@ De publieke productrepository blijft wel de waarheid over de huidige code, tests
 productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen de Git-URL uit de
 `ProductAssignment` tijdens een sessie read-only uitchecken. Zij committen of pushen niets.
 
+## Integratie- en acceptatietesten
+
+De acceptatieomgeving gebruikt echte Product Factory-modules, contracts, queues en statusmachines,
+maar geen echte externe schrijvende diensten. Een aparte Product Factory Testbed simuleert AI en
+Software Factory stateful via dezelfde interfaces als productie. De in-memory database wordt bij
+start of reset gevuld met vaste synthetische data, authenticatie staat uit en automatische
+schedules staan standaard stil zodat een tester iedere stap bewust via de UI kan uitvoeren.
+
+Publieke Git-repositories mogen zonder token via HTTPS worden gelezen. Iedere sessie bevriest de
+gevonden commit-SHA en geen acceptatiecomponent bezit Git-schrijfrechten. Integratietests gebruiken
+dezelfde Testbed-scenario's, maar vervangen internet-Git door een tijdelijke lokale repository.
+
+Een acceptance-only UI-scherm laat scenario's resetten, kiezen en stap voor stap voortzetten. Het
+toont daarna via de gewone product- en operationele schermen wat Product Factory werkelijk heeft
+gedaan. Opstartcontroles weigeren in acceptatie echte AI-providers, een echt Software
+Factory-endpoint, externe schrijftokens, productie-URL's en ingeschakelde achtergrondschedules.
+Details staan in [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
+
 ## Negen hoofdregels
 
 1. De Stakeholder is de klant en diens expliciete richting is leidend.
@@ -371,6 +389,7 @@ productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen
 - [Frontend](frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)

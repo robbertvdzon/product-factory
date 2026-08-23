@@ -362,14 +362,21 @@ geen `if (acceptance)`-vertakkingen in Productontwerp, Productplanning of Kwalit
 
 - **Unit tests van procesmodules** kiezen `provider = MOCKED` en gebruiken een in-memory fake van de
   publieke AI-uitvoeringsinterface met vooraf ingestelde taakstatussen en resultaten.
-- **Integratietests** starten de echte AI-uitvoeringsmodule en database plus een testworker die
-  `MOCKED`-taken claimt en deterministische fixtures terugstuurt.
-- **Acceptatie** draait een kleine mockworker-service die via dezelfde HTTPS-API claimt. De waarde in
-  `model` is daar een stabiel mockprofiel, bijvoorbeeld `quality-success-v1`.
+- **Integratietests** starten de echte AI-uitvoeringsmodule en queue plus `MockAiWorker` uit Product
+  Factory Testbed. De worker claimt `MOCKED`-taken via de echte worker-API en stuurt
+  deterministische fixtures terug.
+- **Acceptatie** draait dezelfde stateful `MockAiWorker` als zelfstandig Testbed-onderdeel. De waarde
+  in `model` is daar een stabiel mockprofiel, bijvoorbeeld `quality-success-v1`.
 
 De mockworker kiest een fixture op basis van het geconfigureerde mockprofiel en optionele
 testcorrelatie in de opaque input. Ook mockresultaten moeten aan het responseschema voldoen en
 doorlopen leases, idempotentie en resultaatacceptatie.
+
+De mockworker kan niet alleen succes teruggeven. Vaste scenario's kunnen langzaam werk, schemafout,
+providerfout, time-out, annulering, ontbrekende heartbeat, slaap, crash, reconciliatie en een laat
+resultaat met een oud fencing token simuleren. Daarmee gebruiken automatische integratietests en
+handmatige UI-acceptatie precies dezelfde queuegrens en scenariofixtures. De volledige
+omgevingsopzet staat in [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
 
 Productieconfiguratie bevat een allowlist van providers en weigert `MOCKED` bij het opslaan van
 algemene instellingen en bij het aanvragen van een taak. Zo kan een verkeerde instelling niet
@@ -431,6 +438,7 @@ proces, agentjob of vervolgstap starten.
 - [Processen en entiteiten](processen-en-entiteiten.md)
 - [Frontend](frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productplanning-API](productplanning.md)
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)

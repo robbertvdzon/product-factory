@@ -146,6 +146,30 @@ Technische gebruikers kunnen apart zien:
 Deze informatie verklaart wat de automatisering doet, maar verandert nooit de inhoudelijke status
 van een epic, story, bug of verificatie.
 
+## Acceptatietesten
+
+Alleen in de acceptatieomgeving toont de frontend het scherm **Acceptatietesten** en op iedere pagina
+een herkenbare banner **synthetische tijdelijke data — authenticatie uit**. Het scherm bedient
+Product Factory Testbed via een acceptance-only Test Control API; het schrijft niet rechtstreeks in
+de Product Factory-database.
+
+De tester kan hier:
+
+- de actieve dataset-, scenario- en Testbed-versie zien;
+- de omgeving resetten naar vaste initiële testdata;
+- een beschreven AI- of Software Factory-scenario activeren;
+- expliciete externe stappen uitvoeren, zoals een mockworker laten slapen of hervatten, een externe
+  story afronden of de volgende externe call laten mislukken;
+- daarna via links de normale processessie, dispatcher, backlog, kwaliteit en operationele historie
+  bekijken;
+- per scenariostap de verwachte zichtbare uitkomst afvinken.
+
+De UI biedt vaste, versieerbare scenario's in plaats van vrije scripts of willekeurige
+mockresponse-JSON. Automatische schedules staan in acceptatie standaard uit. Processen en dispatcher
+worden via hun bestaande handmatige acties gestart, zodat iedere overgang goed te volgen is. Reset
+waarschuwt dat alle tijdelijke acceptatiewijzigingen verdwijnen en is technisch onmogelijk in
+productie.
+
 ## Gerelateerde documenten
 
 - [Overzicht](overzicht.md)
@@ -153,3 +177,4 @@ van een epic, story, bug of verificatie.
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Agentgeheugen](agentgeheugen.md)
 - [AI-uitvoering](ai-uitvoering.md)
+- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
