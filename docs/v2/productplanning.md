@@ -2,17 +2,18 @@
 
 Status: eerste ontwerp van het publieke modulecontract.
 
-Dit document beschrijft de buitenkant van Productplanning en het vaste gedrag van de technische
-Software Factory-dispatcher. Andere modules mogen niet afhankelijk zijn van het aantal agents,
-interne concepten of de volgorde van planningsstappen. De volgende implementaties gebruiken daarom
-hetzelfde contract:
+Dit document beschrijft de buitenkant van Productplanning. Andere modules mogen niet afhankelijk
+zijn van het aantal agents, interne concepten of de volgorde van planningsstappen. De volgende
+implementaties gebruiken daarom hetzelfde contract:
 
 - [Productplanning — MVP](productplanning-mvp.md): één Planner-agent doet selectie, storyvorming en
   prioritering;
 - [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md): vier
   gespecialiseerde rollen met parallelle voorbereiding en een aparte criticus.
 
-De dispatcher is voor beide varianten gelijk en gebruikt nooit agents.
+De technische [Software Factory-dispatcher](software-factory-dispatcher.md) heeft een eigen
+document. Hij blijft binnen Productplanning, maar staat los van de intelligente implementatie en
+gebruikt nooit agents.
 
 ## Verantwoordelijkheid
 
@@ -25,8 +26,7 @@ Productplanning is eigenaar en enige schrijver van:
 
 - `PlanningWorkItem`, de duurzame queue met gerichte planningsopdrachten;
 - `Story`, inclusief type, inhoud, status, versie en `sequenceNumber`;
-- `ProcessSession`, de operationele historie van een intelligente planningsrun;
-- `DeliveryAttempt` en de koppeling tussen een story en Software Factory.
+- `ProcessSession`, de operationele historie van een intelligente planningsrun.
 
 De backlog is geen entiteit. Productplanning wijzigt geen epicinhoud, UX-ontwerp, bug of
 verificatieresultaat. Zij gebruikt daarvoor uitsluitend publieke commands op de eigenaar.
@@ -109,7 +109,6 @@ Productplanning gebruikt alleen publieke Spring Modulith-API's. Read-only DTO's 
 | `BugDetails` | Kwaliteitsbewaking | uitvoerbare bug inclusief ernst, bewijs en versie |
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor ontbrekend gedrag binnen een bevroren epic |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, accounts en toegangsgrenzen |
-| `SoftwareFactoryWork` | dispatcheradapter | actuele externe status van eerder verzonden werk; tijdelijk integratiegegeven |
 
 Tijdens een inhoudelijke sessie mag Productplanning de publieke Git-URL uitchecken en broncode,
 tests en documentatie read-only bekijken. Zij commit en pusht nooit. De bekeken commit-SHA kan als
@@ -128,7 +127,6 @@ kwaliteitsoordeel.
 | `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, status en externe referentie |
 | backlogquery | alle uitvoerbare of reeds verzonden stories in volgorde | `StoryDetails` met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | read-only inzicht in de planningsqueue | type, bron, status, claim, resultaat en fout |
-| `StoryDeliveryPackage` | onveranderlijk pakket voor Software Factory | complete story of bugfix, acceptatiecriteria, UX, attachments, bronversies, hashes en idempotentiesleutel |
 | `ProcessSession` | opgeslagen operationele historie van de intelligente run | geclaimde workitems, inputversies, publicaties, eindstatus en blokkade |
 | `QualityWorkItem` bij Kwaliteitsbewaking | downstream effect van een verificatiecommand; Kwaliteitsbewaking maakt en bezit dit object | type, exact doel-ID en -versie, bron, prioriteit en idempotentiesleutel |
 
@@ -223,36 +221,17 @@ qualitycommands starten evenmin agents; zij maken alleen `QualityWorkItem`s.
 | gedrag binnen de bevroren epic had nooit een story | `requestEpicGapPlanning(...)` | maak aanvullende productstories |
 | epic geslaagd, niet aantoonbaar, geblokkeerd of productaanname niet geslaagd | geen | alleen bij een latere expliciete nieuwe aanleiding |
 
-## Software Factory-dispatcher
+## Grens met de Software Factory-dispatcher
 
-De dispatcher is een eenvoudige geplande adapter binnen Productplanning. Hij gebruikt geen agents
-en heeft als technische ingang:
+De dispatcher leest de backlog en `StoryDetails` via Productplanning en meldt verzending en
+oplevering via `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)`. De intelligente planner
+kent geen extern Software Factory-protocol. Pakketvorming, externe statussynchronisatie,
+`DeliveryAttempt`s, retry en idempotentie staan volledig in het
+[dispatcherdocument](software-factory-dispatcher.md).
 
-```java
-void runDispatchSession();
-```
-
-Iedere dispatchersessie:
-
-1. synchroniseert externe statussen en bewaart responses als `DeliveryAttempt`;
-2. roept voor een opgeleverde story `markStoryAsDeveloped(...)` aan;
-3. verstuurt niets zolang Software Factory nog open werk voor het product heeft;
-4. kiest anders de afhankelijke-vrije `TODO`-story met het laagste `sequenceNumber` waarvan de epic
-   niet `CANCELLED` is;
-5. vormt zonder inhoudelijke beslissing één compleet `StoryDeliveryPackage`;
-6. maakt idempotent één Software Factory-story aan;
-7. roept `markStoryAsDispatched(...)` aan om extern ID en `IN_PROGRESS` op te slaan.
-
-Een lege backlog is een normale no-op. De dispatcher start Productontwerp of Productplanning niet
-en kan geen story overslaan, inhoud of UX wijzigen, epic kiezen of prioriteit veranderen.
-
-Een mislukte dispatch blijft intern technisch werk:
-
-- na timeout of tijdelijke netwerkfout bewaart de dispatcher een `DeliveryAttempt`, zoekt eerst op
-  dezelfde idempotentiesleutel en probeert later met backoff opnieuw;
-- bij configuratie- of autorisatiefout blokkeert hij levering en maakt een operationele melding;
-- alleen bij definitieve inhoudelijke afwijzing van het pakket maakt Productplanning intern een
-  `REPAIR_STORY`-workitem. De dispatcher verandert zelf geen storyinhoud.
+Alleen een definitieve inhoudelijke afwijzing van een pakket levert intern een idempotent
+`REPAIR_STORY`-workitem op. Een tijdelijke transport-, configuratie- of autorisatiefout start geen
+planningsagent.
 
 ## Fouten en idempotentie
 
@@ -261,9 +240,6 @@ Een mislukte dispatch blijft intern technisch werk:
 - Workitems en moduleoverschrijdende commands zijn idempotent en herstelbaar.
 - Een gekozen epicversie kan niet door een nieuwere ontwerpversie worden vervangen.
 - Een mislukte run laat per workitem een zichtbare status en fout achter.
-- De dispatcher zoekt na timeout eerst op idempotentiesleutel en maakt nooit blind een duplicaat.
-- Een fout vóór externe aanmaak laat de story `TODO`; bestaand extern werk houdt haar
-  `IN_PROGRESS`.
 
 ## Eisen aan iedere implementatie
 
@@ -277,12 +253,13 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - epic- en bugbronversies exact vastliggen;
 - `sequenceNumber`s productbreed consistent en uniek zijn;
 - publicatie en definitieve ordening atomair gebeuren;
-- de dispatcher voor beide implementaties hetzelfde vaste contract gebruikt.
+- de dispatcher via de beschreven commands kan leveren zonder interne planningskennis.
 
 ## Gerelateerde documenten
 
 - [Productplanning — MVP](productplanning-mvp.md)
 - [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
+- [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Productontwerp-API](productontwerp.md)
-- [Kwaliteitsbewaking](kwaliteitsbewaking.md)
+- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

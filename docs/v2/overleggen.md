@@ -100,4 +100,4 @@ andere normale processtap is geen besluit.
 - [Overzicht](overzicht.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
 - [Besluitenregister](besluitenregister.md)
-- [Kwaliteitsbewaking](kwaliteitsbewaking.md)
+- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)

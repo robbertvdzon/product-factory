@@ -231,4 +231,7 @@ historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar word
 - [Productplanning-API](productplanning.md)
 - [Productplanning — MVP](productplanning-mvp.md)
 - [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
-- [Kwaliteitsbewaking](kwaliteitsbewaking.md)
+- [Software Factory-dispatcher](software-factory-dispatcher.md)
+- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
+- [Kwaliteitsbewaking — MVP](kwaliteitsbewaking-mvp.md)
+- [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md)

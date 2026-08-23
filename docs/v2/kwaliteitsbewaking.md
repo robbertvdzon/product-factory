@@ -1,9 +1,15 @@
-# Product Factory v2 — Kwaliteitsbewaking
+# Product Factory v2 — Kwaliteitsbewaking-API
 
-Status: eerste ontwerp van modulegrens en interne werking.
+Status: eerste ontwerp van het publieke modulecontract.
 
-Dit document werkt Kwaliteitsbewaking uit. De black-boxinterface in
-[Product Factory v2 — overzicht](overzicht.md) is leidend.
+Dit document beschrijft uitsluitend de buitenkant van Kwaliteitsbewaking. Andere modules mogen niet
+afhankelijk zijn van agents, testorganisatie, interne observaties of de volgorde van teststappen. De
+volgende implementaties gebruiken hetzelfde contract:
+
+- [Kwaliteitsbewaking — MVP](kwaliteitsbewaking-mvp.md): één Tester-agent voert de volledige
+  kwaliteitssessie uit;
+- [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md): vier
+  gespecialiseerde rollen, parallel testen, testrotatie en duurzaam kwaliteitsgeheugen.
 
 ## Verantwoordelijkheid
 
@@ -12,15 +18,9 @@ laatste story of de volledige bevroren epic de bedoelde gebruikersverbetering he
 publiceert reproduceerbare bugs en duurzame verificaties met bewijs. Ontbrekende epicdekking staat
 in een verificatie en wordt via een command als nieuw planwerk aangevraagd.
 
-De module is eigenaar van:
-
-- teststrategie, testrotatie en dekkingsbeeld;
-- testsessies, observaties en bewijs;
-- bugs, ernst en herstelstatus;
-- verificaties van stories, epics en gebruikerssignalen;
-- onveranderlijke kwaliteitssnapshots en hun historie;
-- structurele kwaliteitspatronen en hun bewijs;
-- het eigen agent- en procesgeheugen.
+De module is eigenaar en enige schrijver van `QualityWorkItem`, `Bug`, `Verification`,
+`QualitySnapshot` en haar eigen `ProcessSession`. Hoe de module intern tot testbewijs en conclusies
+komt, verschilt per implementatie.
 
 Kwaliteitsbewaking maakt geen stories, wijzigt geen epicinhoud en bepaalt geen backlogvolgorde. Zij
 kan alleen via publieke commands een bugfix, aanvullend planwerk, epicuitkomst of signaaluitkomst
@@ -37,7 +37,8 @@ void runProcessSession();
 De scheduler of een handmatige UI-/REST-actie kan deze functie starten. Er kan modulebreed maximaal
 één kwaliteitssessie tegelijk actief zijn. Een tweede handmatige aanroep krijgt een
 `ProcessAlreadyRunning`-fout; een botsende geplande aanroep wordt als overgeslagen geregistreerd.
-Alleen deze functie mag testagents starten.
+Alleen deze functie mag testagents starten. Welke en hoeveel agents een sessie gebruikt, is een
+implementatiedetail.
 
 Een run claimt atomair een vaste momentopname van de `PENDING` `QualityWorkItem`s die bij de start
 klaarstaan. Nieuwe verzoeken wachten op de volgende run. Naast deze gerichte queueopdrachten mag de
@@ -282,108 +283,6 @@ Kwaliteitsbewaking roept `requestEpicGapPlanning(...)` aan met het verificatie-I
 maakt tijdens een processessie de aanvullende stories; een latere verificatie toont of het gat is
 opgelost. Zo blijft het bewijs historisch intact zonder een tweede lifecycle naast epic en story.
 
-## Interne entiteiten
-
-- `ProcessSession` — geclaimde en begrensde processessie en haar operationele historie;
-- `QualityWorkItem` — duurzame queueopdracht met type, doelversie, status, claim en idempotentiesleutel;
-- `TestStrategy` — kwaliteitsdoelen en risicoprioriteiten per product;
-- `TestRotation` — wanneer routes en thema's voor het laatst zijn onderzocht;
-- `TestAgenda` — doelen, omgeving en budget voor één sessie;
-- `TestCase` — concrete controle of exploratieve opdracht;
-- `TestObservation` — feitelijke waarneming;
-- `EvidenceArtifact` — screenshot, log, trace of meetresultaat;
-- `BugCandidate` en `Bug` — bevinding en duurzame levenscyclus;
-- `EpicCoverageAssessment` — vergelijking van epic, UX, stories en geleverd gedrag;
-- `VerificationDraft` — story-, epic- of signaalcontrole vóór publicatie;
-- `Verification` — duurzame, onveranderlijke controle met doeltype, uitkomst en bewijs;
-- `QualitySnapshot` — onveranderlijk kwaliteitsbeeld na een afgeronde niet-lege processessie;
-- `QualityPattern` — clustering van verwante bevindingen;
-- `QualityMemory` — lessen over risico's, testaanpak en dekkingsgaten;
-- `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
-
-Ruwe observaties zijn geen publieke interfacestatus. Alleen hun gevalideerde conclusie wordt
-gepubliceerd.
-
-## Agents
-
-Een processessie gebruikt vier vaste agentrollen:
-
-1. **Testcoördinator** — kiest agenda, omgeving, risico's en benodigde controles.
-2. **Functionele tester** — controleert gebruikersroutes, stories, lege toestanden en foutpaden.
-3. **Kwaliteitsspecialist** — rouleert tussen UX-samenhang, toegankelijkheid, responsiviteit,
-   performance, beveiliging, privacy en betrouwbaarheid.
-4. **Verificatiecriticus en bugtriager** — reproduceert bevindingen, classificeert bugs/dekkingsgaten,
-   bepaalt ernst en keurt publieke resultaten goed.
-
-De functionele tester en kwaliteitsspecialist werken parallel op gescheiden testtaken. De criticus
-werkt sequentieel nadat hun observaties beschikbaar zijn. Bij een complete epiccontrole zijn beide
-testrollen verplicht.
-
-## Soorten processessies
-
-1. **Story verifiëren** — acceptatiecriteria en relevante regressie controleren.
-2. **Bugfix hertesten** — oorspronkelijke reproductie en aangrenzend gedrag controleren.
-3. **Epic verifiëren** — de complete bevroren gebruikersverbetering controleren.
-4. **Dagelijkse kernroutes testen** — belangrijkste gebruikersresultaten bewaken.
-5. **Kwaliteitsrotatie uitvoeren** — een onderbelicht thema of apparaat onderzoeken.
-6. **Gebruikerssignaal onderzoeken** — een gemeld probleem reproduceren.
-7. **Patroon analyseren** — verwante bevindingen als `UserSignal` van categorie `QUALITY_PATTERN` registreren.
-
-Gerichte P0/P1-opdrachten gaan voor periodieke rotatie. Een gequeue'de epicverificatie gaat voor
-losse exploratieve tests wanneer alle benodigde omgevingen beschikbaar zijn.
-
-## Verloop van één processessie
-
-```text
-claim product, opdracht en omgeving
-                 │
-                 ▼
-Testcoördinator maakt agenda
-                 │
-        ┌────────┴────────┐
-        ▼                 ▼
-functionele tester   kwaliteitsspecialist
-        └────────┬────────┘
-                 ▼
-reproductie, dekking en classificatie
-                 │
-                 ▼
-story-/epicverificatie + bug/gat
-                 │
-                 ▼
-atomair publiceren, snapshot maken en rotatie bijwerken
-```
-
-### Stap 1 — claimen en omgeving controleren
-
-De module claimt haar vaste batch workitems en leest exacte versies van epic, stories,
-oplevering en eventueel gebruikerssignaal, controleert de omgeving en registreert
-productversie en testaccount. Een onbereikbare omgeving leidt tot **Geblokkeerd**, niet tot een
-productbug.
-
-### Stap 2 — testen
-
-Bij een story test de functionele tester acceptatiecriteria, hoofdroute en relevante fout- en lege
-toestanden. Bij een bugfix begint hij met de oorspronkelijke reproduceerstappen. Bij een epiccontrole
-doorloopt hij de volledige route en vergelijkt hij alle storyresultaten met scope, UX en
-succescriteria van de bevroren epicversie.
-
-De kwaliteitsspecialist kiest relevante kwaliteitsdimensies. Niet iedere storysessie test alles,
-maar een epiccontrole dekt minimaal de expliciete grenzen uit de epic.
-
-### Stap 3 — classificeren en publiceren
-
-De criticus:
-
-- reproduceert mogelijke bugs onafhankelijk;
-- controleert of ontbrekend gedrag een bouwfout, dekkingsgat of nieuwe wens is;
-- zoekt duplicaten;
-- bepaalt ernst en gebruikersimpact;
-- controleert bewijs op geheimen en persoonsgegevens;
-- geeft het story- of epicoordeel;
-- geeft ieder onderzocht gebruikerssignaal een expliciet onderzoeksresultaat;
-- publiceert eigen `Bug`- en `Verification`-entiteiten atomair en voert vervolgcommands idempotent uit.
-
 ## Wanneer Kwaliteitsbewaking draait
 
 Gericht werk wordt gequeue'd door:
@@ -392,30 +291,56 @@ Gericht werk wordt gequeue'd door:
 - de product-/overlegmodule na een kwaliteitszorg of relevant gebruikerssignaal.
 
 Daarnaast kan de scheduler een run starten voor dagelijkse kernroutes, een verouderd kwaliteitsbeeld
-of testrotatie. Een queuecommand is een snelle databasebewerking; alleen de latere
+of een periodieke kwaliteitscontrole. Een queuecommand is een snelle databasebewerking; alleen de latere
 `runProcessSession()` mag agents starten. De backloggrootte speelt hierbij geen rol.
 
 ## Fouten, hervatten en idempotentie
 
 - Een storyverificatie is uniek voor story-ID, storyversie, oplevering en omgeving.
 - Een epicverificatie is uniek voor epic-ID, epicversie en geteste productversie.
-- Herhaling werkt bewijs bij maar maakt geen duplicaat.
+- Een idempotente herhaling voor exact hetzelfde doel maakt geen duplicaat en wijzigt een reeds
+  gepubliceerde verificatie niet.
 - Een technische testfout wordt apart geregistreerd en niet als productbug gepubliceerd.
 - Een sessie kan na een verlopen claim worden hervat met dezelfde inputmomentopname.
-- Parallelle testers schrijven alleen observaties; de criticus publiceert het definitieve resultaat.
 - Gedeeltelijk bewijs blijft intern tot reproductie en privacycontrole zijn afgerond.
+
+## Eisen aan iedere implementatie
+
+De MVP en iedere latere implementatie moeten garanderen dat:
+
+- alleen `runProcessSession()` kwaliteitsagents start;
+- maximaal één kwaliteitssessie tegelijk actief is;
+- ieder geclaimd workitem `DONE`, `BLOCKED` of `FAILED` wordt;
+- een onbereikbare of kapotte testomgeving niet als productbug wordt gepubliceerd;
+- iedere bug reproduceerbaar is en controleerbaar bewijs bevat;
+- iedere verificatie exacte doel-, opleverings-, omgevings- en bronversies bevat;
+- ontbrekende epicdekking binnen de bevroren scope wordt bewezen;
+- ieder gebruikerssignaalonderzoek een expliciete uitkomst of blokkade krijgt;
+- publieke output pas na contract-, privacy- en geheimencontrole verschijnt;
+- iedere sessie waarin daadwerkelijk is getest precies één nieuwe onveranderlijke
+  `QualitySnapshot` maakt;
+- publicaties en vervolgcommands atomair of idempotent herstelbaar zijn.
 
 ## Wanneer een sessie klaar is
 
-Een sessie is klaar wanneer:
+Een inhoudelijke sessie is klaar wanneer:
 
-- ieder gekozen testgeval een resultaat of expliciete blokkade heeft;
+- iedere geclaimde opdracht en gekozen periodieke controle een resultaat of expliciete blokkade heeft;
 - iedere publieke bug reproduceerbaar en van bewijs voorzien is;
 - ieder dekkingsgat aantoonbaar binnen de bevroren epic valt en niet door een story wordt gedekt;
 - iedere verificatie naar exacte epic-, story-, opleverings- en omgevingsversies verwijst;
 - ieder onderzocht gebruikerssignaal naar exact signaal-ID en -versie verwijst en een zichtbaar
   onderzoeksresultaat of expliciete blokkade heeft;
-- testrotatie en kwaliteitsbeeld zijn bijgewerkt;
-- na een niet-lege testsessie precies één nieuwe `QualitySnapshot` is opgeslagen;
+- het kwaliteitsbeeld uit de gevalideerde resultaten is opgebouwd;
+- na daadwerkelijk testwerk precies één nieuwe `QualitySnapshot` is opgeslagen;
 - publicaties atomair en geversioneerd beschikbaar zijn;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.
+
+## Gerelateerde documenten
+
+- [Kwaliteitsbewaking — MVP](kwaliteitsbewaking-mvp.md)
+- [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md)
+- [Productontwerp-API](productontwerp.md)
+- [Productplanning-API](productplanning.md)
+- [Software Factory-dispatcher](software-factory-dispatcher.md)
+- [Processen en entiteiten](processen-en-entiteiten.md)

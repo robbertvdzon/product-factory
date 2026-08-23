@@ -4,7 +4,8 @@ Status: voorstel voor de eerste implementatie.
 
 Deze implementatie gebruikt exact de publieke [Productplanning-API](productplanning.md). Eén
 algemene Planner-agent kiest epics, maakt stories, verwerkt herstelwerk en bepaalt de backlogvolgorde.
-De vaste Software Factory-dispatcher uit het API-document staat hier los van en gebruikt geen agent.
+De vaste [Software Factory-dispatcher](software-factory-dispatcher.md) staat hier los van en gebruikt
+geen agent.
 
 ## Uitgangspunten
 
@@ -49,7 +50,6 @@ De MVP bewaart binnen Productplanning alleen de gegevens die het publieke contra
 - `PlanningWorkItem`;
 - `Story` en onveranderlijke storyversies;
 - `ProcessSession`;
-- `DeliveryAttempt` en de externe storykoppeling van de gedeelde dispatcher;
 - minimale technische lock- en idempotentiegegevens.
 
 Agentcontext en tijdelijk planconcept mogen volgens het bewaarbeleid aan de processessie worden
@@ -155,9 +155,9 @@ atomische productbrede volgorde.
 
 ## Dispatcher
 
-De MVP gebruikt ongewijzigd de dispatcher uit het [publieke contract](productplanning.md). Retry,
-idempotentie, opleverstatus, storyverificatie en definitieve inhoudelijke afwijzing worden volledig
-door die deterministische adapter afgehandeld en starten geen Planner-agent.
+De MVP gebruikt ongewijzigd de [Software Factory-dispatcher](software-factory-dispatcher.md). Retry,
+idempotentie, opleverstatus en definitieve inhoudelijke afwijzing worden volledig door die
+deterministische adapter afgehandeld en starten geen Planner-agent.
 
 ## Wanneer de MVP voldoende is
 
@@ -176,5 +176,6 @@ welke gespecialiseerde rol als eerste nodig is.
 
 - [Productplanning-API](productplanning.md)
 - [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
+- [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Productontwerp-API](productontwerp.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

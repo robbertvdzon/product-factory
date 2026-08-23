@@ -4,8 +4,9 @@ Status: doelontwerp voor een latere uitgebreide implementatie.
 
 Deze implementatie gebruikt exact de publieke [Productplanning-API](productplanning.md). Zij breidt
 de [MVP](productplanning-mvp.md) intern uit met gespecialiseerde rollen, parallelle voorbereiding,
-duurzaam planningsgeheugen en een afzonderlijke kritiekstap. De dispatcher blijft dezelfde
-deterministische adapter uit het publieke contract.
+duurzaam planningsgeheugen en een afzonderlijke kritiekstap. De
+[Software Factory-dispatcher](software-factory-dispatcher.md) blijft dezelfde deterministische
+adapter.
 
 ## Interne entiteiten
 
@@ -135,7 +136,8 @@ interne geheugen is dus geen verborgen uitvoeringscontract.
 
 ## Dispatcher
 
-De uitgebreide implementatie gebruikt exact dezelfde dispatcher als de MVP. Technische retries,
+De uitgebreide implementatie gebruikt exact dezelfde
+[Software Factory-dispatcher](software-factory-dispatcher.md) als de MVP. Technische retries,
 statussynchronisatie en `DeliveryAttempt`s lopen buiten de agents. Alleen een definitieve
 inhoudelijke afwijzing maakt een `REPAIR_STORY`-workitem voor een latere intelligente run.
 
@@ -164,5 +166,6 @@ Een uitgebreide planningsrun is klaar wanneer:
 
 - [Productplanning-API](productplanning.md)
 - [Productplanning — MVP](productplanning-mvp.md)
+- [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Productontwerp-API](productontwerp.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
