@@ -228,5 +228,7 @@ historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar word
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
-- [Productplanning](productplanning.md)
+- [Productplanning-API](productplanning.md)
+- [Productplanning — MVP](productplanning-mvp.md)
+- [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
 - [Kwaliteitsbewaking](kwaliteitsbewaking.md)
