@@ -58,9 +58,13 @@ gekoppeld voor diagnose. Zij zijn geen publieke entiteiten en vormen geen zelfst
 planningsgeheugen.
 
 Het permanente geheugen van de rol `PLANNER_MVP` staat in
-[Agentgeheugen](agentgeheugen.md). De runtime voegt alleen de actuele items van deze rol aan de
+[Agentgeheugen](agentgeheugen.md). De procesruntime voegt alleen de actuele items van deze rol aan de
 agenttaak toe en registreert de exact gelezen versies. De Planner kan geen geheugen van een andere
 rol opvragen.
+
+Voor iedere Planner-taak leest de procesruntime de betreffende `AiJobConfiguration`, neemt provider en
+model als vaste taakwaarden over en gebruikt [AI-uitvoering](ai-uitvoering.md). Een sessie met open
+taken krijgt `WAITING_FOR_AI`; een volgende run hervat haar zonder dubbele taak.
 
 ## Verloop van één processessie
 
@@ -71,13 +75,22 @@ claim run en PENDING workitems
 lees AVAILABLE epics en vaste inputmomentopname
              │
              ▼
-Planner kiest relevante epic(s)
+queue selectie-AiTask
+             │
+             ▼
+WAITING_FOR_AI · latere run hervat
+             │
+             ▼
+Planner-resultaat kiest relevante epic(s)
              │
              ▼
 applicatie claimt exacte epicversie(s)
              │
              ▼
-dezelfde Planner maakt stories en totale TODO-volgorde
+queue plan-AiTask(s)
+             │
+             ▼
+WAITING_FOR_AI · latere run hervat
              │
              ▼
 deterministische contract- en dekkingscontrole
@@ -111,7 +124,7 @@ overige epics en geclaimde workitems kunnen nog wel worden afgehandeld.
 
 ### Stap 3 — dezelfde agent maakt het complete plan
 
-Dezelfde Planner-agent ontvangt de bevestigde epicversie en maakt vervolgens:
+Dezelfde Planner-taak ontvangt de bevestigde epicversie en maakt vervolgens:
 
 - de volledige storyset voor de gekozen epic;
 - gerichte bugfix- en dekkingsgatstories;
@@ -120,6 +133,10 @@ Dezelfde Planner-agent ontvangt de bevestigde epicversie en maakt vervolgens:
 
 Bij een `REPRIORITIZE_EPIC` kan het resultaat uitsluitend een nieuwe volgorde zijn als er al complete
 stories bestaan. Een `IN_PROGRESS` story wordt niet herschikt of onderbroken.
+
+Iedere inhoudelijke Planner-stap wordt als complete opaque taak gequeue'd. Sequentiële stappen
+worden over meerdere korte hervattingen van dezelfde processessie uitgevoerd; er blijft nooit een
+serverthread wachten op de laptopworker.
 
 ### Stap 4 — deterministisch valideren
 
@@ -134,9 +151,9 @@ Gewone code controleert minimaal:
 - unieke en productbrede `sequenceNumber`s voor `TODO`-stories;
 - dat alleen geclaimde workitems als afgehandeld worden gemarkeerd.
 
-Een technisch mislukte modelaanroep mag idempotent met dezelfde input worden herhaald. Een
-inhoudelijk ongeldig concept wordt niet gepubliceerd. Er start in de MVP geen aparte critic-agent;
-de fout blijft zichtbaar op de processessie en betrokken workitems.
+Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
+AI-uitvoering. Een inhoudelijk ongeldig concept wordt niet gepubliceerd. Er start in de MVP geen
+aparte critic-agent; de fout blijft zichtbaar op de processessie en betrokken workitems.
 
 ### Stap 5 — atomair publiceren
 
@@ -185,4 +202,5 @@ welke gespecialiseerde rol als eerste nodig is.
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Productontwerp-API](productontwerp.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

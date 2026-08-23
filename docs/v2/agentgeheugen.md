@@ -9,14 +9,15 @@ intrekken.
 
 Agentgeheugen is een ondersteunende Spring Modulith-module. De module heeft geen agents, scheduler
 of `runProcessSession()` en neemt geen productbesluiten. Zij bewaart alleen gevalideerde
-geheugenwijzigingen en levert de actuele projectie aan een agentrun.
+geheugenwijzigingen en levert de actuele projectie voor de input van een agenttaak.
 
 ## Hoofdregel
 
 > Een agent leest en wijzigt uitsluitend het geheugen van zijn eigen stabiele agentrol binnen het
 > product van de huidige processessie.
 
-De runtime bepaalt `productId` en `agentRole` uit de vertrouwde `AgentExecutionContext`. Deze waarden
+De aanvragende procesruntime bepaalt `productId` en `agentRole` uit de vertrouwde
+`AgentExecutionContext`. Deze waarden
 komen nooit uit agentoutput of vrije prompttekst. Een agent kan daardoor geen andere rol of ander
 product opgeven om daar geheugen te lezen of te wijzigen.
 
@@ -91,9 +92,10 @@ void retractAgentMemory(RetractAgentMemoryCommand command);
 ```
 
 `getActiveMemory(...)` is de enige normale agentquery. Zij accepteert een vertrouwde
-`AgentExecutionContext` en controleert dat product en rol overeenkomen met de actieve agentrun.
+`AgentExecutionContext` en controleert dat product en rol overeenkomen met de actieve
+procesuitvoering die de agenttaak samenstelt.
 
-De historische queries zijn bestemd voor Stakeholder-UI, audit en beheer. Een gewone agentrun krijgt
+De historische queries zijn bestemd voor Stakeholder-UI, audit en beheer. Een gewone agenttaak krijgt
 geen ingetrokken of vervangen versies en kan geen peildatum kiezen.
 
 ## Wie mag schrijven
@@ -113,7 +115,7 @@ alleen titel, inhoud, doelitem en reden. Een agentactie voor een andere rol of e
 daardoor niet uitdrukbaar in het schema.
 
 Geheugenacties worden pas toegepast nadat de agenttaak en haar publieke procesoutput geldig zijn.
-Een mislukte of afgekeurde agenttaak leert niets permanent. De runtime biedt de acties idempotent
+Een mislukte of afgekeurde agenttaak leert niets permanent. De procesruntime biedt de acties idempotent
 aan; een technische retry maakt geen dubbele versie.
 
 ### De Stakeholder via de UI
@@ -220,15 +222,16 @@ append-only versies en intrekkingen:
 Een vervanging of intrekking werkt pas vanaf haar eigen `createdAt`. Daardoor kan de UI betrouwbaar
 tonen wat een rol op een willekeurige dag als actueel geheugen had.
 
-Historische inhoud is auditinformatie en nooit bindende instructie voor een huidige agentrun.
+Historische inhoud is auditinformatie en nooit bindende instructie voor een huidige agenttaak.
 
 ## Geheugen bij het starten van een agent
 
-Voor iedere agenttaak doet de runtime vóór promptopbouw:
+Voor iedere agenttaak doet de procesruntime vóór promptopbouw:
 
 1. bepaal vertrouwd `productId`, `AgentRoleKey`, processessie-ID en agenttaak-ID;
 2. vraag `getActiveMemory(context)` op;
-3. leg de exacte gelezen geheugenversie-ID's vast bij de `AgentRun` of `ProcessSession`;
+3. leg de exacte gelezen geheugenversie-ID's vast bij de `ProcessSession` en in de opaque input van
+   de `AiTask`;
 4. voeg alleen deze actuele eigen-rolitems als onvertrouwde contextdata aan de prompt toe;
 5. start daarna pas de agent.
 
@@ -238,6 +241,11 @@ voor de lopende inputmomentopname.
 
 Parallelle agents hebben ieder hun eigen rolgeheugen. Zij delen tijdelijke resultaten uitsluitend
 via de expliciete handoffs van de processessie en lezen nooit elkaars permanente geheugen.
+
+De aanvragende procesruntime neemt de geselecteerde eigen geheugenversies op in de complete opaque
+taak voor [AI-uitvoering](ai-uitvoering.md). AI-uitvoering krijgt geen afzonderlijke rolparameter,
+vraagt zelf geen geheugen op en begrijpt de inhoud niet. Daarmee blijft de rolgrens bij
+Agentgeheugen en blijft de technische AI-queue volledig generiek.
 
 ## Contextlimiet
 
@@ -320,12 +328,12 @@ agenttaak vastgelegd.
 
 - Iedere geregistreerde agentrol heeft per product een eigen, permanent geheugen.
 - Een agent leest en wijzigt uitsluitend haar eigen rolgeheugen.
-- De runtime bepaalt product en rol; agentoutput kan die niet kiezen.
+- De procesruntime bepaalt product en rol; agentoutput kan die niet kiezen.
 - Een agent ziet normaal alleen actuele versies.
 - De Stakeholder kan via de UI iedere rol corrigeren.
 - Vervangen en intrekken zijn append-only; oude versies blijven auditbaar.
 - Een peildatum reconstrueert de toen actieve projectie.
-- Iedere agentrun legt de exact gelezen geheugenversie-ID's vast.
+- Iedere processessie legt per `AiTask` de exact gelezen geheugenversie-ID's vast.
 - Een mislukte agenttaak schrijft geen geheugen.
 - Geheugen overschrijft nooit publieke productwaarheid of harde regels.
 - Geen wijziging wordt stil afgekapt of zonder actor en reden opgeslagen.
@@ -339,3 +347,4 @@ agenttaak vastgelegd.
 - [Productplanning-API](productplanning.md)
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
 - [Overleggen met de Stakeholder](overleggen.md)
+- [AI-uitvoering](ai-uitvoering.md)

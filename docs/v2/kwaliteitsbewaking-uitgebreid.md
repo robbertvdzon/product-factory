@@ -21,7 +21,6 @@ Naast de publieke module-entiteiten kan de uitgebreide implementatie gebruiken:
 - `EpicCoverageAssessment` — vergelijking van epic, UX, stories en geleverd gedrag;
 - `VerificationDraft` — story-, epic- of signaalcontrole vóór publicatie;
 - `QualityPattern` — clustering van verwante bevindingen;
-- `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
 
 Ruwe observaties en interne beoordelingen steken de modulegrens niet over. Alleen gevalideerde
 `Bug`s, `Verification`s en `QualitySnapshot`s worden publieke productwaarheid.
@@ -37,10 +36,16 @@ Een processessie kan vier vaste agentrollen gebruiken:
 4. **Verificatiecriticus en bugtriager** — reproduceert bevindingen, classificeert bugs en
    dekkingsgaten, bepaalt ernst en keurt publieke resultaten goed.
 
-Alleen `runProcessSession()` mag deze agents starten. Niet iedere kleine storycontrole gebruikt alle
-rollen. Bij een complete epicverificatie zijn beide uitvoerende testrollen en de criticus verplicht.
+Alleen `runProcessSession()` mag voor deze rollen AI-taken aanvragen. Niet iedere kleine
+storycontrole gebruikt alle rollen. Bij een complete epicverificatie zijn beide uitvoerende
+testrollen en de criticus verplicht.
 
-Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. De runtime
+Voor iedere taak leest Kwaliteitsbewaking de betreffende `AiJobConfiguration` en vraagt zij een
+complete opaque taak met bevroren provider en model aan bij
+[AI-uitvoering](ai-uitvoering.md). AI-uitvoering kent de testrollen niet. De processessie bewaart de
+taak-ID's, wordt `WAITING_FOR_AI` en wordt door een volgende run hervat.
+
+Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. De procesruntime
 leidt de vaste `AgentRoleKey` uit vertrouwde configuratie af en geeft een agent alleen actuele items
 van die rol. De Testcoördinator kan dus niet het geheugen van de Functionele tester,
 Kwaliteitsspecialist of Verificatiecriticus lezen. Rollen delen alleen de expliciete sessie-input,
@@ -81,8 +86,9 @@ bugs/verificaties atomair publiceren
 vervolgcommands + QualitySnapshot + rotatie bijwerken
 ```
 
-De functionele tester en kwaliteitsspecialist werken parallel op gescheiden opdrachten uit dezelfde
-vaste inputmomentopname. De criticus werkt sequentieel nadat hun observaties beschikbaar zijn. Alleen
+De functionele tester en kwaliteitsspecialist werken parallel via gescheiden queuetaken uit dezelfde
+vaste inputmomentopname. De processessie keert wachtend terug en een volgende run hervat haar zodra
+beide resultaten beschikbaar zijn. De criticus werkt daarna sequentieel via een nieuwe taak. Alleen
 de publicatiestap schrijft publieke entiteiten.
 
 ### Stap 1 — claimen en agenda kiezen
@@ -200,4 +206,5 @@ Een uitgebreide kwaliteitssessie is klaar wanneer:
 - [Productplanning-API](productplanning.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

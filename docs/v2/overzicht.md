@@ -99,9 +99,14 @@ epic handmatig hoger laten plaatsen; een story die al `IN_PROGRESS` is loopt nor
 ## Vier uitvoerende onderdelen
 
 Productontwerp, Productplanning en Kwaliteitsbewaking zijn de drie intelligente procesmodules. Alleen
-hun geplande of handmatig gestarte `runProcessSession()` mag agents starten. Per module kan maximaal
-één run tegelijk actief zijn. Een handmatige start krijgt een fout als al een run loopt; een geplande
-botsing wordt overgeslagen en geregistreerd.
+hun geplande of handmatig gestarte `runProcessSession()` mag voor dat proces een AI-taak aanvragen.
+Per module kan maximaal één aanroep tegelijk uitvoeren. Een werkelijk botsende handmatige start
+krijgt een fout en een schedulerbotsing wordt overgeslagen en geregistreerd.
+
+Een AI-taak draait asynchroon. De processessie bewaart het taak-ID, krijgt status
+`WAITING_FOR_AI` en houdt geen thread of technische lock vast. Een volgende schedule-run hervat
+dezelfde sessie zodra het resultaat klaarstaat. Bij een handmatige start van een wachtende sessie
+wordt diezelfde sessie veilig gecontroleerd en niet als tweede sessie gestart.
 
 De Software Factory-dispatcher is het vierde uitvoerende onderdeel, maar geen intelligent proces. Hij
 gebruikt geen agents en neemt geen productbesluiten.
@@ -109,6 +114,16 @@ gebruikt geen agents en neemt geen productbesluiten.
 Het Agentgeheugen is een ondersteunende module en geen vijfde proces. Iedere agentrol leest bij een
 taak uitsluitend haar eigen actuele geheugen. De Stakeholder kan alle rolgeheugens via de UI
 bekijken en corrigeren.
+
+AI-uitvoering is eveneens een ondersteunende module. Zij kent geen agentrollen of productobjecten,
+maar alleen complete taken met een expliciete provider en model. Iedere taak staat eerst duurzaam in
+een databasequeue. De laptopworker haalt via HTTPS werk op en meldt heartbeat, veilige voortgang en
+het eindresultaat terug.
+
+Welke provider en welk model een bepaald soort agentjob gebruikt, staat in de algemene instellingen
+in de database. Een proces leest die configuratie vóór het queueën. De gekozen waarden en
+configuratieversie worden op de taak bevroren, zodat een latere instellingenwijziging geen lopende
+taak verandert.
 
 Naast een processessie mogen modules snelle publieke commands en read-only queries aanbieden. Een
 command zoals `requestEpicVerification(...)` start geen agent: het bewaart alleen werk in de queue
@@ -148,6 +163,11 @@ kiest, wordt die versie bevroren en niet meer aangepast.
 Interne analyses, bronnen, concepten en agentuitvoer blijven binnen Productontwerp. Welke interne
 werkwijze de module gebruikt, is niet zichtbaar voor de andere modules.
 
+Wanneer Productontwerp AI nodig heeft, verzamelt het zelf de complete taakinput en alleen het
+geheugen van de uit te voeren eigen rol. Algemene instellingen leveren provider en model.
+AI-uitvoering bewaart en distribueert die opaque taak; het begrijpt niet dat de taak over een epic
+gaat.
+
 ## Productplanning als black box
 
 **Doel:** epics en herstelverzoeken omzetten in volledige stories en alle open stories in één
@@ -182,6 +202,10 @@ ontbreken, is de run een geldige no-op.
 Alleen Productplanning schrijft stories, story-inhoud, status en volgorde. De dispatcher meldt
 leveringsgebeurtenissen via publieke planningcommands en verandert de story niet rechtstreeks.
 
+Eventuele Planner-taken volgen dezelfde generieke AI-queue. AI-uitvoering kent geen Planner of
+story, en Productplanning hervat haar wachtende processessie pas nadat het taakresultaat beschikbaar
+is.
+
 ## Kwaliteitsbewaking als black box
 
 **Doel:** de werkende applicatie onderzoeken, opleveringen controleren en aantonen of een complete
@@ -214,6 +238,10 @@ eigen `QualityWorkItem`-queue. Een queuecommand start nooit onmiddellijk een tes
 
 Kwaliteitsbewaking maakt geen stories en wijzigt geen epic. Zij publiceert bewijs en vraagt de
 eigenaar via een betekenisvol command om de geldige vervolgactie.
+
+De Tester zet iedere benodigde agenttaak als complete `AiTask` in de generieke AI-queue. Dat is een
+andere queue dan `QualityWorkItem`: een qualityworkitem zegt wat Kwaliteitsbewaking moet onderzoeken;
+een AI-taak is alleen de technische uitvoering van één stap binnen die processessie.
 
 ## Software Factory-dispatcher als black box
 
@@ -306,24 +334,34 @@ betekenisvolle commands. Niemand schrijft rechtstreeks in de tabellen van een an
 De frontend maakt dezelfde databasegegevens begrijpelijk voor mensen.
 
 Agentgeheugen staat eveneens in de database, maar is context voor één agentrol en geen alternatieve
-productwaarheid. Iedere agentrun legt vast welke exacte geheugenversies zij heeft gelezen. De
-Stakeholder kan actuele items via de UI toevoegen, vervangen en intrekken en kan met een peildatum
+productwaarheid. Iedere processessie legt vast welke exacte geheugenversies haar taken hebben
+gebruikt. De Stakeholder kan actuele items via de UI toevoegen, vervangen en intrekken en kan met een peildatum
 zien wat een rol vroeger onthield.
+
+Ook algemene `AiJobConfiguration`s, `AiTask`s, attempts en resultaten staan in de database. De
+laptopworker leest nooit rechtstreeks uit die database: hij claimt taken via de publieke worker-API.
+De worker draait niet in een `product-factory-workspace`; iedere taak bevat zelf alle benodigde data
+en gebruikt een tijdelijke werkdirectory.
 
 De publieke productrepository blijft wel de waarheid over de huidige code, tests en
 productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen de Git-URL uit de
 `ProductAssignment` tijdens een sessie read-only uitchecken. Zij committen of pushen niets.
 
-## Zeven hoofdregels
+## Negen hoofdregels
 
 1. De Stakeholder is de klant en diens expliciete richting is leidend.
 2. Productontwerp maakt complete epics met UX, maar geen stories.
 3. Productplanning maakt en ordent alle stories; de backlog is alleen een query op open stories.
 4. Kwaliteitsbewaking levert bewijs en bugs, maar maakt geen stories en wijzigt geen epics.
-5. Alleen `runProcessSession()` mag agents starten; requests zetten alleen duurzaam queuewerk klaar.
+5. Alleen `runProcessSession()` mag voor een intelligent proces AI-taken aanvragen; de laptopworker
+   voert uitsluitend bestaande queuetaken uit.
 6. Iedere entiteit heeft één eigenaar en andere modules wijzigen haar alleen via publieke commands.
 7. Iedere agentrol leest uitsluitend haar eigen actuele, versieerbare geheugen; de Stakeholder mag
    dat geheugen via de UI corrigeren.
+8. AI-uitvoering kent geen rollen of productbetekenis en krijgt altijd een complete taak met
+   bevroren provider en model.
+9. Gemiste worker-heartbeats leiden eerst tot een hersteltermijn; retries zijn met leases en fencing
+   beschermd tegen oude workers.
 
 ## Detaildocumenten
 
@@ -332,6 +370,7 @@ productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Frontend](frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)

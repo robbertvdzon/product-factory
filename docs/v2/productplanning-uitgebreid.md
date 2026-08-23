@@ -18,7 +18,6 @@ Naast de publieke module-entiteiten kan de uitgebreide implementatie gebruiken:
 - `StoryCoverageMap` — relatie tussen epicscope, succescriteria en conceptstories;
 - `StoryCandidateSet` en `PriorityAssessment` — vergelijking van bestaand en nieuw werk;
 - `StoryOrderDraft` — voorgestelde productbrede `TODO`-volgorde;
-- `AgentRun` — input, promptversie, output en fout van één agenttaak.
 
 Deze objecten steken de modulegrens niet over. Alleen `Story`, `PlanningWorkItem`, `ProcessSession`
 en de vaste transportcontracten zijn voor andere onderdelen zichtbaar.
@@ -34,10 +33,15 @@ Een inhoudelijke run kan vier vaste agentrollen gebruiken:
    `sequenceNumber`s.
 4. **Planningscriticus** — controleert dekking, storygrootte, afhankelijkheden, UX en prioriteitsreden.
 
-Alleen `runProcessSession()` mag deze agents starten. Niet iedere run hoeft alle rollen te gebruiken:
-een zuivere herprioritering kan bijvoorbeeld zonder Storymaker.
+Alleen `runProcessSession()` mag voor deze rollen AI-taken aanvragen. Niet iedere run hoeft alle
+rollen te gebruiken: een zuivere herprioritering kan bijvoorbeeld zonder Storymaker.
 
-Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. De runtime
+Voor iedere taak leest Productplanning de betreffende `AiJobConfiguration` en geeft zij de complete
+opaque taak met bevroren provider en model aan [AI-uitvoering](ai-uitvoering.md). AI-uitvoering kent
+de planningsrollen niet. De processessie bewaart de taak-ID's, keert met `WAITING_FOR_AI` terug en
+wordt later hervat.
+
+Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. De procesruntime
 leidt de vaste `AgentRoleKey` uit vertrouwde configuratie af en geeft een agent alleen actuele items
 van die rol. De Epicplanner leest dus niet het geheugen van de Storymaker, Backlogplanner of
 Planningscriticus. Rollen delen werk alleen via expliciete concepten en handoffs binnen de sessie.
@@ -65,8 +69,9 @@ claim PENDING workitems, beschikbare epics en inputversies
 ```
 
 De run verwerkt de bij de start geclaimde batch als één consistente momentopname. Onafhankelijke
-epics, bugs en storydelen mogen parallel worden voorbereid. Epicclaims, definitieve kritiek,
-publicatie en globale ordening zijn sequentieel en atomair.
+epics, bugs en storydelen mogen via meerdere queuetaken parallel worden voorbereid. Iedere golf
+eindigt tijdelijk als `WAITING_FOR_AI`; een volgende run hervat de sessie. Epicclaims, definitieve
+kritiek, publicatie en globale ordening zijn sequentieel en atomair.
 
 ### Stap 1 — claimen en beoordelen
 
@@ -177,4 +182,5 @@ Een uitgebreide planningsrun is klaar wanneer:
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Productontwerp-API](productontwerp.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

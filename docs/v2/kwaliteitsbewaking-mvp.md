@@ -60,9 +60,13 @@ Screenshots, logs, traces en andere bewijsassets worden met veilige metadata aan
 of verificatie gekoppeld. Zij vormen geen afzonderlijk publiek productobject.
 
 Het permanente geheugen van de rol `TESTER_MVP` staat in
-[Agentgeheugen](agentgeheugen.md). De runtime voegt alleen de actuele items van deze rol aan de
+[Agentgeheugen](agentgeheugen.md). De procesruntime voegt alleen de actuele items van deze rol aan de
 agenttaak toe en registreert de exact gelezen geheugenversies. De Tester kan geen geheugen van een
 andere rol opvragen.
+
+Voor de Tester-job leest de procesruntime provider en model uit Algemene instellingen en vraagt zij een
+complete taak aan bij [AI-uitvoering](ai-uitvoering.md). De processessie wacht duurzaam met
+`WAITING_FOR_AI`; een volgende run verwerkt het resultaat zonder een dubbele taak te maken.
 
 ## Verloop van één processessie
 
@@ -73,7 +77,10 @@ claim run en PENDING QualityWorkItems
 lees exacte doelen, omgeving en productversie
                   │
                   ▼
-één Tester voert opdrachten sequentieel uit
+queue één complete Tester-AiTask
+                  │
+                  ▼
+WAITING_FOR_AI · latere run hervat
                   │
                   ▼
 reproduceren, classificeren en conceptresultaten maken
@@ -179,7 +186,8 @@ De publieke eisen aan bewijs, verificaties, bugs en epicoordelen blijven ongewij
 - Een technische toolfout wordt geen productbevinding.
 - Een verlopen claim kan met dezelfde inputmomentopname worden hervat.
 - Een gewijzigde doel- of omgevingsversie blokkeert publicatie en wacht op een volgende run.
-- Een technisch mislukte modelaanroep mag idempotent met dezelfde input worden herhaald.
+- Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt
+  van AI-uitvoering.
 - Een inhoudelijk ongeldig concept wordt niet gepubliceerd; er start geen tweede critic-agent.
 - Reeds geldige resultaten uit een batch kunnen worden gepubliceerd wanneer een ander workitem
   aantoonbaar geïsoleerd faalt.
@@ -205,4 +213,5 @@ bepalen welke uitgebreide rol als eerste nodig is.
 - [Productplanning-API](productplanning.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

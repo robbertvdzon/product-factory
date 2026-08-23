@@ -58,12 +58,13 @@ Ieder overleg heeft:
 - de notulenagent die de afronding controleert;
 - alleen de procesrollen die voor het onderwerp nodig zijn.
 
-Een overleg hoeft niet te wachten op een actieve processessie. Agents worden alleen gestart binnen
-de daarvoor bedoelde overlegafhandeling; het overleg start nooit stilletjes agents in een van de
-drie productprocessen.
+Een overleg hoeft niet te wachten op een actieve processessie. De daarvoor bedoelde
+overlegafhandeling mag complete taken bij AI-uitvoering aanvragen; het overleg start nooit
+stilletjes agents in een van de drie productprocessen. Ook overlegtaaktypes gebruiken provider en
+model uit de algemene `AiJobConfiguration` en bewaren die configuratieversie op de taak.
 
 De gespreksagent, notulenagent en iedere deelnemende procesrol hebben elk een eigen stabiele
-`AgentRoleKey`. Voor iedere agenttaak voegt de runtime alleen het actuele geheugen van die exacte
+`AgentRoleKey`. Voor iedere agenttaak voegt de overlegruntime alleen het actuele geheugen van die exacte
 rol toe en legt zij de gelezen versie-ID's vast. Ook in een overleg kunnen agents dus nooit het
 geheugen van een andere rol lezen. Informatie die zij tijdens het gesprek moeten delen, staat in de
 expliciete meetingcontext en niet in gedeeld permanent geheugen.
@@ -109,3 +110,4 @@ andere normale processtap is geen besluit.
 - [Besluitenregister](besluitenregister.md)
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)

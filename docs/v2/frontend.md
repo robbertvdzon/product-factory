@@ -55,6 +55,20 @@ Vervangen overschrijft de oude inhoud niet en intrekken verwijdert geen historie
 de verwachte actuele versie, zodat een gelijktijdige wijziging als conflict zichtbaar wordt. De
 frontend schrijft nooit rechtstreeks in de geheugentabellen.
 
+## Algemene AI-instellingen
+
+Het scherm **Algemene instellingen** bevat een tabel met alle geregistreerde `AiJobKey`s. Per job
+kan een bevoegde Stakeholder of beheerder kiezen:
+
+- provider `CODEX`, `CLAUDE` of, buiten productie, `MOCKED`;
+- het model of mockprofiel;
+- of de job momenteel ingeschakeld is.
+
+De UI toont ook de configuratieversie en laatste wijziging. Een wijziging geldt alleen voor nieuwe
+AI-taken. Een gequeue'de of lopende taak blijft zichtbaar met de provider, het model en de
+configuratieversie waarmee zij is aangemaakt. Productie weigert `MOCKED` zowel bij opslaan als bij
+taakaanvraag.
+
 ## Inbox
 
 De Inbox toont `UserSignal`s. Per signaal zijn zichtbaar:
@@ -111,7 +125,7 @@ Snelle acties mogen ook rechtstreeks het juiste command aanbieden, bijvoorbeeld:
 - een grote blijvende keuze via een overleg als besluit vastleggen;
 - een urgente epic laten herprioriteren;
 - een beschikbare epic intrekken of een actieve epic annuleren;
-- een processessie handmatig starten.
+- een processessie handmatig starten;
 - geheugen van een gekozen agentrol toevoegen, vervangen of intrekken.
 
 Een handmatige `runProcessSession()` geeft een duidelijke fout als in die module al een run actief
@@ -123,6 +137,9 @@ Technische gebruikers kunnen apart zien:
 
 - de eigen `ProcessSession`s van iedere intelligente module;
 - `PlanningWorkItem`s en `QualityWorkItem`s met status en fout;
+- `AiTask`s met aanvrager, provider, model, configuratieversie, status en attemptnummer;
+- veilige AI-voortgang, laatste heartbeat, lease, hersteltermijn en retryreden;
+- laptop- en mockworkers met capabilities, capaciteit en laatste aanwezigheid;
 - `DeliveryAttempt`s en externe Software Factory-referenties;
 - overgeslagen schedulerbotsingen en idempotente retries.
 
@@ -135,3 +152,4 @@ van een epic, story, bug of verificatie.
 - [Processen en entiteiten](processen-en-entiteiten.md)
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)

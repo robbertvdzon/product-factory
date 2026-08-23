@@ -46,7 +46,6 @@ Naast `Epic` en `ProcessSession` kan de uitgebreide implementatie deze interne o
 - `UxDesign` — gebruikersroutes, toestanden, ontwerpassets en open vragen;
 - `TechnicalExploration` — haalbaarheid, afhankelijkheden en risico's;
 - `EpicReadinessAssessment` — controle of een epic overdraagbaar en behapbaar is;
-- `AgentRun` — input, promptversie, output, fout en verbruik van één agenttaak.
 
 Deze objecten steken de modulegrens niet over. Alleen een complete `Epic` is inhoudelijke output.
 Een uitzonderlijk grote, blijvende Factorykeuze kan daarnaast via de publieke API van het
@@ -67,10 +66,15 @@ Een volledige processessie kan zeven vaste agentrollen gebruiken:
 
 Niet iedere sessie start alle rollen. Een kleine herziening van een beschikbare epic kan volstaan
 met de leider, UX-ontwerper, technisch verkenner en criticus. Een nieuwe productrichting kan alle
-rollen gebruiken. Alleen `runProcessSession()` mag deze agents starten.
+rollen gebruiken. Alleen `runProcessSession()` mag voor deze rollen AI-taken aanvragen.
+
+Technisch betekent starten: provider en model voor de betreffende `AiJobKey` uit Algemene
+instellingen lezen en een complete taak bij [AI-uitvoering](ai-uitvoering.md) aanvragen. AI-uitvoering
+kent de rol en productbetekenis niet. De processessie bewaart taak-ID's, keert met
+`WAITING_FOR_AI` terug en wordt door een volgende run hervat.
 
 Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. Vóór een
-agenttaak leidt de runtime de vaste `AgentRoleKey` uit vertrouwde configuratie af en voegt zij alleen
+agenttaak leidt de procesruntime de vaste `AgentRoleKey` uit vertrouwde configuratie af en voegt zij alleen
 de actuele items van die rol toe. De Productontwerpleider kan dus niet het geheugen van de
 UX-ontwerper lezen, en omgekeerd. Samenwerking verloopt via de expliciete sessie-input en
 agenthandoffs, niet via gedeeld geheugen.
@@ -121,10 +125,11 @@ Productontwerpleider kiest hoofdtaak
        publiceer exacte versie
 ```
 
-De drie onderzoeksagents werken parallel op dezelfde vastgezette inputmomentopname. UX en techniek
-werken daarna parallel zodra probleem, doelgroep en gewenste uitkomst voldoende stabiel zijn. De
-Epiccriticus werkt sequentieel na de synthese. Bij herstelbare tekortkomingen is één gerichte
-herstelronde toegestaan.
+De drie onderzoeksagents werken parallel via afzonderlijke queuetaken met dezelfde vastgezette
+inputmomentopname. UX en techniek werken daarna parallel zodra probleem, doelgroep en gewenste
+uitkomst voldoende stabiel zijn. De Epiccriticus werkt sequentieel na de synthese. Iedere golf laat
+de processessie duurzaam wachten en wordt door een latere run hervat. Bij herstelbare
+tekortkomingen is één gerichte hersteltaak toegestaan.
 
 ### Stap 1 — claimen en agenda kiezen
 
@@ -224,4 +229,5 @@ Een uitgebreide sessie is klaar wanneer:
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

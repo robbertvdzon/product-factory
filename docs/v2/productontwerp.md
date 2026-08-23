@@ -33,12 +33,14 @@ void runProcessSession();
 
 De scheduler of een bevoegde handmatige UI-/REST-actie kan deze functie starten. De aanroep heeft
 geen product-ID of epic-ID als argument: de module bepaalt zelf voor welk product er zinvol werk is.
-Er kan modulebreed maximaal één processessie tegelijk actief zijn. Een tweede handmatige aanroep
-krijgt een `ProcessAlreadyRunning`-fout, bij REST bijvoorbeeld HTTP 409. Een botsende schedulerrun
-wordt als overgeslagen geregistreerd. Zonder zinvol werk eindigt de functie als succesvolle no-op.
+Er kan modulebreed maximaal één uitvoering van de procesfunctie tegelijk lopen. Een tweede
+handmatige aanroep krijgt een `ProcessAlreadyRunning`-fout, bij REST bijvoorbeeld HTTP 409. Een
+botsende schedulerrun wordt als overgeslagen geregistreerd. Zonder zinvol werk eindigt de functie
+als succesvolle no-op.
 
-Alleen `runProcessSession()` mag AI-agents voor Productontwerp starten. Welke en hoeveel agents een
-sessie gebruikt, is een implementatiedetail.
+Alleen `runProcessSession()` mag voor Productontwerp nieuwe taken bij
+[AI-uitvoering](ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
+implementatiedetail. De laptopworker voert ze later asynchroon uit en kent Productontwerp niet.
 
 Daarnaast heeft de module deze deterministische command- en query-interface:
 
@@ -76,9 +78,15 @@ domeinovergang uit. Productontwerp schrijft uitsluitend zijn eigen tabellen.
 | `QualitySnapshotDetails` | Kwaliteitsbewaking-query | huidig kwaliteitsbeeld en historische ontwikkeling van dekking, bugs, risico's en verificaties |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, testaccounts en toegangsgrenzen |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
+| `AiJobConfigurationDetails` | Algemene instellingen | actuele provider en model voor het soort agenttaak; deze waarden worden op iedere nieuwe taak bevroren |
+| `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
 
 Voor iedere gebruikte publicatie legt de module bron-ID en bronversie vast. Dezelfde versie wordt
 niet tweemaal als nieuwe input behandeld.
+
+Een processessie die op AI wacht, bewaart haar taak-ID's en status `WAITING_FOR_AI` en geeft de
+aanroep terug. Een volgende geplande of handmatige `runProcessSession()` hervat dezelfde sessie. Als
+de resultaten nog ontbreken, blijft zij zonder nieuwe taken aan te maken wachten.
 
 Bij een inhoudelijke sessie mag Productontwerp de publieke Git-URL uit de productopdracht uitchecken
 en broncode, tests en documentatie read-only bekijken. Productontwerp commit en pusht nooit. De
@@ -98,7 +106,7 @@ productmodule en krijgt nooit directe schrijftoegang tot het signaal.
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
 | `EpicDetails` | read-only weergave van één complete gebruikersverbetering | versie, status, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's, afhankelijkheden en bron-signaal-ID's |
-| `ProcessSession` | opgeslagen operationele historie van de sessie | sessie-ID, eventueel product-ID, gebruikte inputversies, publicatie-ID's, eindstatus en blokkade |
+| `ProcessSession` | opgeslagen operationele historie van de sessie | sessie-ID, eventueel product-ID, gebruikte inputversies, AI-taak-ID's, publicatie-ID's, wacht- of eindstatus en blokkade |
 
 De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Interne analyses,
 concepten en agentuitvoer steken de modulegrens niet over. Permanent leren loopt uitsluitend via
@@ -216,16 +224,18 @@ De toestand van de backlog is geen startsein. Als er niets zinvols te doen is, i
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
-- alleen `runProcessSession()` Productontwerp-agents start;
-- maximaal één processessie tegelijk actief is;
+- alleen `runProcessSession()` voor Productontwerp nieuwe AI-taken aanvraagt;
+- maximaal één uitvoering tegelijk loopt; een wachtende logische sessie houdt geen lock vast;
 - iedere gepubliceerde epic aan het volledige Epiccontract voldoet;
 - iedere epic zelfstandig door Productplanning kan worden begrepen;
 - geen stories in Productontwerp worden gemaakt;
 - een gekozen epicversie nooit inhoudelijk verandert;
 - alle modulegrenscommunicatie via publieke queries en commands loopt;
-- de runtime de agentrol uit vertrouwde configuratie afleidt en iedere agent alleen het actuele
+- de eigen procesruntime de agentrol uit vertrouwde configuratie afleidt en iedere agent alleen het actuele
   geheugen van die eigen rol geeft;
 - iedere agenttaak vastlegt welke exacte geheugenversies zij heeft gelezen;
+- iedere AI-taak via AI-uitvoering loopt en een vaste provider, model en configuratieversie bevat;
+- een wachtende processessie idempotent kan hervatten;
 - output atomair en geversioneerd beschikbaar komt;
 - de operationele sessiestatus wordt opgeslagen.
 
@@ -234,5 +244,6 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Overzicht](overzicht.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

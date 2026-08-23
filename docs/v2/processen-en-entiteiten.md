@@ -14,19 +14,25 @@ actor.
 ## Ontwerpregels
 
 - Iedere duurzame entiteit heeft precies één schrijvende module.
-- Iedere intelligente procesmodule heeft `runProcessSession()` als enige functie die agents start.
+- Iedere intelligente procesmodule heeft `runProcessSession()` als enige functie die voor dat
+  proces nieuwe AI-taken mag aanvragen.
 - Scheduler en bevoegde UI/REST-bediening mogen een run starten; per procesmodule draait maximaal
   één run tegelijk. Een botsende handmatige aanroep krijgt een fout en een schedulerbotsing wordt
   overgeslagen en geregistreerd.
 - Een procesmodule mag daarnaast snelle, deterministische commands en read-only queries aanbieden.
 - Een queuecommand start geen agents; het voegt alleen idempotent een werkitem bij de ontvangende
   module toe. Alleen een latere `runProcessSession()` claimt dat werk.
+- Een AI-taak is een andere queuegrens: een processessie zet een complete taak bij AI-uitvoering
+  klaar, krijgt `WAITING_FOR_AI` en wordt door een volgende run hervat.
 - Een domeincommand benoemt een geldige overgang; algemene setters zijn niet toegestaan.
 - De eigenaar controleert bevoegdheid, bronversie, huidige status en idempotentie.
 - Modules krijgen nooit elkaars repository of interne JPA-entiteit.
 - De frontend gebruikt dezelfde publieke API's en krijgt geen repositorytoegang.
-- De runtime geeft iedere agent uitsluitend het actuele geheugen van haar vertrouwde eigen rol.
+- De aanvragende procesruntime geeft iedere agent uitsluitend het actuele geheugen van haar
+  vertrouwde eigen rol.
   Agentgeheugen is append-only versieerbaar en geen vervanging voor publieke productwaarheid.
+- AI-uitvoering kent geen rollen of productentiteiten. De aanvrager levert opaque taakdata en een
+  reeds gekozen provider en model.
 
 ## De vier uitvoerende onderdelen
 
@@ -49,6 +55,8 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 | Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `linkBugfixStory` | `getBug`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems` |
 | Besluitenregister | `createDecision`, `reviseDecision`, `withdrawDecision`, `supersedeDecisions` | `getDecisions(productId, validAt?)`, `getDecisionArchive(productId)` |
 | Agentgeheugen | `addAgentMemory`, `replaceAgentMemory`, `retractAgentMemory` | `getActiveMemory(context)`, `getMemoryAt(productId, role, validAt)`, `getMemoryHistory(productId, role, itemId)` |
+| Algemene instellingen | `updateAiJobConfiguration` | `getAiJobConfiguration(jobKey)`, `getAiJobConfigurations()` |
+| AI-uitvoering | `requestAiTask`, `cancelAiTask`; aparte workercommands voor claim, heartbeat, progress, complete en fail | `getAiTask`, `getAiTaskResult`, `findAiTasks` |
 
 Een command mag ID's, verwachte versies, bron, actor en idempotentiesleutel aannemen, maar geen
 vrije velden waarmee de aanroeper de state machine kan omzeilen.
@@ -118,7 +126,12 @@ nooit rechtstreeks in de tabel.
 | `AgentMemoryItem` | Agentgeheugen | uitsluitend de eigen agentrol of de Stakeholder; product en rol worden door vertrouwde code bepaald | alleen de eigen agentrol; Stakeholder en frontend ook voor beheer | stabiele herinneringslijn per product en agentrol; actuele versie of ingetrokken |
 | `AgentMemoryVersion` | Agentgeheugen binnen één `AgentMemoryItem` | via add- of replacecommand; na opslag onveranderlijk | eigen agentrol ziet alleen actueel; Stakeholder en frontend zien ook historie | append-only titel en inhoud met voorganger, actor, reden en geldigheidsperiode |
 | `AgentMemoryRetraction` | Agentgeheugen binnen één `AgentMemoryItem` | eigen agentrol of Stakeholder via retractcommand | Stakeholder, frontend en audit | append-only tombstone die een geheugenlijn vanaf dat moment intrekt |
-| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde uitvoering, inputversies, publicaties, eindstatus en blokkade |
+| `AiJobConfiguration` | Algemene instellingen | bevoegde Stakeholder of beheerder | procesmodules en frontend | stabiele jobkey met actuele provider `MOCKED`, `CODEX` of `CLAUDE`, model en configuratieversie |
+| `AiTask` | AI-uitvoering | een intelligente processessie of bevoegde overlegafhandeling vraagt idempotent een taak aan | aanvragende module, operations en frontend | complete opaque AI-opdracht met bevroren provider/model en status `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` of `CANCELLED` |
+| `AiTaskAttempt` | AI-uitvoering | bevoegde worker claimt en meldt heartbeat, progress, afronding of fout via commands | AI-uitvoering, operations en frontend | één uitvoeringspoging met worker, lease, hersteltermijn en fencing token |
+| `AiTaskResult` | AI-uitvoering | bevoegde worker mag met het actuele fencing token één resultaat aanbieden | alleen aanvragende module, operations en frontend | onveranderlijk technisch gevalideerd resultaat; de procesmodule valideert de productbetekenis |
+| `AiWorkerSession` | AI-uitvoering | worker opent en reconcileert zijn sessie | operations en frontend | worker-ID, bootsessie, provider-capabilities, capaciteit en laatste heartbeat; geen agentrollen |
+| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde uitvoering, inputversies, AI-taak-ID's, publicaties, status inclusief `WAITING_FOR_AI` en blokkade |
 | `DeliveryAttempt` | dispatcher binnen Productplanning | dispatcher via interne service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
 Interne analyses, concepten en agentuitvoer steken de modulegrens niet over. Permanent rolgeheugen
@@ -148,6 +161,9 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `DecisionHistoryDto` | Besluitenregister uit `Decision` plus alle `DecisionDetails` | uitsluitend frontend en audit | actieve, ingetrokken en vervangen besluiten, alle versies, reden en opvolgingsrelatie |
 | `AgentMemoryItemDetails` | Agentgeheugen uit de actuele versie | uitsluitend de bijbehorende agentrol; Stakeholder en frontend ook voor beheer | actueel geheugenitem met exacte versie, titel, inhoud, actor en reden |
 | `AgentMemoryVersionDetails` | Agentgeheugen uit de volledige versielijn | uitsluitend Stakeholder, frontend en audit | versie, status `ACTIVE`, `SUPERSEDED` of `RETRACTED`, geldigheid, actor en reden |
+| `AiJobConfigurationDetails` | Algemene instellingen | procesmodules en frontend | actuele provider, model en versie voor één opaque jobkey |
+| `AiTaskDetails` | AI-uitvoering uit `AiTask` en actuele attempt | aanvragende module, operations en frontend | taakstatus, provider/model-snapshot, attempt, lease, veilige voortgang en fout |
+| `AiTaskResultDetails` | AI-uitvoering uit `AiTaskResult` | uitsluitend de aanvragende module; operations binnen privacygrenzen | technisch gevalideerde opaque output en artifactreferenties |
 | `ProcessSessionDetails` | betreffende procesmodule | operations en frontend | operationele sessiestatus en historie |
 | `SoftwareFactoryWork` | externe adapter | dispatcher | tijdelijk extern integratieantwoord |
 | `StoryDeliveryPackage` | dispatcher uit één `StoryDetails` | Software Factory | volledige, onveranderlijke story met UX, assets, hashes en idempotentiesleutel |
@@ -178,7 +194,7 @@ nodig. Meerdere epics mogen tegelijk actief zijn en hun `TODO`-stories mogen pro
 worden geordend. Een Stakeholder kan een andere epic handmatig voorrang geven; een `IN_PROGRESS`
 story loopt normaal door.
 
-De twee procesqueues zijn wel duurzame entiteiten:
+De twee domeinprocesqueues zijn wel duurzame entiteiten:
 
 - `PlanningWorkItem` vertelt Productplanning welk gericht herstel-, prioriteits- of herplanwerk een
   latere run moet doen; gewone beschikbare epics ontdekt de planner zelf;
@@ -186,6 +202,11 @@ De twee procesqueues zijn wel duurzame entiteiten:
 
 Een queuecommand retourneert zodra het idempotente record is opgeslagen. Het start geen agents.
 Iedere run claimt een stabiele batch; nieuw werk wacht tot de volgende run.
+
+Daarnaast bestaat de generieke `AiTask`-queue. Een procesrun zet daar alleen complete technische
+agenttaken in. Een laptop- of mockworker claimt taken via HTTPS, niet via directe databasetoegang.
+Gemiste heartbeats maken een attempt eerst `SUSPECTED`; pas na de hersteltermijn wordt zij verlaten
+en kan de taak met een nieuw fencing token opnieuw worden aangeboden.
 
 Dispatchfouten blijven intern bij de dispatcher. Tijdelijke transportfouten krijgen een
 `DeliveryAttempt`, idempotentiecontrole en retry met backoff. Configuratie- of autorisatiefouten
@@ -225,6 +246,9 @@ historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar word
 - Queue-inserts en commandketens over modules zijn idempotent en herstelbaar; ze doen niet alsof één
   transactie meerdere module-aggregates bezit.
 - Een unieke actieve-run-constraint per procesmodule voorkomt gelijktijdige agentsessies.
+- Een wachtende processessie houdt geen thread of lock vast; een volgende run hervat dezelfde sessie
+  via haar `AiTask`-resultaten.
+- AI-uitvoering bewaakt leases, fencing en maximaal één geaccepteerd resultaat per taak.
 - Tekst, Markdown, JSON en SVG blijven tekst in `StoryDeliveryPackage`; binaire assets krijgen
   begrensde attachments met MIME-type, grootte en hash en mogen alleen voor transport Base64 zijn.
 
@@ -235,6 +259,7 @@ historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar word
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Frontend](frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — MVP](productontwerp-mvp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)

@@ -40,10 +40,11 @@ void runProcessSession();
 ```
 
 De scheduler of een bevoegde handmatige UI-/REST-actie kan deze functie starten. Er kan modulebreed
-maximaal één planningssessie tegelijk actief zijn. Een tweede handmatige aanroep krijgt een
+maximaal één uitvoering tegelijk lopen. Een tweede handmatige aanroep krijgt een
 `ProcessAlreadyRunning`-fout, bij REST bijvoorbeeld HTTP 409. Een botsende geplande aanroep wordt
-als overgeslagen geregistreerd. Alleen `runProcessSession()` mag planningsagents starten; hoeveel
-agents dat zijn is een implementatiedetail.
+als overgeslagen geregistreerd. Alleen `runProcessSession()` mag voor Productplanning nieuwe taken
+bij [AI-uitvoering](ai-uitvoering.md) aanvragen; hoeveel taken dat zijn is een
+implementatiedetail.
 
 Een run claimt atomair een vaste momentopname van de op dat moment `PENDING`
 `PlanningWorkItem`s en leest de op dat moment `AVAILABLE` epics. Nieuwe verzoeken en epics blijven
@@ -110,6 +111,12 @@ Productplanning gebruikt alleen publieke Spring Modulith-API's. Read-only DTO's 
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor ontbrekend gedrag binnen een bevroren epic |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, accounts en toegangsgrenzen |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
+| `AiJobConfigurationDetails` | Algemene instellingen | actuele provider en model voor het soort planningsjob; bevroren op iedere nieuwe taak |
+| `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
+
+Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug zonder thread of lock
+vast te houden. Een volgende run hervat dezelfde sessie. Ontbreken de resultaten nog, dan maakt zij
+geen duplicaten en blijft zij wachten.
 
 Tijdens een inhoudelijke sessie mag Productplanning de publieke Git-URL uitchecken en broncode,
 tests en documentatie read-only bekijken. Zij commit en pusht nooit. De bekeken commit-SHA kan als
@@ -128,7 +135,7 @@ kwaliteitsoordeel.
 | `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, status en externe referentie |
 | backlogquery | alle uitvoerbare of reeds verzonden stories in volgorde | `StoryDetails` met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | read-only inzicht in de planningsqueue | type, bron, status, claim, resultaat en fout |
-| `ProcessSession` | opgeslagen operationele historie van de intelligente run | geclaimde workitems, inputversies, publicaties, eindstatus en blokkade |
+| `ProcessSession` | opgeslagen operationele historie van de intelligente run | geclaimde workitems, inputversies, AI-taak-ID's, publicaties, wacht- of eindstatus en blokkade |
 | `QualityWorkItem` bij Kwaliteitsbewaking | downstream effect van een verificatiecommand; Kwaliteitsbewaking maakt en bezit dit object | type, exact doel-ID en -versie, bron, prioriteit en idempotentiesleutel |
 
 Operations en frontend lezen de sessie via `ProcessSessionDetails`. Interne analyses, concepten en
@@ -248,15 +255,16 @@ planningsagent.
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
-- alleen `runProcessSession()` planningsagents start;
-- maximaal één intelligente planningsrun tegelijk actief is;
+- alleen `runProcessSession()` voor Productplanning nieuwe AI-taken aanvraagt;
+- maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
 - ieder geclaimd workitem eindigt als `DONE`, `BLOCKED` of `FAILED`;
 - een epic volledig wordt afgedekt door zelfstandig uitvoerbare stories;
 - iedere story het volledige Storycontract volgt;
 - epic- en bugbronversies exact vastliggen;
 - `sequenceNumber`s productbreed consistent en uniek zijn;
-- de runtime iedere agent alleen het actuele geheugen van haar vertrouwd geconfigureerde eigen rol
+- de eigen procesruntime iedere agent alleen het actuele geheugen van haar vertrouwd geconfigureerde eigen rol
   geeft en de exact gelezen geheugenversies vastlegt;
+- iedere AI-taak een vaste provider, model en configuratieversie heeft en via AI-uitvoering loopt;
 - publicatie en definitieve ordening atomair gebeuren;
 - de dispatcher via de beschreven commands kan leveren zonder interne planningskennis.
 
@@ -268,4 +276,5 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - [Productontwerp-API](productontwerp.md)
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

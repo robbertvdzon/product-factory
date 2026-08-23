@@ -59,9 +59,14 @@ processessie worden gekoppeld volgens het geldende privacy- en bewaarbeleid. Zij
 productentiteiten en worden niet als zelfstandig productgeheugen gebruikt.
 
 Het permanente geheugen van de rol `PRODUCT_DESIGNER_MVP` staat niet in Productontwerp, maar in de
-gedeelde module [Agentgeheugen](agentgeheugen.md). De runtime voegt vóór de agenttaak alleen de
+gedeelde module [Agentgeheugen](agentgeheugen.md). De procesruntime voegt vóór de agenttaak alleen de
 actuele items van deze rol toe en registreert de exact gelezen geheugenversies. De agent kan geen
 andere rolnaam of ander rolgeheugen kiezen.
+
+De procesruntime leest voor `PRODUCT_DESIGN.CREATE_EPIC` provider en model uit Algemene instellingen en
+vraagt daarna een complete taak aan bij [AI-uitvoering](ai-uitvoering.md). De processessie bewaart
+het taak-ID, wordt `WAITING_FOR_AI` en keert terug. Een volgende run verwerkt het resultaat; de
+laptopworker kent de Productontwerper-rol niet.
 
 ## Verloop van één processessie
 
@@ -75,7 +80,10 @@ kies één product met relevante input
 maak één vaste inputmomentopname
         │
         ▼
-één Productontwerper-agent
+queue één complete AiTask
+        │
+        ▼
+WAITING_FOR_AI · latere run hervat
         │
         ├── geen goede epic ──> gemotiveerde no-op
         │
@@ -107,16 +115,20 @@ De sessie leest één vaste momentopname van:
 - relevante stories en verificaties;
 - het huidige kwaliteitsbeeld en zo nodig de historie;
 - Git-code en documentatie wanneer die nodig zijn om de huidige situatie te begrijpen;
-- acceptatie en eventueel veilige, read-only productie-informatie.
+- acceptatie en eventueel veilige, read-only productie-informatie;
 - het actuele geheugen van de rol `PRODUCT_DESIGNER_MVP`.
 
 Alle bron-ID's, geheugenversies en de gelezen commit-SHA worden bij de processessie vastgelegd.
 
-### Stap 3 — één agent uitvoeren
+### Stap 3 — één agenttaak aanvragen en later hervatten
 
-De volledige momentopname gaat naar één Productontwerper-agent. De opdracht is niet om zoveel
-mogelijk epics te maken, maar om de belangrijkste aantoonbare en behapbare gebruikersverbetering
-volledig uit te werken.
+De volledige momentopname, inclusief eigen rolgeheugen, gekozen provider, model en responseschema,
+gaat als één opaque `AiTask` naar AI-uitvoering. De opdracht is niet om zoveel mogelijk epics te
+maken, maar om de belangrijkste aantoonbare en behapbare gebruikersverbetering volledig uit te
+werken. De huidige run publiceert nog niets en keert wachtend terug.
+
+Een volgende `runProcessSession()` leest het onveranderlijke `AiTaskResult`. Als het nog niet klaar
+is, blijft de sessie wachten zonder een tweede taak te maken.
 
 De agent retourneert volgens een vast schema:
 
@@ -139,7 +151,8 @@ Gewone code controleert minimaal:
 - product-ID, bronrelaties en geldige besluiten;
 - dat een herziene epic nog steeds `AVAILABLE` is en de verwachte versie heeft.
 
-Een technisch mislukte modelaanroep mag met dezelfde input idempotent opnieuw worden geprobeerd.
+Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
+AI-uitvoering; de procesmodule maakt daarvoor geen duplicerende taak.
 Een inhoudelijk ongeldig concept wordt niet gepubliceerd. In de MVP start daarvoor geen tweede
 critic-agent; de sessie eindigt met een zichtbare validatiefout en kan later opnieuw draaien.
 
@@ -185,4 +198,5 @@ extra agentrol wordt niet alleen toegevoegd omdat die conceptueel aantrekkelijk 
 - [Productontwerp-API](productontwerp.md)
 - [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)

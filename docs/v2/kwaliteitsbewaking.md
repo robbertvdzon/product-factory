@@ -35,9 +35,10 @@ void runProcessSession();
 ```
 
 De scheduler of een handmatige UI-/REST-actie kan deze functie starten. Er kan modulebreed maximaal
-één kwaliteitssessie tegelijk actief zijn. Een tweede handmatige aanroep krijgt een
+één uitvoering tegelijk lopen. Een tweede handmatige aanroep krijgt een
 `ProcessAlreadyRunning`-fout; een botsende geplande aanroep wordt als overgeslagen geregistreerd.
-Alleen deze functie mag testagents starten. Welke en hoeveel agents een sessie gebruikt, is een
+Alleen deze functie mag voor Kwaliteitsbewaking nieuwe taken bij
+[AI-uitvoering](ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
 implementatiedetail.
 
 Een run claimt atomair een vaste momentopname van de `PENDING` `QualityWorkItem`s die bij de start
@@ -99,11 +100,17 @@ adapters.
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
 | `QualityWorkItem` | Kwaliteitsbewaking | duurzame gerichte testopdracht die de run claimt |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
+| `AiJobConfigurationDetails` | Algemene instellingen | actuele provider en model voor het soort kwaliteitsjob; bevroren op iedere nieuwe taak |
+| `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte
 contractversies, exact gelezen geheugenversies en exacte geteste omgeving vast. Permanent leren
 loopt uitsluitend via de publieke API van [Agentgeheugen](agentgeheugen.md); een agent leest en
 wijzigt alleen geheugen van haar eigen vertrouwd geconfigureerde rol.
+
+Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug zonder thread of lock
+vast te houden. Een volgende run hervat dezelfde sessie. Zolang resultaten ontbreken, worden geen
+nieuwe duplicerende taken aangemaakt.
 
 Kwaliteitsbewaking mag de publieke Git-URL uit de productopdracht uitchecken en code, tests en
 documentatie read-only gebruiken voor testselectie, regressierisico en uitleg. Zij commit en pusht
@@ -119,7 +126,7 @@ de verificatie vast welke commit is bekeken en welke productversie werkelijk is 
 | `VerificationDetails` | read-only weergave van een story-, epic- of signaalcontrole | doeltype en -versie, uitkomst, omgeving, controles, bewijs, blokkade, ontbrekende dekking en vervolgkoppelingen |
 | `QualitySnapshotDetails` | read-only kwaliteitsbeeld en historie | tijdstip, omgeving, productversie, onderzochte gebieden, dekking, open bugs per ernst, verificatie-uitkomsten, risico's en bron-ID's |
 | `QualityWorkItemDetails` | read-only inzicht in de kwaliteitsqueue | type, doelversie, status, claim, resultaat en fout; geen wijzigbaar requestobject |
-| `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, inputversies, publicatie-ID's en eindstatus |
+| `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, inputversies, AI-taak-ID's, publicatie-ID's en wacht- of eindstatus |
 | `PlanningWorkItem` bij Productplanning | downstream effect van een gericht herstelcommand; Productplanning maakt en bezit dit object | type bugfix of epicgat, exact bron-ID en -versie, bewijsreferentie en idempotentiesleutel |
 
 Kwaliteitsbewaking schrijft `ProcessSession` uitsluitend voor zijn eigen sessies. De
@@ -295,7 +302,7 @@ Gericht werk wordt gequeue'd door:
 
 Daarnaast kan de scheduler een run starten voor dagelijkse kernroutes, een verouderd kwaliteitsbeeld
 of een periodieke kwaliteitscontrole. Een queuecommand is een snelle databasebewerking; alleen de latere
-`runProcessSession()` mag agents starten. De backloggrootte speelt hierbij geen rol.
+`runProcessSession()` mag nieuwe AI-taken aanvragen. De backloggrootte speelt hierbij geen rol.
 
 ## Fouten, hervatten en idempotentie
 
@@ -311,16 +318,17 @@ of een periodieke kwaliteitscontrole. Een queuecommand is een snelle databasebew
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
-- alleen `runProcessSession()` kwaliteitsagents start;
-- maximaal één kwaliteitssessie tegelijk actief is;
+- alleen `runProcessSession()` voor Kwaliteitsbewaking nieuwe AI-taken aanvraagt;
+- maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
 - ieder geclaimd workitem `DONE`, `BLOCKED` of `FAILED` wordt;
 - een onbereikbare of kapotte testomgeving niet als productbug wordt gepubliceerd;
 - iedere bug reproduceerbaar is en controleerbaar bewijs bevat;
 - iedere verificatie exacte doel-, opleverings-, omgevings- en bronversies bevat;
 - ontbrekende epicdekking binnen de bevroren scope wordt bewezen;
 - ieder gebruikerssignaalonderzoek een expliciete uitkomst of blokkade krijgt;
-- de runtime iedere agent alleen het actuele geheugen van haar eigen rol geeft en de exact gelezen
+- de eigen procesruntime iedere agent alleen het actuele geheugen van haar eigen rol geeft en de exact gelezen
   geheugenversies vastlegt;
+- iedere AI-taak een vaste provider, model en configuratieversie heeft en via AI-uitvoering loopt;
 - publieke output pas na contract-, privacy- en geheimencontrole verschijnt;
 - iedere sessie waarin daadwerkelijk is getest precies één nieuwe onveranderlijke
   `QualitySnapshot` maakt;
@@ -349,4 +357,5 @@ Een inhoudelijke sessie is klaar wanneer:
 - [Productplanning-API](productplanning.md)
 - [Software Factory-dispatcher](software-factory-dispatcher.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](ai-uitvoering.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
