@@ -190,14 +190,14 @@ in Productplanning.
 Op acceptatie kan een tester via het aparte acceptatiescherm een scenario kiezen en bijvoorbeeld
 een externe story afronden of de volgende call laten mislukken. De daaropvolgende
 `runDispatchSession()` wordt bewust via de gewone UI gestart. Zie
-[Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
+[Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md).
 
 ## Gerelateerde documenten
 
-- [Productplanning-API](productplanning.md)
-- [Productplanning — MVP](productplanning-mvp.md)
-- [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
+- [Productplanning-API](productplanning/api.md)
+- [Productplanning — MVP](productplanning/mvp.md)
+- [Productplanning — uitgebreide implementatie](productplanning/uitgebreid.md)
+- [Kwaliteitsbewaking-API](kwaliteitsbewaking/api.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
-- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
+- [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
+- [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)

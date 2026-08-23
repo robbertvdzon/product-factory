@@ -2,10 +2,10 @@
 
 Status: doelontwerp voor een latere uitgebreide implementatie.
 
-Deze implementatie gebruikt exact de publieke [Productplanning-API](productplanning.md). Zij breidt
-de [MVP](productplanning-mvp.md) intern uit met gespecialiseerde rollen, parallelle voorbereiding,
+Deze implementatie gebruikt exact de publieke [Productplanning-API](api.md). Zij breidt
+de [MVP](mvp.md) intern uit met gespecialiseerde rollen, parallelle voorbereiding,
 permanent geheugen per agentrol en een afzonderlijke kritiekstap. De
-[Software Factory-dispatcher](software-factory-dispatcher.md) blijft dezelfde deterministische
+[Software Factory-dispatcher](../software-factory-dispatcher.md) blijft dezelfde deterministische
 adapter.
 
 Zij wordt gebouwd als `product-planning-impl-advanced`. Spring Modulith bewaakt de hieronder
@@ -40,11 +40,11 @@ Alleen `runProcessSession()` mag voor deze rollen AI-taken aanvragen. Niet ieder
 rollen te gebruiken: een zuivere herprioritering kan bijvoorbeeld zonder Storymaker.
 
 Voor iedere taak leest Productplanning de betreffende `AiJobConfiguration` en geeft zij de complete
-opaque taak met bevroren provider en model aan [AI-uitvoering](ai-uitvoering.md). AI-uitvoering kent
+opaque taak met bevroren provider en model aan [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). AI-uitvoering kent
 de planningsrollen niet. De processessie bewaart de taak-ID's, keert met `WAITING_FOR_AI` terug en
 wordt later hervat.
 
-Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. De procesruntime
+Iedere rol heeft in [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md) haar eigen permanente geheugen. De procesruntime
 leidt de vaste `AgentRoleKey` uit vertrouwde configuratie af en geeft een agent alleen actuele items
 van die rol. De Epicplanner leest dus niet het geheugen van de Storymaker, Backlogplanner of
 Planningscriticus. Rollen delen werk alleen via expliciete concepten en handoffs binnen de sessie.
@@ -152,7 +152,7 @@ interne geheugen is dus geen verborgen uitvoeringscontract.
 ## Dispatcher
 
 De uitgebreide implementatie gebruikt exact dezelfde
-[Software Factory-dispatcher](software-factory-dispatcher.md) als de MVP. Technische retries,
+[Software Factory-dispatcher](../software-factory-dispatcher.md) als de MVP. Technische retries,
 statussynchronisatie en `DeliveryAttempt`s lopen buiten de agents. Alleen een definitieve
 inhoudelijke afwijzing maakt een `REPAIR_STORY`-workitem voor een latere intelligente run.
 
@@ -180,11 +180,11 @@ Een uitgebreide planningsrun is klaar wanneer:
 
 ## Gerelateerde documenten
 
-- [Productplanning-API](productplanning.md)
-- [Productplanning — MVP](productplanning-mvp.md)
-- [Software Factory-dispatcher](software-factory-dispatcher.md)
-- [Productontwerp-API](productontwerp.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Productplanning-API](api.md)
+- [Productplanning — MVP](mvp.md)
+- [Software Factory-dispatcher](../software-factory-dispatcher.md)
+- [Productontwerp-API](../productontwerp/api.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

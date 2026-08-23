@@ -3,7 +3,7 @@
 Status: voorstel voor de eerste implementatie.
 
 Deze implementatie gebruikt exact de publieke
-[Kwaliteitsbewaking-API](kwaliteitsbewaking.md). Eén algemene Tester-agent bereidt het testwerk voor,
+[Kwaliteitsbewaking-API](api.md). Eén algemene Tester-agent bereidt het testwerk voor,
 bedient de toegestane testmiddelen, beoordeelt wat hij aantreft en levert gestructureerde concepten
 voor bugs en verificaties. Gewone applicatiecode claimt werk, valideert output, publiceert en voert
 vervolgcommands uit.
@@ -63,12 +63,12 @@ Screenshots, logs, traces en andere bewijsassets worden met veilige metadata aan
 of verificatie gekoppeld. Zij vormen geen afzonderlijk publiek productobject.
 
 Het permanente geheugen van de rol `TESTER_MVP` staat in
-[Agentgeheugen](agentgeheugen.md). De procesruntime voegt alleen de actuele items van deze rol aan de
+[Agentgeheugen](../../gedeelde-modules/agentgeheugen.md). De procesruntime voegt alleen de actuele items van deze rol aan de
 agenttaak toe en registreert de exact gelezen geheugenversies. De Tester kan geen geheugen van een
 andere rol opvragen.
 
 Voor de Tester-job leest de procesruntime provider en model uit Algemene instellingen en vraagt zij een
-complete taak aan bij [AI-uitvoering](ai-uitvoering.md). De processessie wacht duurzaam met
+complete taak aan bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). De processessie wacht duurzaam met
 `WAITING_FOR_AI`; een volgende run verwerkt het resultaat zonder een dubbele taak te maken.
 
 ## Verloop van één processessie
@@ -211,11 +211,11 @@ bepalen welke uitgebreide rol als eerste nodig is.
 
 ## Gerelateerde documenten
 
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
-- [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md)
-- [Productplanning-API](productplanning.md)
-- [Software Factory-dispatcher](software-factory-dispatcher.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Kwaliteitsbewaking-API](api.md)
+- [Kwaliteitsbewaking — uitgebreide implementatie](uitgebreid.md)
+- [Productplanning-API](../productplanning/api.md)
+- [Software Factory-dispatcher](../software-factory-dispatcher.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

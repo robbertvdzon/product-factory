@@ -2,9 +2,9 @@
 
 Status: voorstel voor de eerste implementatie.
 
-Deze implementatie gebruikt exact de publieke [Productplanning-API](productplanning.md). Eén
+Deze implementatie gebruikt exact de publieke [Productplanning-API](api.md). Eén
 algemene Planner-agent kiest epics, maakt stories, verwerkt herstelwerk en bepaalt de backlogvolgorde.
-De vaste [Software Factory-dispatcher](software-factory-dispatcher.md) staat hier los van en gebruikt
+De vaste [Software Factory-dispatcher](../software-factory-dispatcher.md) staat hier los van en gebruikt
 geen agent.
 
 Zij wordt gebouwd als `product-planning-impl-mvp`. De ene main-module neemt dit artifact of de
@@ -61,12 +61,12 @@ gekoppeld voor diagnose. Zij zijn geen publieke entiteiten en vormen geen zelfst
 planningsgeheugen.
 
 Het permanente geheugen van de rol `PLANNER_MVP` staat in
-[Agentgeheugen](agentgeheugen.md). De procesruntime voegt alleen de actuele items van deze rol aan de
+[Agentgeheugen](../../gedeelde-modules/agentgeheugen.md). De procesruntime voegt alleen de actuele items van deze rol aan de
 agenttaak toe en registreert de exact gelezen versies. De Planner kan geen geheugen van een andere
 rol opvragen.
 
 Voor iedere Planner-taak leest de procesruntime de betreffende `AiJobConfiguration`, neemt provider en
-model als vaste taakwaarden over en gebruikt [AI-uitvoering](ai-uitvoering.md). Een sessie met open
+model als vaste taakwaarden over en gebruikt [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). Een sessie met open
 taken krijgt `WAITING_FOR_AI`; een volgende run hervat haar zonder dubbele taak.
 
 ## Verloop van één processessie
@@ -181,7 +181,7 @@ atomische productbrede volgorde.
 
 ## Dispatcher
 
-De MVP gebruikt ongewijzigd de [Software Factory-dispatcher](software-factory-dispatcher.md). Retry,
+De MVP gebruikt ongewijzigd de [Software Factory-dispatcher](../software-factory-dispatcher.md). Retry,
 idempotentie, opleverstatus en definitieve inhoudelijke afwijzing worden volledig door die
 deterministische adapter afgehandeld en starten geen Planner-agent.
 
@@ -200,11 +200,11 @@ welke gespecialiseerde rol als eerste nodig is.
 
 ## Gerelateerde documenten
 
-- [Productplanning-API](productplanning.md)
-- [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
-- [Software Factory-dispatcher](software-factory-dispatcher.md)
-- [Productontwerp-API](productontwerp.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Productplanning-API](api.md)
+- [Productplanning — uitgebreide implementatie](uitgebreid.md)
+- [Software Factory-dispatcher](../software-factory-dispatcher.md)
+- [Productontwerp-API](../productontwerp/api.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

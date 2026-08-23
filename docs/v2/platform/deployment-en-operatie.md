@@ -76,7 +76,7 @@ de draaiende pod gecontroleerd. Een `Synced` melding alleen bewijst niet dat de 
 actief is.
 
 De frontend- en backendidentiteit worden via het beheerscherm zichtbaar. Cache- en
-vernieuwingsgedrag staat in [Frontend](frontend.md).
+vernieuwingsgedrag staat in [Frontend](../stakeholder/frontend.md).
 
 ## OpenShift en Kustomize
 
@@ -204,9 +204,9 @@ Na iedere omgevingsrollout wordt minimaal gecontroleerd:
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
+- [Overzicht](../overzicht.md)
 - [Technische basis](technische-basis.md)
 - [Implementatieplan voor de nieuwe technische fundering](implementatieplan-technische-fundering.md)
-- [Frontend](frontend.md)
+- [Frontend](../stakeholder/frontend.md)
 - [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)

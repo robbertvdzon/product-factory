@@ -37,7 +37,7 @@ De frontend:
 
 Acceptatie schakelt authenticatie expliciet uit. Op iedere pagina staat daar de vaste banner
 **Acceptatie — synthetische tijdelijke data — authenticatie uit**. Productie kan niet in deze modus
-starten. Het backendcontract en secretbeheer staan in [Technische basis](technische-basis.md).
+starten. Het backendcontract en secretbeheer staan in [Technische basis](../platform/technische-basis.md).
 
 ## Cache en nieuwe deployments
 
@@ -234,12 +234,12 @@ productie.
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
-- [Technische basis](technische-basis.md)
-- [Deployment en operatie](deployment-en-operatie.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Overzicht](../overzicht.md)
+- [Technische basis](../platform/technische-basis.md)
+- [Deployment en operatie](../platform/deployment-en-operatie.md)
+- [Processen en entiteiten](../processen/processen-en-entiteiten.md)
 - [Overleggen met de Stakeholder](overleggen.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
+- [Agentgeheugen](../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)
+- [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)

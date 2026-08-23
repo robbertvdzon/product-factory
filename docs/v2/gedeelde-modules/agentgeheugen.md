@@ -341,12 +341,12 @@ agenttaak vastgelegd.
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
-- [Frontend](frontend.md)
-- [Productontwerp-API](productontwerp.md)
-- [Productplanning-API](productplanning.md)
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
-- [Overleggen met de Stakeholder](overleggen.md)
+- [Overzicht](../overzicht.md)
+- [Processen en entiteiten](../processen/processen-en-entiteiten.md)
+- [Frontend](../stakeholder/frontend.md)
+- [Productontwerp-API](../processen/productontwerp/api.md)
+- [Productplanning-API](../processen/productplanning/api.md)
+- [Kwaliteitsbewaking-API](../processen/kwaliteitsbewaking/api.md)
+- [Overleggen met de Stakeholder](../stakeholder/overleggen.md)
 - [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
+- [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)

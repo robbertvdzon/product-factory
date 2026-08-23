@@ -6,9 +6,9 @@ Dit document beschrijft uitsluitend de buitenkant van Kwaliteitsbewaking. Andere
 afhankelijk zijn van agents, testorganisatie, interne observaties of de volgorde van teststappen. De
 volgende implementaties gebruiken hetzelfde contract:
 
-- [Kwaliteitsbewaking — MVP](kwaliteitsbewaking-mvp.md): één Tester-agent voert de volledige
+- [Kwaliteitsbewaking — MVP](mvp.md): één Tester-agent voert de volledige
   kwaliteitssessie uit;
-- [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md): vier
+- [Kwaliteitsbewaking — uitgebreide implementatie](uitgebreid.md): vier
   gespecialiseerde rollen, parallel testen, testrotatie en leren per agentrol.
 
 Beide zijn afzonderlijke Maven-implementatiemodules van dezelfde `quality-api`. De main-module
@@ -41,7 +41,7 @@ De scheduler of een handmatige UI-/REST-actie kan deze functie starten. Er kan m
 één uitvoering tegelijk lopen. Een tweede handmatige aanroep krijgt een
 `ProcessAlreadyRunning`-fout; een botsende geplande aanroep wordt als overgeslagen geregistreerd.
 Alleen deze functie mag voor Kwaliteitsbewaking nieuwe taken bij
-[AI-uitvoering](ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
+[AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
 implementatiedetail.
 
 Een run claimt atomair een vaste momentopname van de `PENDING` `QualityWorkItem`s die bij de start
@@ -108,7 +108,7 @@ structureert alleen de binnenkant van de gekozen Kwaliteitsbewaking-implementati
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte
 contractversies, exact gelezen geheugenversies en exacte geteste omgeving vast. Permanent leren
-loopt uitsluitend via de publieke API van [Agentgeheugen](agentgeheugen.md); een agent leest en
+loopt uitsluitend via de publieke API van [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md); een agent leest en
 wijzigt alleen geheugen van haar eigen vertrouwd geconfigureerde rol.
 
 Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug zonder thread of lock
@@ -357,12 +357,12 @@ Een inhoudelijke sessie is klaar wanneer:
 
 ## Gerelateerde documenten
 
-- [Kwaliteitsbewaking — MVP](kwaliteitsbewaking-mvp.md)
-- [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md)
-- [Productontwerp-API](productontwerp.md)
-- [Productplanning-API](productplanning.md)
-- [Software Factory-dispatcher](software-factory-dispatcher.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Kwaliteitsbewaking — MVP](mvp.md)
+- [Kwaliteitsbewaking — uitgebreide implementatie](uitgebreid.md)
+- [Productontwerp-API](../productontwerp/api.md)
+- [Productplanning-API](../productplanning/api.md)
+- [Software Factory-dispatcher](../software-factory-dispatcher.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

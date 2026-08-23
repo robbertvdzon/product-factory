@@ -3,8 +3,8 @@
 Status: doelontwerp voor een latere uitgebreide implementatie.
 
 Deze implementatie gebruikt exact de publieke
-[Kwaliteitsbewaking-API](kwaliteitsbewaking.md). Zij breidt de
-[MVP](kwaliteitsbewaking-mvp.md) intern uit met gespecialiseerde rollen, parallelle testtaken,
+[Kwaliteitsbewaking-API](api.md). Zij breidt de
+[MVP](mvp.md) intern uit met gespecialiseerde rollen, parallelle testtaken,
 risicogestuurde testrotatie, onafhankelijke kritiek en permanent geheugen per agentrol.
 
 Zij wordt gebouwd als `quality-impl-advanced`. Spring Modulith bewaakt de hieronder beschreven
@@ -45,10 +45,10 @@ testrollen en de criticus verplicht.
 
 Voor iedere taak leest Kwaliteitsbewaking de betreffende `AiJobConfiguration` en vraagt zij een
 complete opaque taak met bevroren provider en model aan bij
-[AI-uitvoering](ai-uitvoering.md). AI-uitvoering kent de testrollen niet. De processessie bewaart de
+[AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). AI-uitvoering kent de testrollen niet. De processessie bewaart de
 taak-ID's, wordt `WAITING_FOR_AI` en wordt door een volgende run hervat.
 
-Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. De procesruntime
+Iedere rol heeft in [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md) haar eigen permanente geheugen. De procesruntime
 leidt de vaste `AgentRoleKey` uit vertrouwde configuratie af en geeft een agent alleen actuele items
 van die rol. De Testcoördinator kan dus niet het geheugen van de Functionele tester,
 Kwaliteitsspecialist of Verificatiecriticus lezen. Rollen delen alleen de expliciete sessie-input,
@@ -203,12 +203,12 @@ Een uitgebreide kwaliteitssessie is klaar wanneer:
 
 ## Gerelateerde documenten
 
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
-- [Kwaliteitsbewaking — MVP](kwaliteitsbewaking-mvp.md)
-- [Productontwerp-API](productontwerp.md)
-- [Productplanning-API](productplanning.md)
-- [Software Factory-dispatcher](software-factory-dispatcher.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Kwaliteitsbewaking-API](api.md)
+- [Kwaliteitsbewaking — MVP](mvp.md)
+- [Productontwerp-API](../productontwerp/api.md)
+- [Productplanning-API](../productplanning/api.md)
+- [Software Factory-dispatcher](../software-factory-dispatcher.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

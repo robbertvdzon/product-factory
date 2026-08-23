@@ -2,7 +2,7 @@
 
 Status: voorstel voor de eerste implementatie.
 
-Deze implementatie gebruikt exact de publieke [Productontwerp-API](productontwerp.md). Zij is
+Deze implementatie gebruikt exact de publieke [Productontwerp-API](api.md). Zij is
 bewust klein: één algemene AI-agent doet het inhoudelijke ontwerpwerk. Er is geen droombeeld, geen
 zelfstandig onderzoeksproces en geen groep gespecialiseerde agents.
 
@@ -11,7 +11,7 @@ uitgebreide variant op, nooit beide.
 
 Het doel van de MVP is eerst betrouwbaar complete epics te maken. Pas wanneer de praktijk een
 concreet tekort laat zien, hoeft een onderdeel uit de
-[uitgebreide implementatie](productontwerp-uitgebreid.md) te worden toegevoegd.
+[uitgebreide implementatie](uitgebreid.md) te worden toegevoegd.
 
 ## Uitgangspunten
 
@@ -62,12 +62,12 @@ processessie worden gekoppeld volgens het geldende privacy- en bewaarbeleid. Zij
 productentiteiten en worden niet als zelfstandig productgeheugen gebruikt.
 
 Het permanente geheugen van de rol `PRODUCT_DESIGNER_MVP` staat niet in Productontwerp, maar in de
-gedeelde module [Agentgeheugen](agentgeheugen.md). De procesruntime voegt vóór de agenttaak alleen de
+gedeelde module [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md). De procesruntime voegt vóór de agenttaak alleen de
 actuele items van deze rol toe en registreert de exact gelezen geheugenversies. De agent kan geen
 andere rolnaam of ander rolgeheugen kiezen.
 
 De procesruntime leest voor `PRODUCT_DESIGN.CREATE_EPIC` provider en model uit Algemene instellingen en
-vraagt daarna een complete taak aan bij [AI-uitvoering](ai-uitvoering.md). De processessie bewaart
+vraagt daarna een complete taak aan bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). De processessie bewaart
 het taak-ID, wordt `WAITING_FOR_AI` en keert terug. Een volgende run verwerkt het resultaat; de
 laptopworker kent de Productontwerper-rol niet.
 
@@ -198,9 +198,9 @@ extra agentrol wordt niet alleen toegevoegd omdat die conceptueel aantrekkelijk 
 
 ## Gerelateerde documenten
 
-- [Productontwerp-API](productontwerp.md)
-- [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Productontwerp-API](api.md)
+- [Productontwerp — uitgebreide implementatie](uitgebreid.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

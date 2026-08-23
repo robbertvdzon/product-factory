@@ -99,15 +99,15 @@ signaalstatus via een command op de productmodule bij.
 ## Grote besluiten
 
 Alleen een expliciete, blijvende keuze die meerdere toekomstige sessies begrenst gaat naar het
-[Besluitenregister](besluitenregister.md). De notulenagent registreert een Stakeholderbesluit namens
+[Besluitenregister](../gedeelde-modules/besluitenregister.md). De notulenagent registreert een Stakeholderbesluit namens
 de Stakeholder, maar is niet de beslisser. Een prioriteitswijziging, epicselectie, bugtriage of
 andere normale processtap is geen besluit.
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
-- [Besluitenregister](besluitenregister.md)
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
+- [Overzicht](../overzicht.md)
+- [Processen en entiteiten](../processen/processen-en-entiteiten.md)
+- [Besluitenregister](../gedeelde-modules/besluitenregister.md)
+- [Kwaliteitsbewaking-API](../processen/kwaliteitsbewaking/api.md)
+- [Agentgeheugen](../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)

@@ -2,8 +2,8 @@
 
 Status: doelontwerp voor een latere uitgebreide implementatie.
 
-Deze implementatie gebruikt exact de publieke [Productontwerp-API](productontwerp.md). Zij breidt de
-[MVP](productontwerp-mvp.md) intern uit met gespecialiseerd onderzoek, meerdere agentrollen en
+Deze implementatie gebruikt exact de publieke [Productontwerp-API](api.md). Zij breidt de
+[MVP](mvp.md) intern uit met gespecialiseerd onderzoek, meerdere agentrollen en
 permanent geheugen per agentrol. Andere modules zien alleen dezelfde `EpicDetails`, commands,
 queries en `ProcessSessionDetails`.
 
@@ -72,11 +72,11 @@ met de leider, UX-ontwerper, technisch verkenner en criticus. Een nieuwe product
 rollen gebruiken. Alleen `runProcessSession()` mag voor deze rollen AI-taken aanvragen.
 
 Technisch betekent starten: provider en model voor de betreffende `AiJobKey` uit Algemene
-instellingen lezen en een complete taak bij [AI-uitvoering](ai-uitvoering.md) aanvragen. AI-uitvoering
+instellingen lezen en een complete taak bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. AI-uitvoering
 kent de rol en productbetekenis niet. De processessie bewaart taak-ID's, keert met
 `WAITING_FOR_AI` terug en wordt door een volgende run hervat.
 
-Iedere rol heeft in [Agentgeheugen](agentgeheugen.md) haar eigen permanente geheugen. Vóór een
+Iedere rol heeft in [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md) haar eigen permanente geheugen. Vóór een
 agenttaak leidt de procesruntime de vaste `AgentRoleKey` uit vertrouwde configuratie af en voegt zij alleen
 de actuele items van die rol toe. De Productontwerpleider kan dus niet het geheugen van de
 UX-ontwerper lezen, en omgekeerd. Samenwerking verloopt via de expliciete sessie-input en
@@ -229,9 +229,9 @@ Een uitgebreide sessie is klaar wanneer:
 
 ## Gerelateerde documenten
 
-- [Productontwerp-API](productontwerp.md)
-- [Productontwerp — MVP](productontwerp-mvp.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Productontwerp-API](api.md)
+- [Productontwerp — MVP](mvp.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

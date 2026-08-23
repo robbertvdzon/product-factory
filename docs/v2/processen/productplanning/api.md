@@ -6,12 +6,12 @@ Dit document beschrijft de buitenkant van Productplanning. Andere modules mogen 
 zijn van het aantal agents, interne concepten of de volgorde van planningsstappen. De volgende
 implementaties gebruiken daarom hetzelfde contract:
 
-- [Productplanning — MVP](productplanning-mvp.md): één Planner-agent doet selectie, storyvorming en
+- [Productplanning — MVP](mvp.md): één Planner-agent doet selectie, storyvorming en
   prioritering;
-- [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md): vier
+- [Productplanning — uitgebreide implementatie](uitgebreid.md): vier
   gespecialiseerde rollen met parallelle voorbereiding en een aparte criticus.
 
-De technische [Software Factory-dispatcher](software-factory-dispatcher.md) heeft een eigen
+De technische [Software Factory-dispatcher](../software-factory-dispatcher.md) heeft een eigen
 document en eigen Maven-API/implementatiegrens. Hij gebruikt `product-planning-api`, staat los van
 de gekozen intelligente planningsimplementatie en gebruikt nooit agents.
 
@@ -43,7 +43,7 @@ De scheduler of een bevoegde handmatige UI-/REST-actie kan deze functie starten.
 maximaal één uitvoering tegelijk lopen. Een tweede handmatige aanroep krijgt een
 `ProcessAlreadyRunning`-fout, bij REST bijvoorbeeld HTTP 409. Een botsende geplande aanroep wordt
 als overgeslagen geregistreerd. Alleen `runProcessSession()` mag voor Productplanning nieuwe taken
-bij [AI-uitvoering](ai-uitvoering.md) aanvragen; hoeveel taken dat zijn is een
+bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen; hoeveel taken dat zijn is een
 implementatiedetail.
 
 Een run claimt atomair een vaste momentopname van de op dat moment `PENDING`
@@ -141,7 +141,7 @@ kwaliteitsoordeel.
 
 Operations en frontend lezen de sessie via `ProcessSessionDetails`. Interne analyses, concepten en
 agentuitvoer steken de modulegrens niet over. Permanent leren loopt uitsluitend via de publieke API
-van [Agentgeheugen](agentgeheugen.md): een agent kan alleen geheugen van zijn eigen rol lezen en
+van [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md): een agent kan alleen geheugen van zijn eigen rol lezen en
 wijzigen.
 
 Na storyoplevering vraagt Productplanning via `requestStoryVerification(...)`,
@@ -238,7 +238,7 @@ De dispatcher leest de backlog en `StoryDetails` via Productplanning en meldt ve
 oplevering via `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)`. De intelligente planner
 kent geen extern Software Factory-protocol. Pakketvorming, externe statussynchronisatie,
 `DeliveryAttempt`s, retry en idempotentie staan volledig in het
-[dispatcherdocument](software-factory-dispatcher.md).
+[dispatcherdocument](../software-factory-dispatcher.md).
 
 Alleen een definitieve inhoudelijke afwijzing van een pakket levert intern een idempotent
 `REPAIR_STORY`-workitem op. Een tijdelijke transport-, configuratie- of autorisatiefout start geen
@@ -274,12 +274,12 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 
 ## Gerelateerde documenten
 
-- [Productplanning — MVP](productplanning-mvp.md)
-- [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
-- [Software Factory-dispatcher](software-factory-dispatcher.md)
-- [Productontwerp-API](productontwerp.md)
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Productplanning — MVP](mvp.md)
+- [Productplanning — uitgebreide implementatie](uitgebreid.md)
+- [Software Factory-dispatcher](../software-factory-dispatcher.md)
+- [Productontwerp-API](../productontwerp/api.md)
+- [Kwaliteitsbewaking-API](../kwaliteitsbewaking/api.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

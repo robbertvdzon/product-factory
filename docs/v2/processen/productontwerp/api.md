@@ -6,8 +6,8 @@ Dit document beschrijft uitsluitend de buitenkant van de module Productontwerp. 
 mogen niet afhankelijk zijn van agents, prompts, interne entiteiten of de volgorde van interne
 stappen. Daardoor kunnen de volgende implementaties hetzelfde contract gebruiken:
 
-- [Productontwerp — MVP](productontwerp-mvp.md): één agent en zo weinig mogelijk interne werking;
-- [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md): gespecialiseerde
+- [Productontwerp — MVP](mvp.md): één agent en zo weinig mogelijk interne werking;
+- [Productontwerp — uitgebreide implementatie](uitgebreid.md): gespecialiseerde
   agents, onderzoek en leren per agentrol.
 
 De MVP kan later door de uitgebreide implementatie worden vervangen zonder Productplanning,
@@ -41,7 +41,7 @@ botsende schedulerrun wordt als overgeslagen geregistreerd. Zonder zinvol werk e
 als succesvolle no-op.
 
 Alleen `runProcessSession()` mag voor Productontwerp nieuwe taken bij
-[AI-uitvoering](ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
+[AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
 implementatiedetail. De laptopworker voert ze later asynchroon uit en kent Productontwerp niet.
 
 Daarnaast heeft de module deze deterministische command- en query-interface:
@@ -114,13 +114,13 @@ productmodule en krijgt nooit directe schrijftoegang tot het signaal.
 
 De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Interne analyses,
 concepten en agentuitvoer steken de modulegrens niet over. Permanent leren loopt uitsluitend via
-de publieke API van [Agentgeheugen](agentgeheugen.md): een agent kan alleen geheugen van zijn eigen
+de publieke API van [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md): een agent kan alleen geheugen van zijn eigen
 rol lezen en wijzigen. Operations en frontend lezen de sessie via het read-only
 `ProcessSessionDetails`-contract.
 
 Alleen wanneer tijdens Productontwerp een afzonderlijke grote, blijvende keuze ontstaat die
 meerdere toekomstige processessies begrenst, kan de module binnen de productopdracht en geldige
-besluiten `createDecision(...)` op het [Besluitenregister](besluitenregister.md) aanroepen. Een epic,
+besluiten `createDecision(...)` op het [Besluitenregister](../../gedeelde-modules/besluitenregister.md) aanroepen. Een epic,
 signaalafhandeling of normale ontwerpkeuze is geen besluit.
 
 ## Samenwerking rond een epic
@@ -248,10 +248,10 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 
 ## Gerelateerde documenten
 
-- [Productontwerp — MVP](productontwerp-mvp.md)
-- [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Overzicht](overzicht.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Productontwerp — MVP](mvp.md)
+- [Productontwerp — uitgebreide implementatie](uitgebreid.md)
+- [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
+- [Overzicht](../../overzicht.md)
+- [Processen en entiteiten](../processen-en-entiteiten.md)

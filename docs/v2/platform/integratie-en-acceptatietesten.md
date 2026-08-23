@@ -348,9 +348,9 @@ acceptatiedata en zijn nooit een voorwaarde om de veilige acceptatieomgeving te 
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
-- [Frontend](frontend.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Software Factory-dispatcher](software-factory-dispatcher.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Overzicht](../overzicht.md)
+- [Frontend](../stakeholder/frontend.md)
+- [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)
+- [Software Factory-dispatcher](../processen/software-factory-dispatcher.md)
+- [Processen en entiteiten](../processen/processen-en-entiteiten.md)
 - [Maven en Spring Modulith](maven-en-spring-modulith.md)

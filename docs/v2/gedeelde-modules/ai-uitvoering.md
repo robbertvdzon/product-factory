@@ -380,7 +380,7 @@ De mockworker kan niet alleen succes teruggeven. Vaste scenario's kunnen langzaa
 providerfout, time-out, annulering, ontbrekende heartbeat, slaap, crash, reconciliatie en een laat
 resultaat met een oud fencing token simuleren. Daarmee gebruiken automatische integratietests en
 handmatige UI-acceptatie precies dezelfde queuegrens en scenariofixtures. De volledige
-omgevingsopzet staat in [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
+omgevingsopzet staat in [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md).
 
 Productieconfiguratie bevat een allowlist van providers en weigert `MOCKED` bij het opslaan van
 algemene instellingen en bij het aanvragen van een taak. Zo kan een verkeerde instelling niet
@@ -438,12 +438,12 @@ proces, agentjob of vervolgstap starten.
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
-- [Frontend](frontend.md)
+- [Overzicht](../overzicht.md)
+- [Processen en entiteiten](../processen/processen-en-entiteiten.md)
+- [Frontend](../stakeholder/frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
-- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Productontwerp-API](productontwerp.md)
-- [Productplanning-API](productplanning.md)
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
+- [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
+- [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)
+- [Productontwerp-API](../processen/productontwerp/api.md)
+- [Productplanning-API](../processen/productplanning/api.md)
+- [Kwaliteitsbewaking-API](../processen/kwaliteitsbewaking/api.md)

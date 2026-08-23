@@ -242,8 +242,8 @@ dezelfde revise-, withdraw- of supersedecommands laten uitvoeren.
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
-- [Overleggen met de Stakeholder](overleggen.md)
+- [Overzicht](../overzicht.md)
+- [Overleggen met de Stakeholder](../stakeholder/overleggen.md)
 - [Agentgeheugen](agentgeheugen.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
+- [Processen en entiteiten](../processen/processen-en-entiteiten.md)
+- [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)

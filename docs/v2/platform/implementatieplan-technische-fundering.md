@@ -33,14 +33,14 @@ destructief aanpassen.
 De nieuwe technische basis moet aansluiten op de al beschreven architectuur. Deze documenten
 blijven behouden en zijn normatief waar zij de technische fundering raken:
 
-- [Overzicht](overzicht.md)
+- [Overzicht](../overzicht.md)
 - [Technische basis](technische-basis.md)
 - [Deployment en operatie](deployment-en-operatie.md)
 - [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Frontend](frontend.md)
+- [Frontend](../stakeholder/frontend.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Agentgeheugen](agentgeheugen.md)
+- [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)
+- [Agentgeheugen](../gedeelde-modules/agentgeheugen.md)
 
 Tijdens de opschoning wordt de volledige inhoud van de huidige map `docs/v2` naar `docs` verplaatst.
 Omdat alle documenten gezamenlijk verhuizen, moeten relatieve links tussen deze documenten blijven
@@ -77,7 +77,7 @@ De oude code is geen contract. Alleen deze technische lessen worden opnieuw geï
   zichtbare versie-informatie.
 
 De blijvende contracten staan in [Technische basis](technische-basis.md),
-[Deployment en operatie](deployment-en-operatie.md) en [Frontend](frontend.md). Het testbed was al
+[Deployment en operatie](deployment-en-operatie.md) en [Frontend](../stakeholder/frontend.md). Het testbed was al
 onderdeel van de nieuwe architectuur en staat in
 [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
 

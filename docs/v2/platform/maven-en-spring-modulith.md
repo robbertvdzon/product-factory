@@ -247,11 +247,11 @@ Daarbovenop bestaan:
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
-- [Processen en entiteiten](processen-en-entiteiten.md)
+- [Overzicht](../overzicht.md)
+- [Processen en entiteiten](../processen/processen-en-entiteiten.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
-- [Productontwerp-API](productontwerp.md)
-- [Productontwerp — MVP](productontwerp-mvp.md)
-- [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
-- [Productplanning-API](productplanning.md)
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
+- [Productontwerp-API](../processen/productontwerp/api.md)
+- [Productontwerp — MVP](../processen/productontwerp/mvp.md)
+- [Productontwerp — uitgebreide implementatie](../processen/productontwerp/uitgebreid.md)
+- [Productplanning-API](../processen/productplanning/api.md)
+- [Kwaliteitsbewaking-API](../processen/kwaliteitsbewaking/api.md)

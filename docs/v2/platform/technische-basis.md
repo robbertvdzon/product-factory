@@ -143,7 +143,7 @@ profielen worden niet gelogd.
 Acceptatie schakelt authenticatie expliciet uit en toont dat op iedere pagina. Productie kan niet
 met het acceptatieprofiel, uitgeschakelde authenticatie of synthetische testbediening starten.
 
-Het frontendgedrag voor login, cache en versies staat in [Frontend](frontend.md).
+Het frontendgedrag voor login, cache en versies staat in [Frontend](../stakeholder/frontend.md).
 
 ## Afbakening
 
@@ -159,9 +159,9 @@ testdocumenten blijven zelfstandig normatief voor hun eigen onderwerp.
 
 ## Gerelateerde documenten
 
-- [Overzicht](overzicht.md)
+- [Overzicht](../overzicht.md)
 - [Implementatieplan voor de nieuwe technische fundering](implementatieplan-technische-fundering.md)
 - [Deployment en operatie](deployment-en-operatie.md)
-- [Frontend](frontend.md)
+- [Frontend](../stakeholder/frontend.md)
 - [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)

@@ -363,7 +363,7 @@ delen te structureren en te testen. De API-modules gebruiken geen Spring Modulit
 Iedere processessie bewaart haar `implementationId` en `implementationVersion`. Zolang terugkeer
 naar de MVP ondersteund wordt, blijven publieke objecten en het duurzame schema compatibel en zijn
 migraties additief. De volledige keuze staat in
-[Maven en Spring Modulith](maven-en-spring-modulith.md).
+[Maven en Spring Modulith](platform/maven-en-spring-modulith.md).
 
 ## Integratie- en acceptatietesten
 
@@ -381,7 +381,7 @@ Een acceptance-only UI-scherm laat scenario's resetten, kiezen en stap voor stap
 toont daarna via de gewone product- en operationele schermen wat Product Factory werkelijk heeft
 gedaan. Opstartcontroles weigeren in acceptatie echte AI-providers, een echt Software
 Factory-endpoint, externe schrijftokens, productie-URL's en ingeschakelde achtergrondschedules.
-Details staan in [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
+Details staan in [Integratie- en acceptatietesten](platform/integratie-en-acceptatietesten.md).
 
 ## Tien hoofdregels
 
@@ -403,24 +403,35 @@ Details staan in [Integratie- en acceptatietesten](integratie-en-acceptatieteste
 
 ## Detaildocumenten
 
-- [Implementatieplan voor de nieuwe technische fundering](implementatieplan-technische-fundering.md)
-- [Technische basis](technische-basis.md)
-- [Deployment en operatie](deployment-en-operatie.md)
-- [Processen, publieke interfaces en entiteiten](processen-en-entiteiten.md)
-- [Besluitenregister](besluitenregister.md)
-- [Overleggen met de Stakeholder](overleggen.md)
-- [Frontend](frontend.md)
-- [Agentgeheugen](agentgeheugen.md)
-- [AI-uitvoering](ai-uitvoering.md)
-- [Maven en Spring Modulith](maven-en-spring-modulith.md)
-- [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
-- [Productontwerp-API](productontwerp.md)
-- [Productontwerp — MVP](productontwerp-mvp.md)
-- [Productontwerp — uitgebreide implementatie](productontwerp-uitgebreid.md)
-- [Productplanning-API](productplanning.md)
-- [Productplanning — MVP](productplanning-mvp.md)
-- [Productplanning — uitgebreide implementatie](productplanning-uitgebreid.md)
-- [Software Factory-dispatcher](software-factory-dispatcher.md)
-- [Kwaliteitsbewaking-API](kwaliteitsbewaking.md)
-- [Kwaliteitsbewaking — MVP](kwaliteitsbewaking-mvp.md)
-- [Kwaliteitsbewaking — uitgebreide implementatie](kwaliteitsbewaking-uitgebreid.md)
+### Platform
+
+- [Technische basis](platform/technische-basis.md)
+- [Maven en Spring Modulith](platform/maven-en-spring-modulith.md)
+- [Deployment en operatie](platform/deployment-en-operatie.md)
+- [Integratie- en acceptatietesten](platform/integratie-en-acceptatietesten.md)
+- [Implementatieplan voor de nieuwe technische fundering](platform/implementatieplan-technische-fundering.md)
+
+### Gedeelde modules
+
+- [Besluitenregister](gedeelde-modules/besluitenregister.md)
+- [Agentgeheugen](gedeelde-modules/agentgeheugen.md)
+- [AI-uitvoering](gedeelde-modules/ai-uitvoering.md)
+
+### Stakeholderbediening
+
+- [Frontend](stakeholder/frontend.md)
+- [Overleggen met de Stakeholder](stakeholder/overleggen.md)
+
+### Processen
+
+- [Processen, publieke interfaces en entiteiten](processen/processen-en-entiteiten.md)
+- [Productontwerp-API](processen/productontwerp/api.md)
+- [Productontwerp — MVP](processen/productontwerp/mvp.md)
+- [Productontwerp — uitgebreide implementatie](processen/productontwerp/uitgebreid.md)
+- [Productplanning-API](processen/productplanning/api.md)
+- [Productplanning — MVP](processen/productplanning/mvp.md)
+- [Productplanning — uitgebreide implementatie](processen/productplanning/uitgebreid.md)
+- [Software Factory-dispatcher](processen/software-factory-dispatcher.md)
+- [Kwaliteitsbewaking-API](processen/kwaliteitsbewaking/api.md)
+- [Kwaliteitsbewaking — MVP](processen/kwaliteitsbewaking/mvp.md)
+- [Kwaliteitsbewaking — uitgebreide implementatie](processen/kwaliteitsbewaking/uitgebreid.md)
