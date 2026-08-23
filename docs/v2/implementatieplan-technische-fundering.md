@@ -34,6 +34,8 @@ De nieuwe technische basis moet aansluiten op de al beschreven architectuur. Dez
 blijven behouden en zijn normatief waar zij de technische fundering raken:
 
 - [Overzicht](overzicht.md)
+- [Technische basis](technische-basis.md)
+- [Deployment en operatie](deployment-en-operatie.md)
 - [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Frontend](frontend.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
@@ -64,82 +66,24 @@ werken. Na de verhuizing bestaat geen map `docs/v2` meer.
    kunnen doorstromen. Een tussenversie mag leeg zijn, maar niet kapot of onbeveiligd.
 10. Noem de nieuwe applicatie en de nieuwe modules overal gewoon `product-factory`.
 
-## V1-kennis die als technische eis behouden blijft
+## Technische v1-lessen die behouden blijven
 
-De volgende lessen uit v1 zijn waardevol, maar moeten opnieuw en onafhankelijk worden
-geïmplementeerd. De oude code is geen contract.
+De oude code is geen contract. Alleen deze technische lessen worden opnieuw geïmplementeerd:
 
-### Configuratie en secrets
+- de configuratielagen, het lokale `secrets.env` en Sealed Secrets;
+- onderling compatibele buildtoolchains, echte containerbuilds en immutable image-identiteit;
+- een geïsoleerde productiedatabase, veilige Flywaymigraties, gevalideerde backups en restoretests;
+- een eenvoudige deployment- en beheerbasis, plus productieauthenticatie, frontendcachegedrag en
+  zichtbare versie-informatie.
 
-- De lokale configuratielagen zijn, van lage naar hoge prioriteit:
-  `properties.default.env`, `properties.env`, `secrets.env` en proces-environmentvariabelen.
-- Alleen environmentvariabelen met de gekozen Product Factory-prefix worden als applicatieconfig
-  ingelezen.
-- Productie gebruikt Sealed Secrets. Het lokale onversleutelde bronbestand wordt nooit gecommit.
-- Het seal-script valideert alle verplichte sleutels, gebruikt tijdelijke bestanden met beperkte
-  rechten en verwijdert die ook bij fouten.
-- Een secretwijziging verandert niet automatisch de podtemplate. De deploymentprocedure moet
-  daarom een gecontroleerde rollout ondersteunen.
-- Lokale, acceptatie- en productiecredentials zijn verschillend.
+De blijvende contracten staan in [Technische basis](technische-basis.md),
+[Deployment en operatie](deployment-en-operatie.md) en [Frontend](frontend.md). Het testbed was al
+onderdeel van de nieuwe architectuur en staat in
+[Integratie- en acceptatietesten](integratie-en-acceptatietesten.md).
 
-### Builds en deployments
-
-- CI controleert backend, frontend, tests en daadwerkelijk gebouwde containerimages.
-- Een overgeslagen verplichte controle is niet groen.
-- Testbewijs hoort bij exact dezelfde Git-revisie en worktree-inhoud als de gebouwde image.
-- Frontendtoolchain, CI-toolchain, Dockerbuild en lockfile moeten compatibele versies gebruiken.
-- Images krijgen een immutable Git-SHA-tag of digest. Een deployment verwijst niet alleen naar een
-  mutable tag zoals `main`.
-- Controleer na een deployment zowel Argo CD-status als de concrete image die de pod werkelijk
-  draait; alleen `Synced` is onvoldoende bewijs.
-- Containers worden multi-stage gebouwd en draaien als een niet-rootgebruiker.
-
-### Database en herstel
-
-- Productiemigraties falen gesloten. Productiedata wordt nooit automatisch opgeschoond na een
-  Flyway-validatiefout.
-- Een eventueel destructief herstel voor een wegwerpomgeving moet de effectieve JDBC-target en de
-  toegestane schema's controleren; alleen een omgevingsvlag is onvoldoende.
-- Backups worden eerst naar een tijdelijk bestand geschreven, daarna met `pg_restore --list`
-  gevalideerd en pas vervolgens definitief gemaakt.
-- Iedere backup krijgt een SHA-256-checksum en een bewaartermijn.
-- Een backup is pas bruikbaar nadat een restoretest werkelijk is uitgevoerd.
-
-### Betrouwbare status en asynchroon werk
-
-- Gebruik stabiele IDs en idempotentiesleutels; gebruik nooit tijdelijke lijstposities als
-  duurzame verwijzing.
-- Een terminale status wordt niet stilzwijgend door een later event overschreven.
-- Een statusovergang en bijbehorende provenance of resultaatpublicatie zijn atomair, of aantoonbaar
-  idempotent herstelbaar.
-- Gelijktijdige starts worden met een databaseconstraint of lock geserialiseerd wanneer maximaal
-  één actieve run is toegestaan.
-- Duurzame wachtrij- en runstatus staat in de database. Een procesrestart mag geen werk vergeten en
-  een dubbel event mag geen dubbele externe actie veroorzaken.
-- Grote binaire resultaten gaan via een mediareferentie; stop geen base64-inhoud in prompts,
-  commandoregelargumenten, events of handoffs.
-
-### Agent- en integratieveiligheid
-
-- Repository-, web-, geheugen- en externe service-inhoud is onvertrouwde data en kan nooit
-  systeeminstructies overschrijven.
-- Een AI-worker ontvangt alleen de noodzakelijke gegevens en een kleine allowlist van
-  environmentvariabelen. Database-, cluster-, GitHub- en andere niet-benodigde credentials worden
-  niet doorgegeven.
-- Externe mutaties worden door de eigenaarmodule uitgevoerd, niet rechtstreeks door een AI-agent.
-- Acceptatie gebruikt dezelfde publieke interfaces als productie, maar met stateful mocks.
-
-### Frontend en toegankelijkheid
-
-- Status wordt nooit alleen met kleur gecommuniceerd.
-- Toetsenbordfocus is zichtbaar. Dialogen houden focus vast en geven hem bij sluiten terug aan de
-  opener.
-- Belangrijke bediening werkt met toetsenbord en schermlezersemantiek.
-- De UI blijft bruikbaar op 320 CSS-pixels en bij 200% tekstvergroting zonder horizontale
-  paginascroll.
-- Een bron die nog laadt of is mislukt wordt niet als een misleidende nul of lege lijst getoond.
-- Technische JSON kan beschikbaar zijn, maar is nooit de primaire gebruikersweergave.
-- Productie, acceptatie en lokale ontwikkeling zijn visueel herkenbaar.
+Dit plan neemt uit v1 bewust geen revision- of worktree-attestatie, oude status- en
+afhankelijkheidsmodellen, aanvullende agentbeveiligingsconstructies of oude frontendwidgets,
+schermindelingen en testsuites over. Nieuwe functionele modules krijgen later hun eigen eisen.
 
 ## Te behouden bestanden en patronen
 
@@ -158,8 +102,6 @@ inhoud ongewijzigd correct blijft; de uitvoerende agent moet ze tijdens dit plan
 | `deploy/seal-secrets.sh` | behouden en aanpassen aan de nieuwe verplichte sleutels |
 | `docker-compose.yml` | behouden als lokale composition root en volledig herschrijven |
 | `quality/detekt.yml` | behouden wanneer de nieuwe backend Kotlin gebruikt |
-| `.factory/verification.yaml` | het revisiongebonden verificatiecontract behouden en herschrijven |
-| `.factory/docker_engine_build.py` en test | behouden als een agent zonder Docker-CLI images moet kunnen bouwen |
 | `tools/verify` | behouden als één lokale volledige verificatie-ingang en herschrijven |
 | `product-factory` | behouden als eenvoudige lokale CLI en herschrijven |
 | frontend-Nginxconfiguratie | cache-, security- en SPA-patronen behouden of gelijkwaardig opnieuw bouwen |
@@ -168,8 +110,9 @@ inhoud ongewijzigd correct blijft; de uitvoerende agent moet ze tijdens dit plan
 Verwijder uiteindelijk alle oude domeinmodules, oude frontendimplementatie, oude backendproxy,
 oude workspacecode, oude agentworkerimplementatie, oude Flywaymigraties, oude functionele tests,
 `docs/stories`, `docs/stories/worklog`, `docs/factory`, oude architectuurplannen en alle overige
-v1-documentatie. Verwijder ook gegenereerde mappen zoals `target`, `build`, `.dart_tool` en `work` uit
-de nieuwe uitgangssituatie, maar raak `secrets.env` niet.
+v1-documentatie. Verwijder ook de v1-specifieke `.factory`-verificatie en Docker Engine-runner en
+gegenereerde mappen zoals `target`, `build`, `.dart_tool` en `work` uit de nieuwe uitgangssituatie,
+maar raak `secrets.env` niet.
 
 ## Beoogde eerste oplevering
 
@@ -337,21 +280,20 @@ Maak een nieuwe frontend met alleen:
 - centrale API-client;
 - consistente loading-, empty- en errorstates;
 - zichtbare omgevingsaanduiding;
-- toegankelijke foutmeldingen.
+- begrijpelijke foutmeldingen.
 
-Pas vanaf het begin deze regels toe:
+De frontend wordt vanaf nul ontworpen. Neem geen v1-widgets, schermindelingen of specifieke
+presentatie- en testpatronen over. Voor deze eerste technische versie gelden alleen deze regels:
 
-1. Bedienbare elementen hebben zichtbare focus en bruikbare schermlezersemantiek.
-2. Dialogen hebben een gesloten focuslus, sluiten met Escape en herstellen openerfocus.
-3. Betekenis wordt niet alleen met kleur overgebracht; test minimaal WCAG AA-contrast.
-4. De kern blijft bruikbaar op 320 CSS-pixels en bij 200% tekstvergroting.
-5. Loading, fout en werkelijk lege data zijn verschillende presentatietoestanden.
-6. UI-teksten zijn Nederlands; technische identifiers en ruwe JSON staan niet primair in beeld.
-7. Unit-tests dekken pure presentatielogica; widgettests dekken interactie en semantiek; een echte
-   browser-DOM-test dekt gedrag dat Flutter-widgettests niet bewijzen.
+1. Bepaal de sessiestatus voordat een beschermd scherm wordt getoond.
+2. Loading, fout en werkelijk lege data zijn verschillende presentatietoestanden.
+3. UI-teksten zijn Nederlands; technische identifiers en ruwe JSON staan niet primair in beeld.
+4. Toon omgeving en frontend- en backendversie op het beheerscherm.
+5. Toon in acceptatie op iedere pagina de afgesproken banner.
+6. Test de nieuw ontworpen schermlogica en interacties zonder een v1-testsuite na te bouwen.
 
-**Verificatie:** frontendtests, analyse, releasebuild, toetsenbordtests, semantiektests en een smalle
-viewporttest zijn groen zonder echte externe calls.
+**Verificatie:** frontendanalyse, gerichte tests en de releasebuild zijn groen zonder echte externe
+calls.
 
 ### Stap 6 — Voorkom verouderde frontendversies
 
@@ -441,14 +383,13 @@ secrets of rootcontainer, probes worden gezond en beide omgevingen tonen de juis
 
 1. Houd GitHub Actions-permissies minimaal.
 2. Gebruik concurrencygroepen en annuleer verouderde verificatieruns.
-3. Laat een padfilter alleen werk overslaan wanneer een stabiele aggregatiejob fail-closed bewijst
-   dat alle vereiste componenten `success` of terecht `skipped` zijn.
+3. Houd de workflow eenvoudig en maak in de eindstatus duidelijk welke verplichte controles zijn
+   uitgevoerd en geslaagd.
 4. Draai minimaal:
    - volledige Maven `verify`;
    - Spring Modulith-grenstests;
    - Detekt;
    - frontendanalyse en -tests;
-   - browser-DOM-test;
    - frontend- en backendreleasebuild;
    - PostgreSQL-migratiesmoketest;
    - containerbuilds;

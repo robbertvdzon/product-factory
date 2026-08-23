@@ -7,6 +7,10 @@ entiteit bezit.
 Voor de Stakeholder is deze gebruikersinterface de normale ingang tot Product Factory: overleggen,
 signalen, besluiten, prioriteitsacties en handmatige processessies beginnen hier.
 
+De frontend wordt volledig opnieuw gemaakt. De v1-code, widgets, schermindeling en specifieke
+presentatiepatronen worden niet hergebruikt. Dit document beschrijft gewenst gedrag en publieke
+gegevens, niet hoe het oude dashboard was opgebouwd.
+
 ## Ontwerpregels
 
 - De gewone schermen gebruiken producttaal en geen agent-, prompt-, queue- of databasetaal.
@@ -15,6 +19,62 @@ signalen, besluiten, prioriteitsacties en handmatige processessies beginnen hier
 - Een commandfout wordt zichtbaar getoond en niet optimistisch als geslaagde wijziging bewaard.
 - Technische sessies, queues en retries staan in een aparte operationele weergave.
 - Productobjecten tonen hun bron, actuele status, versie en relevante koppelingen.
+
+## Authenticatie
+
+Productie toont Google-login. De frontend wisselt het Google ID-token via de backend om voor een
+eigen Product Factory-sessie en gebruikt daarna uitsluitend die sessie. De backend blijft altijd de
+autoritatieve beveiligingsgrens; een verborgen knop of lokale frontendstatus is geen autorisatie.
+
+De frontend:
+
+- bepaalt de sessiestatus voordat beschermde schermen worden getoond;
+- stuurt de eigen sessie via de centrale API-client mee;
+- handelt een verlopen of ingetrokken sessie als uitgelogd af;
+- biedt een duidelijke logoutactie;
+- maakt onderscheid tussen niet ingelogd, niet bevoegd en een technische fout;
+- bewaart geen Google-token of applicatiesessie in leesbare productdata of logging.
+
+Acceptatie schakelt authenticatie expliciet uit. Op iedere pagina staat daar de vaste banner
+**Acceptatie — synthetische tijdelijke data — authenticatie uit**. Productie kan niet in deze modus
+starten. Het backendcontract en secretbeheer staan in [Technische basis](technische-basis.md).
+
+## Cache en nieuwe deployments
+
+Een gebruiker moet na een deployment zonder handmatig cachelegen de nieuwe frontend kunnen laden.
+Daarom gelden deze regels:
+
+- de nieuwe webbuild gebruikt geen actieve PWA-service worker;
+- het oude pad `/flutter_service_worker.js` blijft tijdens de overgang een `no-store`
+  opruimrespons geven die oude Product Factory-service workers en hun caches verwijdert;
+- JavaScript- en CSS-assets krijgen een inhoudshash in hun bestandsnaam;
+- alleen gehashte assets krijgen een lange `immutable` cacheheader;
+- `index.html`, bootstrapbestanden, manifest, serviceworkerpad en versiegegevens worden niet
+  langdurig gecachet;
+- de SPA-fallback serveert routes correct zonder een ontbrekend vast asset als blijvende
+  `index.html`-response te cachen.
+
+De cacheheaders en de echte productiecontainer worden als onderdeel van de normale build en
+deployment gecontroleerd. De frontend vertrouwt niet op een gebruiker die browserdata verwijdert.
+
+## Versie- en omgevingsinformatie
+
+Iedere frontendbuild bevat alleen niet-geheime buildmetadata:
+
+- applicatie- en frontendversie;
+- volledige Git-revisie;
+- UTC-buildtijd;
+- omgeving `local`, `acceptance` of `production`.
+
+De backend biedt haar eigen beperkte versie-informatie. Het beheerscherm toont frontendversie,
+backendversie, omgeving, bronrevisies, buildtijden en later het `ImplementationManifest`. Ontbrekende
+of ongeldige buildmetadata verschijnt als `Onbekend` en wordt niet uit een repository in de
+draaiende container gelezen.
+
+De frontend controleert periodiek een niet-langdurig gecachete versiebron. Is een nieuwere build
+beschikbaar, dan verschijnt eenmaal de melding **Nieuwe versie beschikbaar — vernieuwen**. De
+gebruiker houdt controle over het vernieuwen en de implementatie voorkomt reloadloops. Een bekende
+incompatibiliteit tussen frontend- en backendcontract wordt als duidelijke technische fout getoond.
 
 ## Productoverzicht
 
@@ -175,6 +235,8 @@ productie.
 ## Gerelateerde documenten
 
 - [Overzicht](overzicht.md)
+- [Technische basis](technische-basis.md)
+- [Deployment en operatie](deployment-en-operatie.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
 - [Overleggen met de Stakeholder](overleggen.md)
 - [Agentgeheugen](agentgeheugen.md)
