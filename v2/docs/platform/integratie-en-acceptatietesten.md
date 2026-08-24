@@ -13,7 +13,7 @@ alleen de adapter aan de andere kant is vervangen.
 
 WireMock mag in een gerichte contracttest worden gebruikt, maar is niet de centrale
 acceptatievoorziening. AI-uitvoering en Software Factory hebben een levenscyclus, idempotentie,
-wachtrijen, vragen, vertraging en herstelgedrag. Een stateful simulator maakt die scenario's
+wachtrijen, vertraging en herstelgedrag. Een stateful simulator maakt die scenario's
 explicieter en beter via de UI bestuurbaar dan een verzameling losse HTTP-stubs.
 
 ## Omgevingsgrens
@@ -65,7 +65,7 @@ Product Factory-processen ──> AI-uitvoering en duurzame AiTask-queue
      │
      └── dispatcher ────────> MockSoftwareFactory
 
-Publieke Git-repository ── read-only ──> procesmodule die codecontext nodig heeft
+Publieke Git-repository ── read-only ──> tijdelijke AI-taakcontainer
 ```
 
 De Test Control API is een acceptance-only orchestratiefacade in Product Factory. Zij roept de
@@ -147,6 +147,14 @@ Ondersteunde AI-situaties bevatten minimaal:
 | late oude worker | fencing weigert progress en resultaat van een verouderde attempt |
 | harde time-out | taak eindigt voorspelbaar zonder domeinpublicatie |
 | annulering | worker ziet annulering en een laat resultaat wordt niet geaccepteerd |
+| job uitgeschakeld | de productsessie wordt `BLOCKED` met `AI_JOB_DISABLED`, maakt geen taak en hervat na inschakelen |
+| taak geannuleerd maar domeinwerk geldig | de productsessie blijft zichtbaar `BLOCKED` en maakt later een vervangende taak |
+
+Daarnaast bewijst een workercontracttest dat de taakcontainer zelf de publieke testrepository op de
+bevroren SHA uitcheckt, geen Git-schrijfrechten heeft, begrensde artifacts uploadt en repository- of
+applicatietekst met schijninstructies als onvertrouwde data behandelt. Een credentialtest gebruikt
+alleen lokale mock-secretreferenties en controleert dat plaintext nooit in taak, progress of artifact
+terechtkomt.
 
 Fixtures zijn gekoppeld aan een stabiele `scenarioKey`, `scenarioVersion`, `jobKey` en optionele
 stap. Zij bevatten geen vrije productieprompt. Iedere fixture wordt in CI gevalideerd tegen het
@@ -165,9 +173,8 @@ De simulator kan:
 - open werk per product tonen;
 - een story handmatig of automatisch door statusfasen laten lopen;
 - een open story als geannuleerd of verwijderd teruggeven;
-- een uitvoeringsvraag aanbieden en een antwoord bewaren;
-- oplevergegevens teruggeven;
-- een pakket definitief inhoudelijk afwijzen;
+- oplevergegevens inclusief een geldige `deliveredCommitSha` teruggeven;
+- als expliciet contractfoutscenario een geldig pakket ten onrechte weigeren;
 - een tijdelijke timeout, HTTP 429 of HTTP 5xx simuleren;
 - een succesvolle externe aanmaak gevolgd door een verloren response simuleren;
 - een fout of ongeldig contractantwoord teruggeven.
@@ -178,13 +185,16 @@ Minimaal worden deze situaties als vaste scenario's meegeleverd:
 |---|---|
 | story geaccepteerd | story wordt eerst atomair gereserveerd, één keer extern gemaakt en lokaal `IN_PROGRESS` |
 | nog open werk | dispatcher verstuurt geen volgende backlogstory |
-| story opgeleverd | dispatcher markeert lokaal `DONE` en het juiste kwaliteitswerk ontstaat |
+| story opgeleverd | dispatcher bewaart `deliveredCommitSha`, markeert lokaal `DONE` en het juiste kwaliteitswerk ontstaat |
 | story extern geannuleerd | dispatcher markeert lokaal `CANCELLED`; na het overige werk volgt een feitelijke epicbeoordeling zonder storystatus **mislukt** |
-| tijdelijke storing | dezelfde dispatchreservering, `DeliveryAttempt` en begrensde retry zonder dubbel extern werk |
+| tijdelijke storing | dezelfde dispatchreservering, `DeliveryAttempt`, externe aanwezigheidscontrole en begrensde retry zonder dubbel extern werk |
 | response verloren | idempotentie vindt de eerder aangemaakte story terug |
 | contractbreuk of ongeldig antwoord | dispatcher blokkeert het product, meldt de softwarefout operationeel en maakt geen domein- of planningswerk |
-| uitvoeringsvraag | antwoordflow is zichtbaar zonder echte Software Factory |
 | extern foutstadium | operationele fout blijft bij dispatcher en verandert geen storyinhoud |
+
+De mock biedt bewust geen uitvoeringsvraag of answer-endpoint. Het v2-contract vereist dat Software
+Factory ieder geldig, compleet storypakket accepteert en uitsluitend status `OPEN`, `DONE` of
+`CANCELLED` teruggeeft. Een andere response is een contractbreuk die alleen de dispatcher blokkeert.
 
 De simulator mag geen Productplanning-command aanroepen. Alleen de echte dispatcher vertaalt het
 externe mockantwoord naar Product Factory-statussen. Daarmee test acceptatie de echte grens.
@@ -200,7 +210,8 @@ een herstart of reset levert juist dezelfde bekende uitgangssituatie op. De UI t
 
 De basisdataset bevat minimaal:
 
-- één actief synthetisch product met `ProductAssignment` en read-only publieke Git-URL;
+- één actief synthetisch product met `ProductAssignment`, read-only publieke Git-URL en
+  `TestableProductConfiguration` met een bestuurbaar revisionendpoint;
 - actuele en historische `Decision`s;
 - nieuwe, verwerkte en afgesloten `UserSignal`s;
 - epics in relevante statussen;
@@ -233,9 +244,9 @@ testservice.
 ## Git als echte read-only bron
 
 Publieke productrepositories mogen in acceptatie echt worden gelezen via HTTPS. Daarvoor is geen
-token nodig en er wordt ook geen token geconfigureerd. De Git-adapter staat alleen clone, fetch,
-checkout, log en bestandlezing toe; commit, push, tag, merge en pull-requestacties ontbreken uit de
-publieke read-only interface.
+token nodig en er wordt ook geen token geconfigureerd. De inhoudelijke `AiTask` bevat URL en exacte
+SHA; de mock- of laptopworker voert clone, fetch, detached checkout, log en bestandlezing zelf uit in
+de tijdelijke taakcontainer. Commit, push, tag, merge en pull-requestacties zijn niet beschikbaar.
 
 Voor reproduceerbaarheid legt iedere processessie de opgeloste commit-SHA vast. Een branch mag bij
 de start naar de nieuwste commit wijzen, maar alle taken in die sessie gebruiken daarna dezelfde
@@ -280,15 +291,20 @@ Vaste kwaliteitsscenario's bewijzen daarnaast dat:
   dezelfde bug een volgende gewone bugfixstory kan worden gepland;
 - een door Software Factory geannuleerde story lokaal `CANCELLED` wordt en na afronding van het
   overige werk tot een complete feitelijke epicbeoordeling leidt;
-- annulering vóór dispatchreservering geen externe story oplevert en een reservering die eerst wint
-  zichtbaar als reeds gestart wordt afgehandeld.
+- annulering vóór dispatchreservering geen externe story oplevert;
+- een lang bestaande reservering na herstel eerst extern wordt opgezocht en bij aantoonbare
+  afwezigheid opnieuw tegen de annuleringsmarker wordt gevalideerd;
+- alleen een daadwerkelijk bestaande externe story na epicannulering als gestart doorloopt;
+- een storyverificatie `DEPLOYMENT_PENDING` blijft zolang de synthetische doelomgeving nog een
+  revision vóór `deliveredCommitSha` meldt en daarna zonder onterechte afkeuring hervat.
 
 De UI maakt geen vrije mockresponse-JSON de normale route. Vaste, versieerbare scenario's houden
 acceptatietests herhaalbaar. Een technische beheerweergave mag voor diagnose wel de veilige
 request- en response-envelop tonen.
 
-Automatische schedules staan standaard uit. De tester start `runProcessSession()` en
-`runDispatchSession()` bewust via de bestaande handmatige UI-acties. Een apart schedulerscenario
+Automatische schedules staan standaard uit. De tester kiest een product en start
+`runProcessSession(productId)` en `runDispatchSession(productId)` bewust via de bestaande handmatige
+UI-acties. Een apart schedulerscenario
 kan een bestuurbare klok vooruitzetten en precies één tick uitvoeren om scheduling zelf te testen.
 
 ## Integratietestpatroon

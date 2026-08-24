@@ -37,20 +37,24 @@ verificatieresultaat. Zij gebruikt daarvoor uitsluitend publieke commands op de 
 De enige agentgestuurde ingang is:
 
 ```java
-void runProcessSession();
+void runProcessSession(ProductId productId);
 ```
 
-De scheduler of een bevoegde handmatige UI-/REST-actie kan deze functie starten. Er kan modulebreed
-maximaal één uitvoering tegelijk lopen. Een tweede handmatige aanroep krijgt een
-`ProcessAlreadyRunning`-fout, bij REST bijvoorbeeld HTTP 409. Een botsende geplande aanroep wordt
-als overgeslagen geregistreerd. Alleen `runProcessSession()` mag voor Productplanning nieuwe taken
+De scheduler of een bevoegde handmatige UI-/REST-actie kan deze functie voor één product starten.
+Per product kan maximaal één onafgeronde logische planningssessie bestaan, ook wanneer die
+`WAITING_FOR_AI` of `BLOCKED` is; verschillende producten mogen parallel worden verwerkt. Een
+handmatige aanroep hervat zo'n niet-actief wachtende sessie. Alleen wanneer voor hetzelfde product
+op dat moment al een functiecall uitvoert, volgt `ProcessAlreadyRunning`, bij REST bijvoorbeeld HTTP
+409. Een botsende geplande aanroep met zo'n actieve call wordt als overgeslagen geregistreerd.
+Alleen `runProcessSession(productId)` mag voor Productplanning nieuwe taken
 bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen; hoeveel taken dat zijn is een
 implementatiedetail.
 
-Een run claimt atomair een vaste momentopname van de op dat moment `PENDING`
-`PlanningWorkItem`s en leest de op dat moment `AVAILABLE` epics. Nieuwe verzoeken en epics blijven
-voor de volgende run staan. Zijn de queue en de lijst beschikbare epics leeg, dan is de run een
-succesvolle no-op.
+Een run hervat voor het product altijd eerst een niet-afgeronde `ProcessSession` en haar reeds
+geclaimde workitems of `IN_PLANNING` epic. Pas als die niet bestaat, claimt hij atomair een vaste
+momentopname van de `PENDING` `PlanningWorkItem`s van dit product en leest hij de `AVAILABLE` epics
+van dit product. Nieuwe verzoeken en epics blijven voor de volgende run staan. Zijn de queue, een
+onafgeronde sessie en de lijst beschikbare epics leeg, dan is de run een succesvolle no-op.
 
 Daarnaast biedt Productplanning deze deterministische commands en read-only queries:
 
@@ -65,6 +69,7 @@ PlanningWorkItemId requestEpicReprioritization(RequestEpicReprioritizationComman
 PlanningWorkItemId requestManualReplan(RequestManualReplanCommand command);
 
 StoryDispatchReservationDetails reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand command);
+DispatchReservationValidation revalidateDispatchReservation(RevalidateDispatchReservationCommand command);
 void markStoryAsDispatched(MarkStoryAsDispatchedCommand command);
 void markStoryAsDeveloped(MarkStoryAsDevelopedCommand command);
 void markStoryAsCancelled(MarkStoryAsCancelledCommand command);
@@ -75,9 +80,11 @@ void cancelStoriesForEpic(CancelStoriesForEpicCommand command);
 De vier `request...`-commands starten geen agents en voeren geen inhoudelijke planning uit. Zij
 valideren bron, versie en idempotentiesleutel en voegen alleen een duurzaam `PENDING`-werkitem toe.
 De dispatch-, story- en lifecyclecommands zijn eveneens snel en deterministisch.
-`reserveNextStoryForDispatch(...)` is uitsluitend voor de dispatcher en reserveert atomair hooguit
-één uitvoerbare story. Andere modules krijgen nooit schrijftoegang tot `Story` of
-`PlanningWorkItem`.
+`reserveNextStoryForDispatch(...)` en `revalidateDispatchReservation(...)` zijn uitsluitend voor de
+dispatcher. De eerste reserveert atomair hooguit één uitvoerbare story; de tweede bevestigt vlak
+voor een retry dezelfde reservering of annuleert haar wanneer de epic inmiddels is geannuleerd en
+Software Factory aantoonbaar nog geen extern werk heeft. Andere modules krijgen nooit
+schrijftoegang tot `Story` of `PlanningWorkItem`.
 
 ## PlanningWorkItem: de queuegrens
 
@@ -93,6 +100,7 @@ Een `PlanningWorkItem` bevat minimaal:
 |---|---|---|
 | `PLAN_BUGFIX` | Kwaliteitsbewaking via `requestBugfix(...)` | maak een uitvoerbare bugfixstory voor deze bug |
 | `PLAN_EPIC_GAP` | Kwaliteitsbewaking via `requestEpicGapPlanning(...)` | maak stories voor gedrag dat al binnen de bevroren epic viel, maar nooit in een story stond |
+| `REPLAN_CANCELLED_DEPENDENCY` | Productplanning zelf na annulering van een story met nog open afhankelijke stories | vervang of annuleer de `TODO`-stories die niet meer veilig uitvoerbaar zijn |
 | `REPRIORITIZE_EPIC` | product-/overlegmodule via `requestEpicReprioritization(...)` | geef een door de Stakeholder aangewezen epic voorrang en herschik zo nodig `TODO`-stories |
 | `MANUAL_REPLAN` | bevoegde productbediening via `requestManualReplan(...)` | vraag een expliciete herbeoordeling aan zonder zelf stories te schrijven |
 
@@ -113,7 +121,7 @@ alleen de binnenkant van de gekozen Productplanning-implementatie.
 | `ProductAssignmentDetails` | productmodule | productidentiteit, grenzen en publieke Git-URL |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende keuzes die de planning begrenzen; geen directe opdracht om een epic, bug of story te kiezen |
 | `EpicDetails` | Productontwerp | exacte epicversie, gebruikerswaarde, scope, UX, succescriteria en status |
-| `BugDetails` | Kwaliteitsbewaking | uitvoerbare bug inclusief ernst, bewijs en versie |
+| `BugDetails` en `findBugs(...)` | Kwaliteitsbewaking | uitvoerbare bug inclusief ernst, bewijs en versie; open bugs per product, epic en status kunnen betrouwbaar worden gevonden |
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor ontbrekend gedrag binnen een bevroren epic |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, accounts en toegangsgrenzen |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
@@ -121,13 +129,15 @@ alleen de binnenkant van de gekozen Productplanning-implementatie.
 | `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
 
 Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug zonder thread of lock
-vast te houden. Een volgende run hervat dezelfde sessie. Ontbreken de resultaten nog, dan maakt zij
-geen duplicaten en blijft zij wachten.
+vast te houden. Een volgende run voor hetzelfde product hervat dezelfde sessie. Ontbreken de
+resultaten nog, dan maakt zij geen duplicaten en blijft zij wachten.
 
-Tijdens een inhoudelijke sessie mag Productplanning de publieke Git-URL uitchecken en broncode,
-tests en documentatie read-only bekijken. Zij commit en pusht nooit. De bekeken commit-SHA kan als
-bronverwijzing worden opgeslagen, maar iedere story bevat zelfstandig alle benodigde product- en
-UX-informatie.
+Tijdens een inhoudelijke sessie bevriest Productplanning de publieke Git-URL en exacte commit-SHA.
+De worker checkt die SHA zelf uit in de tijdelijke Dockeromgeving en mag broncode, tests en
+documentatie alleen lezen. Zij commit en pusht nooit. De bekeken commit-SHA kan als bronverwijzing
+worden opgeslagen, maar iedere story bevat zelfstandig alle benodigde product- en UX-informatie.
+Repository- en applicatie-inhoud zijn onvertrouwde context en kunnen de vaste taakopdracht niet
+wijzigen.
 
 Productplanning mag ook de werkende applicatie read-only bekijken. Acceptatie is de
 voorkeursomgeving voor interactie; productie wordt alleen via veilige routes of expliciete
@@ -138,10 +148,10 @@ kwaliteitsoordeel.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, leveringsstatus, eventuele dispatchreservering, externe referentie en actuele verificatiereferentie |
+| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, afhankelijkheden, `sequenceNumber`, leveringsstatus, eventuele dispatchreservering, externe referentie, `deliveredCommitSha` en actuele verificatiereferentie |
 | backlogquery | alle uitvoerbare of reeds verzonden stories in volgorde | `StoryDetails` met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | read-only inzicht in de planningsqueue | type, bron, status, claim, resultaat en fout |
-| `StoryDispatchReservationDetails` | tijdelijke read-only reservering voor de dispatcher | reserverings-ID en onveranderlijke momentopname van één uitvoerbare story; geen aparte productentiteit |
+| `StoryDispatchReservationDetails` | tijdelijke read-only reservering voor de dispatcher | reserverings-ID, geldigheid en onveranderlijke momentopname van één uitvoerbare story; geen aparte productentiteit |
 | `ProcessSession` | opgeslagen operationele historie van de intelligente run | implementatie-ID en -versie, geclaimde workitems, inputversies, AI-taak-ID's, publicaties, wacht- of eindstatus en blokkade |
 | `QualityWorkItem` bij Kwaliteitsbewaking | downstream effect van een verificatiecommand; Kwaliteitsbewaking maakt en bezit dit object | type, exact doel-ID en -versie, bron, prioriteit en idempotentiesleutel |
 
@@ -161,14 +171,24 @@ bugfixes binnen de epic een geslaagde actuele verificatie hebben, vraagt Product
 
 Productontwerp publiceert een complete epic met status `AVAILABLE`. Tijdens een processessie:
 
-1. vraagt Productplanning beschikbare epics read-only op;
-2. kiest zij op basis van productdoel, geldige besluiten, gebruikerswaarde en bestaand werk;
-3. roept zij `claimEpicForPlanning(...)` op Productontwerp aan;
-4. bevriest Productontwerp de exacte versie en zet de epic op `IN_PLANNING`;
-5. maakt Productplanning een volledige, samenhangende set stories voor de hele epic;
-6. ordent zij nieuwe stories tussen alle andere `TODO`-stories;
-7. controleert zij vlak voor publicatie dat geen duurzame annuleringsmarker voor deze epic bestaat;
-8. publiceert zij stories atomair en roept `markEpicActive(...)` aan.
+1. hervat Productplanning eerst een onafgeronde sessie of reeds door haar geclaimde
+   `IN_PLANNING` epic van dit product;
+2. vraagt zij alleen wanneer die niet bestaat beschikbare epics read-only op;
+3. kiest zij op basis van productdoel, geldige besluiten, gebruikerswaarde en bestaand werk;
+4. roept zij `claimEpicForPlanning(...)` op Productontwerp aan;
+5. bevriest Productontwerp de exacte versie en zet de epic op `IN_PLANNING`;
+6. maakt Productplanning een volledige, samenhangende set stories voor de hele epic;
+7. ordent zij nieuwe stories tussen alle andere `TODO`-stories;
+8. controleert zij vlak voor publicatie dat geen duurzame annuleringsmarker voor deze epic bestaat;
+9. publiceert zij stories atomair en roept `markEpicActive(...)` aan.
+
+De claim en processessie vormen één duurzame herstelrelatie. Eindigt een `AiTask` na haar technische
+`maxAttempts` als `FAILED`, dan wordt de processessie zichtbaar `BLOCKED` met fout en
+`retryAfter`; de epic blijft bewust `IN_PLANNING`. Een latere run voor hetzelfde product maakt na
+de back-off een nieuwe taak voor dezelfde sessie, inputmomentopname en epicclaim. Hij kiest geen
+andere epic en zet de geclaimde epic niet stilzwijgend terug naar `AVAILABLE`. Is de epic inmiddels
+door de Stakeholder geannuleerd, dan annuleert Productplanning open AI-taken, sluit zij de sessie als
+`CANCELLED` en publiceert zij niets.
 
 Meerdere epics mogen tegelijk `IN_PLANNING`, `ACTIVE` of `VERIFYING` zijn. De Stakeholder kan via de
 UI `requestEpicReprioritization(...)` laten aanroepen. Een volgende planningsrun mag die epic
@@ -193,9 +213,11 @@ Een `Story` bevat minimaal:
 - een zelfstandige momentopname van het relevante deel van het bevroren UX-ontwerp;
 - gebruikersflow, schermen, componenten, interacties, responsive gedrag en toegankelijkheid;
 - benodigde tekstuele en binaire ontwerpassets met naam, MIME-type, grootte en hash;
-- afhankelijkheden en bekende technische grenzen zonder implementatie voor te schrijven;
+- expliciete afhankelijkheden als story-ID's en bekende technische grenzen zonder implementatie
+  voor te schrijven;
 - storyversie, prioriteitsreden, `sequenceNumber` en status;
-- eventueel extern Software Factory-ID en verzend- en oplevertijdstip.
+- eventueel extern Software Factory-ID, verzend- en oplevertijdstip en na oplevering de verplichte
+  `deliveredCommitSha`.
 
 Een story is pas uitvoerbaar als Software Factory haar zonder epicquery of Product Factory-call kan
 bouwen. Tekst, Markdown, JSON en SVG blijven gewone UTF-8-tekst. Alleen binaire inhoud gebruikt bij
@@ -227,11 +249,24 @@ Een story heeft geen status `FAILED` of **mislukt**. Een functioneel ontoereiken
 Productplanning wijzigt alleen de volgorde van `TODO`-stories. Een `IN_PROGRESS` story wordt normaal
 niet onderbroken.
 
+Een storyafhankelijkheid is voldaan zodra de afhankelijke bronstory `DONE` is; kwaliteitsverificatie
+is geen dispatchvoorwaarde. Daardoor mag de volgende technische slice al worden gebouwd terwijl de
+eerdere oplevering nog wordt getest. `TODO` en `IN_PROGRESS` voldoen een afhankelijkheid niet. Een
+`CANCELLED` dependency voldoet haar evenmin. Als zo'n annulering nog open afhankelijke
+`TODO`-stories raakt, maakt Productplanning idempotent één `REPLAN_CANCELLED_DEPENDENCY`-workitem.
+Een latere planningsrun vervangt of annuleert die stories voordat ze weer uitvoerbaar kunnen zijn.
+Een `IN_PROGRESS` afhankelijke story wordt nooit met terugwerkende kracht onderbroken.
+
+De Stakeholder kan geen losse machinegemaakte story annuleren of inhoudelijk wijzigen. De
+Stakeholder kan de epic stoppen of `TODO`-werk via epicprioriteit laten herordenen. Alleen
+Productplanning annuleert een `TODO`-story als gevolg van een geldige epicannulering of herplanning;
+Software Factory kan haar eigen reeds verstuurde story extern `CANCELLED` melden.
+
 `cancelStoriesForEpic(...)` bewaart altijd een interne duurzame annuleringsmarker voor epic-ID en
 epicversie, ook als nog geen stories bestaan. In dezelfde transactie zet het alle niet-gereserveerde
 `TODO`-stories op `CANCELLED`. Een latere of op AI wachtende planningssessie mag door de marker geen
-stories meer voor die epic publiceren. Een `IN_PROGRESS` of al voor dispatch gereserveerde story
-geldt als gestart en loopt normaal af.
+stories meer voor die epic publiceren. Een `IN_PROGRESS` story loopt normaal af. Een alleen lokaal
+gereserveerde story wacht op de hieronder beschreven externe aanwezigheidscontrole.
 
 ## Atomaire dispatchreservering
 
@@ -247,19 +282,26 @@ De reservering blijft intern onderdeel van de storyadministratie en levert een o
 idempotentiesleutel voor herstel. Een tweede sessie kan daardoor niet een andere story voor dat
 product passeren.
 
-Annulering en reservering gebruiken dezelfde Productplanning-transactiegrens. Wint annulering, dan
-kan de story niet meer worden gereserveerd. Wint de reservering, dan geldt de story als reeds gestart
-en mag de dispatcher de gereserveerde levering afmaken. Dit is de eenduidige grens voor gelijktijdige
-UI-annulering en dispatch.
+Vóór iedere externe retry zoekt de dispatcher eerst met dezelfde idempotentiesleutel bij Software
+Factory. Bestaat het werk al, dan geldt het werkelijk als gestart en wordt de lokale koppeling
+hersteld. Bestaat het aantoonbaar niet, dan roept de dispatcher
+`revalidateDispatchReservation(...)` aan. Productplanning controleert in één transactie opnieuw de
+epicmarker: zonder annulering blijft exact dezelfde reservering geldig; met annulering vervalt zij
+en wordt de story `CANCELLED`. Is de externe toestand onbekend, dan volgt geen externe aanmaak en
+geen lokale annulering. Hiermee blijft alleen het kleine racevenster tussen de laatste atomaire
+herbevestiging en externe aanmaak over; een dagenoude reservering wint niet onbeperkt van een latere
+epicannulering.
 
 ## Snelle opleverstatus en epicverificatie
 
 Wanneer de dispatcher een Software Factory-oplevering ziet, roept hij
 `markStoryAsDeveloped(...)` aan. Deze handler start geen agent en doet in milliseconden:
 
-1. valideer idempotentiesleutel, externe referentie en verwachte storyversie;
-2. zet de story van `IN_PROGRESS` naar `DONE` en bewaar de oplevervelden;
-3. vraag `requestStoryVerification(...)` aan, of `requestBugfixRetest(...)` bij een bugfix;
+1. valideer idempotentiesleutel, externe referentie, verwachte storyversie en de verplichte
+   `deliveredCommitSha`;
+2. zet de story van `IN_PROGRESS` naar `DONE` en bewaar de oplevervelden en exacte commit;
+3. vraag `requestStoryVerification(...)` aan, of `requestBugfixRetest(...)` bij een bugfix, met die
+   commit als vereiste testversie;
 4. laat de epic `ACTIVE`; oplevering alleen is nog geen toestemming voor epicverificatie.
 
 Wanneer de dispatcher ziet dat Software Factory een externe story heeft verwijderd of bewust niet
@@ -290,7 +332,7 @@ Nadat Kwaliteitsbewaking een storyverificatie of bugfixhertest heeft gepubliceer
 3. laat de epic `ACTIVE` bij een afgekeurde of geblokkeerde controle;
 4. controleert bij een geslaagde controle of alle niet-geannuleerde stories `DONE` zijn en iedere
    story of bugfix een geslaagde actuele verificatie heeft;
-5. controleert normaal dat geen open bug en geen `PENDING` of `IN_PROGRESS` bugfix- of
+5. controleert via `findBugs(...)` dat geen open bug en geen `PENDING` of `IN_PROGRESS` bugfix- of
    dekkingsopdracht voor de epic bestaat; als een externe story `CANCELLED` is, mag in plaats
    daarvan de hierboven beschreven feitelijke herbeoordeling plaatsvinden;
 6. roept alleen dan idempotent `markEpicReadyForVerification(...)` en daarna
@@ -328,11 +370,13 @@ Ook een tijdelijke transport-, configuratie- of autorisatiefout start geen plann
 
 ## Fouten en idempotentie
 
-- Maximaal één `runProcessSession()` bewaakt globale publicatie en ordening.
+- Maximaal één `runProcessSession(productId)` bewaakt per product publicatie en ordening;
+  verschillende producten mogen parallel lopen.
 - Een run gebruikt één vastgezette batch en inputmomentopname; nieuw queuewerk wacht.
 - Workitems en moduleoverschrijdende commands zijn idempotent en herstelbaar.
 - Een gekozen epicversie kan niet door een nieuwere ontwerpversie worden vervangen.
-- Een mislukte run laat per workitem een zichtbare status en fout achter.
+- Een technisch mislukte AI-taak laat sessie, workitems en epicclaim zichtbaar en herstelbaar achter;
+  een volgende productrun hervat dezelfde claim.
 
 ## Eisen aan iedere implementatie
 
@@ -341,8 +385,9 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - zij hetzelfde publieke `planning`-contract implementeert en andere capabilities alleen via
   `product-factory-api` gebruikt;
 - iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
-- alleen `runProcessSession()` voor Productplanning nieuwe AI-taken aanvraagt;
-- maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
+- alleen `runProcessSession(productId)` voor Productplanning nieuwe AI-taken aanvraagt;
+- maximaal één onafgeronde logische sessie per product bestaat, verschillende producten parallel
+  mogen lopen en een wachtende sessie geen technische lock vasthoudt;
 - ieder geclaimd workitem eindigt als `DONE`, `BLOCKED` of `FAILED`;
 - een epic volledig wordt afgedekt door zelfstandig uitvoerbare stories;
 - iedere story het volledige Storycontract volgt;
@@ -351,7 +396,11 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - bugfixstories pas na de bevestigde natuurlijke koppeling `linkBugfixStory(bugId, storyId)`
   uitvoerbaar worden en per bug maximaal één story tegelijk `TODO` of `IN_PROGRESS` is;
 - een annuleringsmarker latere storypublicatie verhindert en dispatchreservering de gelijktijdige
-  grens met annuleren atomair maakt;
+  grens met annuleren atomair maakt, ook bij een late retry na een externe storing;
+- `DONE` iedere dependency vervult, `CANCELLED` haar blokkeert en dan automatisch gericht
+  herplanningswerk voor nog open afhankelijke stories ontstaat;
+- iedere opgeleverde story de exacte `deliveredCommitSha` bewaart en die commit meegaat naar het
+  verificatiewerk;
 - de eigen procesruntime iedere agent alleen het actuele geheugen van haar vertrouwd geconfigureerde eigen rol
   geeft en de exact gelezen geheugenversies vastlegt;
 - iedere AI-taak een vaste provider, model en configuratieversie heeft en via AI-uitvoering loopt;

@@ -36,7 +36,7 @@ Een inhoudelijke run kan vier vaste agentrollen gebruiken:
    `sequenceNumber`s.
 4. **Planningscriticus** — controleert dekking, storygrootte, afhankelijkheden, UX en prioriteitsreden.
 
-Alleen `runProcessSession()` mag voor deze rollen AI-taken aanvragen. Niet iedere run hoeft alle
+Alleen `runProcessSession(productId)` mag voor deze rollen AI-taken aanvragen. Niet iedere run hoeft alle
 rollen te gebruiken: een zuivere herprioritering kan bijvoorbeeld zonder Storymaker.
 
 Voor iedere taak leest Productplanning de betreffende `AiJobConfiguration` en geeft zij de complete
@@ -52,7 +52,7 @@ Planningscriticus. Rollen delen werk alleen via expliciete concepten en handoffs
 ## Verloop van één processessie
 
 ```text
-claim PENDING workitems, beschikbare epics en inputversies
+hervat productclaim, anders claim PENDING workitems en beschikbare epics
                       │
                       ▼
        Epicplanner beoordeelt werk en epics
@@ -78,14 +78,16 @@ kritiek, publicatie en globale ordening zijn sequentieel en atomair.
 
 ### Stap 1 — claimen en beoordelen
 
-Applicatiecode claimt de modulebrede run en vaste batch. De Epicplanner ontvangt:
+Applicatiecode claimt of hervat de run voor één product en de vaste batch. Een onafgeronde sessie en
+reeds geclaimde `IN_PLANNING` epic gaan voor nieuw werk. De Epicplanner ontvangt:
 
 - alle `PENDING` workitems uit de batch;
 - `AVAILABLE` epics en bestaande actieve epics;
 - productopdracht en geldige besluiten;
 - bestaande storyvolgorde;
 - exacte bugs, verificaties en relevante omgevingsinformatie;
-- zo nodig Git-code, documentatie en veilige applicatiecontext.
+- zo nodig de door de worker op een bevroren commit-SHA uitgecheckte Git-code, documentatie en
+  veilige applicatiecontext.
 
 De Epicplanner maakt een `EpicSelectionAssessment`, bepaalt welke beschikbare epic of epics deze run
 worden gepland en legt gewone prioriteitsredenen intern vast. Productplanning claimt iedere gekozen
@@ -174,7 +176,7 @@ planningswerk.
 
 ## Wanneer een sessie klaar is
 
-Een uitgebreide planningsrun is klaar wanneer:
+Een uitgebreide planningsrun voor één product is klaar wanneer:
 
 - ieder geclaimd workitem `DONE`, `BLOCKED` of `FAILED` is;
 - iedere nieuwe story zelfstandig uitvoerbaar is;

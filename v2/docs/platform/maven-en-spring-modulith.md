@@ -244,7 +244,8 @@ bewijzen, bijvoorbeeld:
 - dezelfde commands, conflictsituaties en idempotentie;
 - dezelfde publieke statussen en DTO-betekenis;
 - dezelfde eigenaarschaps- en read-only grenzen;
-- maximaal één actieve uitvoering;
+- maximaal één onafgeronde logische uitvoering per product, met parallelle uitvoering voor
+  verschillende producten;
 - correcte implementatie-identiteit op nieuwe sessies.
 
 Daarbovenop bestaan:

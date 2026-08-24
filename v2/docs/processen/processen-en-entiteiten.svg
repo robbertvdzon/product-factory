@@ -30,7 +30,7 @@
   <text x="170" y="130" class="note">command: vraagt de eigenaar om een geldige wijziging</text>
   <path d="M585 125 H675" class="query"/>
   <text x="690" y="130" class="note">query: levert een read-only DTO</text>
-  <text x="1050" y="130" class="note">«scheduled/manual» start de enige functie die AiTasks mag aanvragen · max. één uitvoering per module</text>
+  <text x="1050" y="130" class="note">«scheduled/manual» start de enige AiTask-ingang · max. één sessie per module en product</text>
 
   <!-- Stakeholder actor -->
   <circle cx="260" cy="177" r="25" fill="#fef9c3" stroke="#ca8a04" stroke-width="3"/>
@@ -69,7 +69,7 @@
   <path d="M675 222 V242 H1235 V222" fill="#dbeafe"/>
   <text x="700" y="220" class="module-title">Productontwerp</text>
   <text x="700" y="272" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="700" y="302" class="api">«scheduled/manual» runProcessSession()</text>
+  <text x="700" y="302" class="api">«scheduled/manual» runProcessSession(productId)</text>
   <text x="700" y="334" class="api">«query» getEpic(...) / findAvailableEpics(...)</text>
   <text x="700" y="360" class="api">«query» findActiveEpics(...)</text>
   <text x="700" y="392" class="api">«command» claimEpicForPlanning(...)</text>
@@ -93,13 +93,13 @@
   <path d="M675 932 V952 H1235 V932" fill="#d1fae5"/>
   <text x="700" y="930" class="module-title">Productplanning</text>
   <text x="700" y="982" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="700" y="1012" class="api">«scheduled/manual» runProcessSession()</text>
+  <text x="700" y="1012" class="api">«scheduled/manual» runProcessSession(productId)</text>
   <text x="700" y="1044" class="api">«query» getStory(...) / getBacklog(...)</text>
   <text x="700" y="1070" class="api">«query» findPlanningWorkItems(...)</text>
   <text x="700" y="1096" class="api" style="font-size:12px">«command» requestBugfix(...) / requestEpicGapPlanning(...)</text>
   <text x="700" y="1122" class="api" style="font-size:11px">«command» requestEpicReprioritization(...) / requestManualReplan(...)</text>
   <text x="700" y="1148" class="api">«command» cancelStoriesForEpic(...)</text>
-  <text x="700" y="1174" class="api" style="font-size:10px">«command» reserveNextStoryForDispatch / markStoryAsDispatched/Developed/Cancelled</text>
+  <text x="700" y="1174" class="api" style="font-size:9px">«command» reserve/revalidate dispatch / mark Story dispatched/developed/cancelled</text>
   <text x="700" y="1200" class="api">«command» recordStoryVerification(...)</text>
   <line x1="700" y1="1236" x2="1210" y2="1236" class="divider" stroke="#a7f3d0"/>
   <text x="700" y="1266" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
@@ -117,8 +117,8 @@
   <path d="M1370 222 V242 H2020 V222" fill="#ede9fe"/>
   <text x="1395" y="220" class="module-title">Kwaliteitsbewaking</text>
   <text x="1395" y="272" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="1395" y="302" class="api">«scheduled/manual» runProcessSession()</text>
-  <text x="1395" y="334" class="api">«query» getBug(...)</text>
+  <text x="1395" y="302" class="api">«scheduled/manual» runProcessSession(productId)</text>
+  <text x="1395" y="334" class="api">«query» getBug(...) / findBugs(...)</text>
   <text x="1395" y="360" class="api">«query» findVerifications(...)</text>
   <text x="1395" y="386" class="api" style="font-size:11px">«query» quality/history / workitems / retryable workitems</text>
   <text x="1395" y="418" class="api">«command» requestStoryVerification(...)</text>
@@ -134,7 +134,7 @@
   <text x="1395" y="705" class="note">Queuecommands bewaren alleen werk; alleen de run vraagt AiTasks aan.</text>
   <text x="1395" y="729" class="note">Retry: attemptCount · retryAfter · back-off · Retry now.</text>
   <text x="1395" y="753" class="note">Kwaliteitsbewaking schrijft geen Story, Epic of UserSignal.</text>
-  <text x="1395" y="801" class="note">Iedere niet-lege testsessie maakt een QualitySnapshot.</text>
+  <text x="1395" y="801" class="note">Iedere niet-lege productsessie maakt één QualitySnapshot.</text>
   </g>
 
   <!-- Besluitenregister -->
@@ -161,15 +161,15 @@
   <path d="M1370 1002 V1022 H2020 V1002" fill="#ffedd5"/>
   <text x="1395" y="1000" class="module-title">Software Factory-dispatcher</text>
   <text x="1395" y="1052" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="1395" y="1082" class="api">«scheduled/manual» runDispatchSession()</text>
+  <text x="1395" y="1082" class="api">«scheduled/manual» runDispatchSession(productId)</text>
   <text x="1395" y="1108" class="api" style="font-size:12px">«query» getDispatchStatus(...) / findDeliveryAttempts(...)</text>
   <line x1="1395" y1="1132" x2="1995" y2="1132" class="divider" stroke="#fed7aa"/>
   <text x="1395" y="1162" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="1395" y="1195" class="entity">DeliveryAttempt</text>
   <line x1="1395" y1="1224" x2="1995" y2="1224" class="divider" stroke="#fed7aa"/>
   <text x="1395" y="1254" class="section-title">GEBRUIKT</text>
-  <text x="1395" y="1285" class="note">Alle producten · atomaire Story-dispatchreservering.</text>
-  <text x="1395" y="1309" class="note">Per product max. één nieuwe story · externe Factory-API.</text>
+  <text x="1395" y="1285" class="note">Eén product · atomaire reserveer- en revalidategrens.</text>
+  <text x="1395" y="1309" class="note">Max. één nieuwe story · status OPEN / DONE / CANCELLED.</text>
   <text x="1395" y="1333" class="note">StoryDeliveryPackage is transport, geen entiteit.</text>
   </g>
 
@@ -225,7 +225,7 @@
   <path d="M1750 1340 V1410" class="command"/>
   <text x="1597" y="1380" class="flow">StoryDeliveryPackage</text>
   <path d="M2035 1410 V1340" class="query"/>
-  <text x="2050" y="1380" class="flow">werkstatus</text>
+  <text x="2050" y="1380" class="flow">OPEN / DONE(+commit) / CANCELLED</text>
 
   <!-- Decision commands are summarized to avoid crossing every module -->
   <path d="M320 920 V1030" class="command"/>

@@ -30,17 +30,18 @@ publieke commands en read-only queries en krijgen nooit toegang tot de epicrepos
 De enige agentgestuurde ingang is:
 
 ```java
-void runProcessSession();
+void runProcessSession(ProductId productId);
 ```
 
-De scheduler of een bevoegde handmatige UI-/REST-actie kan deze functie starten. De aanroep heeft
-geen product-ID of epic-ID als argument: de module bepaalt zelf voor welk product er zinvol werk is.
-Er kan modulebreed maximaal één uitvoering van de procesfunctie tegelijk lopen. Een tweede
-handmatige aanroep krijgt een `ProcessAlreadyRunning`-fout, bij REST bijvoorbeeld HTTP 409. Een
-botsende schedulerrun wordt als overgeslagen geregistreerd. Zonder zinvol werk eindigt de functie
-als succesvolle no-op.
+De scheduler of een bevoegde handmatige UI-/REST-actie kan deze functie voor één product starten.
+Per product kan maximaal één onafgeronde logische Productontwerp-sessie bestaan, ook wanneer die
+`WAITING_FOR_AI` of `BLOCKED` is; verschillende producten mogen parallel worden verwerkt. Een
+handmatige aanroep hervat zo'n niet-actief wachtende sessie. Alleen wanneer voor hetzelfde product
+op dat moment al een functiecall uitvoert, volgt `ProcessAlreadyRunning`, bij REST bijvoorbeeld HTTP
+409. Een botsende schedulerrun met zo'n actieve call wordt als overgeslagen geregistreerd. Zonder
+zinvol werk eindigt de functie als succesvolle no-op.
 
-Alleen `runProcessSession()` mag voor Productontwerp nieuwe taken bij
+Alleen `runProcessSession(productId)` mag voor Productontwerp nieuwe taken bij
 [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
 implementatiedetail. De laptopworker voert ze later asynchroon uit en kent Productontwerp niet.
 
@@ -89,13 +90,19 @@ Voor iedere gebruikte publicatie legt de module bron-ID en bronversie vast. Deze
 niet tweemaal als nieuwe input behandeld.
 
 Een processessie die op AI wacht, bewaart haar taak-ID's en status `WAITING_FOR_AI` en geeft de
-aanroep terug. Een volgende geplande of handmatige `runProcessSession()` hervat dezelfde sessie. Als
+aanroep terug. Een volgende geplande of handmatige `runProcessSession(productId)` hervat dezelfde
+sessie voor dat product. Als
 de resultaten nog ontbreken, blijft zij zonder nieuwe taken aan te maken wachten.
 
 Bij een inhoudelijke sessie mag Productontwerp de publieke Git-URL uit de productopdracht uitchecken
 en broncode, tests en documentatie read-only bekijken. Productontwerp commit en pusht nooit. De
 gelezen commit-SHA kan als bronverwijzing bij de sessie of epic worden vastgelegd; ruwe
 repository-inhoud steekt de modulegrens niet over.
+
+Voor een agenttaak bevriest Productontwerp de publieke Git-URL en exacte commit-SHA. De laptopworker
+checkt die SHA zelf uit in de tijdelijke Dockeromgeving van de taak. Git-code, documentatie en tekst
+uit de bekeken applicatie zijn onvertrouwde contextdata en kunnen nooit de vaste taakopdracht,
+veiligheidsgrenzen of toegestane commands wijzigen.
 
 Productontwerp mag ook de werkende applicatie via `TestableProductDetails` bekijken. Acceptatie is
 de voorkeursomgeving voor handelingen die data kunnen veranderen. Productie wordt alleen read-only
@@ -163,6 +170,11 @@ Een beschikbare epicdefinitie bevat minimaal:
 Productontwerp beschrijft geen storylijst. Een mogelijke slice mag de behapbaarheid uitleggen, maar
 is geen vooraf geschreven backlog.
 
+Ieder succescriterium benoemt ook de observeerbare bron waarmee Kwaliteitsbewaking het kan toetsen,
+zoals gedrag op een geconfigureerde omgeving of een expliciet beschikbare meetbron. Een abstract
+langetermijndoel zonder tijdens verificatie beschikbaar bewijs kan richting geven, maar mag niet de
+enige voorwaarde zijn om deze epic af te ronden.
+
 ## Versies en bevriezing
 
 Iedere gepubliceerde epicversie is inhoudelijk onveranderlijk.
@@ -187,9 +199,12 @@ zonder bestaande stories een annuleringsmarker, zodat een wachtende Planner late
 publiceren. Na bevestiging zet Productontwerp de epic op `CANCELLED`. De herstelbare operatie maakt
 deze volgorde na een crash af.
 
-Productplanning annuleert alleen niet-gereserveerde `TODO`-stories. Een `IN_PROGRESS` of reeds voor
-dispatch gereserveerde story geldt als gestart en loopt normaal af. Annulering en reservering worden
-binnen Productplanning atomair geordend. Een ingetrokken nog niet gekozen epic heeft geen stories.
+Productplanning annuleert direct alle niet-gereserveerde `TODO`-stories. Een `IN_PROGRESS` story is
+extern gestart en loopt normaal af. Bij een alleen lokaal gereserveerde story bepaalt de dispatcher
+eerst met dezelfde idempotentiesleutel of Software Factory haar al kent. Alleen bestaand extern werk
+loopt door; wanneer extern aantoonbaar nog niets bestaat, maakt
+`revalidateDispatchReservation(...)` de reservering ongeldig en de story `CANCELLED`. Een
+ingetrokken nog niet gekozen epic heeft geen stories.
 
 Productontwerp controleert status en verwacht versienummer in dezelfde transactie. Zo kan een
 langlopende processessie nooit een inmiddels geclaimde epic overschrijven.
@@ -218,7 +233,8 @@ dekkingsgaten uit de verificatie blijven binnen dezelfde bevroren epic. Bij `BLO
 ## Wanneer Productontwerp draait
 
 Productontwerp heeft geen inkomende werkqueue. Alleen de scheduler of een bevoegde handmatige
-aanroep start `runProcessSession()`. De module bepaalt zelf of input om ontwerpwerk vraagt. Mogelijke
+aanroep start `runProcessSession(productId)`. De module bepaalt zelf of input voor dat product om
+ontwerpwerk vraagt. Mogelijke
 aanleidingen zijn:
 
 - een gewijzigde productopdracht of een nieuw of gewijzigd besluit;
@@ -245,8 +261,9 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - zij hetzelfde publieke `design`-contract implementeert en andere capabilities alleen via
   `product-factory-api` gebruikt;
 - iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
-- alleen `runProcessSession()` voor Productontwerp nieuwe AI-taken aanvraagt;
-- maximaal één uitvoering tegelijk loopt; een wachtende logische sessie houdt geen lock vast;
+- alleen `runProcessSession(productId)` voor Productontwerp nieuwe AI-taken aanvraagt;
+- maximaal één onafgeronde logische sessie per product bestaat; verschillende producten mogen
+  parallel lopen en een wachtende sessie houdt geen technische lock vast;
 - iedere gepubliceerde epic aan het volledige Epiccontract voldoet;
 - iedere epic zelfstandig door Productplanning kan worden begrepen;
 - geen stories in Productontwerp worden gemaakt;

@@ -23,7 +23,13 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 - Bewijs dat een door Software Factory geannuleerde story `CANCELLED` wordt en na afronding van het
   overige werk tot een complete feitelijke epicbeoordeling leidt.
 - Bewijs dat annuleringsmarker en dispatchreservering gelijktijdige planning, annulering en levering
-  eenduidig ordenen.
+  eenduidig ordenen, ook wanneer een langdurige storing pas na epicannulering herstelt.
+- Bewijs dat een terminale planningstaak dezelfde `IN_PLANNING` epic later hervat en geen
+  verweesde claim maakt.
+- Bewijs dat een achterlopende acceptatiedeployment `DEPLOYMENT_PENDING` blijft totdat de
+  `deliveredCommitSha` werkelijk draait.
+- Bewijs dat iedere procesmodule maximaal één sessie per product heeft en twee verschillende
+  producten wel gelijktijdig kan verwerken.
 - Bewijs dat alle geplande functies via zowel schedule als bevoegde UI/REST-start werken.
 - Verifieer dat productie uitsluitend de drie MVP-procesimplementaties selecteert.
 - Werk runbooks, rooktests en documentatie bij op basis van de werkelijk gebouwde route.
@@ -32,6 +38,8 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 
 Geen van de implementaties uit `uitgebreid.md` wordt gebouwd, geselecteerd of gedeeltelijk
 voorbereid. Optimalisaties op basis van productie-ervaring komen pas na deze complete MVP.
+Externe notificaties via e-mail, Telegram of een andere dienst vallen eveneens buiten deze route;
+operationele aandachtspunten zijn in de MVP zichtbaar in de UI.
 
 ## Specificaties
 

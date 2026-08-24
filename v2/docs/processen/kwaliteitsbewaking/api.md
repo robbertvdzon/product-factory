@@ -35,19 +35,22 @@ doorgeven aan de module die de betreffende entiteit bezit.
 De enige agentgestuurde ingang is:
 
 ```java
-void runProcessSession();
+void runProcessSession(ProductId productId);
 ```
 
-De scheduler of een handmatige UI-/REST-actie kan deze functie starten. Er kan modulebreed maximaal
-één uitvoering tegelijk lopen. Een tweede handmatige aanroep krijgt een
-`ProcessAlreadyRunning`-fout; een botsende geplande aanroep wordt als overgeslagen geregistreerd.
-Alleen deze functie mag voor Kwaliteitsbewaking nieuwe taken bij
-[AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
-implementatiedetail.
+De scheduler of een handmatige UI-/REST-actie kan deze functie voor één product starten. Per product
+kan maximaal één onafgeronde logische kwaliteitssessie bestaan, ook wanneer die `WAITING_FOR_AI` of
+`BLOCKED` is; verschillende producten mogen parallel worden getest. Een handmatige aanroep hervat
+zo'n niet-actief wachtende sessie. Alleen wanneer voor hetzelfde product op dat moment al een
+functiecall uitvoert, volgt `ProcessAlreadyRunning`; een botsende geplande aanroep met zo'n actieve
+call wordt als overgeslagen geregistreerd. Alleen deze functie mag voor Kwaliteitsbewaking nieuwe
+taken bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. Welke en hoeveel taken
+een sessie gebruikt, is een implementatiedetail.
 
 Aan het begin van een run zet gewone applicatiecode eerst retrybare `BLOCKED`- of `FAILED`-workitems
-waarvan `retryAfter` is verstreken terug op `PENDING`. Daarna claimt de run atomair een vaste momentopname
-van de `PENDING` `QualityWorkItem`s die klaarstaan. Nieuwe verzoeken wachten op de volgende run.
+van dit product waarvan `retryAfter` is verstreken terug op `PENDING`. Daarna claimt de run atomair
+een vaste momentopname van de `PENDING` `QualityWorkItem`s van dit product die klaarstaan. Nieuwe
+verzoeken wachten op de volgende run.
 Naast deze gerichte queueopdrachten mag de run zelf periodiek testwerk kiezen. Zonder queuewerk of
 periodiek werk eindigt zij als succesvolle no-op.
 
@@ -56,6 +59,7 @@ de eigen queue en bugs:
 
 ```java
 BugDetails getBug(BugId bugId);
+List<BugDetails> findBugs(BugFilter filter);
 List<VerificationDetails> findVerifications(VerificationTarget target);
 QualitySnapshotDetails getCurrentQuality(ProductId productId);
 List<QualitySnapshotDetails> getQualityHistory(ProductId productId, TimeRange range);
@@ -72,10 +76,14 @@ void linkBugfixStory(BugId bugId, StoryId storyId);
 De vier `request...`-commands starten geen test en geen agent. Zij valideren de bron en voegen alleen
 een idempotent `PENDING`-werkitem toe. `retryQualityWorkItem(...)` maakt alleen een retrybaar
 workitem direct klaar; de normale UI-/REST-afhandeling start daarna zo nodig de gewone
-`runProcessSession()`. `linkBugfixStory(bugId, storyId)` laat Productplanning een bugfixstory aan een
+`runProcessSession(productId)`. `linkBugfixStory(bugId, storyId)` laat Productplanning een bugfixstory aan een
 bestaande uitvoerbare bug koppelen. Dezelfde koppeling is idempotent. Een bug mag na een afgeronde
 of geannuleerde eerdere poging later opnieuw een bugfixstory krijgen, maar nooit twee tegelijk
 actieve bugfixstories. Geen aanroeper krijgt toegang tot de kwaliteitsrepository.
+
+`findBugs(...)` ondersteunt minimaal filteren op product-ID, epic-ID en status. Productplanning
+gebruikt deze query om vóór epicverificatie betrouwbaar vast te stellen dat geen relevante `OPEN`
+bug resteert; het hoeft dat niet uit workitems of verificatielinks af te leiden.
 
 ## QualityWorkItem: de queuegrens
 
@@ -119,17 +127,18 @@ voor ieder item minimaal product, type, doel, blokkadereden, aantal pogingen, la
 `retryAfter`.
 
 `retryQualityWorkItem(...)` behoudt historie en `attemptCount`, maakt `retryAfter` leeg en zet het
-item op `PENDING`. De UI-/REST-use-case roept daarna de normale `runProcessSession()` aan wanneer
-Kwaliteitsbewaking niet al draait. Een gelijktijdige `ProcessAlreadyRunning` betekent voor deze
-use-case alleen dat de bestaande run doorgaat; het workitem blijft veilig `PENDING` voor een
-volgende vaste batch.
+item op `PENDING`. De UI-/REST-use-case roept daarna de normale
+`runProcessSession(workItem.productId)` aan wanneer Kwaliteitsbewaking voor dat product niet al
+draait. Een gelijktijdige `ProcessAlreadyRunning` voor hetzelfde product betekent alleen dat de
+bestaande run doorgaat; het workitem blijft veilig `PENDING` voor een volgende vaste batch.
 
 ## Interface met andere modules en services
 
 Kwaliteitsbewaking gebruikt publieke capabilitypackages uit `product-factory-api` en hun read-only
-DTO's. DTO's zijn geen
-database-entiteiten. Browser-, log- en testclients zijn interne adapters. Spring Modulith
-structureert alleen de binnenkant van de gekozen Kwaliteitsbewaking-implementatie.
+DTO's. DTO's zijn geen database-entiteiten. De module assembleert en valideert testtaken; de
+daadwerkelijke Git-checkout, browser, log- en testclients draaien als tools in de tijdelijke
+Dockeromgeving van de worker. Spring Modulith structureert alleen de binnenkant van de gekozen
+Kwaliteitsbewaking-implementatie.
 
 ### Input
 
@@ -139,7 +148,7 @@ structureert alleen de binnenkant van de gekozen Kwaliteitsbewaking-implementati
 | `TestableProductDetails` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende privacy-, veiligheids- of productgrenzen die het testen beïnvloeden |
 | `EpicDetails` | Productontwerp | bevroren scope, UX, succescriteria en status van de geclaimde versie |
-| `StoryDetails` | Productplanning | type, storyversie, status, oplevergegevens, acceptatiecriteria en zelfstandige UX |
+| `StoryDetails` | Productplanning | type, storyversie, status, `deliveredCommitSha`, overige oplevergegevens, acceptatiecriteria en zelfstandige UX |
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
 | `QualityWorkItem` | Kwaliteitsbewaking | duurzame gerichte testopdracht die de run claimt |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
@@ -152,14 +161,23 @@ loopt uitsluitend via de publieke API van [Agentgeheugen](../../gedeelde-modules
 wijzigt alleen geheugen van haar eigen vertrouwd geconfigureerde rol.
 
 Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug zonder thread of lock
-vast te houden. Een volgende run hervat dezelfde sessie. Zolang resultaten ontbreken, worden geen
-nieuwe duplicerende taken aangemaakt.
+vast te houden. Een volgende run voor hetzelfde product hervat dezelfde sessie. Zolang resultaten
+ontbreken, worden geen nieuwe duplicerende taken aangemaakt.
 
-Kwaliteitsbewaking mag de publieke Git-URL uit de productopdracht uitchecken en code, tests en
-documentatie read-only gebruiken voor testselectie, regressierisico en uitleg. Zij commit en pusht
+Kwaliteitsbewaking bevriest de publieke Git-URL en de commit die als codecontext moet worden
+gebruikt. De worker checkt die commit zelf uit in de tijdelijke Dockeromgeving en gebruikt code,
+tests en documentatie read-only voor testselectie, regressierisico en uitleg. Zij commit en pusht
 nooit. Code is context en geen bewijs dat gedrag werkt; de gedeployde applicatie en het verzamelde
-testbewijs blijven leidend. Waar bekend legt
-de verificatie vast welke commit is bekeken en welke productversie werkelijk is getest.
+testbewijs blijven leidend. Git-inhoud en tekst uit de geteste applicatie zijn onvertrouwde data en
+kunnen de vaste taakopdracht, veiligheidsgrenzen of resultaatschema's niet wijzigen.
+
+Voor een story- of bugfixcontrole is `StoryDetails.deliveredCommitSha` de vereiste productversie.
+`TestableProductDetails` wijst voor iedere testomgeving naar een revisionendpoint dat de werkelijk
+gedeployde commit of release betrouwbaar teruggeeft. De worker legt beide waarden vast. Als de
+doelomgeving de oplevercommit nog niet aantoonbaar bevat, wordt het `QualityWorkItem` retrybaar
+`BLOCKED` met reden `DEPLOYMENT_PENDING`; de oplevering wordt niet tegen een oudere deployment
+afgekeurd. Iedere verificatie bewaart de bekeken codecommit, vereiste oplevercommit en werkelijk
+geteste deploymentrevision.
 
 ### Eigen output en downstream effect
 
@@ -185,9 +203,10 @@ kan de onderliggende verificatie of het bewijs veranderen.
 ## Kwaliteitsbeeld en historie
 
 Een `QualitySnapshot` is een onveranderlijke momentopname van wat op dat moment aantoonbaar bekend
-is over de productkwaliteit. Kwaliteitsbewaking maakt na iedere afgeronde processessie waarin
-daadwerkelijk is getest precies één nieuwe snapshot. Een no-op-sessie maakt geen duplicaat en een
-oude snapshot wordt nooit bijgewerkt.
+is over de productkwaliteit. Iedere processessie hoort bij precies één product. Kwaliteitsbewaking
+maakt na iedere afgeronde productgebonden processessie waarin daadwerkelijk is getest precies één
+nieuwe snapshot voor dat product. Een no-op-sessie maakt geen duplicaat en een oude snapshot wordt
+nooit bijgewerkt.
 
 Een snapshot bevat geen verborgen totaalscore. Hij toont afzonderlijk:
 
@@ -275,8 +294,13 @@ De uitkomst is:
   epic;
 - `BLOCKED` — een verantwoord oordeel is tijdelijk niet mogelijk; reden en retry staan op het
   `QualityWorkItem`;
-- `NOT_SUCCESSFUL` — alles werkt zoals afgesproken, maar het bedoelde gebruikersresultaat is niet
-  bereikt.
+- `NOT_SUCCESSFUL` — alles werkt zoals afgesproken, maar beschikbaar bewijs weerlegt een vooraf
+  toetsbaar succescriterium van de epic.
+
+`NOT_SUCCESSFUL` vereist dus positief, herleidbaar bewijs. Ontbrekende gebruiksdata, een onbereikbare
+meetbron of een nog niet gedeployde commit geven `BLOCKED`. Een abstract langetermijndoel zonder
+beschikbare meetbron kan aanleiding zijn voor een later `UserSignal`, maar nooit voor een
+willekeurig negatief epicoordeel.
 
 Kwaliteitsbewaking schrijft eerst een onveranderlijke `Verification` en roept daarna
 `recordEpicVerification(...)` op Productontwerp aan. Productontwerp controleert de epicversie en is
@@ -310,7 +334,7 @@ Kwaliteitsbewaking classificeert een ontbrekend of onjuist resultaat vóór publ
 |---|---|---|
 | Gedrag stond in een uitgevoerde story maar werkt niet volgens de story | bestaande `OPEN` bug of nieuwe `Bug`, plus `Verification` met `NEEDS_WORK` bij een epiccontrole | Kwaliteitsbewaking vraagt Productplanning om een bugfix |
 | Gedrag viel duidelijk binnen de bevroren epic, maar er bestond nooit een story voor | `Verification` met ontbrekende dekking | Kwaliteitsbewaking vraagt Productplanning om aanvullend werk |
-| Alles werkt zoals ontworpen, maar de productaanname blijkt onjuist | `Verification` met `NOT_SUCCESSFUL` en een `UserSignal` van categorie `QUALITY_PATTERN` | Productontwerp registreert de uitkomst en leert |
+| Alles werkt zoals ontworpen en toetsbaar bewijs weerlegt de productaanname | `Verification` met `NOT_SUCCESSFUL` en een `UserSignal` van categorie `QUALITY_PATTERN` | Productontwerp registreert de uitkomst en leert |
 | Gewenst gedrag valt buiten de bevroren scope | `UserSignal` | Productontwerp kan een vervolgepic maken |
 
 Kwaliteitsbewaking maakt in geen van deze gevallen zelf een story.
@@ -384,7 +408,8 @@ Gericht werk wordt gequeue'd door:
 
 Daarnaast kan de scheduler een run starten voor dagelijkse kernroutes, een verouderd kwaliteitsbeeld
 of een periodieke kwaliteitscontrole. Een queuecommand is een snelle databasebewerking; alleen de latere
-`runProcessSession()` mag nieuwe AI-taken aanvragen. De backloggrootte speelt hierbij geen rol.
+`runProcessSession(productId)` mag nieuwe AI-taken aanvragen. De backloggrootte speelt hierbij geen
+rol.
 
 ## Fouten, hervatten en idempotentie
 
@@ -404,8 +429,9 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - zij hetzelfde publieke `quality`-contract implementeert en andere capabilities alleen via
   `product-factory-api` gebruikt;
 - iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
-- alleen `runProcessSession()` voor Kwaliteitsbewaking nieuwe AI-taken aanvraagt;
-- maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
+- alleen `runProcessSession(productId)` voor Kwaliteitsbewaking nieuwe AI-taken aanvraagt;
+- maximaal één onafgeronde logische sessie per product bestaat, verschillende producten parallel
+  mogen lopen en een wachtende sessie geen technische lock vasthoudt;
 - ieder geclaimd workitem `DONE`, `BLOCKED` of `FAILED` wordt;
 - retrybare workitems zonder maximum volgens de vaste begrensde back-off opnieuw beschikbaar komen;
 - een handmatige retry historie en `attemptCount` behoudt en nooit een tweede processessie afdwingt;
@@ -414,6 +440,8 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - een bugfixstory alleen `TODO`, `IN_PROGRESS`, `DONE` of `CANCELLED` kan zijn en een afgekeurde of
   geannuleerde poging nooit een aparte mislukstatus maakt;
 - per bug maximaal één gekoppelde bugfixstory tegelijk `TODO` of `IN_PROGRESS` is;
+- iedere story- of bugfixverificatie de vereiste `deliveredCommitSha` vergelijkt met de werkelijk
+  gedeployde revision en bij achterlopende deployment `BLOCKED` blijft;
 - iedere verificatie exacte doel-, opleverings-, omgevings- en bronversies bevat;
 - ontbrekende epicdekking binnen de bevroren scope wordt bewezen;
 - ieder gebruikerssignaalonderzoek een expliciete uitkomst of blokkade krijgt;
@@ -421,8 +449,8 @@ De MVP en iedere latere implementatie moeten garanderen dat:
   geheugenversies vastlegt;
 - iedere AI-taak een vaste provider, model en configuratieversie heeft en via AI-uitvoering loopt;
 - publieke output pas na contract-, privacy- en geheimencontrole verschijnt;
-- iedere sessie waarin daadwerkelijk is getest precies één nieuwe onveranderlijke
-  `QualitySnapshot` maakt;
+- iedere productgebonden sessie waarin daadwerkelijk is getest precies één nieuwe onveranderlijke
+  `QualitySnapshot` voor dat product maakt;
 - publicaties en vervolgcommands atomair of idempotent herstelbaar zijn.
 
 ## Wanneer een sessie klaar is
@@ -436,7 +464,7 @@ Een inhoudelijke sessie is klaar wanneer:
 - ieder onderzocht gebruikerssignaal naar exact signaal-ID en -versie verwijst en een zichtbaar
   onderzoeksresultaat of expliciete blokkade heeft;
 - het kwaliteitsbeeld uit de gevalideerde resultaten is opgebouwd;
-- na daadwerkelijk testwerk precies één nieuwe `QualitySnapshot` is opgeslagen;
+- na daadwerkelijk testwerk precies één nieuwe `QualitySnapshot` voor het product is opgeslagen;
 - publicaties atomair en geversioneerd beschikbaar zijn;
 - de operationele sessiestatus en volgende plandatum zijn opgeslagen.
 
@@ -449,5 +477,6 @@ Een inhoudelijke sessie is klaar wanneer:
 - [Software Factory-dispatcher](../software-factory-dispatcher.md)
 - [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
 - [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
+- [AI-worker en taakcontainer](../../gedeelde-modules/ai-worker.md)
 - [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
 - [Processen en entiteiten](../processen-en-entiteiten.md)

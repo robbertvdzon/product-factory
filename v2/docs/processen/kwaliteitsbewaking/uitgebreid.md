@@ -39,7 +39,7 @@ Een processessie kan vier vaste agentrollen gebruiken:
 4. **Verificatiecriticus en bugtriager** — reproduceert bevindingen, classificeert bugs en
    dekkingsgaten, bepaalt ernst en keurt publieke resultaten goed.
 
-Alleen `runProcessSession()` mag voor deze rollen AI-taken aanvragen. Niet iedere kleine
+Alleen `runProcessSession(productId)` mag voor deze rollen AI-taken aanvragen. Niet iedere kleine
 storycontrole gebruikt alle rollen. Bij een complete epicverificatie zijn beide uitvoerende
 testrollen en de criticus verplicht.
 
@@ -96,11 +96,13 @@ de publicatiestap schrijft publieke entiteiten.
 
 ### Stap 1 — claimen en agenda kiezen
 
-Applicatiecode activeert eerst retrybare `BLOCKED`- of `FAILED`-items waarvan `retryAfter` is verstreken en
-claimt daarna de modulebrede run en vaste batch `QualityWorkItem`s. De Testcoördinator leest:
+Applicatiecode activeert eerst retrybare `BLOCKED`- of `FAILED`-items van één product waarvan
+`retryAfter` is verstreken en claimt of hervat daarna de productgebonden run en vaste batch
+`QualityWorkItem`s. De Testcoördinator leest:
 
 - exacte epic-, story-, bug-, opleverings- en signaalversies;
-- testomgevingen, productversie, toegestane accounts en datagrenzen;
+- testomgevingen, vereiste oplevercommit, werkelijk gedeployde revision, toegestane accounts en
+  datagrenzen;
 - actuele bugs, verificaties en kwaliteitshistorie;
 - teststrategie, rotatie en bekende risico's;
 - zo nodig read-only Git-code, tests en documentatie.
@@ -150,10 +152,12 @@ Ook deze implementatie gebruikt voor epicverificatie uitsluitend `PASSED`, `NEED
 en `NOT_SUCCESSFUL`. Een afgekeurde bugfixhertest laat dezelfde bug `OPEN`, laat de opgeleverde
 bugfixstory `DONE` en vraagt voor die bug opnieuw gewoon bugfixwerk aan. Een geannuleerde story
 wordt via de complete feitelijke epicbeoordeling verwerkt. De uitgebreide interne rollen veranderen
-deze publieke route niet.
+deze publieke route niet. `NOT_SUCCESSFUL` vereist ook hier toetsbaar positief bewijs; ontbrekende
+gegevens of een nog niet gedeployde oplevercommit blijven `BLOCKED`.
 
-Na een sessie waarin daadwerkelijk is getest bouwt gewone code precies één `QualitySnapshot` uit de
-gevalideerde publieke gegevens. Vervolgens werkt de module `TestRotation` bij. Een rol kan na
+Na een productgebonden sessie waarin daadwerkelijk is getest bouwt gewone code precies één
+`QualitySnapshot` voor dat product uit de gevalideerde publieke gegevens. Vervolgens werkt de
+module `TestRotation` bij. Een rol kan na
 succesvolle validatie via gewone applicatiecode een geheugenactie voor haar eigen rol laten
 uitvoeren. Rotatie of rolgeheugen verandert nooit oude snapshots.
 
@@ -205,7 +209,7 @@ Een uitgebreide kwaliteitssessie is klaar wanneer:
 - de criticus alle publieke concepten heeft beoordeeld;
 - testrotatie en eventuele gevalideerde geheugenacties voor de betrokken eigen rollen zijn
   bijgewerkt;
-- precies één nieuwe snapshot is opgeslagen na werkelijk testwerk;
+- precies één nieuwe snapshot voor het product is opgeslagen na werkelijk testwerk;
 - publicaties en vervolgcommands atomair of idempotent herstelbaar zijn.
 
 ## Gerelateerde documenten

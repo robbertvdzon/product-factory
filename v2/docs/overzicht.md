@@ -100,12 +100,25 @@ De backlog mag leeg zijn en heeft geen kunstmatige maximumgrootte. Een epic kan 
 dertig stories opleveren. Meerdere epics mogen tegelijk actief zijn. De Stakeholder kan een urgente
 epic handmatig hoger laten plaatsen; een story die al `IN_PROGRESS` is loopt normaal door.
 
+De normale route is bewust autonoom. Er zit geen verplichte menselijke goedkeuring tussen een
+`AVAILABLE` epic, planning en dispatch. Product Factory wacht dus niet op akkoord voordat een
+geldige story naar Software Factory gaat. De Stakeholder kan richting, prioriteit en dispatching wel
+op ieder moment aanpassen of een epic annuleren; dat zijn bedieningsmogelijkheden en geen poort in
+iedere cyclus.
+
 ## Vier uitvoerende onderdelen
 
 Productontwerp, Productplanning en Kwaliteitsbewaking zijn de drie intelligente procesmodules. Alleen
-hun geplande of handmatig gestarte `runProcessSession()` mag voor dat proces een AI-taak aanvragen.
-Per module kan maximaal één aanroep tegelijk uitvoeren. Een werkelijk botsende handmatige start
-krijgt een fout en een schedulerbotsing wordt overgeslagen en geregistreerd.
+hun geplande of handmatig gestarte `runProcessSession(productId)` mag voor dat proces een AI-taak
+aanvragen. Per combinatie van module en product kan maximaal één onafgeronde logische sessie
+bestaan, ook wanneer die `WAITING_FOR_AI` of `BLOCKED` is. Hetzelfde proces mag dus wel tegelijk
+voor verschillende producten draaien. Alleen een werkelijk gelijktijdig uitvoerende handmatige
+start voor hetzelfde product krijgt een fout; een schedulerbotsing met zo'n actieve call wordt
+overgeslagen en geregistreerd.
+
+De technische scheduler leest de actieve producten en roept de betreffende functie afzonderlijk
+per product aan. De scheduler bevat geen product- of agentlogica. Een handmatige UI-/REST-start
+kiest eveneens expliciet één product.
 
 Een AI-taak draait asynchroon. De processessie bewaart het taak-ID, krijgt status
 `WAITING_FOR_AI` en houdt geen thread of technische lock vast. Een volgende schedule-run hervat
@@ -133,7 +146,7 @@ bevroren, zodat een latere instellingenwijziging geen lopende taak verandert.
 
 Naast een processessie mogen modules snelle publieke commands en read-only queries aanbieden. Een
 command zoals `requestEpicVerification(...)` start geen agent: het bewaart alleen werk in de queue
-van de ontvangende module. Een latere `runProcessSession()` pakt dat werk op.
+van de ontvangende module. Een latere `runProcessSession(productId)` pakt dat werk op.
 
 ## Productontwerp als black box
 
@@ -180,9 +193,10 @@ gaat.
 **Doel:** epics en herstelverzoeken omzetten in volledige stories en alle open stories in één
 uitlegbare volgorde zetten.
 
-Een scheduler of bevoegde handmatige aanroep start `runProcessSession()`. De run zoekt zelf naar
-`AVAILABLE` epics en claimt daarnaast gericht werk uit de eigen `PlanningWorkItem`-queue. Als beide
-ontbreken, is de run een geldige no-op.
+Een scheduler of bevoegde handmatige aanroep start `runProcessSession(productId)`. De run hervat
+voor dat product eerst een nog niet afgeronde sessie of reeds geclaimde `IN_PLANNING` epic. Pas als
+die niet bestaat, zoekt hij naar `AVAILABLE` epics en claimt hij gericht werk uit de eigen
+`PlanningWorkItem`-queue. Als alles ontbreekt, is de run een geldige no-op.
 
 ### Input
 
@@ -218,10 +232,10 @@ is.
 **Doel:** de werkende applicatie onderzoeken, opleveringen controleren en aantonen of een complete
 epic de bedoelde gebruikersverbetering bereikt.
 
-Een scheduler of bevoegde handmatige aanroep start `runProcessSession()`. De run claimt werk uit de
-eigen `QualityWorkItem`-queue. Een queuecommand start nooit onmiddellijk een tester-agent. Aan het
-begin van een run worden retrybare geblokkeerde of mislukte items waarvan `retryAfter` is verstreken weer
-`PENDING` gemaakt.
+Een scheduler of bevoegde handmatige aanroep start `runProcessSession(productId)`. De run claimt
+uitsluitend werk van dat product uit de eigen `QualityWorkItem`-queue. Een queuecommand start nooit
+onmiddellijk een tester-agent. Aan het begin van een run worden retrybare geblokkeerde of mislukte
+items van dat product waarvan `retryAfter` is verstreken weer `PENDING` gemaakt.
 
 ### Input
 
@@ -230,7 +244,7 @@ begin van een run worden retrybare geblokkeerde of mislukte items waarvan `retry
 | `QualityWorkItem` | Via een snel, idempotent requestcommand | Verzoek om een story, epic, bugfix of gebruikerssignaal te onderzoeken. |
 | `ProductAssignment` en testconfiguratie | Read-only query op de productmodule | Productgrenzen, omgeving, toegestane accounts en Git-URL. |
 | Geldige `Decision`s | Read-only query | Grote product-, privacy- en kwaliteitskeuzes die nu gelden. |
-| `Story` | Read-only query op Productplanning | Wat is gebouwd en waar de oplevering bij hoort. |
+| `Story` | Read-only query op Productplanning | Wat is gebouwd, in welke commit het is opgeleverd en waar de oplevering bij hoort. |
 | Bevroren `Epic` met UX | Read-only query op Productontwerp | De volledige bedoeling die na alle stories moet worden gecontroleerd. |
 | `UserSignal` | Read-only query op de productmodule | De oorspronkelijke zorg of observatie die onderzocht moet worden. |
 | Huidige code en documentatie | Read-only checkout van de publieke Git-URL | Informatie over risico's en relevante tests; geen bewijs van werkend gedrag. |
@@ -242,7 +256,7 @@ begin van een run worden retrybare geblokkeerde of mislukte items waarvan `retry
 |---|---|
 | `Bug` | Reproduceerbare afwijking met verwacht en werkelijk gedrag, bewijs en ernst. |
 | `Verification` | Onveranderlijk oordeel en bewijs over een story, epic of gebruikerssignaal. |
-| `QualitySnapshot` | Onveranderlijke momentopname na iedere afgeronde niet-lege kwaliteitssessie, met dekking, risico's, bugs en verificatie-uitkomsten. |
+| `QualitySnapshot` | Onveranderlijke momentopname voor het ene product van iedere afgeronde niet-lege kwaliteitssessie, met dekking, risico's, bugs en verificatie-uitkomsten. |
 | Kwaliteitsqueuestatus | Read-only zicht op ieder `QualityWorkItem`, inclusief blokkade, pogingen en eerstvolgende retry. |
 | `PlanningWorkItem` bij Productplanning | Kwaliteitsbewaking vraagt de eigenaar om een bugfix of ontbrekende epicdekking te plannen. |
 
@@ -264,17 +278,17 @@ een AI-taak is alleen de technische uitvoering van één stap binnen die process
 **Doel:** voor ieder product steeds precies één geschikte story tegelijk naar Software Factory
 sturen en de leveringsstatus terugmelden aan Productplanning.
 
-De scheduler of een bevoegde handmatige UI-/REST-actie start `runDispatchSession()`. De dispatcher
-gebruikt geen agents, heeft geen productlogica en beheert geen eigen productentiteiten. Eén sessie
-verwerkt alle geconfigureerde producten en kan per product maximaal één nieuwe story versturen.
+De scheduler of een bevoegde handmatige UI-/REST-actie start `runDispatchSession(productId)`. De
+dispatcher gebruikt geen agents, heeft geen productlogica en beheert geen eigen productentiteiten.
+Eén sessie verwerkt precies één product en kan daarvoor maximaal één nieuwe story versturen.
 
 ### Input
 
 | Gegeven | Hoe komt het binnen? | Betekenis |
 |---|---|---|
-| Geconfigureerde producten | Read-only query op de productmodule | De vaste productset die deze sessie verwerkt. |
-| Dispatchreservering | Atomair command op Productplanning | De eerste uitvoerbare `TODO`-story op `sequenceNumber`, beschermd tegen gelijktijdige annulering. |
-| Externe Software Factory-status | API van Software Factory | Of voor het product nog werk openstaat en of een eerdere story is opgeleverd. |
+| Productconfiguratie | Read-only query op de productmodule | Of het gekozen product actief is en dispatching aanstaat. |
+| Dispatchreservering | Atomair command op Productplanning | De eerste uitvoerbare `TODO`-story op `sequenceNumber`; bij een retry wordt de reservering opnieuw tegen annulering gevalideerd. |
+| Externe Software Factory-status | API van Software Factory | `OPEN`, `DONE` of `CANCELLED`; bij `DONE` ook de exacte oplevercommit. |
 
 ### Output
 
@@ -286,13 +300,20 @@ verwerkt alle geconfigureerde producten en kan per product maximaal één nieuwe
 
 De dispatcher verstuurt niets zolang Software Factory voor dat product nog een openstaande story
 heeft. Software Factory hoeft de productrepository niet te lezen: alle inhoud en UX staan in het
-storypakket.
+storypakket. Software Factory accepteert en bouwt het pakket, maar kan Product Factory nooit een
+uitvoeringsvraag stellen.
 
 Een tijdelijke dispatchfout handelt de dispatcher zelf af met een `DeliveryAttempt`, gecontroleerde
 retry en dezelfde idempotentiesleutel. Een configuratie- of autorisatiefout blokkeert de levering en
 wordt operationeel zichtbaar. Software Factory moet ieder contractgeldig storypakket accepteren.
 Een weigering is een technische contractfout die levering voor dat product blokkeert; zij verandert
 de story niet en maakt geen planningswerk.
+
+Vóór iedere retry vraagt de dispatcher eerst met dezelfde idempotentiesleutel of de externe story al
+bestaat. Alleen als Software Factory aantoonbaar nog niets heeft aangemaakt, laat hij
+Productplanning de reservering opnieuw tegen de actuele epicanulering controleren. Een inmiddels
+geannuleerde epic maakt de story dan `CANCELLED`; een onbekende externe toestand leidt nooit tot een
+blinde verzending.
 
 Wanneer Software Factory meldt dat extern werk is geannuleerd of verwijderd, roept de dispatcher
 `markStoryAsCancelled(...)` aan. Productplanning zet de story op `CANCELLED`; dit is geen technische
@@ -312,6 +333,12 @@ Een story gebruikt vier eenvoudige statussen:
 `DONE` betekent hier *finished*. Een story of bugfixstory krijgt nooit `FAILED` of **mislukt** als
 leveringsstatus. Een ontoereikende oplevering blijft `DONE` en krijgt een afgekeurde verificatie.
 Een niet-uitgevoerde story wordt `CANCELLED`.
+
+Bij `DONE` bewaart Productplanning de exacte `deliveredCommitSha` die Software Factory teruggeeft.
+Een gerichte verificatie bevat die commit als vereiste productversie. Kwaliteitsbewaking vraagt via
+de testconfiguratie op welke commit of release de doelomgeving draait en zet de controle op
+`BLOCKED` zolang de oplevercommit daar nog niet aantoonbaar in zit. Zo wordt een nieuwe story nooit
+tegen een oudere deployment afgekeurd.
 
 Een epic gebruikt:
 
@@ -347,9 +374,16 @@ Een `NOT_SUCCESSFUL` epic blijft als historisch eindresultaat bestaan en wordt n
 Productontwerp kan tijdens een latere geplande run op basis van de verificatie een nieuwe vervolgepic
 maken. Een `WITHDRAWN` epic was nog niet gekozen en heeft daarom geen stories. Bij een `CANCELLED`
 epic bewaart Productplanning een duurzame annuleringsmarker en zet alle niet-gereserveerde `TODO`-
-stories op `CANCELLED`. Daardoor kan een wachtende Planner later niets meer publiceren. Een reeds
-gereserveerde of `IN_PROGRESS` story geldt als gestart en loopt normaal af; er wordt geen nieuwe
-epiccontrole gestart.
+stories op `CANCELLED`. Daardoor kan een wachtende Planner later niets meer publiceren. Een
+`IN_PROGRESS` story loopt normaal af. Een alleen lokaal gereserveerde story wordt bij een latere
+dispatchretry eveneens `CANCELLED` als Software Factory aantoonbaar nog geen extern werk heeft; er
+wordt geen nieuwe epiccontrole gestart.
+
+`NOT_SUCCESSFUL` is alleen toegestaan wanneer de functionaliteit volgens afspraak werkt én
+beschikbaar bewijs een toetsbaar epicsuccescriterium aantoonbaar weerlegt. Ontbrekende gegevens of
+een nog niet gedeployde versie geven `BLOCKED`, geen productoordeel. Langdurige gebruiksdoelen die
+niet tijdens een test te meten zijn worden later als gebruikerssignaal gevolgd en houden de
+technische epicafronding niet willekeurig tegen.
 
 ## Overleg en richting
 
@@ -365,6 +399,10 @@ alleen expliciete uitkomsten:
 
 Een transcript verandert niet vanzelf het product. Iedere doorwerking gebeurt via een zichtbaar
 command aan de module die het betreffende object bezit.
+
+Een overleg is geen verplichte goedkeuring in de ontwerp-, plan-, dispatch- of kwaliteitsroute. Als
+de bestaande productopdracht en besluiten voldoende richting geven, werkt de Factory zonder
+menselijke tussenkomst verder.
 
 ## Database, frontend en Git
 
@@ -433,7 +471,7 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 2. Productontwerp maakt complete epics met UX, maar geen stories.
 3. Productplanning maakt en ordent alle stories; de backlog is alleen een query op open stories.
 4. Kwaliteitsbewaking levert bewijs en bugs, maar maakt geen stories en wijzigt geen epics.
-5. Alleen `runProcessSession()` mag voor een intelligent proces AI-taken aanvragen; de laptopworker
+5. Alleen `runProcessSession(productId)` mag voor een intelligent proces AI-taken aanvragen; de laptopworker
    voert uitsluitend bestaande queuetaken uit.
 6. Iedere entiteit heeft één eigenaar en andere modules wijzigen haar alleen via publieke commands.
 7. Iedere agentrol leest uitsluitend haar eigen actuele, versieerbare geheugen; de Stakeholder mag
@@ -465,6 +503,7 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 - [Besluitenregister](gedeelde-modules/besluitenregister.md)
 - [Agentgeheugen](gedeelde-modules/agentgeheugen.md)
 - [AI-uitvoering](gedeelde-modules/ai-uitvoering.md)
+- [AI-worker en taakcontainer](gedeelde-modules/ai-worker.md)
 
 ### Stakeholderbediening
 

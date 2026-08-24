@@ -55,7 +55,8 @@ uitvoering:
 
 - `Epic` en haar onveranderlijke versies;
 - `ProcessSession` met inputversies, uitkomst, fout en publicatie-ID;
-- de minimale technische lock en idempotentiegegevens voor maximaal één actieve run.
+- de minimale technische lock en idempotentiegegevens voor maximaal één onafgeronde logische run
+  per product.
 
 De agentcontext, het tijdelijke epicconcept en technische modelresponse mogen voor diagnose aan de
 processessie worden gekoppeld volgens het geldende privacy- en bewaarbeleid. Zij zijn geen publieke
@@ -75,10 +76,10 @@ laptopworker kent de Productontwerper-rol niet.
 ## Verloop van één processessie
 
 ```text
-claim modulebrede run
+claim of hervat run voor productId
         │
         ▼
-kies één product met relevante input
+controleer relevante input voor dit product
         │
         ▼
 maak één vaste inputmomentopname
@@ -102,14 +103,15 @@ WAITING_FOR_AI · latere run hervat
 
 ### Stap 1 — run claimen
 
-Applicatiecode claimt de modulebrede processessie. Als al een run actief is, volgt het gedrag uit
-het publieke contract. Er start nog geen agent.
+Applicatiecode claimt of hervat de processessie voor het meegegeven product-ID. Als voor hetzelfde
+product al een run werkelijk actief is, volgt het gedrag uit het publieke contract. Een ander
+product mag parallel draaien. Er start nog geen agent.
 
 ### Stap 2 — product en input kiezen
 
-Applicatiecode kiest één product met nieuwe relevante input of een verlopen periodieke controle. De
-keuze gebruikt bronversies uit eerdere processessies zodat ongewijzigde input niet steeds als nieuw
-wordt aangeboden.
+Applicatiecode controleert of het meegegeven product nieuwe relevante input of een verlopen
+periodieke controle heeft. De keuze gebruikt bronversies uit eerdere processessies zodat
+ongewijzigde input niet steeds als nieuw wordt aangeboden.
 
 De sessie leest één vaste momentopname van:
 
@@ -122,7 +124,9 @@ De sessie leest één vaste momentopname van:
 - acceptatie en eventueel veilige, read-only productie-informatie;
 - het actuele geheugen van de rol `PRODUCT_DESIGNER_MVP`.
 
-Alle bron-ID's, geheugenversies en de gelezen commit-SHA worden bij de processessie vastgelegd.
+Alle bron-ID's, geheugenversies en de bevroren commit-SHA worden bij de productgebonden processessie
+vastgelegd. De worker checkt die SHA zelf uit in de tijdelijke Dockeromgeving; de backend embedt
+geen repository in de taak.
 
 ### Stap 3 — één agenttaak aanvragen en later hervatten
 
@@ -131,7 +135,7 @@ gaat als één opaque `AiTask` naar AI-uitvoering. De opdracht is niet om zoveel
 maken, maar om de belangrijkste aantoonbare en behapbare gebruikersverbetering volledig uit te
 werken. De huidige run publiceert nog niets en keert wachtend terug.
 
-Een volgende `runProcessSession()` leest het onveranderlijke `AiTaskResult`. Als het nog niet klaar
+Een volgende `runProcessSession(productId)` leest het onveranderlijke `AiTaskResult`. Als het nog niet klaar
 is, blijft de sessie wachten zonder een tweede taak te maken.
 
 De agent retourneert volgens een vast schema:

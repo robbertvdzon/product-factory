@@ -1,45 +1,42 @@
-# 0001 - Kotlin/Spring-backend gecombineerd met een Flutter-frontend
+# 0001 - Kotlin/Spring-backend met een Flutter-webfrontend
 
 - Status: Accepted
-- Datum: 2026-07-27
+- Datum: 2026-08-24
 
 ## Context
 
-De repo bevat een backend die volledig in Kotlin/Spring Boot is opgebouwd, verdeeld
-over Maven-modules (zie `docs/factory/technical-spec.md`): `softwarefactory` is de
-orchestrator, en `dashboard-backend` is een dunne bridge-service (lokaal op poort
-`9090`) die de agent-/story-data ontsluit voor het dashboard. Daarnaast bestaat er
-een losstaande dashboard-frontend, `dashboard-frontend`, geschreven in Dart/Flutter
-en met een eigen Docker-build buiten de Maven-aggregator om (geen Maven-module,
-lokaal op poort `9080`).
+Product Factory wordt opnieuw opgebouwd. De backend bevat één modulair monoliet met duurzame
+productdata, queues, schedulers en externe adapters. De Stakeholder gebruikt één webinterface voor
+productbediening en operationeel inzicht. Backend en frontend hebben verschillende toolchains en
+worden als afzonderlijke containers gebouwd en gedeployed.
 
-Deze scheiding tussen een JVM/Maven-backend en een Flutter-frontend is al langere
-tijd de bestaande situatie in de repo en informeel beschreven in
-`docs/factory/technical-spec.md`, maar was tot nu toe niet vastgelegd als expliciet
-architectuurbesluit. Deze ADR legt die reeds gemaakte keuze retroactief vast.
+De harde backendmodulegrenzen en verwisselbare implementaties zijn afzonderlijk vastgelegd in
+ADR-0004. Deze ADR legt alleen de technologiestacks en deploybare componenten vast.
 
 ## Decision
 
-We gebruiken Kotlin met Spring Boot voor de backend-services:
-
-- `softwarefactory` — de orchestrator (Maven-module, root-aggregator).
-- `dashboard-backend` — een dunne Spring Boot bridge-service die de dashboard-API
-  aanbiedt aan de frontend.
-
-Voor de dashboard-frontend gebruiken we Flutter (Dart):
-
-- `dashboard-frontend` — een Flutter web-app die de `dashboard-backend`-API
-  consumeert, met een eigen Docker-build los van de Maven-toolchain.
+- De backend gebruikt Kotlin en Java op Spring Boot, gebouwd met Maven.
+- `product-factory-app` is de enige uitvoerbare Spring Boot composition root.
+- De backendcapabilities leven in één gedeeld publiek API-artifact en afzonderlijke
+  implementatie-artifacts volgens ADR-0004.
+- De webfrontend gebruikt Flutter/Dart en communiceert uitsluitend met de publieke backend-API.
+- Backend en frontend krijgen afzonderlijke multi-stage containerimages, immutable bronrevisies en
+  buildtijden.
+- De frontend is geen autorisatiegrens en heeft geen directe database- of moduletoegang.
 
 ## Consequences
 
-- Er zijn twee aparte build-toolchains te onderhouden: Maven/JVM voor de
-  Kotlin/Spring-modules en een losse Docker-build voor Flutter/Dart.
-- De backend- en frontend-code kennen aparte deploy-paden en artefacten (JVM-
-  artefacten uit de Maven-build versus een Docker-image voor de Flutter-web-app),
-  wat los van elkaar gepland en uitgerold moet worden.
-- Beide technologiestacks (Kotlin/Spring/Maven en Flutter/Dart) moeten actief
-  onderhouden worden, inclusief hun eigen dependency-, test- en tooling-beheer.
-- Wijzigingen die zowel backend- als frontend-gedrag raken (bv. een nieuw
-  API-contract) vereisen gecoördineerde aanpassingen in twee losse
-  technologiestacks.
+- Maven/JVM en Flutter/Dart blijven twee expliciet beheerde build-toolchains.
+- Een wijziging van een gedeeld HTTP-contract vereist gecoördineerde backend- en
+  frontendaanpassingen en contracttests.
+- Backend en frontend kunnen afzonderlijk worden uitgerold, maar de UI toont beide actieve
+  bronrevisies en meldt een bekende contractincompatibiliteit duidelijk.
+- Er bestaan geen aparte v1-orchestrator of dashboard-bridge in de nieuwe architectuur; alle
+  backendfunctionaliteit composeert in `product-factory-app`.
+
+## Gerelateerde documenten
+
+- [Technische basis](../platform/technische-basis.md)
+- [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)
+- [Deployment en operatie](../platform/deployment-en-operatie.md)
+- [Frontend](../stakeholder/frontend.md)

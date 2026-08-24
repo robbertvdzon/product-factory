@@ -42,11 +42,13 @@ acceptatieomgeving. Er zijn nog geen epics en geen stories. De backlog is dus le
 8. De dispatcher reserveert bij Productplanning atomair de eerste uitvoerbare `TODO`-story met het
    laagste `sequenceNumber`, stuurt haar naar Software Factory en laat Productplanning de
    reservering bevestigen en story op `IN_PROGRESS` zetten.
-9. Software Factory bouwt en levert de story op.
+9. Software Factory bouwt en levert de story op en meldt de exacte `deliveredCommitSha`.
 10. Een volgende dispatchersessie ziet de oplevering en meldt deze bij Productplanning. De story
-    gaat naar `DONE` en Productplanning vraagt bij Kwaliteitsbewaking een storyverificatie aan.
-11. Een latere Kwaliteitsbewaking-sessie test de opgeleverde story op de bedoelde omgeving. De
-    verificatie slaagt en Kwaliteitsbewaking meldt het resultaat bij Productplanning.
+    gaat naar `DONE` en Productplanning vraagt bij Kwaliteitsbewaking een storyverificatie tegen die
+    commit aan.
+11. Een latere Kwaliteitsbewaking-sessie controleert via het revisionendpoint dat de bedoelde
+    omgeving de oplevercommit bevat en test daarna de opgeleverde story. De verificatie slaagt en
+    Kwaliteitsbewaking meldt het resultaat bij Productplanning.
 12. Zolang er nog stories over zijn, herhalen stappen 8 tot en met 11 zich. Per product staat
     normaal maximaal één Software Factory-story tegelijk open. De dispatcher mag de volgende story
     al versturen terwijl een eerdere `DONE`-story nog wordt geverifieerd; alleen de overgang naar
@@ -251,6 +253,7 @@ staat op `VERIFYING` en de volledige epiccontrole wordt uitgevoerd.
 5. Een latere Productplanning-sessie maakt aanvullende productstories binnen dezelfde epic en zet
    ze op de backlog.
 6. De aanvullende stories doorlopen dispatcher, Software Factory en storyverificatie via de gewone
+   route.
 7. Wanneer opnieuw al het werk actueel geslaagd is, wordt een nieuwe volledige epicverificatie
    klaargezet.
 
@@ -305,8 +308,9 @@ maakt zichtbaar welk bewijs of welke voorwaarde nog ontbreekt.
 
 ### Beginsituatie
 
-De epic staat op `VERIFYING`. Alle afgesproken functionaliteit werkt, maar de volledige controle
-laat zien dat de bedoelde gebruikersverbetering niet is bereikt.
+De epic staat op `VERIFYING`. Alle afgesproken functionaliteit werkt en een vooraf toetsbaar
+succescriterium heeft een beschikbare meetbron, maar de volledige controle levert positief bewijs
+dat de bedoelde gebruikersverbetering niet is bereikt.
 
 ### Scenario
 
@@ -338,16 +342,19 @@ status `TODO`, `IN_PROGRESS` of `DONE` bestaan.
 3. Productplanning bewaart ook zonder bestaande stories een duurzame annuleringsmarker en zet alle
    niet-gereserveerde `TODO`-stories op `CANCELLED`.
 4. Na bevestiging zet Productontwerp de epic op `CANCELLED`.
-5. Een reeds voor dispatch gereserveerde of `IN_PROGRESS` story geldt als gestart en loopt normaal
-   af, maar er wordt geen nieuwe complete epicverificatie meer gestart.
+5. Een `IN_PROGRESS` story geldt als extern gestart en loopt normaal af. Een alleen lokaal
+   gereserveerde story wacht op de eerstvolgende externe aanwezigheidscontrole; bestaat zij niet bij
+   Software Factory, dan wordt ook deze story `CANCELLED`. Er wordt geen nieuwe complete
+   epicverificatie meer gestart.
 6. Een wachtende Planner kan door de marker geen stories meer publiceren. De dispatcher kan geen
    nieuwe reservering meer krijgen.
 
 ### Eindresultaat
 
-De epic en het niet gestarte werk zijn zichtbaar geannuleerd. Als reservering en annulering tegelijk
-plaatsvinden, bepaalt hun atomaire volgorde of de story al als gestart geldt. Reeds gestart extern
-werk verdwijnt niet stilzwijgend en de epic kan niet per ongeluk alsnog `COMPLETED` worden.
+De epic en het niet gestarte werk zijn zichtbaar geannuleerd. Alleen aantoonbaar reeds bestaand
+extern werk loopt door; een lokale reservering tijdens een langdurige storing is niet genoeg. Reeds
+gestart extern werk verdwijnt niet stilzwijgend en de epic kan niet per ongeluk alsnog `COMPLETED`
+worden.
 
 ## 13. Software Factory is tijdelijk niet bereikbaar
 
@@ -365,12 +372,98 @@ netwerkfout of andere tijdelijke transportfout bij Software Factory.
    de story misschien toch heeft aangemaakt.
 4. Bestaat het externe werk al, dan herstelt de dispatcher de koppeling en zet Productplanning de
    story op `IN_PROGRESS`.
-5. Bestaat het niet, dan probeert de dispatcher later gecontroleerd opnieuw.
+5. Bestaat het niet, dan laat de dispatcher Productplanning de reservering opnieuw tegen de actuele
+   epicanulering valideren.
+6. Alleen bij een nog geldige reservering probeert hij later gecontroleerd opnieuw.
 
 ### Eindresultaat
 
 Er ontstaat maximaal één externe Software Factory-story. Er wordt geen bug of
 planningsopdracht gemaakt; de technische fout blijft de verantwoordelijkheid van de dispatcher.
+
+## 14. Een planningstaak faalt definitief binnen AI-uitvoering
+
+### Beginsituatie
+
+Productplanning heeft een epic geclaimd. De epic staat `IN_PLANNING`, maar de plan-AiTask eindigt na
+haar technische `maxAttempts` als `FAILED` voordat stories zijn gepubliceerd.
+
+### Scenario
+
+1. Productplanning bewaart de processessie als `BLOCKED`, inclusief fout, `retryAfter`, epic-ID en
+   exacte bevroren epicversie.
+2. De epic blijft `IN_PLANNING` en wordt niet teruggezet naar `AVAILABLE`.
+3. Een volgende planningsrun voor hetzelfde product hervat vóór nieuw werk deze sessie.
+4. Na de back-off vraagt zij een nieuwe AI-taak aan voor dezelfde inputmomentopname en epicclaim.
+5. Na een geldig resultaat publiceert Productplanning de storyset atomair en zet Productontwerp de
+   epic op `ACTIVE`.
+
+### Eindresultaat
+
+De technische fout heeft geen verweesde epic of dubbele planning veroorzaakt. Dezelfde epicclaim
+is zichtbaar hersteld en pas na volledige storypublicatie actief geworden.
+
+## 15. De oplevercommit staat nog niet op acceptatie
+
+### Beginsituatie
+
+Software Factory heeft een story als `DONE` gemeld met `deliveredCommitSha`, maar het revisionendpoint
+van de acceptatieomgeving meldt nog een oudere commit.
+
+### Scenario
+
+1. Kwaliteitsbewaking vergelijkt vóór inhoudelijk testen de vereiste en gedeployde revision.
+2. Het `QualityWorkItem` wordt retrybaar `BLOCKED` met reden `DEPLOYMENT_PENDING`; er ontstaat geen
+   afgekeurde verificatie en geen bug.
+3. Na de gewone back-off of **Retry now** start een nieuwe kwaliteitssessie voor hetzelfde product.
+4. Het revisionendpoint meldt nu een commit die de oplevercommit bevat.
+5. De Tester voert de normale storyverificatie uit en publiceert de werkelijke uitkomst.
+
+### Eindresultaat
+
+Een trage deployment wordt nooit als productfout behandeld. De verificatie verwijst naar zowel de
+vereiste oplevercommit als de werkelijk geteste deploymentrevision.
+
+## 16. Twee producten draaien gelijktijdig
+
+### Beginsituatie
+
+Product A heeft een langlopende AI-taak in Productplanning. Product B heeft nieuw planwerk of
+kwaliteitswerk klaarstaan.
+
+### Scenario
+
+1. De processessie van Product A staat `WAITING_FOR_AI`.
+2. De scheduler of Stakeholder start dezelfde procesmodule met het product-ID van Product B.
+3. Product B krijgt een eigen processessie en kan normaal werk claimen en AI-taken aanvragen.
+4. Een tweede start voor Product A wordt niet als nieuwe sessie aangemaakt, maar hervat of meldt de
+   bestaande sessie volgens haar status.
+
+### Eindresultaat
+
+Per combinatie van module en product bestaat maximaal één onafgeronde logische sessie. Een traag
+product blokkeert geen ander product.
+
+## 17. Een dependency van een open story wordt geannuleerd
+
+### Beginsituatie
+
+Een `TODO`-story is afhankelijk van een andere story. Software Factory of epicannulering maakt die
+bronstory `CANCELLED` voordat de afhankelijke story is verstuurd.
+
+### Scenario
+
+1. Productplanning behandelt `CANCELLED` niet als een vervulde dependency.
+2. De afhankelijke `TODO`-story is niet dispatchbaar.
+3. Productplanning maakt idempotent een `REPLAN_CANCELLED_DEPENDENCY`-workitem.
+4. Een latere planningsrun voor het product vervangt of annuleert de afhankelijke story op basis van
+   de actuele epic en producttoestand.
+5. Alleen een opnieuw zelfstandig uitvoerbare `TODO`-story kan daarna worden gereserveerd.
+
+### Eindresultaat
+
+De dispatcher bouwt niet blind verder op geannuleerd werk. De backlog blijft door Productplanning
+uitlegbaar en herstelbaar zonder dat de Stakeholder een losse story hoeft te bewerken.
 
 ## Brondocumenten
 

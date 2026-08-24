@@ -10,8 +10,14 @@ uitvoeren, zonder dat AI-uitvoering productobjecten of agentrollen hoeft te begr
 - Implementeer aanvragen, queueën, claimen, leasen, heartbeat, voortgang, afronding en veilig
   opnieuw beschikbaar maken van `AiTask`s.
 - Bouw de HTTPS-interface voor de laptopworker en pas de lokale workerservice daarop aan.
+- Laat de worker iedere taak in een tijdelijke Dockeromgeving uitvoeren en een benodigde publieke
+  Git-repository zelf op de bevroren commit-SHA uitchecken, zonder Git-schrijftoken.
 - Ondersteun `CODEX`, `CLAUDE` en buiten productie `MOCKED`, gekozen via de bevroren taakconfiguratie.
 - Maak slaapstand en tijdelijk ontbrekende heartbeats veilig met een hersteltermijn en fencing.
+- Leg veilig gedrag vast voor uitgeschakelde AI-jobconfiguratie en geannuleerde taken, zodat geen
+  productgebonden processessie verweesd achterblijft.
+- Upload begrensde, gehashte bewijsartifacts via de worker-API en bewaar die voor de MVP als BLOB in
+  de database; geef alleen lokale secretreferenties door en nooit plaintext in de taak.
 - Voeg de mockworker en bestuurbare acceptance-only scenario's toe.
 - Maak taakstatus en veilige voortgang zichtbaar in de operationele frontendweergave.
 - Activeer de gespreks- en notulenagent uit de product-/overlegmodule via dezelfde generieke
@@ -26,6 +32,7 @@ procesprompts en procesvalidatie van de drie intelligente processen horen in lat
 ## Specificaties
 
 - [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)
+- [AI-worker en taakcontainer](../gedeelde-modules/ai-worker.md)
 - [Agentgeheugen](../gedeelde-modules/agentgeheugen.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
 - [Frontend](../stakeholder/frontend.md)

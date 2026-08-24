@@ -103,6 +103,12 @@ nieuwe taak gebruikt de nieuwe provider of het nieuwe model. Een retry van dezel
 behoudt eveneens de oorspronkelijke momentopname; bewust opnieuw uitvoeren met andere instellingen
 vereist een nieuwe taak-ID en idempotentiesleutel.
 
+Bij `enabled = false` vraagt een proces geen nieuwe taak aan. Een sessie die de job nodig heeft
+wordt zichtbaar `BLOCKED` met reden `AI_JOB_DISABLED` en behoudt haar productclaim en
+inputmomentopname. De volgende geplande of handmatige productrun controleert de instelling opnieuw;
+na inschakelen gaat dezelfde domeinsessie verder. Uitschakelen annuleert bestaande gequeue'de of
+lopende taken niet stilzwijgend.
+
 Het interne `task-execution` controleert alleen dat de aangeleverde provider en het model technisch
 geldig en toegestaan zijn. Het vraagt de configuratie niet zelf op en interpreteert de jobkey niet.
 
@@ -128,6 +134,13 @@ bevoegde read-only projectie.
 het command een annuleringsverzoek. De worker ziet dit bij de volgende heartbeat en stopt het lokale
 providerproces zo snel mogelijk. Een resultaat dat daarna arriveert wordt niet meer als succesvol
 geaccepteerd.
+
+AI-uitvoering bepaalt niet wat de aanvragende processessie daarna doet. De aanvrager bewaart daarom
+een annuleringsreden. Is het domeinwerk zelf geannuleerd, bijvoorbeeld doordat de Stakeholder de
+epic stopte, dan sluit de eigenaar de processessie als `CANCELLED`. Is alleen de technische taak
+gestopt terwijl het domeinwerk nog geldig is, dan wordt de sessie `BLOCKED` en vraagt een latere
+`runProcessSession(productId)` na back-off een nieuwe taak aan met een nieuwe taak-ID. Een
+`CANCELLED` `AiTask` kan zo nooit een wachtende processessie verweesd achterlaten.
 
 ## Complete taakenvelop
 
@@ -165,6 +178,11 @@ privacy- en malwarecontroles doen, maar trekt geen productconclusies uit de inho
 Attachments bevatten metadata, hash en een begrensde objectreferentie. Grote binaire gegevens staan
 niet als Base64 in de taaktabel. Secrets en toegangstokens staan niet in `instructions` of `input`;
 waar nodig gebruikt de worker een kortlevende, taakgebonden secretreferentie.
+
+Wanneer een taak repositorycontext nodig heeft, bevat de envelop alleen een publieke HTTPS-Git-URL
+en een vooraf door de aanvragende module bevroren commit-SHA. De worker checkt die SHA zelf uit; de
+server verstuurt geen repositoryboom in JSON. De volledige container-, credential- en
+artifactgrens staat in [AI-worker en taakcontainer](ai-worker.md).
 
 ## Datamodel
 
@@ -362,7 +380,8 @@ Een poging kan eindigen door:
 
 Alleen herstelbare fouten en verlaten attempts mogen binnen `maxAttempts` opnieuw naar `QUEUED`, met
 begrensde backoff. Een domeininvalide maar technisch geldige AI-uitkomst is geen automatische retry
-van AI-uitvoering: de procesmodule beslist of zij tijdens een volgende `runProcessSession()` een
+van AI-uitvoering: de procesmodule beslist of zij tijdens een volgende
+`runProcessSession(productId)` een
 nieuwe, gerichte hersteltaak aanvraagt.
 
 ## MOCKED-provider
@@ -395,7 +414,7 @@ stilletjes een productieproces met fictieve output laten doorgaan.
 ## Processessies wachten zonder thread
 
 Een proces houdt geen serverthread, databaseclaim of HTTP-call open terwijl een AI-taak draait.
-Wanneer een `runProcessSession()` één of meer taken heeft aangevraagd:
+Wanneer een `runProcessSession(productId)` één of meer taken heeft aangevraagd:
 
 1. bewaart de procesmodule de taak-ID's op haar `ProcessSession`;
 2. zet zij de sessie op `WAITING_FOR_AI`;
@@ -404,14 +423,16 @@ Wanneer een `runProcessSession()` één of meer taken heeft aangevraagd:
 5. zolang resultaten ontbreken, blijft de sessie wachtend en eindigt die aanroep als no-op;
 6. bij beschikbare resultaten valideert de procesmodule de inhoud en vervolgt zij haar eigen flow.
 
-Er draait nog steeds maximaal één uitvoering van `runProcessSession()` tegelijk per procesmodule.
-Een wachtende logische sessie houdt echter geen technische lock vast. Een handmatige aanroep tijdens
-een werkelijk actieve uitvoering krijgt HTTP 409; een handmatige aanroep bij `WAITING_FOR_AI`
-probeert veilig dezelfde sessie te hervatten.
+Er bestaat maximaal één onafgeronde logische sessie per combinatie van procesmodule en product,
+ook wanneer die `WAITING_FOR_AI` of `BLOCKED` is. Verschillende producten mogen tegelijk door
+dezelfde module lopen. Een wachtende logische sessie houdt geen technische lock vast. Een
+handmatige aanroep tijdens een werkelijk actieve uitvoering voor hetzelfde product krijgt HTTP
+409; een handmatige aanroep bij `WAITING_FOR_AI` of `BLOCKED` probeert veilig dezelfde
+productsessie te hervatten.
 
-Alleen `runProcessSession()` mag voor Productontwerp, Productplanning of Kwaliteitsbewaking nieuwe
-AI-taken aanvragen. De laptopworker voert uitsluitend bestaande taken uit en kan nooit zelf een
-proces, agentjob of vervolgstap starten.
+Alleen `runProcessSession(productId)` mag voor Productontwerp, Productplanning of
+Kwaliteitsbewaking nieuwe AI-taken aanvragen. De laptopworker voert uitsluitend bestaande taken uit
+en kan nooit zelf een proces, agentjob of vervolgstap starten.
 
 ## Beveiliging
 
@@ -419,11 +440,15 @@ proces, agentjob of vervolgstap starten.
 - De API autoriseert worker, provider, capabilities en maximaal parallelisme.
 - De worker draait iedere taak in een nieuwe tijdelijke werkdirectory en niet in
   `product-factory-workspace`.
+- Een taakcontainer checkt alleen de expliciete publieke Git-URL op de expliciete commit-SHA uit en
+  krijgt geen Git-schrijftoken.
 - Providercredentials blijven uitsluitend op de worker en staan nooit in de database of taak.
 - De worker geeft alleen expliciet toegestane environmentvariabelen door aan Codex of Claude.
 - Een worker kan geen taak voor een niet-ondersteunde provider claimen.
 - Resultaat- en attachmentgroottes zijn begrensd en hashes worden gecontroleerd.
 - Ruwe providerlogs en chain-of-thought worden niet als voortgang of resultaat opgeslagen.
+- Git-inhoud, issue- of storytekst en tekst uit een bekeken applicatie gelden als onvertrouwde data;
+  ingebedde instructies kunnen de vaste systeemtaak, toolrechten of outputvalidatie niet wijzigen.
 - Iedere statuswijziging is herleidbaar tot taak, attempt, worker en tijdstip.
 
 ## Invarianten
@@ -441,6 +466,8 @@ proces, agentjob of vervolgstap starten.
 - AI-taken hebben geen externe schrijfrechten; domeinpublicatie gebeurt idempotent door de
   aanvragende module.
 - `MOCKED` gebruikt dezelfde queuegrens en is technisch uitgesloten in productie.
+- `enabled = false`, terminale taakfouten en geannuleerde taken laten de aanvragende productgebonden
+  processessie altijd zichtbaar en hervatbaar of bewust `CANCELLED` achter.
 
 ## Gerelateerde documenten
 
@@ -448,6 +475,7 @@ proces, agentjob of vervolgstap starten.
 - [Processen en entiteiten](../processen/processen-en-entiteiten.md)
 - [Frontend](../stakeholder/frontend.md)
 - [Agentgeheugen](agentgeheugen.md)
+- [AI-worker en taakcontainer](ai-worker.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
 - [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)
 - [Productontwerp-API](../processen/productontwerp/api.md)

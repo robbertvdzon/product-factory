@@ -8,7 +8,8 @@ behapbare epics met UX-ontwerp. Productontwerp maakt geen stories.
 ## Globale scope
 
 - Implementeer uitsluitend de MVP-provider achter de in stap 1 vastgelegde Productontwerp-API.
-- Implementeer geplande en handmatige `runProcessSession()` met maximaal één actieve sessie.
+- Implementeer geplande en handmatige `runProcessSession(productId)` met maximaal één actieve of
+  wachtende sessie per product en parallelle sessies voor verschillende producten.
 - Geef de MVP-agent de voorgeschreven read-only input, haar eigen geheugen en de centraal gekozen
   AI-configuratie.
 - Gebruik in deze tussenstap alleen input van reeds geactiveerde capabilities. De API-contracten van

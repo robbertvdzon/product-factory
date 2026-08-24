@@ -8,7 +8,8 @@ stories en één geordende backlog.
 ## Globale scope
 
 - Implementeer uitsluitend de MVP-provider achter de in stap 1 vastgelegde Productplanning-API.
-- Implementeer de `PlanningWorkItem`-queue en geplande of handmatige `runProcessSession()`.
+- Implementeer de `PlanningWorkItem`-queue en geplande of handmatige
+  `runProcessSession(productId)`, met maximaal één sessie per product.
 - Laat de planner een exacte epicversie claimen en opdelen in complete product- of bugfixstories.
 - Bewaar storystatus en `sequenceNumber`; bereken de backlog als alle `TODO`- en `IN_PROGRESS`-stories.
 - Ondersteun de publieke, snelle commands voor levering, bugfix- en dekkingswerk en handmatige
@@ -17,6 +18,11 @@ stories en één geordende backlog.
   uitsluitend de storytypen `PRODUCT_STORY` en `BUGFIX`.
 - Bewaar bij annulering ook zonder bestaande stories een marker die latere publicatie en
   dispatchreservering blokkeert.
+- Hervat een geclaimde `IN_PLANNING` epic altijd vóór nieuw werk en laat een terminale technische
+  AI-fout nooit een verweesde epic achterlaten.
+- Definieer dependencies als voldaan bij `DONE`; laat een `CANCELLED` dependency automatisch gericht
+  herplanningswerk voor nog open afhankelijke stories maken.
+- Voeg de benodigde `findBugs(...)`-query en velden voor `deliveredCommitSha` aan het contract toe.
 - Sluit de reeds actieve Productontwerp-implementatie aan. De Kwaliteitsbewaking-API bestaat, maar
   kwaliteitsinputs en -commands worden pas gebruikt nadat haar implementatie in stap 7 actief is.
 - Voeg backlog-, story-, planningwerk- en sessieweergaven plus acceptatiescenario's toe.

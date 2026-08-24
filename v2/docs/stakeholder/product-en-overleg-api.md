@@ -51,14 +51,17 @@ geen algemene setter en kunnen de state machine niet omzeilen.
 
 `Product` bevat minimaal een stabiel product-ID, naam, status `ACTIVE` of `INACTIVE`,
 `dispatchingEnabled`, aanmaakmoment en actuele versie. `findDispatchableProducts()` levert een vaste
-read-only lijst van alle `ACTIVE` producten waarvoor `dispatchingEnabled = true`. De dispatcher
-gebruikt deze query aan het begin van iedere sessie en verstuurt daarna per product maximaal één
-nieuwe story.
+read-only lijst van alle `ACTIVE` producten waarvoor `dispatchingEnabled = true`. De scheduler
+gebruikt deze query om per product `runDispatchSession(productId)` te starten. De dispatchersessie
+zelf valideert nogmaals exact dat ene product.
 
 `ProductAssignment` bevat minimaal doelgroep, productdoel, harde grenzen en de publieke Git-URL.
-`TestableProductConfiguration` bevat de acceptatieomgeving en eventueel veilige productie-informatie,
-toegestane routes, testaccount- of secretreferenties en data- en toegangsgrenzen. DTO's bevatten
-nooit secrets.
+`TestableProductConfiguration` bevat de acceptatieomgeving en eventueel veilige
+productie-informatie, toegestane routes, testaccount- of secretreferenties en data- en
+toegangsgrenzen. Iedere testbare omgeving heeft daarnaast een revisionendpoint en een vaste regel
+om daaruit de werkelijk gedeployde Git-commit of release te lezen. Story- en bugfixverificatie kan
+daardoor aantonen of de `deliveredCommitSha` al op de doelomgeving staat. DTO's bevatten nooit
+secretwaarden, alleen referenties die de worker lokaal veilig kan oplossen.
 
 De globale Stakeholder mag ieder product en de bijbehorende opdracht en testconfiguratie beheren.
 Een proces leest steeds een exacte versie en legt die bronversie op zijn processessie vast.

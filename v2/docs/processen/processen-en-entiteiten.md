@@ -14,14 +14,15 @@ een externe actor.
 ## Ontwerpregels
 
 - Iedere duurzame entiteit heeft precies één schrijvende module.
-- Iedere intelligente procesmodule heeft `runProcessSession()` als enige functie die voor dat
+- Iedere intelligente procesmodule heeft `runProcessSession(productId)` als enige functie die voor dat
   proces nieuwe AI-taken mag aanvragen.
 - Iedere functie die door een scheduler kan worden gestart, kan ook door bevoegde UI/REST-bediening
-  worden gestart. Per uitvoerend onderdeel draait maximaal één run tegelijk. Een botsende handmatige
-  aanroep krijgt een fout en een schedulerbotsing wordt overgeslagen en geregistreerd.
+  worden gestart. Per combinatie van uitvoerend onderdeel en product draait maximaal één run
+  tegelijk; verschillende producten mogen parallel lopen. Een botsende handmatige aanroep voor
+  hetzelfde product krijgt een fout en een schedulerbotsing wordt overgeslagen en geregistreerd.
 - Een procesmodule mag daarnaast snelle, deterministische commands en read-only queries aanbieden.
 - Een queuecommand start geen agents; het voegt alleen idempotent een werkitem bij de ontvangende
-  module toe. Alleen een latere `runProcessSession()` claimt dat werk.
+  module toe. Alleen een latere `runProcessSession(productId)` claimt dat werk.
 - Een AI-taak is een andere queuegrens: een processessie zet een complete taak bij AI-uitvoering
   klaar, krijgt `WAITING_FOR_AI` en wordt door een volgende run hervat.
 - Een domeincommand benoemt een geldige overgang; algemene setters zijn niet toegestaan.
@@ -38,10 +39,10 @@ een externe actor.
 
 | Onderdeel | Uitvoerende ingang | Eigen publieke entiteiten | Deterministische verantwoordelijkheid |
 |---|---|---|---|
-| Productontwerp | `runProcessSession()` | `Epic` | epicstatuscommands uitvoeren; planning ontdekt beschikbare epics zelf |
-| Productplanning | `runProcessSession()` | `PlanningWorkItem`, `Story` | beschikbare epics kiezen, gericht planwerk verwerken en zo nodig epicverificatie aanvragen |
-| Kwaliteitsbewaking | `runProcessSession()` | `QualityWorkItem`, `Bug`, `Verification`, `QualitySnapshot` | testverzoeken queueën, resultaten publiceren en kwaliteitshistorie vastleggen |
-| Software Factory-dispatcher | `runDispatchSession()` | geen productentiteit; eigen technisch `DeliveryAttempt` | alle geconfigureerde producten synchroniseren en per product maximaal één eerste uitvoerbare `TODO`-story versturen |
+| Productontwerp | `runProcessSession(productId)` | `Epic` | voor één product ontwerpen en epicstatuscommands uitvoeren; planning ontdekt beschikbare epics zelf |
+| Productplanning | `runProcessSession(productId)` | `PlanningWorkItem`, `Story` | voor één product beschikbare epics kiezen, gericht planwerk verwerken en zo nodig epicverificatie aanvragen |
+| Kwaliteitsbewaking | `runProcessSession(productId)` | `QualityWorkItem`, `Bug`, `Verification`, `QualitySnapshot` | voor één product testverzoeken claimen, resultaten publiceren en kwaliteitshistorie vastleggen |
+| Software Factory-dispatcher | `runDispatchSession(productId)` | geen productentiteit; eigen technisch `DeliveryAttempt` | één product synchroniseren en maximaal één eerste uitvoerbare `TODO`-story versturen |
 
 De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een geldige no-op.
 
@@ -51,12 +52,12 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 |---|---|---|
 | product-/overlegmodule | `createProduct`, `updateProductAssignment`, `configureTestableProduct`, `setProductDispatching`, `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `startMeeting`, `recordMeetingMessage`, `closeMeeting` | `getProduct`, `findProducts`, `findDispatchableProducts`, `getProductAssignment`, `getUserSignal`, `findOpenUserSignals`, `getTestableProduct`, `getMeeting`, `findMeetings` |
 | Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `withdrawEpic`, `cancelEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpics` |
-| Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `reserveNextStoryForDispatch`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `markStoryAsCancelled`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
-| Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `retryQualityWorkItem`, `linkBugfixStory(bugId, storyId)` | `getBug`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems`, `findRetryableQualityWorkItems` |
+| Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `reserveNextStoryForDispatch`, `revalidateDispatchReservation`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `markStoryAsCancelled`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
+| Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `retryQualityWorkItem`, `linkBugfixStory(bugId, storyId)` | `getBug`, `findBugs`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems`, `findRetryableQualityWorkItems` |
 | Besluitenregister | `createDecision`, `reviseDecision`, `withdrawDecision`, `supersedeDecisions` | `getDecisions(productId, validAt?)`, `getDecisionArchive(productId)` |
 | Agentgeheugen | `addAgentMemory`, `replaceAgentMemory`, `retractAgentMemory` | `getActiveMemory(context)`, `getMemoryAt(productId, role, validAt)`, `getMemoryHistory(productId, role, itemId)` |
 | AI-uitvoering | `updateAiJobConfiguration`, `requestAiTask`, `cancelAiTask`; aparte workercommands voor claim, heartbeat, progress, complete en fail | `getAiJobConfiguration`, `getAiJobConfigurations`, `getAiTask`, `getAiTaskResult`, `findAiTasks` |
-| Software Factory-dispatcher | `runDispatchSession` via scheduler, UI of REST | `getDispatchStatus`, `findDeliveryAttempts` |
+| Software Factory-dispatcher | `runDispatchSession(productId)` via scheduler, UI of REST | `getDispatchStatus`, `findDeliveryAttempts` |
 
 Een command mag ID's, verwachte versies, bron, actor en idempotentiesleutel aannemen, maar geen
 vrije velden waarmee de aanroeper de state machine kan omzeilen.
@@ -73,6 +74,7 @@ eigenaar.
 Agents mogen adviseren, doorvragen en gevolgen uitleggen. De expliciete wil van de Stakeholder is
 uiteindelijk leidend. De Factory handelt zelfstandig binnen de `ProductAssignment` en geldige
 `Decision`s; de Stakeholder kan die via de UI aanpassen en gewone acties direct laten uitvoeren.
+Er is geen verplichte Stakeholdergoedkeuring tussen epic, planning en dispatch.
 
 | Levering door de Stakeholder | Vastlegging | Doorwerking |
 |---|---|---|
@@ -113,27 +115,28 @@ nooit rechtstreeks in de tabel.
 |---|---|---|---|---|
 | `Product` | productmodule | globale Stakeholder of productbediening | alle processen en frontend | productidentiteit, status `ACTIVE` of `INACTIVE` en expliciete dispatchinginstelling |
 | `ProductAssignment` | productmodule | Stakeholder | alle processen en frontend | doelgroep, doel, grenzen en publieke Git-URL |
-| `TestableProductConfiguration` | productmodule | Stakeholder of beheerder | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en productieomgeving, veilige routes, account- en secretreferenties, data- en toegangsgrenzen |
+| `TestableProductConfiguration` | productmodule | Stakeholder of beheerder | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en productieomgeving, veilige routes, revisionendpoint, account- en secretreferenties, data- en toegangsgrenzen |
 | `UserSignal` | productmodule | gebruiker/Stakeholder dient in; ontwerp of kwaliteit registreert een uitkomst via command | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | onveranderlijke melding plus actuele verwerkingsstatus en resultaatlinks |
 | `Meeting` | product-/overlegmodule | Stakeholder of een proces vraagt een overleg aan; de notulenagent sluit het af | Stakeholder, betrokken processen en frontend | agenda, berichten, gekoppelde objecten, status, notulen en expliciete doorwerking |
 | `Epic` | Productontwerp | Productplanning vraagt planning/statusovergangen; Kwaliteitsbewaking registreert uitkomst; Stakeholder kan intrekken of annuleren | ontwerp, planning, kwaliteit en frontend | complete verbetering met scope, UX, versie en status `AVAILABLE`, `IN_PLANNING`, `ACTIVE`, `VERIFYING`, `COMPLETED`, `NOT_SUCCESSFUL`, `CANCELLED`, `SUPERSEDED` of `WITHDRAWN` |
-| `PlanningWorkItem` | Productplanning | Kwaliteitsbewaking, product-/overlegmodule of bevoegde bediening | Productplanning, operations en frontend | gerichte planningsqueue; type `PLAN_BUGFIX`, `PLAN_EPIC_GAP`, `REPRIORITIZE_EPIC` of `MANUAL_REPLAN`; status `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` of `FAILED` |
-| `Story` | Productplanning | dispatcher meldt verzending, oplevering of externe annulering; Kwaliteitsbewaking meldt een exacte verificatie; Productontwerp vraagt annulering van open stories | planning, dispatcher, kwaliteit en frontend | complete productstory of bugfix met UX, productbreed `sequenceNumber`, leveringsstatus `TODO`, `IN_PROGRESS`, `DONE` of `CANCELLED` en een eventuele actuele verificatiereferentie; nooit een status **mislukt** |
+| `PlanningWorkItem` | Productplanning | Kwaliteitsbewaking, product-/overlegmodule, eigen annuleringsafhandeling of bevoegde bediening | Productplanning, operations en frontend | gerichte planningsqueue; type `PLAN_BUGFIX`, `PLAN_EPIC_GAP`, `REPLAN_CANCELLED_DEPENDENCY`, `REPRIORITIZE_EPIC` of `MANUAL_REPLAN`; status `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` of `FAILED` |
+| `Story` | Productplanning | dispatcher meldt verzending, oplevercommit of externe annulering; Kwaliteitsbewaking meldt een exacte verificatie; Productontwerp vraagt annulering van open stories | planning, dispatcher, kwaliteit en frontend | complete productstory of bugfix met UX, afhankelijkheden, productbreed `sequenceNumber`, leveringsstatus `TODO`, `IN_PROGRESS`, `DONE` of `CANCELLED`, eventuele `deliveredCommitSha` en actuele verificatiereferentie; nooit een status **mislukt** |
 | `QualityWorkItem` | Kwaliteitsbewaking | Productplanning of product-/overlegmodule; Stakeholder mag een retry nu klaarzetten | Kwaliteitsbewaking, operations en frontend | duurzame testqueue; type `VERIFY_STORY`, `VERIFY_EPIC`, `RETEST_BUGFIX` of `INVESTIGATE_USER_SIGNAL`; dezelfde vijf werkstatussen plus `attemptCount`, `lastAttemptAt`, `retryable`, `retryAfter` en blokkadereden |
 | `Bug` | Kwaliteitsbewaking | Productplanning mag opeenvolgende bugfixstories koppelen, maar maximaal één tegelijk actief | kwaliteit, planning en frontend | reproduceerbare afwijking met status `OPEN`, `RESOLVED` of `INVALID`; gekoppelde `DONE`- en `CANCELLED`-stories vormen herstelhistorie |
 | `Verification` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | kwaliteit, ontwerp, planning en frontend | controle van `STORY`, `EPIC` of `USER_SIGNAL`, met doelversie, uitkomst, bewijs en eventuele dekkingsgaten |
-| `QualitySnapshot` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | Productontwerp, Stakeholder en frontend | aantoonbaar kwaliteitsbeeld na één afgeronde niet-lege kwaliteitssessie; vormt samen met eerdere snapshots de historie |
+| `QualitySnapshot` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | Productontwerp, Stakeholder en frontend | aantoonbaar kwaliteitsbeeld van precies één product na diens afgeronde niet-lege kwaliteitssessie; vormt samen met eerdere snapshots de historie |
 | `Decision` | Besluitenregister | notulenagent voor de Stakeholder of bevoegde Factorymodule mag aanmaken, herzien, intrekken of vervangen | alle processen via geldige snapshot; Stakeholder en frontend ook via archief | stabiele identiteit, `origin`, state `ACTIVE`, `WITHDRAWN` of `SUPERSEDED`, historie en eventuele opvolger |
 | `DecisionDetails` | Besluitenregister binnen één `Decision` | uitsluitend via revise-, withdraw- of supersedecommand | via `DecisionDto` of `DecisionHistoryDto` | één versie met ID, `validFrom`, `validUntil` en alleen de besluittekst |
 | `AgentMemoryItem` | Agentgeheugen | uitsluitend de eigen agentrol of de Stakeholder; product en rol worden door vertrouwde code bepaald | alleen de eigen agentrol; Stakeholder en frontend ook voor beheer | stabiele herinneringslijn per product en agentrol; actuele versie of ingetrokken |
 | `AgentMemoryVersion` | Agentgeheugen binnen één `AgentMemoryItem` | via add- of replacecommand; na opslag onveranderlijk | eigen agentrol ziet alleen actueel; Stakeholder en frontend zien ook historie | append-only titel en inhoud met voorganger, actor, reden en geldigheidsperiode |
 | `AgentMemoryRetraction` | Agentgeheugen binnen één `AgentMemoryItem` | eigen agentrol of Stakeholder via retractcommand | Stakeholder, frontend en audit | append-only tombstone die een geheugenlijn vanaf dat moment intrekt |
-| `AiJobConfiguration` | AI-uitvoering, intern onderdeel `settings` | globale Stakeholder of beheerder | procesmodules en frontend | stabiele jobkey met actuele provider `MOCKED`, `CODEX` of `CLAUDE`, model en configuratieversie |
+| `AiJobConfiguration` | AI-uitvoering, intern onderdeel `settings` | globale Stakeholder of beheerder | procesmodules en frontend | stabiele jobkey met `enabled`, actuele provider `MOCKED`, `CODEX` of `CLAUDE`, model en configuratieversie; uitgeschakeld werk blokkeert zichtbaar zonder taak |
 | `AiTask` | AI-uitvoering | een intelligente processessie of bevoegde overlegafhandeling vraagt idempotent een taak aan | aanvragende module, operations en frontend | complete opaque AI-opdracht met bevroren provider/model en status `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` of `CANCELLED` |
 | `AiTaskAttempt` | AI-uitvoering | bevoegde worker claimt en meldt heartbeat, progress, afronding of fout via commands | AI-uitvoering, operations en frontend | één uitvoeringspoging met worker, lease, hersteltermijn en fencing token |
 | `AiTaskResult` | AI-uitvoering | bevoegde worker mag met het actuele fencing token één resultaat aanbieden | alleen aanvragende module, operations en frontend | onveranderlijk technisch gevalideerd resultaat; de procesmodule valideert de productbetekenis |
+| `AiResultArtifact` | AI-uitvoering | bevoegde worker uploadt met het actuele fencing token | aanvragende module via resultaatreferentie; frontend binnen autorisatie | begrensd, gehasht en onveranderlijk bewijsbestand; in de MVP als database-BLOB opgeslagen |
 | `AiWorkerSession` | AI-uitvoering | worker opent en reconcileert zijn sessie | operations en frontend | worker-ID, bootsessie, provider-capabilities, capaciteit en laatste heartbeat; geen agentrollen |
-| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | geclaimde uitvoering, implementatie-ID en -versie, inputversies, AI-taak-ID's, publicaties, status inclusief `WAITING_FOR_AI` en blokkade |
+| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | productgebonden uitvoering, implementatie-ID en -versie, inputversies, AI-taak-ID's, publicaties, status inclusief `WAITING_FOR_AI`, `BLOCKED` en `CANCELLED` |
 | `DeliveryAttempt` | Software Factory-dispatcher | dispatcher via eigen service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
 Interne analyses, concepten en agentuitvoer steken de modulegrens niet over. Permanent rolgeheugen
@@ -149,30 +152,30 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 |---|---|---|---|
 | `ProductDetails` | productmodule | dispatcher en frontend | productidentiteit, status en of dispatching actief is |
 | `ProductAssignmentDetails` | productmodule | alle processen en frontend | productdoel, grenzen en publieke Git-URL |
-| `TestableProductDetails` | productmodule | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en eventueel productieomgeving met veilige routes en account- of secretreferenties, zonder secrets in het DTO |
+| `TestableProductDetails` | productmodule | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en eventueel productieomgeving met veilige routes, revisionendpoint en account- of secretreferenties, zonder secrets in het DTO |
 | `UserSignalDetails` | productmodule | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | bronmelding, status, uitkomst en koppelingen |
 | `MeetingDetails` | product-/overlegmodule | Stakeholder, betrokken processen en frontend | agenda, gesprek, status, gekoppelde objecten, notulen en doorwerking |
 | `EpicDetails` | Productontwerp | Productplanning, Kwaliteitsbewaking en frontend | epicinhoud, UX, versie en status; read-only |
-| `StoryDetails` | Productplanning | dispatcher, Kwaliteitsbewaking en frontend | storyinhoud, UX, volgorde, leveringsstatus, eventuele dispatchreservering en actuele verificatiereferentie; read-only |
+| `StoryDetails` | Productplanning | dispatcher, Kwaliteitsbewaking en frontend | storyinhoud, UX, afhankelijkheden, volgorde, leveringsstatus, eventuele dispatchreservering, `deliveredCommitSha` en actuele verificatiereferentie; read-only |
 | backlogquery | Productplanning uit `Story` | dispatcher en frontend | stories met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | Productplanning uit `PlanningWorkItem` | operations en frontend | planningsopdracht, bron, status, claim, resultaat en fout |
 | `BugDetails` | Kwaliteitsbewaking | Productplanning en frontend | bug, bewijs, ernst, status en afgeleide herstelvoortgang uit gekoppelde stories |
 | `VerificationDetails` | Kwaliteitsbewaking | Productontwerp, Productplanning en frontend | doel, uitkomst, bewijs en dekkingsgaten |
 | `QualitySnapshotDetails` | Kwaliteitsbewaking uit `QualitySnapshot` | Productontwerp, Stakeholder en frontend | huidig of historisch kwaliteitsbeeld per dimensie, zonder verborgen totaalscore |
 | `QualityWorkItemDetails` | Kwaliteitsbewaking uit `QualityWorkItem` | operations en frontend | testopdracht, doelversie, status, claim, resultaat, fout, `attemptCount`, `lastAttemptAt`, `retryable`, `retryAfter`, blokkadereden en aandachtlabel |
-| `StoryDispatchReservationDetails` | Productplanning uit de intern gereserveerde story | dispatcher | reserverings-ID en onveranderlijke storymomentopname; geen duurzame publieke productentiteit |
+| `StoryDispatchReservationDetails` | Productplanning uit de intern gereserveerde story | dispatcher | reserverings-ID en onveranderlijke storymomentopname plus actuele geldigheid; geen duurzame publieke productentiteit |
 | `DecisionDto` | Besluitenregister uit de versie die op `validAt` geldig is | alle processen, Stakeholder en normale frontend | platte actuele of historische momentopname; geen andere versies en geen op dat moment ongeldige besluiten |
 | `DecisionHistoryDto` | Besluitenregister uit `Decision` plus alle `DecisionDetails` | uitsluitend frontend en audit | actieve, ingetrokken en vervangen besluiten, alle versies, reden en opvolgingsrelatie |
 | `AgentMemoryItemDetails` | Agentgeheugen uit de actuele versie | uitsluitend de bijbehorende agentrol; Stakeholder en frontend ook voor beheer | actueel geheugenitem met exacte versie, titel, inhoud, actor en reden |
 | `AgentMemoryVersionDetails` | Agentgeheugen uit de volledige versielijn | uitsluitend Stakeholder, frontend en audit | versie, status `ACTIVE`, `SUPERSEDED` of `RETRACTED`, geldigheid, actor en reden |
-| `AiJobConfigurationDetails` | AI-uitvoering, intern onderdeel `settings` | procesmodules en frontend | actuele provider, model en versie voor één opaque jobkey |
+| `AiJobConfigurationDetails` | AI-uitvoering, intern onderdeel `settings` | procesmodules en frontend | `enabled`, actuele provider, model en versie voor één opaque jobkey |
 | `AiTaskDetails` | AI-uitvoering uit `AiTask` en actuele attempt | aanvragende module, operations en frontend | taakstatus, provider/model-snapshot, attempt, lease, veilige voortgang en fout |
 | `AiTaskResultDetails` | AI-uitvoering uit `AiTaskResult` | uitsluitend de aanvragende module; operations binnen privacygrenzen | technisch gevalideerde opaque output en artifactreferenties |
 | `ProcessSessionDetails` | betreffende procesmodule | operations en frontend | operationele sessiestatus, implementatie-ID en -versie en historie |
 | `ImplementationManifestDetails` | buildmetadata van `product-factory-app` | operations, frontend en Test Control API | gekozen artifact, variant, versie en broncommit per capability; read-only en geen database-entiteit |
 | `DispatcherProductStatusDetails` | dispatcher uit externe status en eigen pogingen | operations en frontend | open extern werk, eventuele technische blokkade en laatste poging voor één product |
 | `DeliveryAttemptDetails` | dispatcher uit `DeliveryAttempt` | operations en frontend | read-only technische leveringshistorie zonder wijzigbaar productobject |
-| `SoftwareFactoryWork` | externe adapter | dispatcher | tijdelijk extern integratieantwoord |
+| `SoftwareFactoryWork` | externe adapter | dispatcher | tijdelijk extern antwoord met uitsluitend status `OPEN`, `DONE` of `CANCELLED`, externe referentie en bij `DONE` de oplevercommit; nooit een vraag aan Product Factory |
 | `StoryDeliveryPackage` | dispatcher uit één `StoryDetails` | Software Factory | volledige, onveranderlijke story met UX, assets, hashes en idempotentiesleutel |
 
 ## Publieke productrepository als leesbron
@@ -181,6 +184,11 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 Productplanning en Kwaliteitsbewaking mogen de repository bij een inhoudelijke sessie uitchecken en
 code, tests en documentatie lezen. Zij committen en pushen niet. De Software Factory-story blijft
 zelfstandig en gebruikt Git nooit als enige drager van product- of UX-keuzes.
+
+Een inhoudelijke `AiTask` bevat de publieke Git-URL en een vooraf bevroren commit-SHA. De worker
+checkt die SHA zelf read-only uit in de tijdelijke Dockeromgeving van de taak. Repositoryinhoud en
+tekst uit een bekeken applicatie zijn onvertrouwde context: zij kunnen nooit systeeminstructies,
+toegangsgrenzen of modulecommands overschrijven.
 
 Dezelfde drie procesmodules mogen via `TestableProductDetails` de acceptatieomgeving en, binnen
 expliciet veilige read-only grenzen, de productieomgeving bekijken. Acceptatie is de voorkeursplek
@@ -209,10 +217,11 @@ De twee domeinprocesqueues zijn wel duurzame entiteiten:
   bewaart iedere retry met reden, telling en eerstvolgend tijdstip.
 
 Een queuecommand retourneert zodra het idempotente record is opgeslagen. Het start geen agents.
-Iedere run activeert eerst verstreken kwaliteitsretries en claimt daarna een stabiele batch; nieuw
-werk wacht tot de volgende run. De kwaliteitsback-off is 15 minuten, 1 uur, 4 uur en daarna 24 uur
-zonder maximaal aantal domeinretries. **Retry now** maakt een item direct `PENDING` en laat de UI
-daarna alleen wanneer nodig de normale kwaliteitsrun starten.
+Iedere productgebonden run activeert eerst de verstreken retries van dat product en claimt daarna
+een stabiele productbatch; nieuw werk wacht tot de volgende run. De kwaliteitsback-off is 15
+minuten, 1 uur, 4 uur en daarna 24 uur zonder maximaal aantal domeinretries. **Retry now** maakt een
+item direct `PENDING` en laat de UI daarna alleen wanneer nodig de normale kwaliteitsrun voor dat
+product starten.
 
 Daarnaast bestaat de generieke `AiTask`-queue. Een procesrun zet daar alleen complete technische
 agenttaken in. Een laptop- of mockworker claimt taken via HTTPS, niet via directe databasetoegang.
@@ -231,6 +240,8 @@ Dispatchfouten blijven intern bij de dispatcher. Tijdelijke transportfouten krij
 worden operationeel geblokkeerd. Software Factory moet ieder contractgeldig storypakket accepteren.
 Een weigering blokkeert het betreffende product als technische contractfout en levert nooit
 planningswerk of gewijzigde storyinhoud op.
+Software Factory retourneert uitsluitend `OPEN`, `DONE` met oplevercommit of `CANCELLED` en kan
+Product Factory geen uitvoeringsvraag stellen.
 
 ## Belangrijkste levenscyclus
 
@@ -248,8 +259,9 @@ planningswerk of gewijzigde storyinhoud op.
    geen open bug of herstelwerk resteert.
 6. Alleen als dat zo is, roept Productplanning `markEpicReadyForVerification(...)` en daarna
    `requestEpicVerification(...)` aan. Dit laatste maakt alleen een `VERIFY_EPIC`-workitem.
-7. Een latere kwaliteitsrun test de epic, bewaart een onveranderlijke `Verification`, maakt na de
-   niet-lege sessie een nieuwe `QualitySnapshot` en roept `recordEpicVerification(...)` op
+7. Een latere productgebonden kwaliteitsrun test de epic, bewaart een onveranderlijke
+   `Verification`, maakt na de niet-lege sessie één nieuwe `QualitySnapshot` voor dat product en
+   roept `recordEpicVerification(...)` op
    Productontwerp aan.
 8. Alleen bij nieuw ontwikkelwerk roept Kwaliteitsbewaking `requestBugfix(...)` of
    `requestEpicGapPlanning(...)` aan; deze commands zetten werk in de planningsqueue.
@@ -267,9 +279,16 @@ bugfixstory. Een story of bug krijgt nooit de productstatus **mislukt**.
 Een nog niet gekozen epic kan `WITHDRAWN` worden zonder storygevolgen. Bij annulering van een reeds
 gekozen epic laat Productontwerp Productplanning eerst duurzaam blokkeren dat nog stories worden
 gepubliceerd of gereserveerd en zet daarna de epic op `CANCELLED`. Niet-gereserveerde `TODO`-stories
-worden `CANCELLED`; een reeds gereserveerde of `IN_PROGRESS` story geldt als gestart en loopt
-normaal af. Een `NOT_SUCCESSFUL` epic blijft historisch gesloten en kan later aanleiding zijn voor
+worden `CANCELLED`; een `IN_PROGRESS` story loopt normaal af. Een alleen lokaal gereserveerde story
+loopt uitsluitend door wanneer Software Factory haar al kent. Is extern aantoonbaar nog niets
+aangemaakt, dan annuleert de eerstvolgende dispatchretry ook die story. Een `NOT_SUCCESSFUL` epic
+blijft historisch gesloten en kan later aanleiding zijn voor
 een nieuwe epic, maar wordt niet heropend.
+
+Iedere `ProcessSession` hoort bij precies één product. Per combinatie van procesmodule en product
+kan maximaal één onafgeronde logische sessie bestaan, ook wanneer die `WAITING_FOR_AI` of `BLOCKED`
+is; verschillende producten mogen parallel door dezelfde module lopen. Schedulers en handmatige
+UI-/REST-starts geven daarom altijd het product-ID mee.
 
 ## Technische vertaling naar Maven en Spring Modulith
 
@@ -290,7 +309,8 @@ een nieuwe epic, maar wordt niet heropend.
 - Iedere processessie bewaart de exacte implementatie-ID en -versie die haar heeft gemaakt.
 - Queue-inserts en commandketens over modules zijn idempotent en herstelbaar; ze doen niet alsof één
   transactie meerdere module-aggregates bezit.
-- Een unieke actieve-run-constraint per procesmodule voorkomt gelijktijdige agentsessies.
+- Een unieke actieve- of wachtende-run-constraint per procesmodule en product voorkomt dubbele
+  productsessies en laat verschillende producten parallel lopen.
 - Een wachtende processessie houdt geen thread of lock vast; een volgende run hervat dezelfde sessie
   via haar `AiTask`-resultaten.
 - AI-uitvoering bewaakt leases, fencing en maximaal één geaccepteerd resultaat per taak.
@@ -306,6 +326,7 @@ een nieuwe epic, maar wordt niet heropend.
 - [Frontend](../stakeholder/frontend.md)
 - [Agentgeheugen](../gedeelde-modules/agentgeheugen.md)
 - [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)
+- [AI-worker en taakcontainer](../gedeelde-modules/ai-worker.md)
 - [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
 - [Productontwerp-API](productontwerp/api.md)

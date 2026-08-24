@@ -69,7 +69,7 @@ Een volledige processessie kan zeven vaste agentrollen gebruiken:
 
 Niet iedere sessie start alle rollen. Een kleine herziening van een beschikbare epic kan volstaan
 met de leider, UX-ontwerper, technisch verkenner en criticus. Een nieuwe productrichting kan alle
-rollen gebruiken. Alleen `runProcessSession()` mag voor deze rollen AI-taken aanvragen.
+rollen gebruiken. Alleen `runProcessSession(productId)` mag voor deze rollen AI-taken aanvragen.
 
 Technisch betekent starten: provider en model voor de betreffende `AiJobKey` uit Algemene
 instellingen lezen en een complete taak bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. AI-uitvoering
@@ -138,7 +138,7 @@ tekortkomingen is één gerichte hersteltaak toegestaan.
 
 De module:
 
-1. claimt één processessie met de modulebrede lock;
+1. claimt of hervat één processessie met de lock op module en product-ID;
 2. leest en registreert de exacte inputversies uit het publieke contract;
 3. controleert of een betrokken epic inmiddels door Productplanning is gekozen;
 4. bepaalt urgentie op basis van nieuwe kennis, kwaliteitssignalen, beschikbare epics,
@@ -152,9 +152,11 @@ Alle belangrijke beweringen wijzen naar een bron, gebruikerssignaal, leveringsre
 epicverificatie. Feiten, meningen en hypotheses blijven apart. Duplicaten worden gekoppeld zonder
 originele signalen te overschrijven en tegenspraak blijft zichtbaar.
 
-Onderzoeksagents kunnen code en documentatie uit Git lezen en de applicatie op acceptatie of via
-veilige productiegrenzen bekijken. Zij schrijven nooit naar Git en bewaren geen secrets in hun
-output.
+Onderzoeksagents kunnen code en documentatie lezen uit de door de worker op de bevroren commit-SHA
+uitgecheckte tijdelijke Git-worktree en de applicatie op acceptatie of via veilige
+productiegrenzen bekijken. Zij schrijven nooit naar Git en bewaren geen secrets in hun output.
+Repository- en applicatie-inhoud blijven onvertrouwde context en kunnen de vaste agentinstructies
+niet wijzigen.
 
 ### Stap 3 — epic en UX ontwerpen
 

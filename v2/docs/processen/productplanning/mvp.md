@@ -14,7 +14,8 @@ uitgebreide variant op, nooit beide.
 
 - Eén processessie gebruikt één agentrol: **Planner**.
 - Dezelfde agent mag binnen de sessie meerdere opeenvolgende gestructureerde stappen uitvoeren.
-- Alle bij de start geclaimde `PlanningWorkItem`s worden in één vaste inputmomentopname beoordeeld.
+- Alle bij de start voor hetzelfde product geclaimde `PlanningWorkItem`s worden in één vaste
+  inputmomentopname beoordeeld.
 - Normaal kiest een run één nieuwe `AVAILABLE` hoofdepic; dit is geen technische limiet. Dezelfde
   agent mag meerdere urgente epics uit dezelfde momentopname kiezen wanneer dat nodig is.
 - De agent levert de complete storyset voor een gekozen epic, niet alleen de eerstvolgende stories.
@@ -72,10 +73,10 @@ taken krijgt `WAITING_FOR_AI`; een volgende run hervat haar zonder dubbele taak.
 ## Verloop van één processessie
 
 ```text
-claim run en PENDING workitems
+claim of hervat productrun en PENDING workitems
              │
              ▼
-lees AVAILABLE epics en vaste inputmomentopname
+lees eerst geclaimde IN_PLANNING epic, anders AVAILABLE epics
              │
              ▼
 queue selectie-AiTask
@@ -104,13 +105,16 @@ atomair publiceren en workitems afronden
 
 ### Stap 1 — claimen en input vastzetten
 
-Applicatiecode claimt de modulebrede run en alle op dat moment `PENDING` workitems. Daarna leest zij
-één vaste momentopname van beschikbare epics, bestaande open stories, productopdracht, geldige
-besluiten, exacte bug- en verificatiebronnen en het actuele geheugen van `PLANNER_MVP`.
+Applicatiecode claimt of hervat de run voor het opgegeven product. Een bestaande processessie en
+haar reeds geclaimde `IN_PLANNING` epic gaan altijd voor nieuw werk. Alleen zonder onafgeronde
+sessie claimt zij de op dat moment `PENDING` workitems van dit product en leest zij één vaste
+momentopname van beschikbare epics, bestaande open stories, productopdracht, geldige besluiten,
+exacte bug- en verificatiebronnen en het actuele geheugen van `PLANNER_MVP`.
 
 Git, acceptatie en veilige productie-informatie worden alleen toegevoegd als zij nodig zijn om
 bestaande routes, schermen of technische grenzen te begrijpen. Alle gebruikte bron- en
-geheugenversies en de eventuele commit-SHA komen op de processessie.
+geheugenversies en de bevroren commit-SHA komen op de processessie. De worker checkt die SHA zelf
+uit in de tijdelijke Dockeromgeving.
 
 ### Stap 2 — werk beoordelen en epic claimen
 
@@ -158,7 +162,10 @@ Gewone code controleert minimaal:
 - dat alleen geclaimde workitems als afgehandeld worden gemarkeerd.
 
 Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
-AI-uitvoering. Een inhoudelijk ongeldig concept wordt niet gepubliceerd. Er start in de MVP geen
+AI-uitvoering. Eindigt die taak definitief als `FAILED`, dan wordt de processessie zichtbaar
+`BLOCKED` en maakt een latere productrun na back-off een nieuwe taak voor dezelfde epicclaim. De
+epic blijft `IN_PLANNING` en wordt niet door nieuw werk gepasseerd. Een inhoudelijk ongeldig concept
+wordt niet gepubliceerd. Er start in de MVP geen
 aparte critic-agent; de fout blijft zichtbaar op de processessie en betrokken workitems.
 
 ### Stap 5 — atomair publiceren
@@ -176,6 +183,10 @@ uitsluitend productstories en bugfixstories.
 
 De eigen schedule van de dispatcher vindt later de eerste uitvoerbare `TODO`-story. De planner start
 de dispatcher niet.
+
+Een dependency is pas voldaan wanneer de bronstory `DONE` is. Verificatie hoeft daarvoor niet klaar
+te zijn. Annulering van een dependency maakt haar afhankelijke `TODO`-stories niet uitvoerbaar en
+zet idempotent `REPLAN_CANCELLED_DEPENDENCY` klaar voor een volgende productrun.
 
 ## Wat bewust niet in de MVP zit
 

@@ -21,7 +21,7 @@ variant op, nooit beide.
 - Een mogelijke bug wordt binnen dezelfde sessie nogmaals vanaf een bekende uitgangssituatie
   gereproduceerd voordat hij publiceerbaar is.
 - Gewone code controleert contracten, bronversies, secrets en persoonsgegevens.
-- Iedere niet-lege testsessie publiceert precies één nieuwe `QualitySnapshot`.
+- Iedere niet-lege testsessie publiceert precies één nieuwe `QualitySnapshot` voor haar ene product.
 - Er is geen extra intern testgeheugen, geen slimme testrotatie en geen verzameling interne
   teststrategie-entiteiten; de Tester gebruikt wel het centrale geheugen van haar eigen agentrol.
 
@@ -75,10 +75,10 @@ AI-uitvoering en vraagt zij een complete taak aan bij
 ## Verloop van één processessie
 
 ```text
-activeer verstreken retries en claim PENDING QualityWorkItems
+activeer verstreken retries en claim PENDING items van één product
                   │
                   ▼
-lees exacte doelen, omgeving en productversie
+lees exacte doelen, oplevercommit en gedeployde productversie
                   │
                   ▼
 queue één complete Tester-AiTask
@@ -98,16 +98,20 @@ atomair publiceren + vervolgcommands + QualitySnapshot
 
 ### Stap 1 — claimen en omgeving controleren
 
-Applicatiecode zet eerst retrybare `BLOCKED`- of `FAILED`-workitems waarvan `retryAfter` is
-verstreken terug op `PENDING`. Daarna claimt zij de modulebrede run en alle `PENDING` workitems uit de vaste
-startmomentopname.
+Applicatiecode zet eerst retrybare `BLOCKED`- of `FAILED`-workitems van het opgegeven product waarvan
+`retryAfter` is verstreken terug op `PENDING`. Daarna claimt of hervat zij de run voor dat product en
+alle `PENDING` workitems uit de vaste startmomentopname. Een ander product kan gelijktijdig een eigen
+kwaliteitssessie uitvoeren.
 Daarna leest zij per opdracht de exacte epic-, story-, bug-, opleverings- en signaalversies plus
 `TestableProductDetails` en het actuele geheugen van `TESTER_MVP`. De processessie legt de exacte
 bron- en geheugenversies vast.
 
-De Tester controleert bereikbaarheid, geteste productversie en accountgrenzen vóór inhoudelijk
-testen. Een onbereikbare omgeving of ontbrekende toegang verhoogt `attemptCount`, maakt het
-workitem retrybaar `BLOCKED`, berekent `retryAfter` volgens de vaste back-off en wordt nooit een
+De Tester controleert bereikbaarheid, werkelijk gedeployde revision en accountgrenzen vóór
+inhoudelijk testen. Voor story- en bugfixwerk moet de omgeving de
+`Story.deliveredCommitSha` aantoonbaar bevatten. Een achterlopende deployment wordt
+`DEPLOYMENT_PENDING`; een onbereikbare omgeving of ontbrekende toegang krijgt een andere concrete
+blokkadereden. In alle gevallen verhoogt Kwaliteitsbewaking `attemptCount`, maakt zij het workitem
+retrybaar `BLOCKED`, berekent zij `retryAfter` volgens de vaste back-off en publiceert zij nooit een
 productbug. Een blokkade vóór werkelijk testwerk maakt geen `QualitySnapshot`.
 
 ### Stap 2 — opdrachten ordenen
@@ -136,6 +140,12 @@ Per opdracht voert dezelfde Tester het passende minimale maar volledige werk uit
 Niet ieder storyworkitem onderzoekt automatisch alle kwaliteitsdimensies. Expliciete
 toegankelijkheids-, privacy-, beveiligings-, performance- of responsive eisen uit de story of epic
 worden wel altijd meegenomen.
+
+De complete Tester-AiTask bevat de bevroren publieke Git-URL en commit-SHA, doelomgeving,
+revisionendpoint, veilige secretreferenties en resultaatschema. De worker checkt de code zelf uit en
+voert browser- en testtools in een tijdelijke Dockeromgeving uit. Screenshots en logs komen als
+begrensde artifacts terug; secrets en repository- of applicatietekst worden nooit als instructies
+vertrouwd.
 
 ### Stap 4 — reproduceren en classificeren
 
@@ -178,9 +188,13 @@ bugfix aan. Bij een geslaagde hertest wordt de bug `RESOLVED` en queue't zij de 
 van de oorspronkelijke story. Een geannuleerde bugfixstory wordt niet als hertest aangeboden; zij
 loopt mee in de complete feitelijke herbeoordeling van de epic.
 
+De MVP gebruikt `NOT_SUCCESSFUL` alleen wanneer alle afgesproken functionaliteit werkt en
+beschikbaar, herleidbaar bewijs een vooraf toetsbaar epicsuccescriterium weerlegt. Ontbrekende
+gebruiksdata, een onbereikbare meetbron of een achterlopende deployment geven `BLOCKED`.
+
 Na een werkelijk uitgevoerde niet-lege testsessie wordt uit de gevalideerde publieke gegevens
-precies één nieuwe `QualitySnapshot` opgebouwd. Een no-op of uitsluitend technische startfout maakt
-geen snapshot.
+precies één nieuwe `QualitySnapshot` voor het product van die sessie opgebouwd. Een no-op of
+uitsluitend technische startfout maakt geen snapshot.
 
 ## Wat bewust niet in de MVP zit
 

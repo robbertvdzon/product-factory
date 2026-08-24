@@ -9,11 +9,17 @@ kwaliteitshistorie publiceren.
 
 - Implementeer uitsluitend de MVP-provider achter de in stap 1 vastgelegde
   Kwaliteitsbewaking-API.
-- Implementeer de `QualityWorkItem`-queue en geplande of handmatige `runProcessSession()`.
+- Implementeer de `QualityWorkItem`-queue en geplande of handmatige
+  `runProcessSession(productId)`, met maximaal één sessie per product en één snapshot per niet-lege
+  productsessie.
 - Implementeer zichtbare retryhistorie met `attemptCount`, `retryAfter`, vaste begrensde back-off,
   onbeperkte domeinretries en **Retry now** zonder dubbele processessie.
 - Laat de tester stories, complete epics, bugfixes en gebruikerssignalen controleren volgens hun
   bevroren context.
+- Laat de worker zelf de publieke Git-repository op de bevroren SHA in zijn taakcontainer
+  uitchecken en browser- en testtools daar uitvoeren.
+- Vergelijk vóór story- en bugfixverificatie de `deliveredCommitSha` met het revisionendpoint van de
+  doelomgeving en gebruik `DEPLOYMENT_PENDING` in plaats van een onterechte afkeuring.
 - Bewaar onveranderlijke `Verification`s, `Bug`s en `QualitySnapshot`s.
 - Vraag ontbrekend of fout werk via publieke commands bij Productplanning aan; wijzig geen story of
   epic rechtstreeks.
@@ -21,7 +27,8 @@ kwaliteitshistorie publiceren.
   Productplanning. Laat Productplanning in de normale route pas epicverificatie aanvragen wanneer
   alle actuele gerichte controles zijn geslaagd en geen herstelwerk resteert; documenteer daarnaast
   de expliciete feitelijke herbeoordeling na een extern geannuleerde story met status `CANCELLED`.
-- Gebruik voor epicverificatie alleen `PASSED`, `NEEDS_WORK`, `BLOCKED` en `NOT_SUCCESSFUL`.
+- Gebruik voor epicverificatie alleen `PASSED`, `NEEDS_WORK`, `BLOCKED` en `NOT_SUCCESSFUL`; die
+  laatste vereist positief bewijs tegen een vooraf toetsbaar succescriterium.
 - Laat een afgekeurde bugfixhertest dezelfde bug `OPEN` houden en voor die bug opnieuw een gewone
   bugfixstory aanvragen. Behandel een `CANCELLED` bugfixstory via een complete feitelijke
   epicbeoordeling, niet als een mislukte fix.

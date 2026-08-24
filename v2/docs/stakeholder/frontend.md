@@ -161,6 +161,8 @@ Het planningsscherm toont:
   storystatus te introduceren;
 - de reden voor een handmatige prioriteitswijziging;
 - de Software Factory-status van de verzonden story en een eventuele technische dispatchblokkade.
+- bij een `DONE` story de `deliveredCommitSha`, de werkelijk geteste deploymentrevision en een
+  zichtbare blokkade **Wacht op deployment** wanneer de doelomgeving nog achterloopt.
 
 Er is geen afzonderlijke roadmapentiteit en geen tweede handmatige backlog. De epicstatussen en de
 berekende storylijst zijn de enige bronnen.
@@ -193,9 +195,10 @@ Ieder retrybaar item heeft de actie **Retry now**. De UI:
 
 1. roept `retryQualityWorkItem(...)` aan; historie en `attemptCount` blijven staan, `retryAfter`
    wordt leeggemaakt en het item wordt `PENDING`;
-2. start daarna de normale `runProcessSession()` van Kwaliteitsbewaking als die nog niet draait;
-3. behandelt een gelijktijdige `ProcessAlreadyRunning` hier als bevestiging dat de kwaliteitsrun al
-   bezig is, niet als verloren retry.
+2. start daarna de normale `runProcessSession(workItem.productId)` van Kwaliteitsbewaking als die
+   voor dit product nog niet draait;
+3. behandelt een gelijktijdige `ProcessAlreadyRunning` voor dit product als bevestiging dat de
+   kwaliteitsrun al bezig is, niet als verloren retry.
 
 Een workitem dat na de vaste batchselectie `PENDING` is geworden, wacht zichtbaar op de volgende
 run. De knop start nooit rechtstreeks een agent en maakt nooit een tweede gelijktijdige
@@ -218,8 +221,10 @@ Snelle acties mogen ook rechtstreeks het juiste command aanbieden, bijvoorbeeld:
 - retrybaar testwerk met **Retry now** direct klaarzetten en zo nodig de kwaliteitsrun starten;
 - geheugen van een gekozen agentrol toevoegen, vervangen of intrekken.
 
-Een handmatige `runProcessSession()` of `runDispatchSession()` geeft een duidelijke fout als in die
-module al een run actief is. De REST-ingang retourneert voor deze botsing bijvoorbeeld HTTP 409.
+Een handmatige start kiest altijd een product en roept `runProcessSession(productId)` of
+`runDispatchSession(productId)` aan. Zij geeft een duidelijke fout als in dezelfde module voor dat
+product al een run actief is. De REST-ingang retourneert voor deze botsing bijvoorbeeld HTTP 409.
+Een run voor een ander product blijft wel toegestaan.
 
 ## Operationele weergave
 
@@ -231,8 +236,13 @@ Technische gebruikers kunnen apart zien:
 - `PlanningWorkItem`s en `QualityWorkItem`s met status, fout, blokkadereden, `attemptCount` en
   `retryAfter`;
 - `AiTask`s met aanvrager, provider, model, configuratieversie, status en attemptnummer;
+- geblokkeerde processessies door `AI_JOB_DISABLED`, een terminale taakfout of een geannuleerde
+  technische taak, inclusief product, volgende retry en behouden domeinclaim;
 - veilige AI-voortgang, laatste heartbeat, lease, hersteltermijn en retryreden;
 - laptop- en mockworkers met capabilities, capaciteit en laatste aanwezigheid;
+
+De MVP toont operationele aandachtspunten alleen in deze UI. E-mail, Telegram of andere externe
+notificaties vallen buiten de MVP en kunnen later als aparte uitgaande adapter worden toegevoegd.
 - `DeliveryAttempt`s en externe Software Factory-referenties;
 - overgeslagen schedulerbotsingen en idempotente retries.
 
