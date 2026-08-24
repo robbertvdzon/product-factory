@@ -18,9 +18,14 @@ kwaliteitshistorie publiceren.
   bevroren context.
 - Laat de worker zelf de publieke Git-repository op de bevroren SHA in zijn taakcontainer
   uitchecken en browser- en testtools daar uitvoeren.
+- Laat de tester op diezelfde commit de relevante actuele gebruikersroutes en testscenario's uit
+  `/doc` lezen, combineren met het workitemcontract en risicogestuurd uitvoeren. Documentatie is
+  testinput en nooit bewijs van werkend gedrag.
 - Vergelijk vóór story- en bugfixverificatie de `deliveredCommitSha` met het revisionendpoint van de
   doelomgeving en gebruik `DEPLOYMENT_PENDING` in plaats van een onterechte afkeuring.
 - Bewaar onveranderlijke `Verification`s, `Bug`s en `QualitySnapshot`s.
+- Geef iedere bug een opgeslagen korte titel en samenvatting van maximaal twee korte zinnen naast
+  het volledige Bugcontract.
 - Vraag ontbrekend of fout werk via publieke commands bij Productplanning aan; wijzig geen story of
   epic rechtstreeks.
 - Meld iedere gepubliceerde storyverificatie of bugfixhertest via `recordStoryVerification(...)` aan

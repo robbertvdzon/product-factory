@@ -21,6 +21,8 @@ minimaal:
 
 - functionele documentatie die beschrijft wat een gebruiker op dit moment kan doen en welk gedrag
   de applicatie nu vertoont;
+- de belangrijkste actuele gebruikersroutes en regressiescenario's, met minimaal een herkenbare
+  beginsituatie, de uit te voeren route en het verwachte resultaat;
 - technische documentatie die de huidige architectuur, modulegrenzen, publieke contracten,
   datamodellen, integraties, configuratie en operationele werking beschrijft;
 - een korte inhoudsopgave waarmee een mens of AI-agent de relevante actuele documentatie kan
@@ -44,19 +46,29 @@ Iedere Software Factory-story bevat een verplichte documentatiesubtaak. Die subt
 1. onderzoekt de daadwerkelijk opgeleverde code en het werkelijk beschikbare gedrag;
 2. controleert zowel de functionele als de technische documentatie op impact;
 3. werkt alle geraakte bestanden onder `/doc` bij;
-4. verwijdert uitspraken die door de story niet meer waar zijn;
-5. voegt geen gedrag toe dat nog niet is geïmplementeerd;
-6. wordt binnen dezelfde storyoplevering afgerond als de codewijziging.
+4. werkt geraakte gebruikersroutes en regressiescenario's bij of voegt ze toe wanneer de story
+   nieuw testbaar gedrag introduceert;
+5. verwijdert uitspraken en scenario's die door de story niet meer waar zijn;
+6. voegt geen gedrag toe dat nog niet is geïmplementeerd;
+7. wordt binnen dezelfde storyoplevering afgerond als de codewijziging.
 
 Als een story aantoonbaar geen functionele of technische documentatie-impact heeft, legt de
 documentatiesubtaak dat als opleverresultaat uit. Die uitleg wordt geen blijvende tekst in `/doc`.
 Een story kan pas als `DONE` aan Product Factory worden gemeld wanneer de verplichte
 documentatiesubtaak is afgerond.
 
-Kwaliteitsbewaking gebruikt `/doc` als input bij ontwikkelingstests en producttests en controleert
-waar relevant of het beschreven gedrag overeenkomt met de geteste applicatie en de opgeleverde
-code. Een aantoonbare afwijking is een documentatiefout: de verificatie kan dan niet volledig
-slagen en de gewone bugfixroute kan herstel aanvragen.
+Kwaliteitsbewaking leest bij iedere inhoudelijke test de relevante delen en testscenario's uit
+`/doc` op exact de Gitcommit die bij de geteste productversie hoort. Zij combineert die met het
+bevroren story-, bug- of epiccontract en kiest alleen scenario's die relevant zijn voor het
+workitem en het regressierisico; een kleine wijziging vereist niet automatisch alle scenario's.
+
+Documentatie is testinput, nooit bewijs dat gedrag werkt. De werkelijk geteste applicatie en het
+verzamelde bewijs blijven leidend voor de waarneming. Wanneer `/doc`, het bevroren contract en de
+applicatie elkaar tegenspreken, legt Kwaliteitsbewaking de concrete afwijking vast als product- of
+documentatiefout. Zij negeert de tegenstelling niet en een verificatie kan dan niet volledig slagen.
+Ontbreekt voor gewijzigd belangrijk gedrag een relevant scenario, dan geldt dat eveneens als
+documentatiegebrek; de tester leidt het noodzakelijke testwerk ondertussen af uit het contract en
+de werkende applicatie en slaat de controle niet over.
 
 ## Consequences
 

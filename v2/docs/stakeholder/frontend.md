@@ -151,7 +151,7 @@ databasetoegang.
 
 Het planningsscherm toont:
 
-- alle open stories op `sequenceNumber`;
+- alle open stories op `sequenceNumber`, met de opgeslagen titel en samenvatting;
 - geannuleerde stories apart van de backlog, met bron en reden;
 - bij een door Software Factory geannuleerde story uitleg dat Product Factory de complete epic na
   het overige werk opnieuw op de feitelijke producttoestand beoordeelt;
@@ -167,7 +167,8 @@ Er is geen afzonderlijke roadmapentiteit en geen tweede handmatige backlog. De e
 berekende storylijst zijn de enige bronnen.
 
 Epics staan niet nogmaals als hoofdlijst bij Planning. Het scherm **Ontwerp** gebruikt
-`findEpics(...)` en toont actuele en historische epics per lifecyclestatus. Op epicdetail kan de
+`findEpics(...)` en toont actuele en historische epics per lifecyclestatus, steeds met de opgeslagen
+titel en samenvatting. Op epicdetail kan de
 Stakeholder, wanneer de status dat toestaat, de epic met reden laten herprioriteren, intrekken of
 annuleren. Planning toont bij een handmatige prioriteitsactie de reden en de zichtbare doorwerking
 op nog niet verstuurde stories.
@@ -178,10 +179,16 @@ Een epic, story, bug, verificatie, kwaliteitssnapshot, signaal, besluit, meeting
 detailpagina. Die toont alleen de velden die bij dat object horen, plus relaties naar bron- en
 vervolgobjecten.
 
-Een epic toont probleem, oplossing, relatie met productdoel of besluiten, eventueel het actuele
-UX-ontwerp, testbare acceptatiecriteria en uitleg over de behapbaarheid.
-Een story toont zelfstandig alle relevante UX en assets die ook naar Software Factory worden
-verstuurd. Een verificatie toont omgeving, controles, oordeel en bewijs. Een besluit toont normaal
+Iedere lijst met epics, stories of bugs toont `title` als hoofdregel en `summary` als korte regel
+eronder. De frontend gebruikt de opgeslagen waarden en probeert ze niet bij het renderen opnieuw uit
+de volledige inhoud samen te vatten.
+
+Epic-, story- en bugdetails tonen bovenaan de opgeslagen `title` met daaronder de `summary` van
+maximaal twee korte zinnen. Daaronder staat altijd de volledige inhoud. Een epic toont dus ook
+probleem, oplossing, relatie met productdoel of besluiten, eventueel het actuele UX-ontwerp,
+testbare acceptatiecriteria en uitleg over de behapbaarheid. Een story toont zelfstandig alle
+relevante UX en assets die ook naar Software Factory worden verstuurd. Een verificatie toont
+omgeving, controles, oordeel en bewijs. Een besluit toont normaal
 alleen de geldige tekst; een aparte archiefweergave toont eerdere versies, ingetrokken besluiten en
 vervangingsrelaties.
 

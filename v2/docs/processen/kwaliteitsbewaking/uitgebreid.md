@@ -114,6 +114,7 @@ De coördinator maakt één begrensde `TestAgenda`. Een onbereikbare omgeving wo
 
 De Functionele tester controleert:
 
+- relevante actuele gebruikersroutes en regressiescenario's uit `/doc` op de bevroren testcommit;
 - storyacceptatiecriteria, hoofdroute en relevante alternatieven;
 - lege, laad-, fout- en uitzonderingssituaties;
 - oorspronkelijke reproduceerstappen bij een bugfix;
@@ -136,6 +137,8 @@ De Verificatiecriticus en bugtriager:
 - zoekt duplicaten en verwante patronen;
 - vergelijkt epic, UX, alle stories en werkelijk gedrag in een `EpicCoverageAssessment`;
 - bepaalt ernst en gebruikersimpact;
+- maakt voor iedere te publiceren bug een korte titel en een samenvatting van maximaal twee korte
+  zinnen die met de volledige afwijkingsinformatie overeenkomen;
 - controleert bewijs op secrets en persoonsgegevens;
 - geeft het story-, epic- of signaaloordeel;
 - keurt `BugCandidate`s en `VerificationDraft`s goed of af.

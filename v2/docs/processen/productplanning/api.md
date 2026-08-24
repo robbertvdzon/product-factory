@@ -131,8 +131,8 @@ alleen de binnenkant van de gekozen Productplanning-implementatie.
 | `PlanningWorkItem` | Productplanning | duurzame opdracht die de run claimt; andere modules kunnen alleen een aanvraagcommand doen |
 | `ProductAssignmentDetails` | productmodule | productidentiteit, grenzen en publieke Git-URL |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende keuzes die de planning begrenzen; geen directe opdracht om een epic, bug of story te kiezen |
-| `EpicDetails` | Productontwerp | exacte metadata, probleem, oplossing, richtingsrelaties, eventueel UX-ontwerp, acceptatiecriteria en behapbaarheid |
-| `BugDetails` en `findBugs(...)` | Kwaliteitsbewaking | uitvoerbare bug inclusief ernst, bewijs en versie; open bugs per product, epic en status kunnen betrouwbaar worden gevonden |
+| `EpicDetails` | Productontwerp | exacte metadata, titel, samenvatting, probleem, oplossing, richtingsrelaties, eventueel UX-ontwerp, acceptatiecriteria en behapbaarheid |
+| `BugDetails` en `findBugs(...)` | Kwaliteitsbewaking | uitvoerbare bug met titel, samenvatting, volledige afwijkingsinformatie, ernst, bewijs en versie; open bugs per product, epic en status kunnen betrouwbaar worden gevonden |
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor ontbrekend gedrag binnen een bevroren epic |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, accounts en toegangsgrenzen |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
@@ -159,7 +159,7 @@ kwaliteitsoordeel.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, eventuele UX, afhankelijkheden, `sequenceNumber`, leveringsstatus, eventuele dispatchreservering, externe referentie, `deliveredCommitSha` en actuele verificatiereferentie |
+| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | titel, samenvatting, type, bronrelaties, epicversie, gedrag, acceptatiecriteria, eventuele UX, afhankelijkheden, `sequenceNumber`, leveringsstatus, eventuele dispatchreservering, externe referentie, `deliveredCommitSha` en actuele verificatiereferentie |
 | backlogquery | alle uitvoerbare of reeds verzonden stories in volgorde | `StoryDetails` met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | read-only inzicht in de planningsqueue | type, bron, status, claim, resultaat en fout |
 | `StoryDispatchReservationDetails` | tijdelijke read-only reservering voor de dispatcher | reserverings-ID, geldigheid en onveranderlijke momentopname van één uitvoerbare story; geen aparte productentiteit |
@@ -216,6 +216,8 @@ herordening verandert alleen de nummers van `TODO`-stories.
 Een `Story` bevat minimaal:
 
 - stabiel story-ID en product-ID;
+- `title`: één korte regel van enkele woorden voor backlog- en andere lijstweergaven;
+- `summary`: maximaal twee korte zinnen die onder de titel de kern van het werk uitleggen;
 - type `PRODUCT_STORY` of `BUGFIX`;
 - epic-ID en bevroren epicversie voor een productstory en waar relevant voor een bugfix;
 - bug-ID en bugversie voor een bugfix;
@@ -235,6 +237,10 @@ Een `Story` bevat minimaal:
 Een story is pas uitvoerbaar als Software Factory haar zonder epicquery of Product Factory-call kan
 bouwen. Tekst, Markdown, JSON en SVG blijven gewone UTF-8-tekst. Alleen binaire inhoud gebruikt bij
 een JSON-only transport Base64; de database bewaart het oorspronkelijke object en metadata.
+
+`title` en `summary` worden met de storyversie opgeslagen en veranderen niet doordat de frontend de
+story toont. Ze helpen bij herkenning, maar vervangen nooit het volledige zelfstandige
+Storycontract en mogen daarmee niet in tegenspraak zijn.
 
 De backlog is exact deze query en heeft geen eigen tabel, schrijver of voorraadstatus:
 

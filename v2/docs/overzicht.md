@@ -43,9 +43,9 @@ werkdocumenten, prompts en agentadministratie horen hier niet bij.
 | `ProductAssignment` | Het doel, de doelgroep, de harde grenzen en de publieke Git-URL van het product. |
 | `UserSignal` | Feedback, een probleem, zorg, kans of observatie, met zichtbare verwerking en uitkomst. |
 | `Decision` | Een grote, blijvende keuze die meerdere toekomstige sessies richting geeft. |
-| `Epic` | Een concreet probleem met een duidelijke oplossing, richting, eventuele UX, testbare acceptatiecriteria en uitleg over behapbaarheid. |
-| `Story` | Eén zelfstandig uitvoerbaar stuk productwerk of bugfixwerk voor Software Factory. |
-| `Bug` | Een reproduceerbare afwijking tussen verwacht en werkelijk gedrag. |
+| `Epic` | Titel en korte samenvatting plus een concreet probleem met een duidelijke oplossing, richting, eventuele UX, testbare acceptatiecriteria en uitleg over behapbaarheid. |
+| `Story` | Titel en korte samenvatting plus één volledig zelfstandig uitvoerbaar stuk productwerk of bugfixwerk voor Software Factory. |
+| `Bug` | Titel en korte samenvatting plus een volledige reproduceerbare afwijking tussen verwacht en werkelijk gedrag. |
 | `Verification` | Onveranderlijk bewijs en een oordeel over een story, epic of gebruikerssignaal. |
 | `QualitySnapshot` | Een onveranderlijke momentopname van de aantoonbare productkwaliteit na een kwaliteitssessie. |
 | `Meeting` | Een overleg met de Stakeholder, inclusief agenda, gesprek en gecontroleerde uitkomst. |
@@ -186,7 +186,7 @@ doet.
 
 | Gegeven | Betekenis |
 |---|---|
-| `Epic` | Technische metadata plus probleem, oplossing, relatie met productdoel of besluiten, eventueel UX-ontwerp, testbare acceptatiecriteria en uitleg over behapbaarheid. |
+| `Epic` | Technische metadata, titel en samenvatting plus probleem, oplossing, relatie met productdoel of besluiten, eventueel UX-ontwerp, testbare acceptatiecriteria en uitleg over behapbaarheid. |
 
 Productontwerp mag een beschikbare epic nog verbeteren. Zodra Productplanning een exacte epicversie
 kiest, wordt die versie bevroren en niet meer aangepast.
@@ -227,7 +227,7 @@ die niet bestaat, zoekt hij naar `AVAILABLE` epics en claimt hij gericht werk ui
 
 | Gegeven | Betekenis |
 |---|---|
-| `Story` | Zelfstandige productstory of bugfixstory met acceptatiecriteria, relevante UX, assets, status en `sequenceNumber`. |
+| `Story` | Titel en samenvatting plus een zelfstandige productstory of bugfixstory met acceptatiecriteria, relevante UX, assets, status en `sequenceNumber`. |
 | Backlogquery | Alle stories met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber`. |
 | Planningstatus | Zichtbaar resultaat van ieder `PlanningWorkItem`. |
 | `QualityWorkItem` bij Kwaliteitsbewaking | Productplanning vraagt de eigenaar om een gerichte story-, bugfix- of epiccontrole klaar te zetten. |
@@ -266,7 +266,7 @@ items van dat product waarvan `retryAfter` is verstreken weer `PENDING` gemaakt.
 
 | Gegeven | Betekenis |
 |---|---|
-| `Bug` | Reproduceerbare afwijking met verwacht en werkelijk gedrag, bewijs en ernst. |
+| `Bug` | Titel en samenvatting plus een reproduceerbare afwijking met verwacht en werkelijk gedrag, bewijs en ernst. |
 | `Verification` | Onveranderlijk oordeel en bewijs over een story, epic of gebruikerssignaal. |
 | `QualitySnapshot` | Onveranderlijke momentopname voor het ene product van iedere afgeronde niet-lege kwaliteitssessie, met dekking, risico's, bugs en verificatie-uitkomsten. |
 | Kwaliteitsqueuestatus | Read-only zicht op ieder `QualityWorkItem`, inclusief blokkade, pogingen en eerstvolgende retry. |
@@ -306,7 +306,7 @@ Eén sessie verwerkt precies één product en kan daarvoor maximaal één nieuwe
 
 | Gegeven | Betekenis |
 |---|---|
-| `StoryDeliveryPackage` | Volledige momentopname van de story met alle benodigde UX en assets. |
+| `StoryDeliveryPackage` | Volledige momentopname van de story, inclusief opgeslagen titel, samenvatting en alle benodigde UX en assets. |
 | Storycommands | Reservering en meldingen `markStoryAsDispatched(...)`, `markStoryAsDeveloped(...)` en `markStoryAsCancelled(...)` aan Productplanning. |
 | `DeliveryAttempt` | Technische historie van de Software Factory-dispatcher over verzending, response, fout en retry. |
 

@@ -30,15 +30,17 @@ acceptatieomgeving. Er zijn nog geen epics en geen stories. De backlog is dus le
 1. Productontwerp wordt volgens schedule of handmatig gestart.
 2. Productontwerp leest onder andere de productopdracht, geldige besluiten, gebruikerssignalen,
    huidige code, documentatie en de werkende applicatie.
-3. Productontwerp publiceert één complete epic met status `AVAILABLE`. De epic bevat een concreet
-   probleem, een duidelijke oplossing, haar relatie met productdoel of besluiten, testbare
-   acceptatiecriteria, uitleg over behapbaarheid en waar nodig het UX-ontwerp.
+3. Productontwerp publiceert één complete epic met status `AVAILABLE`. De epic bevat een korte
+   titel, een samenvatting van maximaal twee korte zinnen, een concreet probleem, een duidelijke
+   oplossing, haar relatie met productdoel of besluiten, testbare acceptatiecriteria, uitleg over
+   behapbaarheid en waar nodig het UX-ontwerp.
 4. Een latere Productplanning-sessie vindt de epic zelf. Productontwerp hoeft planning niet te
    starten en stuurt geen planningsrequest.
 5. Productplanning claimt de exacte epicversie. De epic gaat van `AVAILABLE` naar `IN_PLANNING` en
    de inhoud en UX van die versie worden bevroren.
 6. Productplanning deelt de hele epic op in zelfstandig uitvoerbare stories. Iedere story krijgt
-   status `TODO` en een productbreed `sequenceNumber`.
+   een korte titel, een samenvatting van maximaal twee korte zinnen, status `TODO` en een
+   productbreed `sequenceNumber`.
 7. Na de atomaire publicatie van de stories gaat de epic naar `ACTIVE`.
 8. De dispatcher reserveert bij Productplanning atomair de eerste uitvoerbare `TODO`-story met het
    laagste `sequenceNumber`, stuurt haar naar Software Factory en laat Productplanning de
@@ -84,8 +86,9 @@ andere actieve epics bestaan.
 
 1. Productplanning claimt een beschikbare epic en maakt alle stories die nodig zijn om de epic af
    te dekken.
-2. Iedere story is zelfstandig uitvoerbaar en bevat haar eigen acceptatiecriteria, relevante UX en
-   benodigde assets. Software Factory hoeft de epic of Product Factory niet te raadplegen.
+2. Iedere story is zelfstandig uitvoerbaar en bevat een korte titel, een samenvatting van maximaal
+   twee korte zinnen, haar eigen acceptatiecriteria, relevante UX en benodigde assets. Software
+   Factory hoeft de epic of Product Factory niet te raadplegen.
 3. Productplanning ordent de nieuwe stories samen met alle bestaande `TODO`-stories.
 4. Iedere `TODO`- en `IN_PROGRESS`-story heeft samen een uniek productbreed `sequenceNumber`.
    Productplanning herordent alleen `TODO`-stories. Afhankelijkheden worden zo vastgelegd dat een
@@ -130,8 +133,9 @@ storyverificatie. De epic is `ACTIVE`.
 ### Scenario
 
 1. Kwaliteitsbewaking toont aan dat afgesproken storygedrag verkeerd is gebouwd.
-2. Kwaliteitsbewaking bewaart een afgekeurde `Verification` en een reproduceerbare `Bug` en meldt
-   de storyuitkomst bij Productplanning.
+2. Kwaliteitsbewaking bewaart een afgekeurde `Verification` en een reproduceerbare `Bug` met korte
+   titel, samenvatting van maximaal twee korte zinnen en volledige afwijkingsinformatie, en meldt de
+   storyuitkomst bij Productplanning.
 3. Kwaliteitsbewaking vraagt met `requestBugfix(...)` gericht herstelwerk aan. Het command maakt
    alleen een `PlanningWorkItem` en start geen planner-agent.
 4. Een latere Productplanning-sessie maakt een complete bugfixstory, koppelt haar idempotent met

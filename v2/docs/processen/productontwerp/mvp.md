@@ -19,8 +19,8 @@ concreet tekort laat zien, hoeft een onderdeel uit de
 - De agent beoordeelt alle relevante beschikbare input in één samenhangende context.
 - De mogelijke inhoudelijke uitkomst is: geen epic, één nieuwe epic of één nieuwe versie van een
   nog `AVAILABLE` epic.
-- De agent maakt probleem, oplossing, richtingsrelaties, eventueel UX, testbare acceptatiecriteria
-  en de uitleg over behapbaarheid compleet.
+- De agent maakt titel, samenvatting, probleem, oplossing, richtingsrelaties, eventueel UX,
+  testbare acceptatiecriteria en de uitleg over behapbaarheid compleet.
 - De agent maakt nooit stories.
 - Gewone applicatiecode verzamelt input, valideert het contract en schrijft atomair naar de database.
 - Er worden geen interne onderzoeksvragen, kansenlijsten of productdromen duurzaam opgeslagen.
@@ -154,6 +154,8 @@ De agent kan geen statusovergang of databasewijziging rechtstreeks uitvoeren.
 Gewone code controleert minimaal:
 
 - alle verplichte velden uit het Epiccontract;
+- een korte, enkelregelige `title` en een `summary` van maximaal twee korte zinnen die niet met de
+  volledige inhoud botsen;
 - één concreet probleem en één duidelijke oplossing;
 - dat `solution` functionele werking, grens en de reden waarom zij het probleem oplost bevat;
 - minimaal één geldige relatie met productdoel en/of besluit;

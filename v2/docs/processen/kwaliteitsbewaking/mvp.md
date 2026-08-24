@@ -35,7 +35,8 @@ De Tester:
 
 - controleert eerst bereikbaarheid, productversie en toegestane testaccount;
 - leest de exacte story, epic, bug of het gebruikerssignaal bij ieder workitem;
-- gebruikt Git-code, tests en documentatie alleen om risico's en verwacht gedrag te begrijpen;
+- leest de inhoudsopgave en relevante gebruikersroutes en testscenario's uit `/doc` op de bevroren
+  testcommit om risico's, regressies en verwacht gedrag te begrijpen;
 - bedient browser-, API-, log- en andere toegestane testadapters;
 - controleert hoofdroute, belangrijke alternatieven, lege en fouttoestanden;
 - hertest een bugfix vanaf de oorspronkelijke reproduceerstappen;
@@ -129,6 +130,12 @@ enige zichtbare werkstatus.
 
 ### Stap 3 — testen
 
+De Tester leest vóór de uitvoering de relevante scenario's uit `/doc` in dezelfde bevroren
+repositorycheckout. Hij combineert hun beginsituatie, route en verwacht resultaat met het exacte
+workitemcontract en kiest alleen de relevante regressies. De documentatie bepaalt wat onderzocht
+moet worden, maar geldt nooit als bewijs dat het gedrag werkt. Een ontbrekend of strijdig scenario
+wordt als documentatiegebrek vastgelegd en de daadwerkelijke test wordt niet overgeslagen.
+
 Per opdracht voert dezelfde Tester het passende minimale maar volledige werk uit:
 
 - **story** — acceptatiecriteria, hoofdroute en relevante lege, laad- en fouttoestanden;
@@ -153,7 +160,8 @@ vertrouwd.
 
 Bij een mogelijke productafwijking herhaalt de Tester de relevante stappen binnen dezelfde sessie
 vanaf een bekende uitgangssituatie. Het concept bevat werkelijk gedrag, verwacht gedrag, omgeving,
-productversie, bewijs, impact en voorgestelde ernst.
+productversie, bewijs, impact, voorgestelde ernst, een korte titel en een samenvatting van maximaal
+twee korte zinnen.
 
 De Tester classificeert ontbrekend of onjuist gedrag als:
 
@@ -171,6 +179,8 @@ Gewone code controleert minimaal:
 - exacte doel-, bron-, opleverings- en omgevingsversies;
 - toegestane verificatie-uitkomst voor het doeltype;
 - reproduceerstappen en bewijs voor iedere publieke bug;
+- een korte, enkelregelige `title` en een `summary` van maximaal twee korte zinnen die niet met de
+  volledige bug botsen;
 - onderbouwing van ernst en gebruikersimpact;
 - dat een dekkingsgat aantoonbaar door `solution`, `uxDesign` of `acceptanceCriteria` wordt vereist;
 - dat een nieuwe wens niet als bug of dekkingsgat wordt gepubliceerd;

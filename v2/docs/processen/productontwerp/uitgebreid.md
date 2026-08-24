@@ -28,9 +28,9 @@ publieke output en geen roadmapitem. Nieuwe kennis verandert nooit rechtstreeks 
 zij leidt tot een nieuwe versie van een beschikbare epic of een nieuwe vervolgepic.
 
 Een los idee blijft eveneens intern. Het kan worden bewaard, samengevoegd, afgewezen of verder
-onderzocht. Pas wanneer probleem, oplossing, richtingsrelaties, eventueel benodigde UX, testbare
-acceptatiecriteria en behapbaarheid compleet zijn, publiceert Productontwerp een `Epic` volgens het
-publieke contract.
+onderzocht. Pas wanneer titel, samenvatting, probleem, oplossing, richtingsrelaties, eventueel
+benodigde UX, testbare acceptatiecriteria en behapbaarheid compleet zijn, publiceert Productontwerp
+een `Epic` volgens het publieke contract.
 
 ## Interne entiteiten
 
@@ -176,6 +176,7 @@ er wel en niet bij hoort en `slicabilityRationale` maakt de behapbaarheid explic
 De Epiccriticus controleert minimaal:
 
 - één concreet probleem en één duidelijke oplossing;
+- een herkenbare titel en een samenvatting van maximaal twee korte zinnen;
 - een geldige relatie met productdoel en/of besluiten;
 - dat de oplossing haar functionele werking, grens en verwachte verbetering uitlegt;
 - voldoende bewijs en zichtbare onzekerheid;

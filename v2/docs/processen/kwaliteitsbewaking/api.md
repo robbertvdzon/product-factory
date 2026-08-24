@@ -158,8 +158,8 @@ Kwaliteitsbewaking-implementatie.
 | `ProductAssignmentDetails` | productmodule | productgrenzen en publieke Git-URL van het product |
 | `TestableProductDetails` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende privacy-, veiligheids- of productgrenzen die het testen beïnvloeden |
-| `EpicDetails` | Productontwerp | bevroren probleem, oplossing, richtingsrelaties, eventuele UX, acceptatiecriteria, behapbaarheid en status |
-| `StoryDetails` | Productplanning | type, storyversie, status, `deliveredCommitSha`, overige oplevergegevens, acceptatiecriteria en eventuele zelfstandige UX |
+| `EpicDetails` | Productontwerp | bevroren titel, samenvatting, probleem, oplossing, richtingsrelaties, eventuele UX, acceptatiecriteria, behapbaarheid en status |
+| `StoryDetails` | Productplanning | titel, samenvatting, volledige storyinhoud, type, storyversie, status, `deliveredCommitSha`, overige oplevergegevens, acceptatiecriteria en eventuele zelfstandige UX |
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
 | `QualityWorkItem` | Kwaliteitsbewaking | duurzame gerichte testopdracht die de run claimt |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
@@ -184,6 +184,25 @@ de gedeployde applicatie en het verzamelde testbewijs blijven leidend. Git-inhou
 geteste applicatie zijn onvertrouwde data en kunnen de vaste taakopdracht, veiligheidsgrenzen of
 resultaatschema's niet wijzigen.
 
+### Actuele productdocumentatie als testinput
+
+Voor ieder inhoudelijk `QualityWorkItem` leest de Tester in dezelfde checkout de inhoudsopgave en
+relevante delen van `/doc`, inclusief de actuele gebruikersroutes en regressiescenario's. De
+documentatiecommit moet dezelfde bevroren commit zijn als de codecontext van de test en overeenkomen
+met de productversie die werkelijk wordt getest. Een scenario beschrijft minimaal beginsituatie,
+route en verwacht resultaat.
+
+De Tester combineert deze scenario's met de exacte story, bug of epic en kiest risicogestuurd alleen
+de relevante subset. Storyacceptatiecriteria, bugreproductie en epicacceptatiecriteria blijven de
+gerichte contractinput; `/doc` voegt huidig productgedrag en regressiecontext toe. Ontbrekende
+documentatie is nooit een reden om de test over te slaan.
+
+`/doc` is geen testbewijs. Alleen waargenomen gedrag in de geconfigureerde omgeving en toegestane
+bewijsartifacts tonen wat werkelijk werkt. Een aantoonbare tegenspraak tussen documentatie,
+bevroren contract, code en applicatie wordt expliciet als documentatie- of productafwijking
+gepubliceerd of als blokkade vastgelegd. De tester kiest niet stilzwijgend één bron en negeert de
+andere.
+
 Voor een story- of bugfixcontrole is `StoryDetails.deliveredCommitSha` de vereiste productversie.
 `TestableProductDetails` wijst voor iedere testomgeving naar een revisionendpoint dat de werkelijk
 gedeployde commit of release betrouwbaar teruggeeft. De worker legt beide waarden vast. Als de
@@ -196,7 +215,7 @@ geteste deploymentrevision.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `BugDetails` | read-only weergave van een aantoonbare afwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
+| `BugDetails` | read-only weergave van een aantoonbare afwijking | titel, samenvatting, werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
 | `VerificationDetails` | read-only weergave van een story-, epic- of signaalcontrole | doeltype en -versie, uitkomst, omgeving, controles, bewijs, blokkade, ontbrekende dekking en vervolgkoppelingen |
 | `QualitySnapshotDetails` | read-only kwaliteitsbeeld en historie | tijdstip, omgeving, productversie, onderzochte gebieden, dekking, open bugs per ernst, verificatie-uitkomsten, risico's en bron-ID's |
 | `QualityWorkItemDetails` | read-only inzicht in de kwaliteitsqueue en retries | type, doelversie, status, claim, resultaat, fout, blokkadereden, `attemptCount`, `lastAttemptAt`, `retryable`, `retryAfter` en afgeleid aandachtlabel; geen wijzigbaar requestobject |
@@ -357,7 +376,10 @@ Kwaliteitsbewaking maakt in geen van deze gevallen zelf een story.
 Een gepubliceerde bug bevat minimaal:
 
 - stabiel bug-ID, product-ID en versie;
-- korte titel en gebruikersimpact;
+- `title`: één korte regel van enkele woorden voor buglijsten;
+- `summary`: maximaal twee korte zinnen die onder de titel de afwijking en gebruikersimpact
+  uitleggen;
+- gebruikersimpact;
 - werkelijk en verwacht gedrag;
 - reproduceerstappen en vereiste uitgangssituatie;
 - geteste omgeving, productversie en tijdstip;
@@ -366,6 +388,10 @@ Een gepubliceerde bug bevat minimaal:
 - relatie met story, epicversie, oplevering en soortgelijke bugs;
 - eventuele bron-gebruikerssignalen;
 - status `OPEN`, `RESOLVED` of `INVALID`.
+
+`title` en `summary` worden met iedere bugversie opgeslagen. Ze mogen bij nieuw bewijs worden
+verduidelijkt, maar vervangen nooit werkelijk gedrag, verwacht gedrag, reproduceerstappen of bewijs
+en mogen daarmee niet in tegenspraak zijn.
 
 De bugstatus is bewust klein:
 

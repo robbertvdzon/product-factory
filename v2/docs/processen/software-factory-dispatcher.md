@@ -95,6 +95,7 @@ Productplanning-commands en hun invarianten.
 Het pakket bevat minimaal:
 
 - stabiel story-ID, storyversie, product-ID en type;
+- de opgeslagen `title` en `summary` voor herkenning in Software Factory;
 - zelfstandig gebruikersgedrag en gebruikerswaarde;
 - alle acceptatiecriteria;
 - waar de story UX bevat: het relevante volledige UX-ontwerp en alle schermtoestanden;

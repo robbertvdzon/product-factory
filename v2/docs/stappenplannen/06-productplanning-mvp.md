@@ -11,6 +11,8 @@ stories en één geordende backlog.
 - Implementeer de `PlanningWorkItem`-queue en geplande of handmatige
   `runProcessSession(productId)`, met maximaal één sessie per product.
 - Laat de planner een exacte epicversie claimen en opdelen in complete product- of bugfixstories.
+- Geef iedere story een opgeslagen korte titel en samenvatting van maximaal twee korte zinnen naast
+  het volledige Storycontract.
 - Bewaar storystatus en `sequenceNumber`; bereken de backlog als alle `TODO`- en `IN_PROGRESS`-stories.
 - Ondersteun de publieke, snelle commands voor levering, bugfix- en dekkingswerk en handmatige
   prioriteitswijziging.

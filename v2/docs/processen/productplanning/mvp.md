@@ -151,6 +151,8 @@ serverthread wachten op een laptopworker of server-side mockresultaat.
 Gewone code controleert minimaal:
 
 - alle verplichte velden uit het Storycontract;
+- een korte, enkelregelige `title` en een `summary` van maximaal twee korte zinnen die niet met de
+  volledige story botsen;
 - exacte epic-, bug- en verificatieversies;
 - volledige dekking van oplossing, acceptatiecriteria en eventuele UX van iedere nieuw geplande
   epic;

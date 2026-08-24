@@ -103,8 +103,9 @@ Storymakers mogen onafhankelijk werken aan:
 - bugfixstories.
 
 Iedere Storymaker levert `StoryDraft`s, waar nodig zelfstandige `StoryUxSnapshot`s en een
-`StoryCoverageMap`. De maps moeten samen de volledige oplossing, alle acceptatiecriteria en het
-eventuele UX-ontwerp aantoonbaar afdekken.
+`StoryCoverageMap`. Iedere draft bevat ook een korte titel en een samenvatting van maximaal twee
+korte zinnen. De maps moeten samen de volledige oplossing, alle acceptatiecriteria en het eventuele
+UX-ontwerp aantoonbaar afdekken.
 
 ### Stap 3 — productbreed ordenen
 
@@ -121,6 +122,8 @@ De Planningscriticus controleert minimaal:
 
 - volledige dekking van iedere geclaimde epic;
 - kleine, zelfstandig leverbare stories zonder onnodige overlap;
+- een korte, enkelregelige titel en een samenvatting van maximaal twee korte zinnen die niet met de
+  volledige storyinhoud botsen;
 - complete acceptatiecriteria en zelfstandige UX;
 - correcte bron- en versierelaties;
 - uitvoerbare afhankelijkheden;

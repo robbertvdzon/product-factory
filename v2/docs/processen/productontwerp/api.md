@@ -86,7 +86,7 @@ Productontwerp-implementatie.
 | `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote, blijvende Stakeholder- en Factorybesluiten die het ontwerp begrenzen |
 | `UserSignalDetails` | productmodule | oorspronkelijke feedback plus actuele status, uitkomst en resultaatkoppelingen |
-| `StoryDetails` | Productplanning-query | wat Software Factory heeft opgeleverd en welke story bij een epic hoort |
+| `StoryDetails` | Productplanning-query | titel, samenvatting en volledige storyinhoud; wat Software Factory heeft opgeleverd en welke story bij een epic hoort |
 | `VerificationDetails` | Kwaliteitsbewaking-query | of de bedoelde gebruikersverbetering is bereikt en welk bewijs daarbij hoort |
 | `QualitySnapshotDetails` | Kwaliteitsbewaking-query | huidig kwaliteitsbeeld en historische ontwikkeling van dekking, bugs, risico's en verificaties |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, testaccounts en toegangsgrenzen |
@@ -125,7 +125,7 @@ productmodule en krijgt nooit directe schrijftoegang tot het signaal.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `EpicDetails` | read-only weergave van één complete gebruikersverbetering | technische metadata plus probleem, oplossing, richtingsrelaties, eventueel UX-ontwerp, testbare acceptatiecriteria en uitleg over behapbaarheid |
+| `EpicDetails` | read-only weergave van één complete gebruikersverbetering | technische metadata, titel en samenvatting plus probleem, oplossing, richtingsrelaties, eventueel UX-ontwerp, testbare acceptatiecriteria en uitleg over behapbaarheid |
 | `ProcessSession` | opgeslagen operationele historie van de sessie | sessie-ID, product-ID, implementatie-ID en -versie, gebruikte inputversies, AI-taak-ID's, publicatie-ID's, wacht- of eindstatus en blokkade |
 
 De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Interne analyses,
@@ -169,6 +169,9 @@ en de publieke levenscyclus:
 
 De inhoud van een beschikbare epicdefinitie bestaat uitsluitend uit:
 
+- `title` — één korte regel van enkele woorden waarmee mensen de epic in lijsten herkennen;
+- `summary` — maximaal twee korte zinnen die onder de titel de kern van probleem en oplossing
+  uitleggen;
 - `problem` — het concrete gebruikersprobleem dat moet worden opgelost;
 - `solution` — wat de voorgestelde oplossing is, hoe zij functioneel moet werken, wat er wel en niet
   bij hoort en waarom zij het probleem oplost;
@@ -185,6 +188,10 @@ Doelgroep, routes, toestanden, grenzen, bewijs, risico's en afhankelijkheden wor
 publieke epicvelden. Alleen informatie die voor deze epic werkelijk nodig is, wordt verwerkt in
 `problem`, `solution`, `uxDesign` of `acceptanceCriteria`. Onderzoek, bronnen, aannames en
 technische verkenningen blijven interne sessie-informatie.
+
+`title` en `summary` zijn opgeslagen presentatievelden en worden met iedere epicversie bevroren. Ze
+zijn geen vervanging voor de volledige epicinhoud en mogen daar niet mee in tegenspraak zijn. De
+frontend leidt ze niet tijdens het tonen opnieuw af uit `problem` of `solution`.
 
 Productontwerp beschrijft geen storylijst. Een mogelijke slice mag de behapbaarheid uitleggen, maar
 is geen vooraf geschreven backlog.
