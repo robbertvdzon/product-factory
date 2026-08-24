@@ -9,11 +9,14 @@ Deze stap levert de publieke productbasis waarop alle latere modules voortbouwen
 
 - Implementeer `product-impl` als provider achter de in stap 1 vastgelegde product-/overleg-API,
   met `Product`, `ProductAssignment`, `TestableProductConfiguration` en `UserSignal`, inclusief de
-  expliciete dispatchinginstelling per product.
+  expliciete dispatchinginstelling en `ProcessScheduleConfiguration` per product en uitvoerend
+  onderdeel.
 - Implementeer het Besluitenregister, inclusief actuele besluiten, historie, intrekken en vervangen.
 - Implementeer overleggen, notulen en de gecontroleerde verwerking van stakeholderuitkomsten.
 - Leg vast dat één globale Stakeholder alle producten en Product Factory-brede instellingen beheert.
-- Voeg de bijbehorende product-, inbox-, besluiten- en overlegschermen aan de frontend toe.
+- Voeg de bijbehorende product-, signalen-, schedule-, besluiten- en overlegschermen aan de
+  frontend toe. Schedulebediening ondersteunt menselijke weekdagen/tijden of een interval, een
+  expliciete tijdzone en toont `nextRunAt`; er is geen cronveld.
 - Toon herkomst, status en historie via de publieke module-API's; schrijf nooit vanuit de UI in
   moduletabellen.
 - Voeg vaste acceptatiescenario's toe en deploy de afgeronde stap naar acceptatie en productie.
@@ -35,6 +38,8 @@ overleguitkomst zonder AI via dezelfde publieke commands worden geregistreerd.
 
 ## Klaar wanneer
 
-De Stakeholder kan in de UI het product beheren, signalen indienen en volgen, overleggen vastleggen
-en geldige of historische besluiten bekijken en wijzigen. Dit werkt met synthetische data op
-acceptatie en met duurzame data en authenticatie op productie.
+De Stakeholder kan in de UI het product beheren, per proces een schedule configureren, signalen
+indienen en volgen, overleggen vastleggen en geldige of historische besluiten bekijken en wijzigen.
+De scheduleconfiguratie is in stap 2 al duurzaam en uitleesbaar; de echte automatische starts worden
+pas in stap 9 geactiveerd. Dit werkt met synthetische data op acceptatie en met duurzame data en
+authenticatie op productie.

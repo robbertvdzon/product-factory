@@ -116,9 +116,17 @@ voor verschillende producten draaien. Alleen een werkelijk gelijktijdig uitvoere
 start voor hetzelfde product krijgt een fout; een schedulerbotsing met zo'n actieve call wordt
 overgeslagen en geregistreerd.
 
-De technische scheduler leest de actieve producten en roept de betreffende functie afzonderlijk
-per product aan. De scheduler bevat geen product- of agentlogica. Een handmatige UI-/REST-start
-kiest eveneens expliciet één product.
+De technische scheduler leest voor ieder actief product de `ProcessScheduleConfiguration` van de
+vier uitvoerende onderdelen en roept alleen vervallen, ingeschakelde schedules aan. De Stakeholder
+stelt via de UI menselijke weekdagen, tijden of een vast interval en een expliciete tijdzone in;
+cronexpressies zijn geen onderdeel van de publieke bediening. De scheduler bevat geen product- of
+agentlogica. Een handmatige UI-/REST-start kiest eveneens expliciet één product en blijft ook bij
+een uitgeschakeld schedule beschikbaar.
+
+Iedere geplande combinatie wordt hooguit eenmaal geclaimd. Na downtime wordt maximaal één gemiste
+run ingehaald en daarna het eerstvolgende toekomstige tijdstip berekend; een lange storing speelt
+dus geen hele rij oude runs af. Een wijziging geldt alleen voor toekomstige starts en annuleert geen
+lopende of wachtende processessie.
 
 Een AI-taak draait asynchroon. De processessie bewaart het taak-ID, krijgt status
 `WAITING_FOR_AI` en houdt geen thread of technische lock vast. Een volgende schedule-run hervat
@@ -421,6 +429,11 @@ Ook algemene `AiJobConfiguration`s, `AiTask`s, attempts en resultaten staan in d
 laptopworker leest nooit rechtstreeks uit die database: hij claimt taken via de publieke worker-API.
 De worker draait niet in een `product-factory-workspace`; iedere taak bevat zelf alle benodigde data
 en gebruikt een tijdelijke werkdirectory.
+
+Ook iedere `ProcessScheduleConfiguration` staat duurzaam en geversioneerd in de database bij het
+betreffende product. De technische scheduler gebruikt uitsluitend deze publieke configuratie en een
+eigen idempotente claim op het geplande tijdstip; omgevingsconfiguratie kan automatische polling,
+zoals op acceptatie, volledig uitschakelen zonder de productinstelling te overschrijven.
 
 De publieke productrepository blijft wel de waarheid over de huidige code, tests en
 productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen de Git-URL uit de

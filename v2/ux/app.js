@@ -12,8 +12,11 @@
   const statsBackdrop = document.querySelector(".stats-backdrop");
   const authModal = document.querySelector(".auth-modal");
   const authBackdrop = document.querySelector(".auth-backdrop");
+  const scheduleModal = document.querySelector(".schedule-modal");
+  const scheduleBackdrop = document.querySelector(".schedule-backdrop");
   const toast = document.querySelector(".toast");
   let returnFocus = null;
+  let editingScheduleRow = null;
   let toastTimeout;
 
   const entityData = {
@@ -155,7 +158,7 @@
   };
 
   function updateOverlayState() {
-    const anyOpen = drawer.classList.contains("open") || !signalModal.hidden || !statsModal.hidden || !authModal.hidden;
+    const anyOpen = drawer.classList.contains("open") || !signalModal.hidden || !statsModal.hidden || !authModal.hidden || !scheduleModal.hidden;
     body.classList.toggle("overlay-open", anyOpen);
   }
 
@@ -239,6 +242,62 @@
       button.disabled = false;
       button.textContent = button.dataset.originalLabel;
     }, 4200);
+  }
+
+  function setScheduleMode(mode) {
+    scheduleModal.querySelector(".schedule-mode").value = mode;
+    scheduleModal.querySelector(".weekly-schedule-fields").hidden = mode !== "weekly";
+    scheduleModal.querySelector(".interval-schedule-fields").hidden = mode !== "interval";
+  }
+
+  function formatScheduleFromModal() {
+    const mode = scheduleModal.querySelector(".schedule-mode").value;
+    if (mode === "interval") {
+      const minutes = Math.max(5, Number(scheduleModal.querySelector(".interval-input input").value) || 60);
+      if (minutes === 60) return "Ieder uur";
+      if (minutes % 60 === 0) return `Iedere ${minutes / 60} uur`;
+      return `Iedere ${minutes} minuten`;
+    }
+
+    const dayNames = { "0": "zo", "1": "ma", "2": "di", "3": "wo", "4": "do", "5": "vr", "6": "za" };
+    const fullDayNames = { "0": "zondag", "1": "maandag", "2": "dinsdag", "3": "woensdag", "4": "donderdag", "5": "vrijdag", "6": "zaterdag" };
+    const days = [...scheduleModal.querySelectorAll(".weekday-picker input:checked")].map((input) => input.value);
+    const times = [...scheduleModal.querySelectorAll(".schedule-times input")].map((input) => input.value).filter(Boolean);
+    let dayText = "Op gekozen dagen";
+    if (days.length === 7) dayText = "Dagelijks";
+    else if (days.length === 1) dayText = `Iedere ${fullDayNames[days[0]]}`;
+    else if (days.length > 1) dayText = days.map((day) => dayNames[day]).join(", ");
+    const timeText = times.length ? ` om ${times.join(" en ")}` : "";
+    return `${dayText}${timeText}`;
+  }
+
+  function updateSchedulePreview() {
+    scheduleModal.querySelector(".schedule-preview-text").textContent = formatScheduleFromModal();
+    const enabled = scheduleModal.querySelector(".schedule-enabled input").checked;
+    scheduleModal.querySelector(".schedule-enabled b").textContent = enabled ? "Ingeschakeld" : "Uitgeschakeld";
+  }
+
+  function configureScheduleModal(button) {
+    const mode = button.dataset.scheduleMode;
+    editingScheduleRow = button.closest("article");
+    scheduleModal.querySelector("#schedule-modal-title").textContent = `${button.dataset.scheduleProcess} plannen`;
+    setScheduleMode(mode);
+    scheduleModal.querySelector(".schedule-enabled input").checked = editingScheduleRow.querySelector("[data-schedule-toggle]").checked;
+    const selectedDays = new Set((button.dataset.scheduleDays || "").split(",").filter(Boolean));
+    scheduleModal.querySelectorAll(".weekday-picker input").forEach((input) => {
+      input.checked = selectedDays.has(input.value);
+    });
+    const times = (button.dataset.scheduleTimes || "08:00").split(",");
+    const timesContainer = scheduleModal.querySelector(".schedule-times");
+    timesContainer.querySelectorAll("input").forEach((input) => input.remove());
+    times.forEach((time) => {
+      const input = document.createElement("input");
+      input.type = "time";
+      input.value = time;
+      timesContainer.querySelector("button").before(input);
+    });
+    scheduleModal.querySelector(".interval-input input").value = button.dataset.scheduleInterval || "60";
+    updateSchedulePreview();
   }
 
   document.addEventListener("click", (event) => {
@@ -340,6 +399,44 @@
         break;
       case "edit-test-config":
         showToast("De veilige routes en omgevingsgrenzen kunnen nu worden aangepast.");
+        break;
+      case "edit-schedule":
+        configureScheduleModal(actionButton);
+        openModal(scheduleModal, scheduleBackdrop, actionButton, scheduleModal.querySelector(".schedule-mode"));
+        break;
+      case "save-schedule": {
+        const editButton = editingScheduleRow.querySelector('[data-action="edit-schedule"]');
+        const enabled = scheduleModal.querySelector(".schedule-enabled input").checked;
+        const mode = scheduleModal.querySelector(".schedule-mode").value;
+        const times = [...scheduleModal.querySelectorAll(".schedule-times input")].map((input) => input.value).filter(Boolean);
+        const days = [...scheduleModal.querySelectorAll(".weekday-picker input:checked")].map((input) => input.value);
+        const interval = Number(scheduleModal.querySelector(".interval-input input").value);
+        if ((mode === "weekly" && (!days.length || !times.length)) || (mode === "interval" && interval < 5)) {
+          showToast(mode === "weekly" ? "Kies minimaal één dag en één tijd." : "Het interval is minimaal 5 minuten.");
+          break;
+        }
+        editButton.dataset.scheduleMode = mode;
+        editButton.dataset.scheduleTimes = times.join(",");
+        editButton.dataset.scheduleDays = days.join(",");
+        editButton.dataset.scheduleInterval = interval;
+        editingScheduleRow.querySelector("[data-schedule-toggle]").checked = enabled;
+        editingScheduleRow.querySelector(".schedule-description strong").textContent = formatScheduleFromModal();
+        editingScheduleRow.querySelector(".schedule-description small").textContent = `${mode === "interval" ? "Vast interval" : "Vaste dagen en tijden"} · ${scheduleModal.querySelector(".schedule-timezone").value}`;
+        editingScheduleRow.querySelector("time").textContent = enabled ? "Wordt berekend…" : "Niet gepland";
+        closeModal(scheduleModal, scheduleBackdrop);
+        showToast("Het schema is als nieuwe versie bewaard; de server berekent nu de volgende run.");
+        break;
+      }
+      case "add-schedule-time": {
+        const input = document.createElement("input");
+        input.type = "time";
+        input.value = "12:00";
+        actionButton.before(input);
+        input.focus();
+        break;
+      }
+      case "run-scheduled-process":
+        startButton(actionButton, "Gestart", `${actionButton.dataset.processLabel} is handmatig gestart voor HKH.`);
         break;
       case "logout":
         closeDrawer();
@@ -497,10 +594,30 @@
   statsModal.querySelector(".stats-modal-close").addEventListener("click", () => closeModal(statsModal, statsBackdrop));
   statsBackdrop.addEventListener("click", () => closeModal(statsModal, statsBackdrop));
 
+  scheduleModal.querySelector(".schedule-modal-close").addEventListener("click", () => closeModal(scheduleModal, scheduleBackdrop));
+  scheduleModal.querySelector(".schedule-modal-cancel").addEventListener("click", () => closeModal(scheduleModal, scheduleBackdrop));
+  scheduleBackdrop.addEventListener("click", () => closeModal(scheduleModal, scheduleBackdrop));
+  scheduleModal.querySelector(".schedule-mode").addEventListener("change", (event) => {
+    setScheduleMode(event.target.value);
+    updateSchedulePreview();
+  });
+  scheduleModal.addEventListener("input", updateSchedulePreview);
+  scheduleModal.addEventListener("change", updateSchedulePreview);
+
+  document.querySelectorAll("[data-schedule-toggle]").forEach((toggle) => {
+    toggle.addEventListener("change", () => {
+      const scheduleRow = toggle.closest("article");
+      const processName = scheduleRow.querySelector(".schedule-process strong").textContent;
+      scheduleRow.querySelector("time").textContent = toggle.checked ? "Wordt berekend…" : "Niet gepland";
+      showToast(`${processName}: automatische starts zijn ${toggle.checked ? "ingeschakeld" : "uitgeschakeld"}. Handmatig starten blijft mogelijk.`);
+    });
+  });
+
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     if (!signalModal.hidden) closeModal(signalModal, signalBackdrop);
     else if (!statsModal.hidden) closeModal(statsModal, statsBackdrop);
+    else if (!scheduleModal.hidden) closeModal(scheduleModal, scheduleBackdrop);
     else if (!authModal.hidden) return;
     else if (drawer.classList.contains("open")) closeDrawer();
     else closeNavigation();

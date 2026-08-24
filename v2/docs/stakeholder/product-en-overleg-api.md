@@ -6,7 +6,8 @@ Status: publiek contract voor productgegevens, gebruikerssignalen en overleggen.
 
 De product-/overlegmodule bewaart de richting en invoer die de ene globale Stakeholder via de
 gebruikersinterface aan Product Factory geeft. Zij is eigenaar en enige schrijver van `Product`,
-`ProductAssignment`, `TestableProductConfiguration`, `UserSignal` en `Meeting`.
+`ProductAssignment`, `TestableProductConfiguration`, `ProcessScheduleConfiguration`, `UserSignal`
+en `Meeting`.
 
 Andere modules gebruiken uitsluitend deze API. Zij krijgen geen repositorytoegang en wijzigen deze
 entiteiten alleen via betekenisvolle commands. De module maakt geen epics, stories, bugs,
@@ -23,12 +24,14 @@ ProductId createProduct(CreateProductCommand command);
 void updateProductAssignment(UpdateProductAssignmentCommand command);
 void configureTestableProduct(ConfigureTestableProductCommand command);
 void setProductDispatching(SetProductDispatchingCommand command);
+void updateProcessSchedule(UpdateProcessScheduleCommand command);
 
 ProductDetails getProduct(ProductId productId);
 List<ProductDetails> findProducts();
-List<ProductDetails> findDispatchableProducts();
 ProductAssignmentDetails getProductAssignment(ProductId productId);
 TestableProductDetails getTestableProduct(ProductId productId);
+ProcessScheduleDetails getProcessSchedule(ProductId productId, ScheduledProcess process);
+List<ProcessScheduleDetails> getProcessSchedules(ProductId productId);
 
 UserSignalId submitUserSignal(SubmitUserSignalCommand command);
 void markUserSignalInReview(MarkUserSignalInReviewCommand command);
@@ -50,10 +53,10 @@ geen algemene setter en kunnen de state machine niet omzeilen.
 ## Product en productopdracht
 
 `Product` bevat minimaal een stabiel product-ID, naam, status `ACTIVE` of `INACTIVE`,
-`dispatchingEnabled`, aanmaakmoment en actuele versie. `findDispatchableProducts()` levert een vaste
-read-only lijst van alle `ACTIVE` producten waarvoor `dispatchingEnabled = true`. De scheduler
-gebruikt deze query om per product `runDispatchSession(productId)` te starten. De dispatchersessie
-zelf valideert nogmaals exact dat ene product.
+`dispatchingEnabled`, aanmaakmoment en actuele versie. `findProducts()` maakt dit per product
+uitleesbaar. De dispatcher-scheduler kiest geen producten op basis van een losse productquery, maar
+claimt vervallen `SOFTWARE_FACTORY_DISPATCHER`-schema's. De dispatchersessie valideert daarna
+nogmaals dat exact dat ene product actief is en dispatching aanstaat.
 
 `ProductAssignment` bevat minimaal doelgroep, productdoel, harde grenzen en de publieke Git-URL.
 `TestableProductConfiguration` bevat de acceptatieomgeving en eventueel veilige
@@ -65,6 +68,49 @@ secretwaarden, alleen referenties die de worker lokaal veilig kan oplossen.
 
 De globale Stakeholder mag ieder product en de bijbehorende opdracht en testconfiguratie beheren.
 Een proces leest steeds een exacte versie en legt die bronversie op zijn processessie vast.
+
+## Procesconfiguratie en schedules
+
+De Stakeholder beheert per product een afzonderlijk schedule voor:
+
+- `PRODUCT_DESIGN` — roept `runProcessSession(productId)` op Productontwerp aan;
+- `PRODUCT_PLANNING` — roept `runProcessSession(productId)` op Productplanning aan;
+- `QUALITY_ASSURANCE` — roept `runProcessSession(productId)` op Kwaliteitsbewaking aan;
+- `SOFTWARE_FACTORY_DISPATCHER` — roept `runDispatchSession(productId)` aan.
+
+`ProcessScheduleConfiguration` bevat minimaal product-ID, proces, `enabled`, IANA-tijdzone,
+schedulepatroon, berekende `nextRunAt`, wijzigingsmoment en versie. Het patroon ondersteunt:
+
+- één of meer vaste tijden op gekozen weekdagen, bijvoorbeeld dagelijks om 08:00 en 20:00 of
+  iedere maandag om 07:00;
+- een vast interval in hele minuten, bijvoorbeeld ieder uur voor de dispatcher.
+
+De normale UI toont menselijke dagen en tijden en geen cronexpressie. De tijdzone is expliciet en
+standaard `Europe/Amsterdam`, zodat zomer- en wintertijd volgens die zone worden berekend.
+`updateProcessSchedule(...)` wijzigt alleen toekomstige starts, annuleert geen lopende sessie en
+verandert niets aan handmatige bediening.
+
+`createProduct(...)` maakt voor de vier processen een uitgeschakelde configuratie zonder
+`nextRunAt`. De eerste keer inschakelen vereist een geldig patroon. Uitschakelen bewaart het patroon
+voor later maar maakt `nextRunAt` leeg; opnieuw inschakelen berekent vanaf dat moment uitsluitend
+een toekomstig tijdstip. Zo start een nieuw product nooit onverwacht automatisch.
+
+De technische scheduler pollt vervallen `nextRunAt`s, claimt iedere combinatie van schedule-ID en
+gepland tijdstip hooguit eenmaal en roept alleen de gewone publieke runfunctie aan. Na downtime
+wordt een gemist schema hooguit eenmaal ingehaald; eerdere gemiste tijdstippen worden niet allemaal
+nagespeeld. Daarna wordt direct het eerstvolgende toekomstige tijdstip berekend. Voor een `INACTIVE`
+product wordt geen proces gestart. De dispatcher controleert daarnaast zoals altijd
+`dispatchingEnabled`.
+
+De scheduleradapter en het atomische zoeken en claimen van vervallen schema's horen intern bij de
+productimplementatie. Andere modules krijgen daarvoor geen repositorytoegang en ook geen algemene
+publieke setter. Na een geldige claim kent de adapter alleen product-ID, proces en gepland tijdstip
+en roept hij de publieke run-API van dat proces aan.
+
+Een botsing met een al uitvoerende call volgt de bestaande regel: de scheduler registreert de
+geplande start als overgeslagen en forceert geen tweede uitvoering. Een niet-actief wachtende
+logische sessie, bijvoorbeeld `WAITING_FOR_AI`, wordt door de geplande call juist veilig hervat.
+Een uitgeschakeld schedule verhindert alleen automatische starts; **Nu starten** blijft beschikbaar.
 
 ## UserSignal
 
@@ -105,8 +151,9 @@ wijzigt nooit stilzwijgend productdata.
 - Broninhoud van een `UserSignal` en vastgelegde meetingberichten worden niet overschreven.
 - Algemene AI-instellingen horen bij AI-uitvoering en niet bij deze module.
 - De frontend gebruikt exact dezelfde commands en queries als andere aanroepers.
-- `findDispatchableProducts()` bevat alleen actieve, expliciet voor dispatching ingeschakelde
-  producten.
+- Per product en `ScheduledProcess` bestaat precies één geversioneerde scheduleconfiguratie.
+- Een schedule start uitsluitend de bestaande publieke runfunctie en bevat geen product- of
+  agentlogica.
 - Overlegagents schrijven nooit rechtstreeks in een andere module.
 
 ## Gerelateerde documenten

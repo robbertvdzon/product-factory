@@ -26,6 +26,9 @@ Open daarna `http://localhost:8080`.
   voorgesteld.
 - Handmatige acties gebruiken precies de publieke commands uit de specificatie, maar tonen in de
   UI gewone mensentaal.
+- Onder **Productinstellingen → Automatisering** kan de Stakeholder per product en proces vaste
+  weekdagen en één of meer tijden, of een vast interval instellen. De UI toont geen cronexpressies;
+  uitschakelen laat **Nu starten** beschikbaar.
 - Een dispatchreservering verschijnt tijdelijk als **Wordt verstuurd**, zonder extra storystatus.
 - Kwaliteit groepeert testwerk, bugs, verificaties en historie in rustige deelweergaven. Statistieken
   blijven secundair.
@@ -47,7 +50,8 @@ Open daarna `http://localhost:8080`.
 - **Kwaliteit** — actuele en afgeronde QualityWorkItems, bugs, verificaties en kwaliteitshistorie.
 - **Signalen** — onveranderlijke gebruikerssignalen met bron, context, status en doorwerking.
 - **Overleggen** — agenda, gesprek, notulen en de status van iedere expliciete actie.
-- **Beheer** — ingang naar productinstellingen, besluiten, geheugen, AI-instellingen en techniek.
+- **Beheer** — ingang naar productinstellingen, procesautomatisering, besluiten, geheugen,
+  AI-instellingen en techniek.
 - **Besluiten** — actuele grote besluiten, peildatum, versies, intrekkingen en opvolgers.
 - **Agentgeheugen** — geheugen en contextbudget per rol, inclusief versiehistorie en correcties.
 - **Algemene instellingen** — provider, model en beschikbaarheid per `AiJobKey`.

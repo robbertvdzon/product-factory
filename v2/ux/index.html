@@ -324,7 +324,7 @@
         <section class="view" id="view-management" aria-labelledby="management-title">
           <div class="page-heading"><div><p class="eyebrow">Beheer</p><h1 id="management-title">Richting, geheugen en techniek</h1><p>Onderdelen die je minder vaak nodig hebt, zonder het dagelijkse werk druk te maken.</p></div></div>
           <div class="management-grid">
-            <button class="surface management-card" data-view="product-settings"><span class="management-icon">◎</span><span><strong>Productinstellingen</strong><small>Productopdracht, testomgevingen en dispatching</small></span><span>→</span></button>
+            <button class="surface management-card" data-view="product-settings"><span class="management-icon">◎</span><span><strong>Productinstellingen</strong><small>Opdracht, omgevingen, dispatching en automatisering</small></span><span>→</span></button>
             <button class="surface management-card" data-view="decisions"><span class="management-icon">✓</span><span><strong>Besluiten</strong><small>Actuele keuzes, peildatum en volledige historie</small></span><span>→</span></button>
             <button class="surface management-card" data-view="memory"><span class="management-icon">◫</span><span><strong>Agentgeheugen</strong><small>Geheugen per rol controleren en corrigeren</small></span><span>→</span></button>
             <button class="surface management-card" data-view="settings"><span class="management-icon">⚙</span><span><strong>Algemene instellingen</strong><small>Model, provider en beschikbaarheid per AI-job</small></span><span>→</span></button>
@@ -351,6 +351,17 @@
               <div class="surface-heading"><div><span class="kicker">Testbare omgevingen</span><h2>Acceptatie en productie</h2></div></div>
               <div class="environment-settings"><article><span class="status-chip active">Bereikbaar</span><h3>Acceptatie</h3><p>https://acc.hkh.example.nl</p><small>Veilige testaccounts · schrijven toegestaan binnen testdata</small></article><article><span class="status-chip active">Read-only</span><h3>Productie</h3><p>https://hkh.example.nl</p><small>Alleen veilige routes · geen echte klantdata wijzigen</small></article></div>
               <button class="secondary-action" data-action="edit-test-config">Omgevingen aanpassen</button>
+            </section>
+            <section class="surface settings-section full-span automation-section">
+              <div class="surface-heading"><div><span class="kicker">Automatisering</span><h2>Wanneer de processen voor HKH draaien</h2><p>Automatische starts gebruiken Europe/Amsterdam. Handmatig starten blijft altijd mogelijk.</p></div><span class="status-chip active">Automatische starts actief</span></div>
+              <div class="schedule-table">
+                <div class="schedule-head"><span>Proces</span><span>Automatisch</span><span>Schema</span><span>Volgende run</span><span></span></div>
+                <article><span class="schedule-process"><i class="run-icon design">✦</i><span><strong>Productontwerp</strong><small>PRODUCT_DESIGN</small></span></span><label class="switch compact"><input type="checkbox" checked data-schedule-toggle aria-label="Automatische starts voor Productontwerp"><span></span></label><span class="schedule-description"><strong>Iedere maandag om 07:00</strong><small>Wekelijks · Europe/Amsterdam</small></span><time>ma. 31 aug. · 07:00</time><span class="schedule-actions"><button data-action="edit-schedule" data-schedule-process="Productontwerp" data-schedule-mode="weekly" data-schedule-days="1" data-schedule-times="07:00">Bewerken</button><button data-action="run-scheduled-process" data-process-label="Productontwerp">Nu starten</button></span></article>
+                <article><span class="schedule-process"><i class="run-icon planning">≡</i><span><strong>Productplanning</strong><small>PRODUCT_PLANNING</small></span></span><label class="switch compact"><input type="checkbox" checked data-schedule-toggle aria-label="Automatische starts voor Productplanning"><span></span></label><span class="schedule-description"><strong>Dagelijks om 08:00 en 20:00</strong><small>Iedere dag · Europe/Amsterdam</small></span><time>Vandaag · 20:00</time><span class="schedule-actions"><button data-action="edit-schedule" data-schedule-process="Productplanning" data-schedule-mode="weekly" data-schedule-days="1,2,3,4,5,6,0" data-schedule-times="08:00,20:00">Bewerken</button><button data-action="run-scheduled-process" data-process-label="Productplanning">Nu starten</button></span></article>
+                <article><span class="schedule-process"><i class="run-icon quality">◇</i><span><strong>Kwaliteitsbewaking</strong><small>QUALITY_ASSURANCE</small></span></span><label class="switch compact"><input type="checkbox" checked data-schedule-toggle aria-label="Automatische starts voor Kwaliteitsbewaking"><span></span></label><span class="schedule-description"><strong>Dagelijks om 06:00</strong><small>Iedere dag · Europe/Amsterdam</small></span><time>Morgen · 06:00</time><span class="schedule-actions"><button data-action="edit-schedule" data-schedule-process="Kwaliteitsbewaking" data-schedule-mode="weekly" data-schedule-days="1,2,3,4,5,6,0" data-schedule-times="06:00">Bewerken</button><button data-action="run-scheduled-process" data-process-label="Kwaliteitsbewaking">Nu starten</button></span></article>
+                <article><span class="schedule-process"><i class="run-icon dispatch">↗</i><span><strong>Dispatcher</strong><small>SOFTWARE_FACTORY_DISPATCHER</small></span></span><label class="switch compact"><input type="checkbox" checked data-schedule-toggle aria-label="Automatische starts voor Dispatcher"><span></span></label><span class="schedule-description"><strong>Ieder uur</strong><small>Vast interval · Europe/Amsterdam</small></span><time>Vandaag · 16:00</time><span class="schedule-actions"><button data-action="edit-schedule" data-schedule-process="Dispatcher" data-schedule-mode="interval" data-schedule-interval="60">Bewerken</button><button data-action="run-scheduled-process" data-process-label="Dispatcher">Nu starten</button></span></article>
+              </div>
+              <p class="settings-note">Na downtime wordt hooguit één gemiste run ingehaald. Een wijziging annuleert geen lopende of wachtende sessie.</p>
             </section>
           </div>
         </section>
@@ -395,10 +406,10 @@
         <section class="view" id="view-operations" aria-labelledby="operations-title">
           <div class="page-heading"><div><p class="eyebrow">Operatie</p><h1 id="operations-title">Automatisering die je kunt volgen</h1><p>Technische status staat apart van de productwaarheid.</p></div><span class="environment"><i></i> Alle systemen bereikbaar</span></div>
           <section class="process-grid">
-            <article class="process-card"><div class="process-icon design">✦</div><div><span class="status-chip idle">Wacht</span><h2>Productontwerp</h2><p>Laatste run vandaag 07:00 · 1 epic gemaakt</p></div><button class="small-action process-run">Nu starten</button></article>
-            <article class="process-card"><div class="process-icon planning">≡</div><div><span class="status-chip progress">Wacht op AI</span><h2>Productplanning</h2><p>Sessie PS-188 · taak 2 van 2</p></div><button class="small-action" data-entity-id="PS-188">Bekijken</button></article>
-            <article class="process-card"><div class="process-icon quality">◇</div><div><span class="status-chip warning">2 met aandacht</span><h2>Kwaliteitsbewaking</h2><p>Laatste run 10:05 · volgende 11:05</p></div><button class="small-action process-run">Nu starten</button></article>
-            <article class="process-card"><div class="process-icon dispatch">↗</div><div><span class="status-chip active">Actief</span><h2>Dispatcher</h2><p>1 story bij Software Factory · geen fouten</p></div><button class="small-action process-run">Nu starten</button></article>
+            <article class="process-card"><div class="process-icon design">✦</div><div><span class="status-chip idle">Wacht</span><h2>Productontwerp</h2><p>Laatste run vandaag 07:00 · volgende ma. 31 aug. 07:00</p></div><button class="small-action process-run">Nu starten</button></article>
+            <article class="process-card"><div class="process-icon planning">≡</div><div><span class="status-chip progress">Wacht op AI</span><h2>Productplanning</h2><p>Sessie PS-188 · volgende automatische start vandaag 20:00</p></div><button class="small-action" data-entity-id="PS-188">Bekijken</button></article>
+            <article class="process-card"><div class="process-icon quality">◇</div><div><span class="status-chip warning">2 met aandacht</span><h2>Kwaliteitsbewaking</h2><p>Laatste run vandaag 06:00 · volgende morgen 06:00</p></div><button class="small-action process-run">Nu starten</button></article>
+            <article class="process-card"><div class="process-icon dispatch">↗</div><div><span class="status-chip active">Actief</span><h2>Dispatcher</h2><p>1 story bij Software Factory · volgende start 16:00</p></div><button class="small-action process-run">Nu starten</button></article>
           </section>
 
           <div class="section-tabs operation-tabs" aria-label="Operationele onderdelen"><button class="active" data-operation-section="sessions" aria-pressed="true">Processessies</button><button data-operation-section="queues" aria-pressed="false">Werkqueues</button><button data-operation-section="ai" aria-pressed="false">AI-uitvoering</button><button data-operation-section="dispatcher" aria-pressed="false">Dispatcher</button><button data-operation-section="versions" aria-pressed="false">Versies</button></div>
@@ -450,6 +461,21 @@
   <div class="modal-backdrop auth-backdrop" hidden></div>
   <section class="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
     <span class="modal-icon">●</span><p class="eyebrow">Product Factory</p><h2 id="auth-modal-title">Je bent uitgelogd</h2><p>Log opnieuw in met het Google-account dat voor Product Factory bevoegd is.</p><button class="primary-action google-login" data-action="login-google">Inloggen met Google</button><small>Een verlopen sessie komt altijd terug op dit scherm. Niet bevoegd en technische storing krijgen ieder een eigen duidelijke foutmelding.</small>
+  </section>
+
+  <div class="modal-backdrop schedule-backdrop" hidden></div>
+  <section class="modal schedule-modal" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title" hidden>
+    <button class="modal-close schedule-modal-close" aria-label="Sluiten">×</button><span class="modal-icon">◷</span><p class="eyebrow">Automatisering · HKH</p><h2 id="schedule-modal-title">Productplanning plannen</h2><p>Stel dagen en tijden in gewone taal in. Product Factory berekent zelf de volgende run.</p>
+    <label class="schedule-enabled"><span>Automatische starts</span><span class="switch"><input type="checkbox" checked><span></span><b>Ingeschakeld</b></span></label>
+    <label>Soort schema<select class="schedule-mode"><option value="weekly">Vaste dagen en tijden</option><option value="interval">Vast interval</option></select></label>
+    <div class="weekly-schedule-fields">
+      <fieldset><legend>Dagen</legend><div class="weekday-picker"><label><input type="checkbox" value="1"><span>Ma</span></label><label><input type="checkbox" value="2"><span>Di</span></label><label><input type="checkbox" value="3"><span>Wo</span></label><label><input type="checkbox" value="4"><span>Do</span></label><label><input type="checkbox" value="5"><span>Vr</span></label><label><input type="checkbox" value="6"><span>Za</span></label><label><input type="checkbox" value="0"><span>Zo</span></label></div></fieldset>
+      <label>Tijden<div class="schedule-times"><input type="time" value="08:00"><input type="time" value="20:00"><button data-action="add-schedule-time" aria-label="Tijd toevoegen">+</button></div></label>
+    </div>
+    <div class="interval-schedule-fields" hidden><label>Iedere <span class="interval-input"><input type="number" min="5" step="5" value="60"><span>minuten</span></span></label></div>
+    <label>Tijdzone<select class="schedule-timezone"><option>Europe/Amsterdam</option></select></label>
+    <div class="schedule-preview"><span>Voorbeeld</span><strong class="schedule-preview-text">Dagelijks om 08:00 en 20:00</strong><small>Volgende run wordt na opslaan door de server berekend.</small></div>
+    <div class="modal-actions"><button class="secondary-action schedule-modal-cancel">Annuleren</button><button class="primary-action" data-action="save-schedule">Schema opslaan</button></div>
   </section>
 
   <div class="toast" role="status" aria-live="polite"></div>

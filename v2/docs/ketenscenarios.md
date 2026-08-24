@@ -465,6 +465,33 @@ bronstory `CANCELLED` voordat de afhankelijke story is verstuurd.
 De dispatcher bouwt niet blind verder op geannuleerd werk. De backlog blijft door Productplanning
 uitlegbaar en herstelbaar zonder dat de Stakeholder een losse story hoeft te bewerken.
 
+## 18. De Stakeholder stelt per proces een eigen automatisch ritme in
+
+### Beginsituatie
+
+HKH is actief. De Stakeholder wil Productplanning iedere dag om 08:00 en 20:00 laten draaien,
+Productontwerp alleen iedere maandag om 07:00 en de dispatcher ieder uur.
+
+### Scenario
+
+1. De Stakeholder opent **Beheer → Productinstellingen → Automatisering** voor HKH.
+2. Zij stelt Productplanning in op alle weekdagen met de tijden 08:00 en 20:00 in
+   `Europe/Amsterdam` en Productontwerp op maandag 07:00.
+3. Zij stelt de dispatcher in op een interval van 60 minuten en slaat ieder schema op.
+4. De backend bewaart per product en proces één nieuwe configuratieversie en berekent `nextRunAt`.
+5. Op ieder vervallen tijdstip claimt de scheduler de geplande start hooguit eenmaal en roept hij de
+   gewone publieke runfunctie voor HKH aan.
+6. De Stakeholder schakelt later Productontwerp tijdelijk uit en kan het desondanks met
+   **Nu starten** handmatig uitvoeren.
+7. Na een periode van downtime haalt de scheduler hooguit één gemiste run per schema in en plant
+   daarna meteen het eerstvolgende toekomstige tijdstip.
+
+### Eindresultaat
+
+Ieder product en proces kan een eigen begrijpelijk automatisch ritme hebben, inclusief meerdere
+tijden per dag. Er zijn geen cronexpressies in de UI, geen dubbele geplande starts en uitschakelen
+blokkeert de handmatige bediening niet.
+
 ## Brondocumenten
 
 - [Overzicht](overzicht.md)
@@ -473,4 +500,5 @@ uitlegbaar en herstelbaar zonder dat de Stakeholder een losse story hoeft te bew
 - [Software Factory-dispatcher](processen/software-factory-dispatcher.md)
 - [Kwaliteitsbewaking-API](processen/kwaliteitsbewaking/api.md)
 - [Processen en entiteiten](processen/processen-en-entiteiten.md)
+- [Product- en overlegmodule-API](stakeholder/product-en-overleg-api.md)
 - [Integratie- en acceptatietesten](platform/integratie-en-acceptatietesten.md)

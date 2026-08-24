@@ -305,7 +305,12 @@ request- en response-envelop tonen.
 Automatische schedules staan standaard uit. De tester kiest een product en start
 `runProcessSession(productId)` en `runDispatchSession(productId)` bewust via de bestaande handmatige
 UI-acties. Een apart schedulerscenario
-kan een bestuurbare klok vooruitzetten en precies één tick uitvoeren om scheduling zelf te testen.
+kan duurzame `ProcessScheduleConfiguration`s laden, een bestuurbare klok vooruitzetten en precies
+één tick uitvoeren om scheduling zelf te testen. De scenario's controleren minimaal meerdere
+dagtijden, een weekdag, een interval, een uitgeschakeld schema, een schedulerbotsing, tijdzonegedrag
+en dat na downtime hooguit één gemiste run wordt ingehaald. De acceptance-only omgevingsschakelaar
+blijft leidend: gewone achtergrondpolling staat uit, ook als synthetische productdata een schema als
+ingeschakeld toont.
 
 ## Integratietestpatroon
 

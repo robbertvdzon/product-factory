@@ -50,7 +50,7 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 
 | Eigenaar | Commands | Read-only queries |
 |---|---|---|
-| product-/overlegmodule | `createProduct`, `updateProductAssignment`, `configureTestableProduct`, `setProductDispatching`, `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `startMeeting`, `recordMeetingMessage`, `closeMeeting` | `getProduct`, `findProducts`, `findDispatchableProducts`, `getProductAssignment`, `getUserSignal`, `findUserSignals`, `getTestableProduct`, `getMeeting`, `findMeetings` |
+| product-/overlegmodule | `createProduct`, `updateProductAssignment`, `configureTestableProduct`, `setProductDispatching`, `updateProcessSchedule`, `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `startMeeting`, `recordMeetingMessage`, `closeMeeting` | `getProduct`, `findProducts`, `getProductAssignment`, `getUserSignal`, `findUserSignals`, `getTestableProduct`, `getProcessSchedule`, `getProcessSchedules`, `getMeeting`, `findMeetings` |
 | Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `withdrawEpic`, `cancelEpic` | `getEpic`, `findEpics`, `getProcessSession`, `findProcessSessions` |
 | Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `reserveNextStoryForDispatch`, `revalidateDispatchReservation`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `markStoryAsCancelled`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findStories`, `findPlanningWorkItems`, `getProcessSession`, `findProcessSessions` |
 | Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `retryQualityWorkItem`, `linkBugfixStory(bugId, storyId)` | `getBug`, `findBugs`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems`, `findRetryableQualityWorkItems`, `getProcessSession`, `findProcessSessions` |
@@ -85,6 +85,7 @@ Er is geen verplichte Stakeholdergoedkeuring tussen epic, planning en dispatch.
 | beschikbare epic intrekken of actieve epic annuleren | direct UI-command op Productontwerp | `withdrawEpic(...)` of `cancelEpic(...)`, met bron en reden |
 | overleg, vragen en antwoorden | `Meeting` | bewaart de bespreking en maakt expliciete doorwerking controleerbaar |
 | testomgevingen en toegestane toegang | `TestableProductConfiguration` | maakt gecontroleerd testen mogelijk |
+| automatisch ritme per product en proces | `ProcessScheduleConfiguration` | de technische scheduler start de gewone publieke runfunctie op de ingestelde weekdagen/tijden of volgens het interval |
 | geheugen voor een agentrol toevoegen, corrigeren of intrekken | `AgentMemoryItem` via een direct UI-command | append-only wijziging met actor en reden; een volgende agenttaak van die rol leest de nieuwe versie |
 
 De Stakeholder schrijft geen epic, story, bug, verificatie of backlogpositie.
@@ -116,6 +117,7 @@ nooit rechtstreeks in de tabel.
 | `Product` | productmodule | globale Stakeholder of productbediening | alle processen en frontend | productidentiteit, status `ACTIVE` of `INACTIVE` en expliciete dispatchinginstelling |
 | `ProductAssignment` | productmodule | Stakeholder | alle processen en frontend | doelgroep, doel, grenzen en publieke Git-URL |
 | `TestableProductConfiguration` | productmodule | Stakeholder of beheerder | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en productieomgeving, veilige routes, revisionendpoint, account- en secretreferenties, data- en toegangsgrenzen |
+| `ProcessScheduleConfiguration` | productmodule | globale Stakeholder | technische scheduler, operations en frontend | per product en proces één geversioneerd automatisch schema met aan/uit, weekdagen en tijden of interval, tijdzone en `nextRunAt`; start alleen de gewone publieke runfunctie |
 | `UserSignal` | productmodule | gebruiker/Stakeholder dient in; ontwerp of kwaliteit registreert een uitkomst via command | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | onveranderlijke melding plus actuele verwerkingsstatus en resultaatlinks |
 | `Meeting` | product-/overlegmodule | Stakeholder of een proces vraagt een overleg aan; de notulenagent sluit het af | Stakeholder, betrokken processen en frontend | agenda, berichten, gekoppelde objecten, status, notulen en expliciete doorwerking |
 | `Epic` | Productontwerp | Productplanning vraagt planning/statusovergangen; Kwaliteitsbewaking registreert uitkomst; Stakeholder kan intrekken of annuleren | ontwerp, planning, kwaliteit en frontend | complete verbetering met scope, UX, versie en status `AVAILABLE`, `IN_PLANNING`, `ACTIVE`, `VERIFYING`, `COMPLETED`, `NOT_SUCCESSFUL`, `CANCELLED`, `SUPERSEDED` of `WITHDRAWN` |
@@ -153,6 +155,7 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `ProductDetails` | productmodule | dispatcher en frontend | productidentiteit, status en of dispatching actief is |
 | `ProductAssignmentDetails` | productmodule | alle processen en frontend | productdoel, grenzen en publieke Git-URL |
 | `TestableProductDetails` | productmodule | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en eventueel productieomgeving met veilige routes, revisionendpoint en account- of secretreferenties, zonder secrets in het DTO |
+| `ProcessScheduleDetails` | productmodule | technische scheduler, operations en frontend | proces, actief schema in menselijke vorm, tijdzone, laatst gepland tijdstip, `nextRunAt`, versie en eventuele laatste overgeslagen start |
 | `UserSignalDetails` | productmodule | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | bronmelding, status, uitkomst en koppelingen |
 | `MeetingDetails` | product-/overlegmodule | Stakeholder, betrokken processen en frontend | agenda, gesprek, status, gekoppelde objecten, notulen en doorwerking |
 | `EpicDetails` | Productontwerp | Productplanning, Kwaliteitsbewaking en frontend | epicinhoud, UX, versie en status; read-only |

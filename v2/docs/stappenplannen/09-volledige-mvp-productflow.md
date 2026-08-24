@@ -7,8 +7,10 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 
 ## Globale scope
 
-- Activeer en stem de schedules van Productontwerp, Productplanning, Kwaliteitsbewaking en dispatcher
-  op elkaar af zonder directe proces-naar-processtarts.
+- Activeer de productgebonden `ProcessScheduleConfiguration`s van Productontwerp,
+  Productplanning, Kwaliteitsbewaking en dispatcher zonder directe proces-naar-processtarts. Poll en
+  claim ieder vervallen tijdstip idempotent, haal na downtime maximaal één run in en bereken daarna
+  het eerstvolgende toekomstige tijdstip in de ingestelde IANA-tijdzone.
 - Controleer alle queues, commands, statussen, idempotentie en eigenaarsgrenzen in de complete route.
 - Maak het productoverzicht en de operationele weergave compleet voor de hele MVP.
 - Voeg vaste end-to-endacceptatiescenario's toe voor de normale route, bugs, ontbrekende epicdekking,
@@ -31,6 +33,8 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 - Bewijs dat iedere procesmodule maximaal één sessie per product heeft en twee verschillende
   producten wel gelijktijdig kan verwerken.
 - Bewijs dat alle geplande functies via zowel schedule als bevoegde UI/REST-start werken.
+- Bewijs dat aan/uit, meerdere tijden per dag, een wekelijkse dag, een interval, zomer-/wintertijd,
+  wijziging tijdens een lopende sessie en maximaal één inhaalrun na downtime correct werken.
 - Verifieer dat productie uitsluitend de drie MVP-procesimplementaties selecteert.
 - Werk runbooks, rooktests en documentatie bij op basis van de werkelijk gebouwde route.
 

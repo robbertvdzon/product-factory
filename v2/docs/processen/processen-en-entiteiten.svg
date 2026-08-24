@@ -46,20 +46,21 @@
   <text x="80" y="335" class="module-title">Product en overleg</text>
   <text x="80" y="387" class="section-title">PUBLIEKE INTERFACE</text>
   <text x="80" y="417" class="api" style="font-size:12px">«command» createProduct(...) / updateProductAssignment(...)</text>
-  <text x="80" y="443" class="api" style="font-size:12px">«command» configureTestableProduct(...) / setProductDispatching(...)</text>
+  <text x="80" y="443" class="api" style="font-size:10px">«command» testconfig / dispatching / updateProcessSchedule(...)</text>
   <text x="80" y="469" class="api">«command» submitUserSignal(...)</text>
   <text x="80" y="495" class="api">«command» markUserSignalInReview(...)</text>
   <text x="80" y="521" class="api">«command» recordSignalInvestigation(...)</text>
   <text x="80" y="547" class="api">«command» linkSignalToEpic(...)</text>
   <text x="80" y="573" class="api" style="font-size:12px">«command» start/record/closeMeeting(...)</text>
-  <text x="80" y="605" class="api" style="font-size:12px">«query» get/findProduct(...) / findDispatchableProducts()</text>
-  <text x="80" y="631" class="api" style="font-size:12px">«query» getProductAssignment(...) / getTestableProduct(...)</text>
+  <text x="80" y="605" class="api" style="font-size:12px">«query» get/findProduct(...)</text>
+  <text x="80" y="631" class="api" style="font-size:10px">«query» assignment / testproduct / getProcessSchedules(...)</text>
   <text x="80" y="657" class="api" style="font-size:12px">«query» getUserSignal(...) / findUserSignals(...)</text>
   <text x="80" y="683" class="api">«query» getMeeting(...) / findMeetings(...)</text>
   <line x1="80" y1="735" x2="555" y2="735" class="divider" stroke="#cbd5e1"/>
   <text x="80" y="765" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="80" y="798" class="entity">Product · ProductAssignment · Meeting</text>
   <text x="80" y="829" class="entity">UserSignal · TestableProductConfiguration</text>
+  <text x="80" y="860" class="entity">ProcessScheduleConfiguration</text>
   <text x="80" y="891" class="note">Broninhoud van UserSignal blijft onveranderlijk.</text>
   <text x="80" y="913" class="note">Alleen status en gecontroleerde koppelingen mogen wijzigen.</text>
 

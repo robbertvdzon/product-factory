@@ -216,6 +216,7 @@ Snelle acties mogen ook rechtstreeks het juiste command aanbieden, bijvoorbeeld:
 
 - productopdracht aanpassen;
 - dispatching voor een product bewust in- of uitschakelen;
+- automatische schedules per proces instellen of uitschakelen;
 - gebruikerssignaal indienen;
 - een grote blijvende keuze via een overleg als besluit vastleggen;
 - een urgente epic laten herprioriteren;
@@ -239,14 +240,37 @@ met dat object als bron worden gestart.
 
 Om de dagelijkse navigatie rustig te houden groepeert **Beheer** de minder vaak gebruikte onderdelen:
 
-- **Productinstellingen** — product aanmaken, productopdracht en testconfiguratie aanpassen en
-  dispatching bewust aan- of uitzetten;
+- **Productinstellingen** — product aanmaken, productopdracht en testconfiguratie aanpassen,
+  dispatching bewust aan- of uitzetten en de schedules van de vier uitvoerende onderdelen beheren;
 - **Besluiten** — actuele besluiten, peildatum, archief, versies, intrekkingsreden en opvolgers;
 - **Agentgeheugen** — actueel rolgeheugen, contextbudget, historie en add/replace/retract-acties;
 - **Algemene instellingen** — provider, model en `enabled` per `AiJobKey`, plus configuratieversie.
 
 **Operatie** blijft binnen Beheer een afzonderlijk technisch onderdeel. De frontend mag deze
 informatie anders groeperen op mobiel, zolang iedere functie rechtstreeks bereikbaar blijft.
+
+### Automatisering per product
+
+Onder **Productinstellingen → Automatisering** toont de frontend per uitvoerend onderdeel:
+
+- of automatische starts zijn ingeschakeld;
+- het schema in gewone taal, bijvoorbeeld **Dagelijks om 08:00 en 20:00** of
+  **Iedere maandag om 07:00**;
+- de tijdzone, standaard `Europe/Amsterdam`;
+- de eerstvolgende geplande start;
+- **Bewerken** en de bestaande actie **Nu starten**.
+
+De bewerkweergave gebruikt gekozen weekdagen met één of meer tijden, of een vast interval in hele
+minuten. Zij toont geen cronexpressie. Opslaan roept `updateProcessSchedule(...)` aan met de
+verwachte configuratieversie. Een wijzigingsconflict en ongeldige combinatie worden zichtbaar
+getoond; de frontend rekent `nextRunAt` niet zelf uit.
+
+Uitschakelen voorkomt alleen toekomstige automatische starts. Handmatig starten blijft mogelijk en
+een bestaande lopende of `WAITING_FOR_AI`-sessie wordt niet geannuleerd. In acceptatie staan
+automatische starts door de omgevingsgrens standaard uit, ook wanneer de bewaarde
+productconfiguratie `enabled = true` is; de vaste banner en het acceptatiescherm maken dit zichtbaar.
+Bij een nieuw product tonen de vier regels eerst **Niet ingesteld** en geen volgende start; de
+Stakeholder moet een geldig patroon kiezen voordat inschakelen kan worden opgeslagen.
 
 ## Operationele weergave
 
@@ -255,6 +279,7 @@ Technische gebruikers kunnen apart zien:
 - het `ImplementationManifest` van de actieve build met gekozen artifact, variant, versie en
   broncommit per capability;
 - de eigen `ProcessSession`s van iedere intelligente module en de dispatcher;
+- het ingestelde schema en `nextRunAt` van ieder uitvoerend onderdeel;
 - `PlanningWorkItem`s en `QualityWorkItem`s met status, fout, blokkadereden, `attemptCount` en
   `retryAfter`;
 - `AiTask`s met aanvrager, provider, model, configuratieversie, status en attemptnummer;
