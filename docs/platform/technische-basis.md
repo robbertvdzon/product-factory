@@ -4,6 +4,9 @@ Dit document beschrijft de blijvende technische contracten voor de nieuwe Produc
 geen uitvoeringsplan en bevat geen proces-, agent- of productlogica. De concrete bouwvolgorde staat
 in [Stap 1 — Technische fundering](../stappenplannen/01-technische-fundering.md).
 
+Het actuele sleutelcontract en de aantoonbare configuratieprioriteit staan in
+[Configuratie en secrets](configuratie-en-secrets.md).
+
 De nieuwe applicatie heet in code, configuratie en gebruikersinterface gewoon **Product Factory**.
 `v2` is geen onderdeel van Maven-artifactnamen, packages, URLs, modulenamen of schermteksten. Alleen
 een technisch geïsoleerde overgangsdatabase of PVC mag tijdelijk `_v2` in de naam dragen.
