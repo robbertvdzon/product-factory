@@ -474,7 +474,7 @@ Productontwerp op maandag om 09:00 en op vrijdag om 21:00 en de dispatcher ieder
 
 ### Scenario
 
-1. De Stakeholder opent **Beheer → Productinstellingen → Automatisering** voor HKH.
+1. De Stakeholder opent **Beheer → Instellingen → Automatisering** voor HKH.
 2. Zij maakt voor Productplanning één regel met alle dagen en de tijden 07:00 en 20:00 in
    `Europe/Amsterdam`.
 3. Zij maakt voor Productontwerp twee regels: maandag om 09:00 en vrijdag om 21:00.

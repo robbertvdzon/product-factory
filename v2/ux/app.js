@@ -179,7 +179,7 @@
     const nextView = document.querySelector(`#view-${viewName}`);
     if (!nextView) return;
     views.forEach((view) => view.classList.toggle("active", view === nextView));
-    const managementViews = ["management", "product-settings", "decisions", "memory", "settings", "operations", "acceptance"];
+    const managementViews = ["management", "product-settings", "decisions", "memory", "operations", "acceptance"];
     navItems.forEach((item) => item.classList.toggle("active", item.dataset.view === viewName || (item.dataset.view === "management" && managementViews.includes(viewName))));
     closeNavigation();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -478,6 +478,11 @@
       case "edit-test-config":
         showToast("De veilige routes en omgevingsgrenzen kunnen nu worden aangepast.");
         break;
+      case "jump-settings": {
+        const section = document.getElementById(actionButton.dataset.settingsTarget);
+        if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
+        break;
+      }
       case "edit-schedule":
         configureScheduleModal(actionButton);
         openModal(scheduleModal, scheduleBackdrop, actionButton, scheduleModal.querySelector(".schedule-mode"));

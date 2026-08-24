@@ -93,10 +93,10 @@ List<AiJobConfigurationDetails> getAiJobConfigurations();
 void updateAiJobConfiguration(UpdateAiJobConfigurationCommand command);
 ```
 
-De ene globale Stakeholder of een bevoegde beheerder kan provider en model in het scherm
-**Algemene instellingen** wijzigen. Een proces leest de configuratie vlak voordat het een taak
-aanvraagt en zet `provider`, `model`, `jobKey` en `configurationVersion` als vaste waarden op de
-`AiTask`.
+De ene globale Stakeholder of een bevoegde beheerder kan provider en model in de frontend onder
+**Instellingen → AI-modellen** wijzigen. De frontend vermeldt daarbij dat deze configuratie voor
+alle producten geldt. Een proces leest de configuratie vlak voordat het een taak aanvraagt en zet
+`provider`, `model`, `jobKey` en `configurationVersion` als vaste waarden op de `AiTask`.
 
 Een al gequeue'de of lopende taak verandert dus nooit mee met een instellingenwijziging. Alleen een
 nieuwe taak gebruikt de nieuwe provider of het nieuwe model. Een retry van dezelfde technische taak

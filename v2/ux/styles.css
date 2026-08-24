@@ -2178,12 +2178,80 @@ select:focus-visible {
   align-items: start;
 }
 
+.back-to-management {
+  margin-bottom: 0.85rem;
+  padding: 0;
+  color: #17785f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: transparent;
+}
+
+.back-to-management:hover {
+  text-decoration: underline;
+}
+
+.settings-jumpbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: -0.35rem 0 1.15rem;
+  padding: 0.5rem;
+  border: 1px solid #dde6e1;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.settings-jumpbar button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.35rem;
+  padding: 0.48rem 0.75rem;
+  border-radius: 0.55rem;
+  color: #3f5e58;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: #f4f7f5;
+}
+
+.settings-jumpbar button:hover {
+  color: #087156;
+  background: #e5f4ee;
+}
+
+.settings-jumpbar small {
+  color: #758681;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
 .settings-section {
   padding: 1.35rem;
+  scroll-margin-top: 1rem;
 }
 
 .settings-section.full-span {
   grid-column: 1 / -1;
+}
+
+.ai-settings-section .surface-heading p {
+  max-width: 48rem;
+  margin: 0.3rem 0 0;
+  color: #6b7d79;
+  font-size: 0.8rem;
+}
+
+.ai-settings-footer {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.ai-settings-footer .settings-note {
+  margin: 0;
 }
 
 .form-grid {
@@ -2994,6 +3062,10 @@ select:focus-visible {
   .schedule-actions button {
     flex: 1;
   }
+
+  .ai-settings-footer {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 440px) {
@@ -3020,6 +3092,15 @@ select:focus-visible {
 
   .weekday-picker {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .settings-jumpbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-jumpbar button {
+    justify-content: center;
   }
 }
 

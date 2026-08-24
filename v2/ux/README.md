@@ -26,7 +26,7 @@ Open daarna `http://localhost:8080`.
   voorgesteld.
 - Handmatige acties gebruiken precies de publieke commands uit de specificatie, maar tonen in de
   UI gewone mensentaal.
-- Onder **Productinstellingen → Automatisering** kan de Stakeholder per product en proces meerdere
+- Onder **Instellingen → Automatisering** kan de Stakeholder per product en proces meerdere
   regels met eigen weekdagen en tijden, of één vast interval instellen. Zo passen zowel dagelijks
   07:00 en 20:00 als maandag 09:00 plus vrijdag 21:00. De UI toont geen cronexpressies;
   uitschakelen laat **Nu starten** beschikbaar.
@@ -38,8 +38,9 @@ Open daarna `http://localhost:8080`.
   zichtbare verwerking.
 - Procesruns, queues, AI-taken, dispatcherhistorie en versies staan in **Operatie**, zodat de gewone
   productschermen rustig blijven.
-- Minder dagelijkse onderdelen staan onder **Beheer**: productinstellingen, besluiten,
-  Agentgeheugen, algemene AI-instellingen, Operatie en de acceptance-only testbediening.
+- Minder dagelijkse onderdelen staan onder **Beheer**: Instellingen, besluiten, Agentgeheugen,
+  Operatie en de acceptance-only testbediening. Instellingen groepeert de productconfiguratie,
+  procesautomatisering en globale AI-modellen op één pagina.
 - Het ontwerp schaalt van een brede desktopweergave naar 320 CSS-pixels en blijft bruikbaar bij
   tekstvergroting.
 
@@ -51,11 +52,11 @@ Open daarna `http://localhost:8080`.
 - **Kwaliteit** — actuele en afgeronde QualityWorkItems, bugs, verificaties en kwaliteitshistorie.
 - **Signalen** — onveranderlijke gebruikerssignalen met bron, context, status en doorwerking.
 - **Overleggen** — agenda, gesprek, notulen en de status van iedere expliciete actie.
-- **Beheer** — ingang naar productinstellingen, procesautomatisering, besluiten, geheugen,
-  AI-instellingen en techniek.
+- **Beheer** — ingang naar Instellingen, besluiten, geheugen en techniek.
+- **Instellingen** — product, omgevingen, dispatching en schedules voor het gekozen product, plus
+  duidelijk gemarkeerde Product Factory-brede AI-modellen; met een expliciete terugknop naar Beheer.
 - **Besluiten** — actuele grote besluiten, peildatum, versies, intrekkingen en opvolgers.
 - **Agentgeheugen** — geheugen en contextbudget per rol, inclusief versiehistorie en correcties.
-- **Algemene instellingen** — provider, model en beschikbaarheid per `AiJobKey`.
 - **Operatie** — processessies met uitkomst, werkqueues, AI-taken, workerstatus, dispatcherhistorie en
   actieve implementatieversies.
 - **Acceptatietesten** — alleen op acceptatie: datasets resetten en vaste mockscenario's bedienen.

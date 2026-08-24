@@ -116,10 +116,12 @@ Vervangen overschrijft de oude inhoud niet en intrekken verwijdert geen historie
 de verwachte actuele versie, zodat een gelijktijdige wijziging als conflict zichtbaar wordt. De
 frontend schrijft nooit rechtstreeks in de geheugentabellen.
 
-## Algemene AI-instellingen
+## AI-modellen binnen Instellingen
 
-Het scherm **Algemene instellingen** bevat een tabel met alle geregistreerde `AiJobKey`s. Per job
-kan de ene globale Stakeholder of een bevoegde beheerder kiezen:
+De sectie **Instellingen → AI-modellen** bevat een tabel met alle geregistreerde `AiJobKey`s. Zij
+staat omwille van vindbaarheid bij de product- en procesinstellingen, maar toont nadrukkelijk
+**Geldt voor alle producten**. Per job kan de ene globale Stakeholder of een bevoegde beheerder
+kiezen:
 
 - provider `CODEX`, `CLAUDE` of, buiten productie, `MOCKED`;
 - het model of mockprofiel;
@@ -240,18 +242,20 @@ met dat object als bron worden gestart.
 
 Om de dagelijkse navigatie rustig te houden groepeert **Beheer** de minder vaak gebruikte onderdelen:
 
-- **Productinstellingen** — product aanmaken, productopdracht en testconfiguratie aanpassen,
-  dispatching bewust aan- of uitzetten en de schedules van de vier uitvoerende onderdelen beheren;
+- **Instellingen** — product aanmaken, productopdracht en testconfiguratie aanpassen, dispatching
+  bewust aan- of uitzetten, de schedules van de vier uitvoerende onderdelen beheren en de globale
+  provider-, model- en `enabled`-keuze per `AiJobKey` bekijken of wijzigen;
 - **Besluiten** — actuele besluiten, peildatum, archief, versies, intrekkingsreden en opvolgers;
-- **Agentgeheugen** — actueel rolgeheugen, contextbudget, historie en add/replace/retract-acties;
-- **Algemene instellingen** — provider, model en `enabled` per `AiJobKey`, plus configuratieversie.
+- **Agentgeheugen** — actueel rolgeheugen, contextbudget, historie en add/replace/retract-acties.
 
 **Operatie** blijft binnen Beheer een afzonderlijk technisch onderdeel. De frontend mag deze
 informatie anders groeperen op mobiel, zolang iedere functie rechtstreeks bereikbaar blijft.
+De pagina **Instellingen** heeft boven de titel een expliciete actie **Terug naar Beheer** en een
+compacte inhoudsnavigatie naar Product, Omgevingen, Automatisering en AI-modellen.
 
 ### Automatisering per product
 
-Onder **Productinstellingen → Automatisering** toont de frontend per uitvoerend onderdeel:
+Onder **Instellingen → Automatisering** toont de frontend per uitvoerend onderdeel:
 
 - of automatische starts zijn ingeschakeld;
 - het volledige schema in gewone taal, bijvoorbeeld **Dagelijks om 07:00 en 20:00** of

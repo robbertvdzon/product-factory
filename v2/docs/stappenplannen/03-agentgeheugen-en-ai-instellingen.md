@@ -12,6 +12,9 @@ voeren.
 - Geef de Stakeholder via de UI toegang tot alle rolgeheugens, historie en correctiecommands.
 - Implementeer de algemene AI-instellingen per `AiJobKey`, inclusief provider, model of mockprofiel,
   inschakeling en configuratieversie, als intern `settings`-onderdeel van `ai-execution-impl`.
+- Toon deze globale instellingen in de bestaande frontendpagina **Instellingen → AI-modellen**, met
+  een expliciete aanduiding dat zij voor alle producten gelden; maak geen losse algemene
+  instellingenpagina.
 - Neem `ai-execution-impl` vanaf deze stap als enige provider van de AI-uitvoeringscapability in de
   app op. Alleen het interne `settings`-onderdeel is al functioneel; de taakqueue en workerroute
   worden in stap 4 toegevoegd.

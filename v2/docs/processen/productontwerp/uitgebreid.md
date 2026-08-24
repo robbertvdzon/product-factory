@@ -71,8 +71,8 @@ Niet iedere sessie start alle rollen. Een kleine herziening van een beschikbare 
 met de leider, UX-ontwerper, technisch verkenner en criticus. Een nieuwe productrichting kan alle
 rollen gebruiken. Alleen `runProcessSession(productId)` mag voor deze rollen AI-taken aanvragen.
 
-Technisch betekent starten: provider en model voor de betreffende `AiJobKey` uit Algemene
-instellingen lezen en een complete taak bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. AI-uitvoering
+Technisch betekent starten: provider en model voor de betreffende `AiJobKey` uit de globale
+AI-jobconfiguratie lezen en een complete taak bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. AI-uitvoering
 kent de rol en productbetekenis niet. De processessie bewaart taak-ID's, keert met
 `WAITING_FOR_AI` terug en wordt door een volgende run hervat.
 

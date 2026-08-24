@@ -324,10 +324,9 @@
         <section class="view" id="view-management" aria-labelledby="management-title">
           <div class="page-heading"><div><p class="eyebrow">Beheer</p><h1 id="management-title">Richting, geheugen en techniek</h1><p>Onderdelen die je minder vaak nodig hebt, zonder het dagelijkse werk druk te maken.</p></div></div>
           <div class="management-grid">
-            <button class="surface management-card" data-view="product-settings"><span class="management-icon">◎</span><span><strong>Productinstellingen</strong><small>Opdracht, omgevingen, dispatching en automatisering</small></span><span>→</span></button>
+            <button class="surface management-card" data-view="product-settings"><span class="management-icon">◎</span><span><strong>Instellingen</strong><small>Product, omgevingen, automatisering en globale AI-modellen</small></span><span>→</span></button>
             <button class="surface management-card" data-view="decisions"><span class="management-icon">✓</span><span><strong>Besluiten</strong><small>Actuele keuzes, peildatum en volledige historie</small></span><span>→</span></button>
             <button class="surface management-card" data-view="memory"><span class="management-icon">◫</span><span><strong>Agentgeheugen</strong><small>Geheugen per rol controleren en corrigeren</small></span><span>→</span></button>
-            <button class="surface management-card" data-view="settings"><span class="management-icon">⚙</span><span><strong>Algemene instellingen</strong><small>Model, provider en beschikbaarheid per AI-job</small></span><span>→</span></button>
             <button class="surface management-card attention" data-view="operations"><span class="management-icon">⌁</span><span><strong>Operatie</strong><small>Runs, queues, AI-uitvoering, dispatcher en versies</small></span><span class="status-chip warning">2 aandacht</span></button>
             <button class="surface management-card acceptance-card" data-view="acceptance" data-environment-only="acceptance" hidden><span class="management-icon">◈</span><span><strong>Acceptatietesten</strong><small>Alleen zichtbaar op acceptatie</small></span><span>→</span></button>
           </div>
@@ -335,9 +334,11 @@
         </section>
 
         <section class="view" id="view-product-settings" aria-labelledby="product-settings-title">
-          <div class="page-heading"><div><p class="eyebrow">Beheer · HKH</p><h1 id="product-settings-title">Productinstellingen</h1><p>De grenzen waarbinnen alle processen voor dit product werken.</p></div><button class="secondary-action" data-action="create-product">Nieuw product</button></div>
+          <button class="back-to-management" data-view="management">← Terug naar Beheer</button>
+          <div class="page-heading"><div><p class="eyebrow">Instellingen · HKH</p><h1 id="product-settings-title">Instellingen</h1><p>Alle productinstellingen en Product Factory-brede AI-modelkeuzes op één plek.</p></div><button class="secondary-action" data-action="create-product">Nieuw product</button></div>
+          <nav class="settings-jumpbar" aria-label="Onderdelen van Instellingen"><button data-action="jump-settings" data-settings-target="settings-product">Product</button><button data-action="jump-settings" data-settings-target="settings-environments">Omgevingen</button><button data-action="jump-settings" data-settings-target="settings-automation">Automatisering</button><button data-action="jump-settings" data-settings-target="settings-ai">AI-modellen <small>Alle producten</small></button></nav>
           <div class="settings-layout">
-            <section class="surface settings-section">
+            <section class="surface settings-section" id="settings-product">
               <div class="surface-heading"><div><span class="kicker">Product</span><h2>Opdracht en richting</h2></div><span class="status-chip active">Actief</span></div>
               <div class="form-grid"><label>Productnaam<input value="HKH"></label><label>Publieke Git-URL<input value="https://github.com/example/hkh"></label><label class="full">Productdoel<textarea rows="3">Iedere bezoeker vindt zonder twijfel de juiste hulp.</textarea></label><label class="full">Harde grenzen<textarea rows="3">Geen medische diagnose. Persoonsgegevens worden nooit in testbewijs opgenomen.</textarea></label></div>
               <div class="settings-actions"><button class="primary-action" data-action="save-product">Productopdracht bewaren</button></div>
@@ -347,12 +348,12 @@
               <p class="muted">Als dispatching uitstaat, blijven stories veilig in de backlog staan. Lopend extern werk wordt nog wel gesynchroniseerd.</p>
               <button class="secondary-action" data-action="save-dispatch">Instelling bewaren</button>
             </section>
-            <section class="surface settings-section full-span">
+            <section class="surface settings-section full-span" id="settings-environments">
               <div class="surface-heading"><div><span class="kicker">Testbare omgevingen</span><h2>Acceptatie en productie</h2></div></div>
               <div class="environment-settings"><article><span class="status-chip active">Bereikbaar</span><h3>Acceptatie</h3><p>https://acc.hkh.example.nl</p><small>Veilige testaccounts · schrijven toegestaan binnen testdata</small></article><article><span class="status-chip active">Read-only</span><h3>Productie</h3><p>https://hkh.example.nl</p><small>Alleen veilige routes · geen echte klantdata wijzigen</small></article></div>
               <button class="secondary-action" data-action="edit-test-config">Omgevingen aanpassen</button>
             </section>
-            <section class="surface settings-section full-span automation-section">
+            <section class="surface settings-section full-span automation-section" id="settings-automation">
               <div class="surface-heading"><div><span class="kicker">Automatisering</span><h2>Wanneer de processen voor HKH draaien</h2><p>Automatische starts gebruiken Europe/Amsterdam. Handmatig starten blijft altijd mogelijk.</p></div><span class="status-chip active">Automatische starts actief</span></div>
               <div class="schedule-table">
                 <div class="schedule-head"><span>Proces</span><span>Automatisch</span><span>Schema</span><span>Volgende run</span><span></span></div>
@@ -362,6 +363,11 @@
                 <article><span class="schedule-process"><i class="run-icon dispatch">↗</i><span><strong>Dispatcher</strong><small>SOFTWARE_FACTORY_DISPATCHER</small></span></span><label class="switch compact"><input type="checkbox" checked data-schedule-toggle aria-label="Automatische starts voor Dispatcher"><span></span></label><span class="schedule-description"><strong>Ieder uur</strong><small>Vast interval · Europe/Amsterdam</small></span><time>Vandaag · 16:00</time><span class="schedule-actions"><button data-action="edit-schedule" data-schedule-process="Dispatcher" data-schedule-mode="interval" data-schedule-interval="60">Bewerken</button><button data-action="run-scheduled-process" data-process-label="Dispatcher">Nu starten</button></span></article>
               </div>
               <p class="settings-note">Na downtime wordt hooguit één gemiste run ingehaald. Een wijziging annuleert geen lopende of wachtende sessie.</p>
+            </section>
+            <section class="surface settings-section full-span ai-settings-section" id="settings-ai">
+              <div class="surface-heading"><div><span class="kicker">Configuratie v18</span><h2>AI-model per job</h2><p>Deze instellingen gelden voor alle producten. Nieuwe taken gebruiken de wijziging; lopende taken houden hun oorspronkelijke instelling.</p></div><span class="status-chip waiting">Alle producten</span></div>
+              <div class="config-table"><div class="config-head"><span>AI-job</span><span>Provider</span><span>Model</span><span>Ingeschakeld</span><span></span></div><div><span><strong>Epic ontwerpen</strong><small>PRODUCT_DESIGN.CREATE_EPIC</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Stories plannen</strong><small>PLANNING.SLICE_EPIC</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Productkwaliteit testen</strong><small>QUALITY.VERIFY_EPIC</small></span><select><option>Claude</option><option>Codex</option></select><input value="claude-sonnet-4"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Overlegnotulen</strong><small>MEETING.SUMMARIZE</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6-mini"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div></div>
+              <div class="ai-settings-footer"><span class="updated">Laatst gewijzigd vandaag 09:12 door Stakeholder</span><p class="settings-note">Provider <b>Mocked</b> is alleen beschikbaar op local en acceptatie en wordt in productie door de backend geweigerd.</p></div>
             </section>
           </div>
         </section>
@@ -386,15 +392,6 @@
               <button class="text-button" data-action="memory-history">Volledige versiegeschiedenis en gebruikte processessies →</button>
             </section>
           </div>
-        </section>
-
-        <section class="view" id="view-settings" aria-labelledby="settings-title">
-          <div class="page-heading"><div><p class="eyebrow">Beheer</p><h1 id="settings-title">Algemene AI-instellingen</h1><p>Een wijziging geldt alleen voor nieuwe taken; lopende taken houden hun oorspronkelijke instelling.</p></div></div>
-          <section class="surface settings-section">
-            <div class="surface-heading"><div><span class="kicker">Configuratie v18</span><h2>Model per AI-job</h2></div><span class="updated">Laatst gewijzigd vandaag 09:12 door Stakeholder</span></div>
-            <div class="config-table"><div class="config-head"><span>AI-job</span><span>Provider</span><span>Model</span><span>Ingeschakeld</span><span></span></div><div><span><strong>Epic ontwerpen</strong><small>PRODUCT_DESIGN_MVP</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Stories plannen</strong><small>PRODUCT_PLANNING_MVP</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Productkwaliteit testen</strong><small>QUALITY_MVP</small></span><select><option>Claude</option><option>Codex</option></select><input value="claude-sonnet-4"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Overlegnotulen</strong><small>MEETING_MINUTES</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6-mini"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div></div>
-            <p class="settings-note">Provider <b>Mocked</b> is alleen beschikbaar op local en acceptatie en wordt in productie door de backend geweigerd.</p>
-          </section>
         </section>
 
         <section class="view acceptance-view" id="view-acceptance" aria-labelledby="acceptance-title">

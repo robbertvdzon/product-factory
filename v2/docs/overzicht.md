@@ -147,11 +147,13 @@ maar alleen complete taken met een expliciete provider en model. Iedere taak sta
 een databasequeue. De laptopworker haalt via HTTPS werk op en meldt heartbeat, veilige voortgang en
 het eindresultaat terug.
 
-Welke provider en welk model een bepaald soort agentjob gebruikt, staat in de algemene instellingen
-van de AI-uitvoeringscapability in de database. Dit is daar een afzonderlijk intern
-Spring Modulith-onderdeel; de generieke taakqueue kiest of interpreteert het model niet. Een proces
-leest de configuratie vóór het queueën. De gekozen waarden en configuratieversie worden op de taak
-bevroren, zodat een latere instellingenwijziging geen lopende taak verandert.
+Welke provider en welk model een bepaald soort agentjob gebruikt, staat in de globale
+AI-jobconfiguratie van de AI-uitvoeringscapability in de database. De Stakeholder bedient die op
+dezelfde frontendpagina onder **Instellingen → AI-modellen**, duidelijk gemarkeerd als geldig voor
+alle producten. Technisch blijft dit een afzonderlijk intern Spring Modulith-onderdeel van
+AI-uitvoering; de generieke taakqueue kiest of interpreteert het model niet. Een proces leest de
+configuratie vóór het queueën. De gekozen waarden en configuratieversie worden op de taak bevroren,
+zodat een latere instellingenwijziging geen lopende taak verandert.
 
 Naast een processessie mogen modules snelle publieke commands en read-only queries aanbieden. Een
 command zoals `requestEpicVerification(...)` start geen agent: het bewaart alleen werk in de queue
