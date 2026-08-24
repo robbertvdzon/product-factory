@@ -40,6 +40,8 @@ De publieke read-only queries zijn:
 ```java
 DispatcherProductStatusDetails getDispatchStatus(ProductId productId);
 List<DeliveryAttemptDetails> findDeliveryAttempts(DeliveryAttemptFilter filter);
+ProcessSessionDetails getDispatchSession(ProcessSessionId processSessionId);
+List<ProcessSessionDetails> findDispatchSessions(ProcessSessionFilter filter);
 ```
 
 Een sessie start nooit agents. Per product kan maximaal één uitvoering tegelijk lopen; sessies voor
@@ -48,8 +50,10 @@ hetzelfde product krijgt `ProcessAlreadyRunning`, bij REST bijvoorbeeld HTTP 409
 schedulerrun voor dat product wordt als overgeslagen geregistreerd. Atomische selectie en
 idempotentie voorkomen altijd twee nieuwe externe stories voor hetzelfde product.
 
-De twee queries zijn read-only en ondersteunen de gewone operationele en frontendweergave. De
+De queries zijn read-only en ondersteunen de gewone operationele en frontendweergave. De
 productstatus toont onder meer open extern werk, eventuele technische blokkade en laatste poging.
+De sessiehistorie toont per product ook no-opruns, overgeslagen schedulerbotsingen, verzendingen,
+statussynchronisaties en de uiteindelijke uitkomst; nieuwste sessies staan eerst.
 
 ## Input
 
@@ -74,6 +78,7 @@ Software Factory nodig heeft, moet al zelfstandig in de story staan.
 | Contract of effect | Eigenaar | Betekenis |
 |---|---|---|
 | `StoryDeliveryPackage` | tijdelijk transportobject van de dispatcher | volledige, onveranderlijke story voor Software Factory |
+| `ProcessSession` | Software Factory-dispatcher | één verklaarbare dispatcherrun met product, tijden, trigger, status en leesbare uitkomst |
 | `DeliveryAttempt` | Software Factory-dispatcher | technische historie van request, response, fout, retry en idempotentiesleutel |
 | `reserveNextStoryForDispatch(...)` | Productplanning | reserveer atomair hooguit één geldige volgende story en verkrijg de momentopname |
 | `revalidateDispatchReservation(...)` | Productplanning | bevestig dezelfde reservering vlak voor een retry of annuleer haar bij een inmiddels geannuleerde epic zonder extern werk |
@@ -82,7 +87,7 @@ Software Factory nodig heeft, moet al zelfstandig in de story staan.
 | `markStoryAsCancelled(...)` | Productplanning | leg vast dat Software Factory het externe werk niet uitvoert en zet de story op `CANCELLED` |
 
 De dispatcher schrijft niet rechtstreeks in `Story` of `PlanningWorkItem`. Zijn implementatiemodule
-is de enige schrijver van `DeliveryAttempt`; inhoudelijke veranderingen lopen via de publieke
+is de enige schrijver van de eigen `ProcessSession` en `DeliveryAttempt`; inhoudelijke veranderingen lopen via de publieke
 Productplanning-commands en hun invarianten.
 
 ## StoryDeliveryPackage

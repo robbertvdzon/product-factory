@@ -10,6 +10,8 @@
   const signalBackdrop = document.querySelector(".signal-backdrop");
   const statsModal = document.querySelector(".statistics-modal");
   const statsBackdrop = document.querySelector(".stats-backdrop");
+  const authModal = document.querySelector(".auth-modal");
+  const authBackdrop = document.querySelector(".auth-backdrop");
   const toast = document.querySelector(".toast");
   let returnFocus = null;
   let toastTimeout;
@@ -25,7 +27,8 @@
         <section><h3>Gebruikersverbetering</h3><p>De belangrijkste aanvraagroute voelt voorspelbaar, ook wanneer verzenden niet direct lukt of iemand terugnavigeert.</p></section>
         <section><h3>Scope</h3><ul><li>Bevestiging en fouttoestand na verzenden.</li><li>Focus en terugnavigeren op mobiel.</li><li>Behoud van ingevulde gegevens.</li></ul></section>
         <section><h3>UX-ontwerp</h3><div class="ux-wireframe"><div class="phone"><span></span><div class="fake-title"></div><div class="fake-line"></div><div class="fake-line short"></div><div class="fake-error">Verzenden lukte niet<br><b>Probeer opnieuw</b></div><div class="fake-button"></div></div><div><strong>Mobiele aanvraag · herstelbare fout</strong><p>Behoud de formuliercontext en plaats de herstelactie direct bij de fout.</p><small>Het complete ontwerp en alle toestanden horen bij deze epic.</small></div></div></section>
-        <section><h3>Succes</h3><p>Gebruikers begrijpen of hun aanvraag is verzonden en kunnen zonder dubbele aanvraag herstellen.</p></section>`
+        <section><h3>Succes</h3><p>Gebruikers begrijpen of hun aanvraag is verzonden en kunnen zonder dubbele aanvraag herstellen.</p></section>
+        <section class="drawer-actions"><h3>Stakeholderacties</h3><p>Deze epic is actief. Je kunt hem voorrang geven of met een verplichte reden annuleren.</p><div><button class="secondary-action" data-action="prioritize-epic">Epic voorrang geven</button><button class="danger-action" data-action="cancel-epic">Epic annuleren</button></div></section>`
     },
     "EP-016": {
       status: "Beschikbaar",
@@ -33,7 +36,7 @@
       reference: "Epic EP-016 · versie 1",
       title: "Documenten begrijpelijk vergelijken",
       lead: "Mensen zien zonder vakkennis welk document bij hun situatie past.",
-      body: `<section><h3>Gebruikersverbetering</h3><p>De verschillen worden uitgelegd vanuit de vraag van de bezoeker, niet vanuit interne documentnamen.</p></section><section><h3>UX-ontwerp</h3><p>Een rustige vergelijking met maximaal drie relevante verschillen en een duidelijke vervolgstap.</p></section><section><h3>Status</h3><p>Productplanning heeft deze epic nog niet opgepakt. Productontwerp mag hem dus nog verbeteren.</p></section>`
+      body: `<section><h3>Gebruikersverbetering</h3><p>De verschillen worden uitgelegd vanuit de vraag van de bezoeker, niet vanuit interne documentnamen.</p></section><section><h3>UX-ontwerp</h3><p>Een rustige vergelijking met maximaal drie relevante verschillen en een duidelijke vervolgstap.</p></section><section><h3>Status</h3><p>Productplanning heeft deze epic nog niet opgepakt. Productontwerp mag hem dus nog verbeteren.</p></section><section class="drawer-actions"><h3>Stakeholderacties</h3><p>Deze epic is nog beschikbaar en kan daarom worden geprioriteerd of ingetrokken.</p><div><button class="secondary-action" data-action="prioritize-epic">Epic voorrang geven</button><button class="danger-action" data-action="withdraw-epic">Epic intrekken</button></div></section>`
     },
     "EP-009": {
       status: "Controle",
@@ -99,13 +102,15 @@
       lead: "Een bezoeker kan later verdergaan met een nog niet afgeronde aanvraag.",
       body: `<section><h3>Afhankelijkheid</h3><p>Deze story wordt uitvoerbaar nadat ST-101 is opgeleverd.</p></section>`
     },
+    "ST-073": {status:"Geannuleerd",statusClass:"warning",reference:"Story ST-073 · EP-003",title:"Los bevestigingsscherm na verzenden",lead:"De Stakeholder annuleerde de actieve epic en gaf een reden.",body:`<section><h3>Annulering</h3><p>Bron: overleg M-009. Reden: een los scherm maakte de route langer zonder aantoonbare gebruikersverbetering.</p></section>`},
+    "ST-074": {status:"Geannuleerd",statusClass:"warning",reference:"Story ST-074 · EP-009",title:"Oude zoekfilter uitbreiden",lead:"Software Factory heeft dit externe werk geannuleerd.",body:`<section><h3>Doorwerking</h3><p>Product Factory legt geen mislukstatus vast. Na het overige werk beoordeelt Kwaliteitsbewaking de feitelijke complete epic; Productplanning herplant alleen wanneer die controle een dekkingsgat bewijst.</p></section>`},
     "US-044": {
       status: "Open",
       statusClass: "open",
       reference: "Signaal US-044 · klantgesprek",
       title: "Formulier voelt onduidelijk op mobiel",
       lead: "“Ik wist niet of mijn aanvraag al verzonden was.”",
-      body: `<section><h3>Oorspronkelijke melding</h3><p>Op mijn telefoon bleef ik twijfelen of ik nog een keer moest drukken. Ik wilde mijn gegevens niet dubbel insturen.</p></section><section><h3>Verwerking</h3><p>Dit signaal is nog niet opgepakt. De oorspronkelijke tekst kan niet worden aangepast.</p></section>`
+      body: `<section><h3>Oorspronkelijke melding</h3><p>Op mijn telefoon bleef ik twijfelen of ik nog een keer moest drukken. Ik wilde mijn gegevens niet dubbel insturen.</p><dl class="detail-grid"><div><dt>Categorie</dt><dd>Feedback</dd></div><div><dt>Urgentie</dt><dd>Hoog</dd></div><div><dt>Bron</dt><dd>Klantgesprek</dd></div><div><dt>Bijlagen</dt><dd>schermopname-mobiel.mp4</dd></div></dl></section><section><h3>Verwerking</h3><p>Dit signaal is nog niet opgepakt. De oorspronkelijke tekst kan niet worden aangepast.</p></section>`
     },
     "US-039": {
       status: "In behandeling",
@@ -113,7 +118,7 @@
       reference: "Signaal US-039 · support",
       title: "Bevestigingsmail soms dubbel",
       lead: "Drie vergelijkbare meldingen in de afgelopen week.",
-      body: `<section><h3>Verwerking</h3><p>Kwaliteitsbewaking onderzoekt dit signaal via QualityWorkItem QW-063. Het resultaat wordt hier zichtbaar zodra de controle klaar is.</p></section>`
+      body: `<section><h3>Melding</h3><dl class="detail-grid"><div><dt>Categorie</dt><dd>Kwaliteitszorg</dd></div><div><dt>Urgentie</dt><dd>Hoog</dd></div><div><dt>Bron</dt><dd>Support</dd></div><div><dt>Bijlagen</dt><dd>3 supporttickets</dd></div></dl></section><section><h3>Verwerking</h3><p>Kwaliteitsbewaking onderzoekt dit signaal via QualityWorkItem QW-063. Het resultaat wordt hier zichtbaar zodra de controle klaar is.</p><p><b>Gekoppeld:</b> QW-063 · BUG-021 zodra reproductie bevestigd is.</p></section>`
     },
     "US-031": {
       status: "Verwerkt",
@@ -121,12 +126,36 @@
       reference: "Signaal US-031 · overleg M-18",
       title: "Meer aandacht voor begrijpelijke taal",
       lead: "De Stakeholder wil vaktermen structureel vermijden.",
-      body: `<section><h3>Uitkomst</h3><p>Het signaal is gekoppeld aan epic EP-014. De blijvende taalrichting is daarnaast als apart Stakeholderbesluit vastgelegd.</p></section>`
-    }
+      body: `<section><h3>Uitkomst</h3><p>Het signaal is gekoppeld aan epic EP-014. De blijvende taalrichting is daarnaast als apart Stakeholderbesluit vastgelegd.</p><p><b>Gekoppeld:</b> overleg M-018 · epic EP-014 · besluit DEC-031.</p></section>`
+    },
+    "BUG-021": {
+      status: "Open · P1", statusClass: "warning", reference: "Bug BUG-021 · versie 2", title: "Bevestigingsmail wordt soms dubbel verstuurd", lead: "Eén aanvraag kan twee identieke bevestigingsmails veroorzaken.",
+      body: `<section><h3>Verwacht en werkelijk</h3><p><b>Verwacht:</b> precies één bevestigingsmail per geslaagde aanvraag.<br><b>Werkelijk:</b> bij een trage mailresponse wordt dezelfde mail soms tweemaal verstuurd.</p></section><section><h3>Reproductie en bewijs</h3><ol><li>Open acceptatie op mobiel.</li><li>Verstuur één aanvraag tijdens het trage-mailprofiel.</li><li>Controleer de mailbox: twee berichten met hetzelfde aanvraag-ID.</li></ol><p>Omgeving: acceptatie · commit 7f3b9d1 · bewijs VER-146.</p></section><section><h3>Herstel</h3><p>Bugfixstory ST-096 staat in de backlog. Na oplevering maakt Kwaliteitsbewaking een nieuwe hertest.</p></section>`
+    },
+    "BUG-018": {status:"Open · P2",statusClass:"open",reference:"Bug BUG-018 · versie 1",title:"Focus verdwijnt na een mislukte verzending",lead:"Toetsenbord- en schermlezergebruikers komen niet bij de foutmelding uit.",body:`<section><h3>Bewijs</h3><p>Gereproduceerd in mobiele Safari en VoiceOver op acceptatie. De fout verschijnt visueel, maar focus blijft op de verzendknop.</p></section><section><h3>Herstel</h3><p>Bugfixstory ST-104 staat klaar. Er is maximaal één actieve bugfixstory aan deze bug gekoppeld.</p></section>`},
+    "BUG-012": {status:"Opgelost",statusClass:"processed",reference:"Bug BUG-012 · herstelhistorie",title:"Adresgegevens verdwenen bij terugnavigeren",lead:"De bugfix is op de werkelijk gedeployde commit hertest en geslaagd.",body:`<section><h3>Herstelhistorie</h3><p>ST-082 · opgeleverd commit 7f3b9d1 · verificatie VER-144 geslaagd op acceptatie.</p></section>`},
+    "VER-144": {status:"Geslaagd",statusClass:"processed",reference:"Verificatie VER-144 · onveranderlijk",title:"Adresgegevens blijven bewaard",lead:"Story ST-082 is op de gedeployde commit aantoonbaar geslaagd.",body:`<section><h3>Controle</h3><dl class="detail-grid"><div><dt>Omgeving</dt><dd>Acceptatie</dd></div><div><dt>Storycommit</dt><dd>7f3b9d1</dd></div><div><dt>Deployment</dt><dd>7f3b9d1</dd></div><div><dt>Uitkomst</dt><dd>Geslaagd</dd></div></dl><p>Alle acht acceptatiecontroles slaagden. Screenshot- en browserlogbewijs zijn bewaard.</p></section>`},
+    "VER-141": {status:"Geslaagd",statusClass:"processed",reference:"Verificatie VER-141 · onveranderlijk",title:"Zoeken zonder vaktaal",lead:"De volledige gebruikersverbetering van EP-009 is aantoonbaar bereikt.",body:`<section><h3>Epiccontrole</h3><p>Twaalf primaire en alternatieve routes zijn gecontroleerd op acceptatie en read-only in productie. Geen open bug blokkeert de succescriteria.</p></section>`},
+    "VER-139": {status:"Geblokkeerd",statusClass:"warning",reference:"Verificatiepoging VER-139",title:"Mobiele Safari-route",lead:"Het oordeel over de story is niet vervalst door een onbereikbaar testaccount.",body:`<section><h3>Blokkade</h3><p>Het veilige Safari-testaccount was niet bereikbaar. QualityWorkItem QW-031 blijft retrybaar en staat zichtbaar bovenaan.</p></section>`},
+    "SNAP-051": {status:"Actueel",statusClass:"active",reference:"Kwaliteitssnapshot SNAP-051 · 24 augustus",title:"Kwaliteitsbeeld van HKH",lead:"Onveranderlijke momentopname na de laatste afgeronde niet-lege kwaliteitssessie.",body:`<section><h3>Dimensies</h3><dl class="detail-grid"><div><dt>Kritieke bugs</dt><dd>0</dd></div><div><dt>Open bugs</dt><dd>2</dd></div><div><dt>Recent geteste kernroutes</dt><dd>13 van 15</dd></div><div><dt>Geblokkeerd testwerk</dt><dd>2</dd></div></dl></section><section><h3>Bronnen</h3><p>Gebaseerd op verificaties VER-139 t/m VER-146 en bugs BUG-012, BUG-018 en BUG-021. Er is geen verborgen totaalscore.</p></section>`},
+    "DEC-031": {status:"Actief",statusClass:"active",reference:"Besluit DEC-031 · versie 3",title:"We schrijven voor mensen zonder vakkennis",lead:"Geldig sinds 12 mei 2026.",body:`<section><h3>Actuele beslissing</h3><p>Alle primaire routes gebruiken gewone taal. Een vakterm krijgt uitleg op de plek waar die nodig is.</p></section><section><h3>Historie</h3><p>Versie 3 verving versie 2 na overleg M-018. Alle eerdere teksten en geldigheidsperioden blijven beschikbaar.</p><button class="secondary-action" data-action="start-meeting">Besluit in overleg aanpassen</button></section>`},
+    "DEC-028": {status:"Actief",statusClass:"active",reference:"Besluit DEC-028 · versie 1",title:"Persoonlijke gegevens blijven in PostgreSQL",lead:"Factorybesluit, zichtbaar en corrigeerbaar via een stakeholderoverleg.",body:`<section><h3>Actuele beslissing</h3><p>Nieuwe productdata wordt relationeel opgeslagen en volgt de vastgelegde bewaartermijnen.</p></section><section><h3>Vervangt</h3><p>DEC-014 over MongoDB is hierdoor SUPERSEDED. De opvolgingslink is in beide richtingen zichtbaar.</p></section>`},
+    "DEC-036": {status:"Actief",statusClass:"active",reference:"Besluit DEC-036 · versie 1",title:"Productietesten wijzigen nooit echte klantdata",lead:"Geldig sinds 21 juni 2026.",body:`<section><h3>Actuele beslissing</h3><p>Processen gebruiken alleen veilige read-only routes of expliciete testaccounts.</p></section>`},
+    "DEC-014": {status:"Vervangen",statusClass:"waiting",reference:"Besluit DEC-014 · alle versies",title:"Productdata opslaan in MongoDB",lead:"Niet meer geldig; opgevolgd door DEC-028.",body:`<section><h3>Vervangingsrelatie</h3><p>Dit besluit werd op 3 juni 2026 ongeldig toen DEC-028 de relationele opslagrichting overnam.</p></section>`},
+    "DEC-019": {status:"Ingetrokken",statusClass:"warning",reference:"Besluit DEC-019 · alle versies",title:"Alle formulieren openen in een losse stap",lead:"Ingetrokken op 9 april 2026.",body:`<section><h3>Reden</h3><p>Gebruikersonderzoek liet zien dat de losse stap juist extra twijfel veroorzaakte. Er is geen opvolgend besluit.</p></section>`},
+    "M-024": {status:"Open",statusClass:"open",reference:"Overleg M-024 · vandaag 14:30",title:"Mobiele aanvraagroute bespreken",lead:"Agenda: drie signalen en de terugkerende Safari-testblokkade.",body:`<section><h3>Gesprek</h3><div class="conversation"><p><b>Stakeholder · 14:31</b><br>De foutmelding voelt nog te technisch. Ik wil dat duidelijker wordt wat iemand zelf kan doen.</p><p><b>Gespreksagent · 14:32</b><br>Ik leg dit vast als richting voor de huidige epic. Wilt u ook dat de Safari-blokkade apart onderzocht blijft?</p></div><label class="meeting-message">Bericht<textarea rows="3" placeholder="Geef richting of stel een vraag..."></textarea></label><button class="secondary-action" data-action="meeting-message">Bericht versturen</button></section><section><h3>Gekoppeld</h3><p>EP-014 · US-044 · US-039 · QW-031</p></section><section class="drawer-actions"><h3>Overleg afronden</h3><p>De notulenagent maakt daarna de notulen en laat per uitkomst zien welk command is uitgevoerd.</p><button class="primary-action" data-action="close-meeting">Afsluiten en notulen maken</button></section>`},
+    "M-018": {status:"Afgerond",statusClass:"processed",reference:"Overleg M-018 · 18 augustus",title:"Begrijpelijke taal als vaste richting",lead:"Alle notulen en expliciete doorwerkingen zijn verwerkt.",body:`<section><h3>Notulen</h3><p>De Stakeholder wil dat primaire routes ook zonder vakkennis begrijpelijk zijn. Technische precisie blijft, maar wordt op de plek zelf uitgelegd.</p></section><section><h3>Doorwerking</h3><ul><li>✓ UserSignal US-031 gemaakt.</li><li>✓ Besluit DEC-031 herzien naar versie 3.</li><li>✓ Geheugen van PRODUCT_DESIGNER_MVP vervangen.</li></ul></section>`},
+    "M-015": {status:"Afgerond",statusClass:"processed",reference:"Overleg M-015 · 4 augustus",title:"Prioriteit mobiele aanvraag",lead:"EP-014 kreeg aantoonbaar voorrang via gewoon planningswerk.",body:`<section><h3>Doorwerking</h3><p>PlanningWorkItem PW-028 is uitgevoerd. Dit was een prioriteitsactie en geen blijvend besluit.</p></section>`},
+    "M-011": {status:"Afgerond",statusClass:"processed",reference:"Overleg M-011 · 21 juli",title:"Productietesten en privacy",lead:"Eén blijvende privacykeuze is als besluit vastgelegd.",body:`<section><h3>Doorwerking</h3><p>Besluit DEC-036 is aangemaakt. TestableProductConfiguration werd aangepast met read-only productiegrenzen.</p></section>`},
+    "PS-188": {status:"Geslaagd",statusClass:"processed",reference:"Processessie PS-188 · Productplanning",title:"Stories voor EP-016 gepland",lead:"De run publiceerde acht zelfstandige stories en ordende de productbacklog.",body:`<section><h3>Run</h3><dl class="detail-grid"><div><dt>Start</dt><dd>10:17:04</dd></div><div><dt>Einde</dt><dd>10:20:31</dd></div><div><dt>Implementatie</dt><dd>planning-mvp 1.2.0</dd></div><div><dt>Hervat</dt><dd>2 keer na WAITING_FOR_AI</dd></div></dl></section><section><h3>Input en output</h3><p>Input: EP-016 v1, opdracht v8, besluitenpeildatum 10:17, geheugenversies 11 en 14.<br>Output: ST-101 t/m ST-108 en backlogvolgorde 14–21.</p></section>`},
+    "PS-187": {status:"Geslaagd",statusClass:"processed",reference:"Processessie PS-187 · Productontwerp",title:"Nieuwe epic gepubliceerd",lead:"EP-016 versie 1 is als complete beschikbare epic gepubliceerd.",body:`<section><h3>Uitkomst</h3><p>1 epic gepubliceerd · 0 signalen verwerkt · AI-taak AI-401 geslaagd.</p></section>`},
+    "PS-186": {status:"Geblokkeerd",statusClass:"warning",reference:"Processessie PS-186 · Kwaliteitsbewaking",title:"Twee controles wachten op een testvoorwaarde",lead:"De productuitkomst is niet als mislukt geregistreerd.",body:`<section><h3>Uitkomst</h3><p>QW-031 wacht op een Safari-testaccount. QW-052 wacht tot commit 91c0ae2 op acceptatie staat. Beide retries blijven zichtbaar.</p></section>`},
+    "PS-185": {status:"No-op",statusClass:"idle",reference:"Dispatchersessie PS-185",title:"Geen nieuw werk verstuurd",lead:"De dispatcher synchroniseerde ST-087 en vond daarna terecht geen nieuwe uitvoerbare story.",body:`<section><h3>Uitkomst</h3><p>Software Factory meldde ST-087 nog als OPEN. Daarom is geen tweede story aangemaakt.</p></section>`},
+    "PS-184": {status:"Overgeslagen",statusClass:"waiting",reference:"Processessie PS-184 · Productontwerp",title:"Schedulerbotsing overgeslagen",lead:"Een handmatige run voor hetzelfde product voerde al een call uit.",body:`<section><h3>Uitkomst</h3><p>Geen input geclaimd, geen AI-taak gestart en geen productdata gewijzigd.</p></section>`}
   };
 
   function updateOverlayState() {
-    const anyOpen = drawer.classList.contains("open") || !signalModal.hidden || !statsModal.hidden;
+    const anyOpen = drawer.classList.contains("open") || !signalModal.hidden || !statsModal.hidden || !authModal.hidden;
     body.classList.toggle("overlay-open", anyOpen);
   }
 
@@ -147,7 +176,8 @@
     const nextView = document.querySelector(`#view-${viewName}`);
     if (!nextView) return;
     views.forEach((view) => view.classList.toggle("active", view === nextView));
-    navItems.forEach((item) => item.classList.toggle("active", item.dataset.view === viewName));
+    const managementViews = ["management", "product-settings", "decisions", "memory", "settings", "operations", "acceptance"];
+    navItems.forEach((item) => item.classList.toggle("active", item.dataset.view === viewName || (item.dataset.view === "management" && managementViews.includes(viewName))));
     closeNavigation();
     window.scrollTo({ top: 0, behavior: "smooth" });
     const heading = nextView.querySelector("h1");
@@ -244,6 +274,9 @@
       case "new-signal":
         openModal(signalModal, signalBackdrop, actionButton, signalModal.querySelector("textarea"));
         break;
+      case "close-navigation":
+        closeNavigation();
+        break;
       case "show-quality-stats":
         openModal(statsModal, statsBackdrop, actionButton, statsModal.querySelector(".stats-modal-close"));
         break;
@@ -257,10 +290,80 @@
         startButton(actionButton, "Kwaliteit gestart", "De Kwaliteitsbewaking-sessie is gestart.");
         break;
       case "start-meeting":
-        showToast("Een nieuw stakeholderoverleg is klaargezet.");
+        openView("meetings");
+        showToast("Een nieuw stakeholderoverleg is klaargezet. Voeg een agenda toe om te beginnen.");
         break;
       case "join-meeting":
         showToast("Het overleg is geopend.");
+        break;
+      case "prioritize-epic":
+        showToast("De prioriteitsreden wordt gevraagd en daarna als PlanningWorkItem klaargezet.");
+        break;
+      case "withdraw-epic":
+        showToast("Na bevestiging en een verplichte reden wordt deze beschikbare epic ingetrokken.");
+        break;
+      case "cancel-epic":
+        showToast("Na bevestiging en een verplichte reden wordt deze actieve epic geannuleerd.");
+        break;
+      case "meeting-message":
+        showToast("Het bericht is aan het overleg toegevoegd.");
+        break;
+      case "close-meeting":
+        showToast("Het overleg wordt afgesloten; de notulenagent verwerkt daarna iedere expliciete uitkomst.");
+        break;
+      case "memory-add":
+        showToast("Nieuw geheugen vraagt inhoud en een verplichte wijzigingsreden.");
+        break;
+      case "memory-replace":
+        showToast("De nieuwe versie wordt toegevoegd; de vorige versie blijft in de historie.");
+        break;
+      case "memory-retract":
+        showToast("Intrekken vraagt een reden en verwijdert de eerdere versies niet.");
+        break;
+      case "memory-history":
+        showToast("De versiegeschiedenis toont ook welke processessies iedere versie gebruikten.");
+        break;
+      case "memory-date":
+        showToast("Kies een peildatum om de toen actieve geheugenset te reconstrueren.");
+        break;
+      case "save-ai-config":
+        showToast("AI-instelling bewaard als configuratie v19; alleen nieuwe taken gebruiken haar.");
+        break;
+      case "save-product":
+        showToast("De productopdracht is als nieuwe versie bewaard.");
+        break;
+      case "save-dispatch":
+        showToast("De dispatchinstelling voor HKH is bewaard.");
+        break;
+      case "create-product":
+        showToast("Een nieuw product krijgt eerst een naam, opdracht en testconfiguratie.");
+        break;
+      case "edit-test-config":
+        showToast("De veilige routes en omgevingsgrenzen kunnen nu worden aangepast.");
+        break;
+      case "logout":
+        closeDrawer();
+        openModal(authModal, authBackdrop, actionButton, authModal.querySelector(".google-login"));
+        break;
+      case "login-google":
+        closeModal(authModal, authBackdrop);
+        showToast("Je Product Factory-sessie is actief.");
+        break;
+      case "check-version":
+        showToast("Dit is de nieuwste beschikbare productiebuild.");
+        break;
+      case "reset-acceptance":
+        showToast("Acceptatiedata wordt na bevestiging teruggezet naar HKH-MVP-04.");
+        break;
+      case "choose-scenario":
+        showToast("Kies een vast, versieerbaar mockscenario.");
+        break;
+      case "mock-sleep":
+      case "mock-resume":
+      case "mock-complete":
+      case "mock-cancel":
+      case "mock-fail":
+        showToast("De testbedactie is uitgevoerd; controleer nu de normale flow en historie.");
         break;
       default:
         break;
@@ -292,6 +395,69 @@
       document.querySelectorAll("[data-work-group]").forEach((row) => {
         row.hidden = row.dataset.workGroup !== filter;
       });
+    });
+  });
+
+  document.querySelectorAll("[data-planning-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.dataset.planningFilter;
+      document.querySelectorAll("[data-planning-filter]").forEach((tab) => {
+        const selected = tab.dataset.planningFilter === value;
+        tab.classList.toggle("active", selected);
+        tab.setAttribute("aria-pressed", String(selected));
+      });
+      document.querySelectorAll("[data-planning-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.planningPanel !== value;
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-quality-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.dataset.qualitySection;
+      document.querySelectorAll("[data-quality-section]").forEach((tab) => {
+        const selected = tab.dataset.qualitySection === value;
+        tab.classList.toggle("active", selected);
+        tab.setAttribute("aria-pressed", String(selected));
+      });
+      document.querySelectorAll("[data-quality-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.qualityPanel !== value;
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-operation-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.dataset.operationSection;
+      document.querySelectorAll("[data-operation-section]").forEach((tab) => {
+        const selected = tab.dataset.operationSection === value;
+        tab.classList.toggle("active", selected);
+        tab.setAttribute("aria-pressed", String(selected));
+      });
+      document.querySelectorAll("[data-operation-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.operationPanel !== value;
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-decision-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.dataset.decisionFilter;
+      document.querySelectorAll("[data-decision-filter]").forEach((tab) => {
+        const selected = tab.dataset.decisionFilter === value;
+        tab.classList.toggle("active", selected);
+        tab.setAttribute("aria-pressed", String(selected));
+      });
+      document.querySelectorAll("[data-decision-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.decisionPanel !== value;
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-memory-role]").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll("[data-memory-role]").forEach((role) => role.classList.toggle("active", role === button));
+      if (button.dataset.memoryRole !== "designer") showToast("UX-demo: deze rol krijgt dezelfde actuele, historische en wijzigingsweergave.");
     });
   });
 
@@ -335,6 +501,7 @@
     if (event.key !== "Escape") return;
     if (!signalModal.hidden) closeModal(signalModal, signalBackdrop);
     else if (!statsModal.hidden) closeModal(statsModal, statsBackdrop);
+    else if (!authModal.hidden) return;
     else if (drawer.classList.contains("open")) closeDrawer();
     else closeNavigation();
   });

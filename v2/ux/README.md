@@ -27,12 +27,15 @@ Open daarna `http://localhost:8080`.
 - Handmatige acties gebruiken precies de publieke commands uit de specificatie, maar tonen in de
   UI gewone mensentaal.
 - Een dispatchreservering verschijnt tijdelijk als **Wordt verstuurd**, zonder extra storystatus.
-- Het hoofdscherm van Kwaliteit toont alle actuele `QualityWorkItem`s. Statistieken en historie staan
-  achter een aparte knop.
+- Kwaliteit groepeert testwerk, bugs, verificaties en historie in rustige deelweergaven. Statistieken
+  blijven secundair.
 - Kwaliteitsretries staan met de meeste pogingen bovenaan en hebben een duidelijke **Retry now**-actie.
 - **Signalen** is geen aparte inboxentiteit: het is een eenvoudige lijst van `UserSignal`s en hun
   zichtbare verwerking.
-- Procesruns en AI-taken staan in **Operatie**, zodat de gewone productschermen rustig blijven.
+- Procesruns, queues, AI-taken, dispatcherhistorie en versies staan in **Operatie**, zodat de gewone
+  productschermen rustig blijven.
+- Minder dagelijkse onderdelen staan onder **Beheer**: productinstellingen, besluiten,
+  Agentgeheugen, algemene AI-instellingen, Operatie en de acceptance-only testbediening.
 - Het ontwerp schaalt van een brede desktopweergave naar 320 CSS-pixels en blijft bruikbaar bij
   tekstvergroting.
 
@@ -41,11 +44,16 @@ Open daarna `http://localhost:8080`.
 - **Overzicht** — productdoel, actuele epic en story, plus concrete aandachtspunten.
 - **Ontwerp** — epics per levenscyclusstatus en epicdetails inclusief UX-ontwerp.
 - **Planning** — de berekende backlog en storydetails inclusief UX-overdracht.
-- **Kwaliteit** — alle actuele en afgeronde QualityWorkItems; statistieken als secundaire weergave.
-- **Signalen** — onveranderlijke gebruikerssignalen met status en doorwerking.
-- **Besluiten** — actuele grote besluiten en toegang tot de historie.
-- **Overleggen** — gesprekken, notulen en expliciete acties.
-- **Operatie** — processessies, AI-taken, workerstatus en dispatcher.
+- **Kwaliteit** — actuele en afgeronde QualityWorkItems, bugs, verificaties en kwaliteitshistorie.
+- **Signalen** — onveranderlijke gebruikerssignalen met bron, context, status en doorwerking.
+- **Overleggen** — agenda, gesprek, notulen en de status van iedere expliciete actie.
+- **Beheer** — ingang naar productinstellingen, besluiten, geheugen, AI-instellingen en techniek.
+- **Besluiten** — actuele grote besluiten, peildatum, versies, intrekkingen en opvolgers.
+- **Agentgeheugen** — geheugen en contextbudget per rol, inclusief versiehistorie en correcties.
+- **Algemene instellingen** — provider, model en beschikbaarheid per `AiJobKey`.
+- **Operatie** — processessies met uitkomst, werkqueues, AI-taken, workerstatus, dispatcherhistorie en
+  actieve implementatieversies.
+- **Acceptatietesten** — alleen op acceptatie: datasets resetten en vaste mockscenario's bedienen.
 
 De getoonde inhoud is synthetische HKH-voorbeelddata en dient alleen om de informatiehiërarchie en
 interacties te beoordelen.

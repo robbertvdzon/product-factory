@@ -42,7 +42,7 @@ een externe actor.
 | Productontwerp | `runProcessSession(productId)` | `Epic` | voor één product ontwerpen en epicstatuscommands uitvoeren; planning ontdekt beschikbare epics zelf |
 | Productplanning | `runProcessSession(productId)` | `PlanningWorkItem`, `Story` | voor één product beschikbare epics kiezen, gericht planwerk verwerken en zo nodig epicverificatie aanvragen |
 | Kwaliteitsbewaking | `runProcessSession(productId)` | `QualityWorkItem`, `Bug`, `Verification`, `QualitySnapshot` | voor één product testverzoeken claimen, resultaten publiceren en kwaliteitshistorie vastleggen |
-| Software Factory-dispatcher | `runDispatchSession(productId)` | geen productentiteit; eigen technisch `DeliveryAttempt` | één product synchroniseren en maximaal één eerste uitvoerbare `TODO`-story versturen |
+| Software Factory-dispatcher | `runDispatchSession(productId)` | geen inhoudelijke productentiteit; eigen technische `ProcessSession` en `DeliveryAttempt` | één product synchroniseren en maximaal één eerste uitvoerbare `TODO`-story versturen |
 
 De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een geldige no-op.
 
@@ -50,14 +50,14 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 
 | Eigenaar | Commands | Read-only queries |
 |---|---|---|
-| product-/overlegmodule | `createProduct`, `updateProductAssignment`, `configureTestableProduct`, `setProductDispatching`, `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `startMeeting`, `recordMeetingMessage`, `closeMeeting` | `getProduct`, `findProducts`, `findDispatchableProducts`, `getProductAssignment`, `getUserSignal`, `findOpenUserSignals`, `getTestableProduct`, `getMeeting`, `findMeetings` |
-| Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `withdrawEpic`, `cancelEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpics` |
-| Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `reserveNextStoryForDispatch`, `revalidateDispatchReservation`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `markStoryAsCancelled`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
-| Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `retryQualityWorkItem`, `linkBugfixStory(bugId, storyId)` | `getBug`, `findBugs`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems`, `findRetryableQualityWorkItems` |
+| product-/overlegmodule | `createProduct`, `updateProductAssignment`, `configureTestableProduct`, `setProductDispatching`, `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `startMeeting`, `recordMeetingMessage`, `closeMeeting` | `getProduct`, `findProducts`, `findDispatchableProducts`, `getProductAssignment`, `getUserSignal`, `findUserSignals`, `getTestableProduct`, `getMeeting`, `findMeetings` |
+| Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `withdrawEpic`, `cancelEpic` | `getEpic`, `findEpics`, `getProcessSession`, `findProcessSessions` |
+| Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `reserveNextStoryForDispatch`, `revalidateDispatchReservation`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `markStoryAsCancelled`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findStories`, `findPlanningWorkItems`, `getProcessSession`, `findProcessSessions` |
+| Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `retryQualityWorkItem`, `linkBugfixStory(bugId, storyId)` | `getBug`, `findBugs`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems`, `findRetryableQualityWorkItems`, `getProcessSession`, `findProcessSessions` |
 | Besluitenregister | `createDecision`, `reviseDecision`, `withdrawDecision`, `supersedeDecisions` | `getDecisions(productId, validAt?)`, `getDecisionArchive(productId)` |
 | Agentgeheugen | `addAgentMemory`, `replaceAgentMemory`, `retractAgentMemory` | `getActiveMemory(context)`, `getMemoryAt(productId, role, validAt)`, `getMemoryHistory(productId, role, itemId)` |
 | AI-uitvoering | `updateAiJobConfiguration`, `requestAiTask`, `cancelAiTask`; aparte workercommands voor claim, heartbeat, progress, complete en fail | `getAiJobConfiguration`, `getAiJobConfigurations`, `getAiTask`, `getAiTaskResult`, `findAiTasks` |
-| Software Factory-dispatcher | `runDispatchSession(productId)` via scheduler, UI of REST | `getDispatchStatus`, `findDeliveryAttempts` |
+| Software Factory-dispatcher | `runDispatchSession(productId)` via scheduler, UI of REST | `getDispatchStatus`, `findDeliveryAttempts`, `getDispatchSession`, `findDispatchSessions` |
 
 Een command mag ID's, verwachte versies, bron, actor en idempotentiesleutel aannemen, maar geen
 vrije velden waarmee de aanroeper de state machine kan omzeilen.
@@ -136,7 +136,7 @@ nooit rechtstreeks in de tabel.
 | `AiTaskResult` | AI-uitvoering | bevoegde worker mag met het actuele fencing token één resultaat aanbieden | alleen aanvragende module, operations en frontend | onveranderlijk technisch gevalideerd resultaat; de procesmodule valideert de productbetekenis |
 | `AiResultArtifact` | AI-uitvoering | bevoegde worker uploadt met het actuele fencing token | aanvragende module via resultaatreferentie; frontend binnen autorisatie | begrensd, gehasht en onveranderlijk bewijsbestand; in de MVP als database-BLOB opgeslagen |
 | `AiWorkerSession` | AI-uitvoering | worker opent en reconcileert zijn sessie | operations en frontend | worker-ID, bootsessie, provider-capabilities, capaciteit en laatste heartbeat; geen agentrollen |
-| `ProcessSession` | betreffende intelligente procesmodule | niemand buiten eigenaar | operations en frontend | productgebonden uitvoering, implementatie-ID en -versie, inputversies, AI-taak-ID's, publicaties, status inclusief `WAITING_FOR_AI`, `BLOCKED` en `CANCELLED` |
+| `ProcessSession` | betreffende procesmodule of dispatcher | niemand buiten eigenaar | operations en frontend | productgebonden uitvoering, implementatie-ID en -versie, inputversies, eventuele AI-taak-ID's, publicaties of technische effecten, status inclusief `WAITING_FOR_AI`, `BLOCKED` en `CANCELLED` waar van toepassing |
 | `DeliveryAttempt` | Software Factory-dispatcher | dispatcher via eigen service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
 Interne analyses, concepten en agentuitvoer steken de modulegrens niet over. Permanent rolgeheugen
@@ -171,7 +171,7 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `AiJobConfigurationDetails` | AI-uitvoering, intern onderdeel `settings` | procesmodules en frontend | `enabled`, actuele provider, model en versie voor één opaque jobkey |
 | `AiTaskDetails` | AI-uitvoering uit `AiTask` en actuele attempt | aanvragende module, operations en frontend | taakstatus, provider/model-snapshot, attempt, lease, veilige voortgang en fout |
 | `AiTaskResultDetails` | AI-uitvoering uit `AiTaskResult` | uitsluitend de aanvragende module; operations binnen privacygrenzen | technisch gevalideerde opaque output en artifactreferenties |
-| `ProcessSessionDetails` | betreffende procesmodule | operations en frontend | operationele sessiestatus, implementatie-ID en -versie en historie |
+| `ProcessSessionDetails` | betreffende procesmodule of dispatcher | operations en frontend | sessie-ID, module, product, trigger, start/eindtijd, status, leesbare uitkomst, blokkade/fout, implementatie-ID en -versie, gebruikte input- en geheugenversies, AI-taak-ID's en publicaties of technische effecten |
 | `ImplementationManifestDetails` | buildmetadata van `product-factory-app` | operations, frontend en Test Control API | gekozen artifact, variant, versie en broncommit per capability; read-only en geen database-entiteit |
 | `DispatcherProductStatusDetails` | dispatcher uit externe status en eigen pogingen | operations en frontend | open extern werk, eventuele technische blokkade en laatste poging voor één product |
 | `DeliveryAttemptDetails` | dispatcher uit `DeliveryAttempt` | operations en frontend | read-only technische leveringshistorie zonder wijzigbaar productobject |

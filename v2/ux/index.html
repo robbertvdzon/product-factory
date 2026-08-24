@@ -10,6 +10,7 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar" aria-label="Hoofdnavigatie">
+      <button class="sidebar-close" data-action="close-navigation" aria-label="Navigatie sluiten">×</button>
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
         <span><strong>Product Factory</strong><small>Van inzicht naar verbetering</small></span>
@@ -21,19 +22,18 @@
         <button class="nav-item" data-view="planning"><span aria-hidden="true">≡</span>Planning</button>
         <button class="nav-item" data-view="quality"><span aria-hidden="true">◇</span>Kwaliteit <b class="nav-count">2</b></button>
         <button class="nav-item" data-view="signals"><span aria-hidden="true">○</span>Signalen</button>
-        <button class="nav-item" data-view="decisions"><span aria-hidden="true">✓</span>Besluiten</button>
         <button class="nav-item" data-view="meetings"><span aria-hidden="true">◌</span>Overleggen</button>
       </nav>
 
-      <div class="sidebar-section-label">Techniek</div>
+      <div class="sidebar-section-label">Beheer</div>
       <nav class="nav-list">
-        <button class="nav-item" data-view="operations"><span aria-hidden="true">⌁</span>Operatie <b class="nav-dot" title="Aandacht nodig"></b></button>
+        <button class="nav-item" data-view="management"><span aria-hidden="true">⌘</span>Beheer <b class="nav-dot" title="Aandacht nodig"></b></button>
       </nav>
 
       <div class="sidebar-footer">
         <div class="avatar" aria-hidden="true">RV</div>
         <div><strong>Robbert</strong><small>Stakeholder</small></div>
-        <button class="icon-button" title="Instellingen" aria-label="Instellingen">⚙</button>
+        <button class="icon-button" data-view="management" title="Beheer" aria-label="Beheer openen">⚙</button>
       </div>
     </aside>
 
@@ -152,30 +152,42 @@
           </div>
 
           <section class="surface backlog-panel calm-backlog">
-            <div class="surface-heading">
-              <div><span class="kicker">HKH</span><h2>Stories</h2></div>
+            <div class="panel-toolbar">
+              <div class="view-tabs"><button class="view-tab active" data-planning-filter="open" aria-pressed="true">Open backlog</button><button class="view-tab" data-planning-filter="cancelled" aria-pressed="false">Geannuleerd <span>2</span></button></div>
               <span class="updated">Volgorde door Productplanning</span>
             </div>
-            <div class="backlog-list" role="list">
+            <div class="priority-context" data-planning-panel="open"><span>Handmatige richting</span><strong>EP-016 kreeg voorrang</strong><small>“De mobiele documentenroute is deze week urgent.” · alleen nog niet verstuurde stories zijn herordend.</small></div>
+            <div class="backlog-list" role="list" data-planning-panel="open">
               <button class="story-row in-progress" data-entity-id="ST-087"><span class="sequence">10</span><span class="story-state-icon">↗</span><span class="story-copy"><strong>Bevestiging na verzenden verbeteren</strong><small>EP-014 · Productstory</small></span><span class="status-chip progress">In uitvoering</span></button>
               <button class="story-row" data-entity-id="ST-088"><span class="sequence">11</span><span class="story-state-icon">•</span><span class="story-copy"><strong>Foutmelding met herstelactie</strong><small>EP-014 · Productstory</small></span><span class="status-chip todo">Te doen</span></button>
               <button class="story-row reserved" data-entity-id="ST-091"><span class="sequence">12</span><span class="story-state-icon">⇢</span><span class="story-copy"><strong>Focus behouden na terugnavigeren</strong><small>EP-014 · Productstory</small></span><span class="status-chip reserved">Wordt verstuurd</span></button>
               <button class="story-row" data-entity-id="ST-096"><span class="sequence">13</span><span class="story-state-icon bug">!</span><span class="story-copy"><strong>Herstel dubbele bevestigingsmail</strong><small>EP-011 · Bugfix · P1</small></span><span class="status-chip todo">Te doen</span></button>
               <button class="story-row blocked" data-entity-id="ST-102"><span class="sequence">14</span><span class="story-state-icon">•</span><span class="story-copy"><strong>Voortgang veilig bewaren</strong><small>EP-016 · wacht op ST-101</small></span><span class="status-chip waiting">Wacht</span></button>
             </div>
+            <div class="backlog-list" role="list" data-planning-panel="cancelled" hidden>
+              <button class="story-row" data-entity-id="ST-073"><span class="sequence">—</span><span class="story-state-icon">×</span><span class="story-copy"><strong>Los bevestigingsscherm na verzenden</strong><small>EP-003 · geannuleerd door Stakeholder · reden beschikbaar</small></span><span class="status-chip warning">Geannuleerd</span></button>
+              <button class="story-row" data-entity-id="ST-074"><span class="sequence">—</span><span class="story-state-icon">×</span><span class="story-copy"><strong>Oude zoekfilter uitbreiden</strong><small>EP-009 · Software Factory annuleerde extern werk</small></span><span class="status-chip warning">Geannuleerd</span></button>
+            </div>
           </section>
         </section>
 
         <section class="view" id="view-quality" aria-labelledby="quality-title">
           <div class="page-heading">
-            <div><p class="eyebrow">Kwaliteitsbewaking</p><h1 id="quality-title">Kwaliteitswerk</h1><p>Alles wat klaarstaat, wordt uitgevoerd of aandacht nodig heeft.</p></div>
+            <div><p class="eyebrow">Kwaliteitsbewaking</p><h1 id="quality-title">Kwaliteit</h1><p>Testwerk, bewezen bugs en controleerbare resultaten op één plek.</p></div>
             <div class="heading-actions">
               <button class="secondary-action" data-action="show-quality-stats">Statistieken</button>
               <button class="primary-action" data-action="run-quality">Kwaliteitsrun starten</button>
             </div>
           </div>
 
-          <section class="surface quality-work-panel">
+          <div class="section-tabs" aria-label="Kwaliteitsonderdelen">
+            <button class="active" data-quality-section="work" aria-pressed="true">Testwerk <span>5</span></button>
+            <button data-quality-section="bugs" aria-pressed="false">Bugs <span>2</span></button>
+            <button data-quality-section="verifications" aria-pressed="false">Verificaties</button>
+            <button data-quality-section="history" aria-pressed="false">Historie</button>
+          </div>
+
+          <section class="surface quality-work-panel" data-quality-panel="work">
             <div class="panel-toolbar">
               <div class="view-tabs" aria-label="Kwaliteitswerkweergave">
                 <button class="view-tab active" data-quality-filter="current" aria-pressed="true">Actueel <span>5</span></button>
@@ -225,6 +237,31 @@
               </article>
             </div>
           </section>
+
+          <section class="surface entity-panel" data-quality-panel="bugs" hidden>
+            <div class="surface-heading"><div><span class="kicker">Bewezen afwijkingen</span><h2>Bugs</h2></div><span class="updated">2 open · 4 opgelost</span></div>
+            <div class="entity-list">
+              <button class="entity-row" data-entity-id="BUG-021"><span class="entity-id bug-id">P1</span><span class="entity-copy"><strong>Bevestigingsmail wordt soms dubbel verstuurd</strong><small>BUG-021 · EP-011 · gereproduceerd op acceptatie</small></span><span class="status-chip warning">Open</span><span aria-hidden="true">→</span></button>
+              <button class="entity-row" data-entity-id="BUG-018"><span class="entity-id bug-id">P2</span><span class="entity-copy"><strong>Focus verdwijnt na een mislukte verzending</strong><small>BUG-018 · EP-014 · bugfixstory ST-104 staat klaar</small></span><span class="status-chip open">Open</span><span aria-hidden="true">→</span></button>
+              <button class="entity-row" data-entity-id="BUG-012"><span class="entity-id bug-id resolved">P1</span><span class="entity-copy"><strong>Adresgegevens verdwenen bij terugnavigeren</strong><small>BUG-012 · opgelost en hertest geslaagd op 20 augustus</small></span><span class="status-chip processed">Opgelost</span><span aria-hidden="true">→</span></button>
+            </div>
+          </section>
+
+          <section class="surface entity-panel" data-quality-panel="verifications" hidden>
+            <div class="surface-heading"><div><span class="kicker">Onveranderlijk bewijs</span><h2>Recente verificaties</h2></div><span class="updated">Nieuwste eerst</span></div>
+            <div class="entity-list">
+              <button class="entity-row" data-entity-id="VER-144"><span class="entity-id">Story</span><span class="entity-copy"><strong>Adresgegevens blijven bewaard · ST-082</strong><small>Acceptatie · commit 7f3b9d1 · 8 controles</small></span><span class="status-chip processed">Geslaagd</span><span aria-hidden="true">→</span></button>
+              <button class="entity-row" data-entity-id="VER-141"><span class="entity-id">Epic</span><span class="entity-copy"><strong>Zoeken zonder vaktaal · EP-009</strong><small>Productie read-only · 12 routes · bewijs beschikbaar</small></span><span class="status-chip processed">Geslaagd</span><span aria-hidden="true">→</span></button>
+              <button class="entity-row" data-entity-id="VER-139"><span class="entity-id">Story</span><span class="entity-copy"><strong>Mobiele Safari-route · ST-079</strong><small>Acceptatie · testaccount niet bereikbaar</small></span><span class="status-chip warning">Geblokkeerd</span><span aria-hidden="true">→</span></button>
+            </div>
+          </section>
+
+          <section class="quality-history-grid" data-quality-panel="history" hidden>
+            <article class="surface dimension-card"><span class="kicker">Kritieke bugs</span><strong>0</strong><p>Zes weken zonder P0-bug.</p><div class="mini-bars"><i style="height:70%"></i><i style="height:55%"></i><i style="height:35%"></i><i style="height:12%"></i><i style="height:12%"></i><i style="height:12%"></i></div></article>
+            <article class="surface dimension-card"><span class="kicker">Open bugs</span><strong>2</strong><p>Van vijf naar twee open afwijkingen.</p><div class="mini-bars green"><i style="height:80%"></i><i style="height:65%"></i><i style="height:65%"></i><i style="height:48%"></i><i style="height:34%"></i><i style="height:34%"></i></div></article>
+            <article class="surface dimension-card"><span class="kicker">Recent geteste kernroutes</span><strong>87%</strong><p>13 van 15 routes zijn actueel getest.</p><div class="dimension-track"><span style="width:87%"></span></div><button class="text-button" data-entity-id="SNAP-051">Bekijk nieuwste snapshot →</button></article>
+            <article class="surface dimension-card"><span class="kicker">Geblokkeerd testwerk</span><strong>2</strong><p>Beide blokkades hebben een retrymoment.</p><button class="text-button" data-quality-section="work">Bekijk testwerk →</button></article>
+          </section>
         </section>
 
         <section class="view" id="view-signals" aria-labelledby="signals-title">
@@ -263,11 +300,15 @@
         <section class="view" id="view-decisions" aria-labelledby="decisions-title">
           <div class="page-heading"><div><p class="eyebrow">Besluiten</p><h1 id="decisions-title">Keuzes die richting geven</h1><p>Alleen grote, blijvende keuzes. Gewone processtappen staan hier niet.</p></div><button class="secondary-action" data-action="start-meeting">Besluit bespreken</button></div>
           <section class="surface decision-panel">
-            <div class="surface-heading"><div><span class="kicker">Geldig op 24 augustus 2026</span><h2>Actuele besluiten</h2></div><button class="period-button">Peildatum wijzigen</button></div>
-            <div class="decision-list">
-              <article><span class="decision-kind">Product</span><h3>We schrijven voor mensen zonder vakkennis</h3><p>Alle primaire routes gebruiken gewone taal. Een vakterm krijgt uitleg op de plek waar die nodig is.</p><footer><span>Stakeholderbesluit</span><span>Geldig sinds 12 mei 2026</span><button>Historie</button></footer></article>
-              <article><span class="decision-kind technical">Techniek</span><h3>Persoonlijke gegevens blijven in PostgreSQL</h3><p>Nieuwe productdata wordt relationeel opgeslagen en volgt de vastgelegde bewaartermijnen.</p><footer><span>Factorybesluit</span><span>Geldig sinds 3 juni 2026</span><button>Historie</button></footer></article>
-              <article><span class="decision-kind privacy">Privacy</span><h3>Productietesten wijzigen nooit echte klantdata</h3><p>Processen gebruiken alleen veilige read-only routes of expliciete testaccounts.</p><footer><span>Stakeholderbesluit</span><span>Geldig sinds 21 juni 2026</span><button>Historie</button></footer></article>
+            <div class="panel-toolbar"><div class="view-tabs"><button class="view-tab active" data-decision-filter="current" aria-pressed="true">Actueel</button><button class="view-tab" data-decision-filter="archive" aria-pressed="false">Archief</button></div><button class="period-button">Peildatum: 24 augustus 2026</button></div>
+            <div class="decision-list" data-decision-panel="current">
+              <article data-entity-id="DEC-031"><span class="decision-kind">Product</span><h3>We schrijven voor mensen zonder vakkennis</h3><p>Alle primaire routes gebruiken gewone taal. Een vakterm krijgt uitleg op de plek waar die nodig is.</p><footer><span>Stakeholderbesluit</span><span>Geldig sinds 12 mei 2026</span><button>Bekijk</button></footer></article>
+              <article data-entity-id="DEC-028"><span class="decision-kind technical">Techniek</span><h3>Persoonlijke gegevens blijven in PostgreSQL</h3><p>Nieuwe productdata wordt relationeel opgeslagen en volgt de vastgelegde bewaartermijnen.</p><footer><span>Factorybesluit</span><span>Geldig sinds 3 juni 2026</span><button>Bekijk</button></footer></article>
+              <article data-entity-id="DEC-036"><span class="decision-kind privacy">Privacy</span><h3>Productietesten wijzigen nooit echte klantdata</h3><p>Processen gebruiken alleen veilige read-only routes of expliciete testaccounts.</p><footer><span>Stakeholderbesluit</span><span>Geldig sinds 21 juni 2026</span><button>Bekijk</button></footer></article>
+            </div>
+            <div class="decision-list archive-list" data-decision-panel="archive" hidden>
+              <article data-entity-id="DEC-014"><span class="decision-kind technical">Techniek</span><h3>Productdata opslaan in MongoDB</h3><p>Dit besluit is vervangen toen voor relationele opslag is gekozen.</p><footer><span class="status-chip waiting">Vervangen</span><span>Opgevolgd door DEC-028</span><button>Versies</button></footer></article>
+              <article data-entity-id="DEC-019"><span class="decision-kind">Product</span><h3>Alle formulieren openen in een losse stap</h3><p>Ingetrokken omdat gebruikersonderzoek een rustiger geïntegreerde route liet zien.</p><footer><span class="status-chip warning">Ingetrokken</span><span>Reden vastgelegd op 9 april</span><button>Versies</button></footer></article>
             </div>
           </section>
         </section>
@@ -275,23 +316,107 @@
         <section class="view" id="view-meetings" aria-labelledby="meetings-title">
           <div class="page-heading"><div><p class="eyebrow">Overleggen</p><h1 id="meetings-title">Samen richting geven</h1><p>Van gesprek naar expliciete signalen, besluiten en acties.</p></div><button class="primary-action" data-action="start-meeting">Nieuw overleg</button></div>
           <div class="meeting-grid">
-            <article class="surface next-meeting"><span class="status-chip open">Open</span><p class="meeting-date">Vandaag · 14:30</p><h2>Mobiele aanvraagroute bespreken</h2><p>Aanleiding: drie signalen en één terugkerende testblokkade.</p><div class="meeting-links"><span>EP-014</span><span>3 signalen</span><span>QW-031</span></div><button class="primary-action" data-action="join-meeting">Overleg openen</button></article>
-            <section class="surface"><div class="surface-heading"><div><span class="kicker">Eerder</span><h2>Afgeronde overleggen</h2></div></div><div class="meeting-list"><button><time>18 aug</time><span><strong>Begrijpelijke taal als vaste richting</strong><small>2 signalen · 1 besluit · afgerond</small></span><span>→</span></button><button><time>4 aug</time><span><strong>Prioriteit mobiele aanvraag</strong><small>Epic EP-014 kreeg voorrang · afgerond</small></span><span>→</span></button><button><time>21 jul</time><span><strong>Productietesten en privacy</strong><small>1 besluit · afgerond</small></span><span>→</span></button></div></section>
+            <article class="surface next-meeting"><span class="status-chip open">Open</span><p class="meeting-date">Vandaag · gestart om 14:30</p><h2>Mobiele aanvraagroute bespreken</h2><p>Aanleiding: drie signalen en één terugkerende testblokkade.</p><div class="meeting-links"><span>EP-014</span><span>3 signalen</span><span>QW-031</span></div><button class="primary-action" data-entity-id="M-024">Overleg openen</button></article>
+            <section class="surface"><div class="surface-heading"><div><span class="kicker">Eerder</span><h2>Afgeronde overleggen</h2></div></div><div class="meeting-list"><button data-entity-id="M-018"><time>18 aug</time><span><strong>Begrijpelijke taal als vaste richting</strong><small>2 signalen · 1 besluit · alle acties verwerkt</small></span><span>→</span></button><button data-entity-id="M-015"><time>4 aug</time><span><strong>Prioriteit mobiele aanvraag</strong><small>Epic EP-014 kreeg voorrang · afgerond</small></span><span>→</span></button><button data-entity-id="M-011"><time>21 jul</time><span><strong>Productietesten en privacy</strong><small>1 besluit · afgerond</small></span><span>→</span></button></div></section>
           </div>
+        </section>
+
+        <section class="view" id="view-management" aria-labelledby="management-title">
+          <div class="page-heading"><div><p class="eyebrow">Beheer</p><h1 id="management-title">Richting, geheugen en techniek</h1><p>Onderdelen die je minder vaak nodig hebt, zonder het dagelijkse werk druk te maken.</p></div></div>
+          <div class="management-grid">
+            <button class="surface management-card" data-view="product-settings"><span class="management-icon">◎</span><span><strong>Productinstellingen</strong><small>Productopdracht, testomgevingen en dispatching</small></span><span>→</span></button>
+            <button class="surface management-card" data-view="decisions"><span class="management-icon">✓</span><span><strong>Besluiten</strong><small>Actuele keuzes, peildatum en volledige historie</small></span><span>→</span></button>
+            <button class="surface management-card" data-view="memory"><span class="management-icon">◫</span><span><strong>Agentgeheugen</strong><small>Geheugen per rol controleren en corrigeren</small></span><span>→</span></button>
+            <button class="surface management-card" data-view="settings"><span class="management-icon">⚙</span><span><strong>Algemene instellingen</strong><small>Model, provider en beschikbaarheid per AI-job</small></span><span>→</span></button>
+            <button class="surface management-card attention" data-view="operations"><span class="management-icon">⌁</span><span><strong>Operatie</strong><small>Runs, queues, AI-uitvoering, dispatcher en versies</small></span><span class="status-chip warning">2 aandacht</span></button>
+            <button class="surface management-card acceptance-card" data-view="acceptance" data-environment-only="acceptance" hidden><span class="management-icon">◈</span><span><strong>Acceptatietesten</strong><small>Alleen zichtbaar op acceptatie</small></span><span>→</span></button>
+          </div>
+          <button class="text-button logout-link" data-action="logout">Uitloggen bij Product Factory</button>
+        </section>
+
+        <section class="view" id="view-product-settings" aria-labelledby="product-settings-title">
+          <div class="page-heading"><div><p class="eyebrow">Beheer · HKH</p><h1 id="product-settings-title">Productinstellingen</h1><p>De grenzen waarbinnen alle processen voor dit product werken.</p></div><button class="secondary-action" data-action="create-product">Nieuw product</button></div>
+          <div class="settings-layout">
+            <section class="surface settings-section">
+              <div class="surface-heading"><div><span class="kicker">Product</span><h2>Opdracht en richting</h2></div><span class="status-chip active">Actief</span></div>
+              <div class="form-grid"><label>Productnaam<input value="HKH"></label><label>Publieke Git-URL<input value="https://github.com/example/hkh"></label><label class="full">Productdoel<textarea rows="3">Iedere bezoeker vindt zonder twijfel de juiste hulp.</textarea></label><label class="full">Harde grenzen<textarea rows="3">Geen medische diagnose. Persoonsgegevens worden nooit in testbewijs opgenomen.</textarea></label></div>
+              <div class="settings-actions"><button class="primary-action" data-action="save-product">Productopdracht bewaren</button></div>
+            </section>
+            <section class="surface settings-section">
+              <div class="surface-heading"><div><span class="kicker">Levering</span><h2>Software Factory</h2></div><label class="switch"><input type="checkbox" checked><span></span><b>Dispatching aan</b></label></div>
+              <p class="muted">Als dispatching uitstaat, blijven stories veilig in de backlog staan. Lopend extern werk wordt nog wel gesynchroniseerd.</p>
+              <button class="secondary-action" data-action="save-dispatch">Instelling bewaren</button>
+            </section>
+            <section class="surface settings-section full-span">
+              <div class="surface-heading"><div><span class="kicker">Testbare omgevingen</span><h2>Acceptatie en productie</h2></div></div>
+              <div class="environment-settings"><article><span class="status-chip active">Bereikbaar</span><h3>Acceptatie</h3><p>https://acc.hkh.example.nl</p><small>Veilige testaccounts · schrijven toegestaan binnen testdata</small></article><article><span class="status-chip active">Read-only</span><h3>Productie</h3><p>https://hkh.example.nl</p><small>Alleen veilige routes · geen echte klantdata wijzigen</small></article></div>
+              <button class="secondary-action" data-action="edit-test-config">Omgevingen aanpassen</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-memory" aria-labelledby="memory-title">
+          <div class="page-heading"><div><p class="eyebrow">Beheer</p><h1 id="memory-title">Agentgeheugen</h1><p>Iedere rol leest alleen haar eigen permanente geheugen; jij kunt alle rollen controleren.</p></div><button class="primary-action" data-action="memory-add">Geheugen toevoegen</button></div>
+          <div class="memory-layout">
+            <aside class="surface role-list" aria-label="Agentrollen">
+              <button class="active" data-memory-role="designer"><span class="role-mark design">✦</span><span><strong>Productontwerper MVP</strong><small>PRODUCT_DESIGNER_MVP · 3 items</small></span><b>68%</b></button>
+              <button data-memory-role="planner"><span class="role-mark planning">≡</span><span><strong>Planner MVP</strong><small>PLANNER_MVP · 2 items</small></span><b>41%</b></button>
+              <button data-memory-role="tester"><span class="role-mark quality">◇</span><span><strong>Tester MVP</strong><small>TESTER_MVP · 4 items</small></span><b>82%</b></button>
+              <button data-memory-role="minutes"><span class="role-mark meeting">◌</span><span><strong>Notulenagent</strong><small>MEETING_MINUTES · 1 item</small></span><b>19%</b></button>
+            </aside>
+            <section class="surface memory-content">
+              <div class="surface-heading"><div><span class="kicker">PRODUCT_DESIGNER_MVP</span><h2>Productontwerper MVP</h2></div><button class="period-button" data-action="memory-date">Peildatum: nu</button></div>
+              <div class="memory-budget"><span><b>6.800</b> van 10.000 tokens gebruikt</span><div><i style="width:68%"></i></div><small>Deze rol krijgt alleen deze actuele set mee.</small></div>
+              <div class="memory-items">
+                <article><div><span class="status-chip active">Actueel · v3</span><h3>Schrijf voor mensen zonder vakkennis</h3><p>Begin bij de vraag van de bezoeker en leg noodzakelijke vaktermen op dezelfde plek uit.</p><small>Gewijzigd door Stakeholder · 18 augustus · reden: uitkomst overleg M-018</small></div><div><button data-action="memory-replace">Vervangen</button><button data-action="memory-retract">Intrekken</button></div></article>
+                <article><div><span class="status-chip active">Actueel · v1</span><h3>Mobiele route eerst bekijken</h3><p>Controleer iedere nieuwe epic eerst op 320 CSS-pixels en werk daarna pas de brede toestand uit.</p><small>Toegevoegd door de eigen agentrol · 5 augustus · gebruikt door 8 sessies</small></div><div><button data-action="memory-replace">Vervangen</button><button data-action="memory-retract">Intrekken</button></div></article>
+                <article><div><span class="status-chip active">Actueel · v2</span><h3>Geen oplossing zonder aantoonbaar probleem</h3><p>Leg altijd de bron en de observeerbare gebruikersverbetering vast.</p><small>Gewijzigd door Stakeholder · 22 juli · gebruikt door 14 sessies</small></div><div><button data-action="memory-replace">Vervangen</button><button data-action="memory-retract">Intrekken</button></div></article>
+              </div>
+              <button class="text-button" data-action="memory-history">Volledige versiegeschiedenis en gebruikte processessies →</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-settings" aria-labelledby="settings-title">
+          <div class="page-heading"><div><p class="eyebrow">Beheer</p><h1 id="settings-title">Algemene AI-instellingen</h1><p>Een wijziging geldt alleen voor nieuwe taken; lopende taken houden hun oorspronkelijke instelling.</p></div></div>
+          <section class="surface settings-section">
+            <div class="surface-heading"><div><span class="kicker">Configuratie v18</span><h2>Model per AI-job</h2></div><span class="updated">Laatst gewijzigd vandaag 09:12 door Stakeholder</span></div>
+            <div class="config-table"><div class="config-head"><span>AI-job</span><span>Provider</span><span>Model</span><span>Ingeschakeld</span><span></span></div><div><span><strong>Epic ontwerpen</strong><small>PRODUCT_DESIGN_MVP</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Stories plannen</strong><small>PRODUCT_PLANNING_MVP</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Productkwaliteit testen</strong><small>QUALITY_MVP</small></span><select><option>Claude</option><option>Codex</option></select><input value="claude-sonnet-4"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div><div><span><strong>Overlegnotulen</strong><small>MEETING_MINUTES</small></span><select><option>Codex</option><option>Claude</option></select><input value="gpt-5.6-mini"><label class="switch compact"><input type="checkbox" checked><span></span></label><button data-action="save-ai-config">Bewaar</button></div></div>
+            <p class="settings-note">Provider <b>Mocked</b> is alleen beschikbaar op local en acceptatie en wordt in productie door de backend geweigerd.</p>
+          </section>
+        </section>
+
+        <section class="view acceptance-view" id="view-acceptance" aria-labelledby="acceptance-title">
+          <div class="acceptance-banner">Acceptatie — synthetische tijdelijke data — authenticatie uit</div>
+          <div class="page-heading"><div><p class="eyebrow">Alleen acceptatie</p><h1 id="acceptance-title">Acceptatietesten</h1><p>Bestuur de gefakete buitenwereld en controleer daarna de normale schermen en historie.</p></div><button class="secondary-action" data-action="reset-acceptance">Testdata resetten</button></div>
+          <div class="acceptance-grid"><section class="surface settings-section"><span class="kicker">Actieve set</span><h2>Volledige happy flow</h2><dl class="detail-grid"><div><dt>Dataset</dt><dd>HKH-MVP-04</dd></div><div><dt>Scenario</dt><dd>HAPPY-FLOW-01</dd></div><div><dt>Testbed</dt><dd>2.3.0</dd></div><div><dt>Implementatie</dt><dd>mvp-2026.08.24</dd></div></dl><button class="secondary-action" data-action="choose-scenario">Scenario kiezen</button></section><section class="surface settings-section"><span class="kicker">Externe stappen</span><h2>Mockbesturing</h2><div class="test-controls"><button data-action="mock-sleep">AI-worker laten slapen</button><button data-action="mock-resume">AI-worker hervatten</button><button data-action="mock-complete">Externe story afronden</button><button data-action="mock-cancel">Externe story annuleren</button><button data-action="mock-fail">Volgende externe call laten mislukken</button></div></section></div>
         </section>
 
         <section class="view" id="view-operations" aria-labelledby="operations-title">
           <div class="page-heading"><div><p class="eyebrow">Operatie</p><h1 id="operations-title">Automatisering die je kunt volgen</h1><p>Technische status staat apart van de productwaarheid.</p></div><span class="environment"><i></i> Alle systemen bereikbaar</span></div>
           <section class="process-grid">
             <article class="process-card"><div class="process-icon design">✦</div><div><span class="status-chip idle">Wacht</span><h2>Productontwerp</h2><p>Laatste run vandaag 07:00 · 1 epic gemaakt</p></div><button class="small-action process-run">Nu starten</button></article>
-            <article class="process-card"><div class="process-icon planning">≡</div><div><span class="status-chip progress">Wacht op AI</span><h2>Productplanning</h2><p>Sessie PS-188 · taak 2 van 2</p></div><button class="small-action">Bekijken</button></article>
+            <article class="process-card"><div class="process-icon planning">≡</div><div><span class="status-chip progress">Wacht op AI</span><h2>Productplanning</h2><p>Sessie PS-188 · taak 2 van 2</p></div><button class="small-action" data-entity-id="PS-188">Bekijken</button></article>
             <article class="process-card"><div class="process-icon quality">◇</div><div><span class="status-chip warning">2 met aandacht</span><h2>Kwaliteitsbewaking</h2><p>Laatste run 10:05 · volgende 11:05</p></div><button class="small-action process-run">Nu starten</button></article>
             <article class="process-card"><div class="process-icon dispatch">↗</div><div><span class="status-chip active">Actief</span><h2>Dispatcher</h2><p>1 story bij Software Factory · geen fouten</p></div><button class="small-action process-run">Nu starten</button></article>
           </section>
-          <section class="surface"><div class="surface-heading"><div><span class="kicker">AI-uitvoering</span><h2>Taken en worker</h2></div><span class="status-chip active">Laptop online</span></div>
-            <div class="worker-row"><span class="worker-pulse"></span><div><strong>Robberts MacBook Pro</strong><small>Laatste heartbeat 12 sec geleden · 1 van 2 plekken actief</small></div><span>CODEX · CLAUDE</span></div>
-            <div class="task-table"><div class="task-table-head"><span>Taak</span><span>Model</span><span>Status</span><span>Gestart</span></div><div><span><strong>Planning stories EP-016</strong><small>Productplanning · PS-188</small></span><span>Codex · gpt-5</span><span class="status-chip progress">Bezig 62%</span><span>10:18</span></div><div><span><strong>Epic ontwerpen</strong><small>Productontwerp · PS-187</small></span><span>Claude · Sonnet</span><span class="status-chip processed">Klaar</span><span>07:02</span></div></div>
+
+          <div class="section-tabs operation-tabs" aria-label="Operationele onderdelen"><button class="active" data-operation-section="sessions" aria-pressed="true">Processessies</button><button data-operation-section="queues" aria-pressed="false">Werkqueues</button><button data-operation-section="ai" aria-pressed="false">AI-uitvoering</button><button data-operation-section="dispatcher" aria-pressed="false">Dispatcher</button><button data-operation-section="versions" aria-pressed="false">Versies</button></div>
+
+          <section class="surface operation-panel" data-operation-panel="sessions"><div class="surface-heading"><div><span class="kicker">Alle modules · HKH</span><h2>Recente processessies</h2></div><span class="updated">Nieuwste eerst</span></div>
+            <div class="run-list"><button data-entity-id="PS-188"><span class="run-icon planning">≡</span><span><strong>PS-188 · Productplanning</strong><small>Vandaag 10:17 · MVP 1.2.0 · hervat 2 keer</small></span><span><b>Stories voor EP-016 gepland</b><small>8 stories gepubliceerd en geprioriteerd</small></span><span class="status-chip processed">Geslaagd</span><span>→</span></button><button data-entity-id="PS-187"><span class="run-icon design">✦</span><span><strong>PS-187 · Productontwerp</strong><small>Vandaag 07:00 · MVP 1.1.0 · 2m 18s</small></span><span><b>Nieuwe epic gepubliceerd</b><small>EP-016 versie 1</small></span><span class="status-chip processed">Geslaagd</span><span>→</span></button><button data-entity-id="PS-186"><span class="run-icon quality">◇</span><span><strong>PS-186 · Kwaliteitsbewaking</strong><small>Vandaag 06:05 · MVP 1.3.1 · 42s</small></span><span><b>2 tests geblokkeerd</b><small>Testaccount en deployment niet beschikbaar</small></span><span class="status-chip warning">Geblokkeerd</span><span>→</span></button><button data-entity-id="PS-185"><span class="run-icon dispatch">↗</span><span><strong>PS-185 · Dispatcher</strong><small>Vandaag 06:00 · 310ms</small></span><span><b>Geen nieuw werk</b><small>Externe story ST-087 is nog open</small></span><span class="status-chip idle">No-op</span><span>→</span></button><button data-entity-id="PS-184"><span class="run-icon design">✦</span><span><strong>PS-184 · Productontwerp</strong><small>Gisteren 21:00 · scheduler</small></span><span><b>Run overgeslagen</b><small>Een handmatige call voor HKH was al actief</small></span><span class="status-chip waiting">Overgeslagen</span><span>→</span></button></div>
           </section>
+
+          <section class="surface operation-panel" data-operation-panel="queues" hidden><div class="surface-heading"><div><span class="kicker">Duurzaam werk</span><h2>Planning- en kwaliteitsqueue</h2></div><span class="status-chip warning">2 aandacht</span></div><div class="queue-columns"><div><h3>PlanningWorkItems</h3><article><span class="status-chip todo">Open</span><strong>PW-033 · Bugfix plannen</strong><small>BUG-021 · aangemaakt 10:44</small></article><article><span class="status-chip progress">Bezig</span><strong>PW-032 · Epic herprioriteren</strong><small>EP-016 · Stakeholder: mobiele documentenroute is urgent</small></article></div><div><h3>QualityWorkItems</h3><article><span class="status-chip warning">7 pogingen</span><strong>QW-031 · Epiccontrole</strong><small>Geblokkeerd · retry om 13:15</small></article><article><span class="status-chip warning">4 pogingen</span><strong>QW-044 · Storycontrole</strong><small>Mislukt · retry morgen 09:00</small></article></div></div></section>
+
+          <section class="surface operation-panel" data-operation-panel="ai" hidden><div class="surface-heading"><div><span class="kicker">AI-uitvoering</span><h2>Taken en workers</h2></div><span class="status-chip active">Laptop online</span></div>
+            <div class="worker-row"><span class="worker-pulse"></span><div><strong>Robberts MacBook Pro</strong><small>Laatste heartbeat 12 sec geleden · lease gezond · 1 van 2 plekken actief</small></div><span>CODEX · CLAUDE</span></div>
+            <div class="task-table"><div class="task-table-head"><span>Taak</span><span>Model en configuratie</span><span>Status</span><span>Attempt</span></div><div><span><strong>Planning stories EP-016</strong><small>Productplanning · PS-188 · AI-402</small></span><span>Codex · gpt-5.6 · cfg v18</span><span class="status-chip progress">Bezig 62% · heartbeat 12s</span><span>1</span></div><div><span><strong>Epic ontwerpen</strong><small>Productontwerp · PS-187 · AI-401</small></span><span>Claude · Sonnet · cfg v17</span><span class="status-chip processed">Klaar</span><span>2</span></div><div><span><strong>Safari-route testen</strong><small>Kwaliteit · PS-186 · AI-398</small></span><span>Claude · Sonnet · cfg v17</span><span class="status-chip warning">Lease verlopen · retry</span><span>3</span></div></div>
+          </section>
+
+          <section class="surface operation-panel" data-operation-panel="dispatcher" hidden><div class="surface-heading"><div><span class="kicker">Software Factory</span><h2>Leveringen en synchronisatie</h2></div><span class="status-chip active">Niet geblokkeerd</span></div><div class="delivery-list"><article><span class="delivery-mark success">✓</span><div><strong>DA-208 · ST-087 gesynchroniseerd</strong><p>Software Factory-status OPEN · externe referentie SF-8821</p><small>Vandaag 10:30 · 184ms · idempotentiesleutel ongewijzigd</small></div></article><article><span class="delivery-mark success">✓</span><div><strong>DA-207 · ST-087 aangemaakt</strong><p>StoryDeliveryPackage geaccepteerd door Software Factory.</p><small>Vandaag 09:30 · 412ms · HTTP 201</small></div></article><article><span class="delivery-mark warning">!</span><div><strong>DA-206 · tijdelijke timeout</strong><p>Zelf afgehandeld; dezelfde poging is veilig herhaald zonder dubbel extern werk.</p><small>Vandaag 09:25 · retry na 5 minuten</small></div></article></div></section>
+
+          <section class="surface operation-panel" data-operation-panel="versions" hidden><div class="surface-heading"><div><span class="kicker">Productie</span><h2>Actieve build</h2></div><span class="status-chip active">Frontend en backend passend</span></div><dl class="version-grid"><div><dt>Applicatie</dt><dd>2026.08.24-3</dd><small>build 24 aug 2026 · 09:42 UTC</small></div><div><dt>Frontend</dt><dd>2026.08.24-3</dd><small>commit 9df61c8…</small></div><div><dt>Backend</dt><dd>2026.08.24-3</dd><small>commit 9df61c8…</small></div><div><dt>Productontwerp</dt><dd>design-mvp 1.1.0</dd><small>artifact product-design-mvp</small></div><div><dt>Productplanning</dt><dd>planning-mvp 1.2.0</dd><small>artifact product-planning-mvp</small></div><div><dt>Kwaliteitsbewaking</dt><dd>quality-mvp 1.3.1</dd><small>artifact product-quality-mvp</small></div></dl><button class="secondary-action" data-action="check-version">Controleren op nieuwe versie</button></section>
         </section>
       </main>
     </div>
@@ -305,7 +430,7 @@
 
   <div class="modal-backdrop signal-backdrop" hidden></div>
   <section class="modal signal-modal" role="dialog" aria-modal="true" aria-labelledby="signal-modal-title" hidden>
-    <button class="modal-close signal-modal-close" aria-label="Sluiten">×</button><span class="modal-icon">✦</span><h2 id="signal-modal-title">Nieuw signaal</h2><p>Leg vast wat je zag, hoorde of belangrijk vindt. De oorspronkelijke tekst blijft ongewijzigd.</p><label>Wat wil je meegeven?<textarea rows="5" placeholder="Beschrijf je observatie of zorg..."></textarea></label><div class="modal-actions"><button class="secondary-action signal-modal-cancel">Annuleren</button><button class="primary-action signal-modal-confirm">Signaal bewaren</button></div>
+    <button class="modal-close signal-modal-close" aria-label="Sluiten">×</button><span class="modal-icon">✦</span><h2 id="signal-modal-title">Nieuw signaal</h2><p>Leg vast wat je zag, hoorde of belangrijk vindt. De oorspronkelijke tekst blijft ongewijzigd.</p><div class="signal-fields"><label>Categorie<select><option>Feedback</option><option>Kwaliteitszorg</option><option>Kans</option><option>Risico</option></select></label><label>Urgentie<select><option>Normaal</option><option>Hoog</option><option>Laag</option></select></label></div><label>Wat wil je meegeven?<textarea rows="5" placeholder="Beschrijf je observatie of zorg..."></textarea></label><label>Bijlage <input type="file"><small>Optioneel; de bron en context worden met het signaal bewaard.</small></label><div class="modal-actions"><button class="secondary-action signal-modal-cancel">Annuleren</button><button class="primary-action signal-modal-confirm">Signaal bewaren</button></div>
   </section>
 
   <div class="modal-backdrop stats-backdrop" hidden></div>
@@ -320,6 +445,11 @@
       <g class="chart-points"><circle cx="44" cy="158" r="5"></circle><circle cx="202" cy="128" r="5"></circle><circle cx="360" cy="100" r="5"></circle><circle cx="515" cy="88" r="5"></circle><circle cx="700" cy="48" r="6"></circle></g>
       <g class="chart-labels"><text x="44" y="204">20 jul</text><text x="202" y="204">27 jul</text><text x="360" y="204">3 aug</text><text x="515" y="204">10 aug</text><text x="700" y="204" text-anchor="end">Vandaag</text></g>
     </svg>
+  </section>
+
+  <div class="modal-backdrop auth-backdrop" hidden></div>
+  <section class="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
+    <span class="modal-icon">●</span><p class="eyebrow">Product Factory</p><h2 id="auth-modal-title">Je bent uitgelogd</h2><p>Log opnieuw in met het Google-account dat voor Product Factory bevoegd is.</p><button class="primary-action google-login" data-action="login-google">Inloggen met Google</button><small>Een verlopen sessie komt altijd terug op dit scherm. Niet bevoegd en technische storing krijgen ieder een eigen duidelijke foutmelding.</small>
   </section>
 
   <div class="toast" role="status" aria-live="polite"></div>

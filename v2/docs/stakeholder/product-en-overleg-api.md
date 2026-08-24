@@ -35,7 +35,7 @@ void markUserSignalInReview(MarkUserSignalInReviewCommand command);
 void recordSignalInvestigation(RecordSignalInvestigationCommand command);
 void linkSignalToEpic(LinkSignalToEpicCommand command);
 UserSignalDetails getUserSignal(UserSignalId userSignalId);
-List<UserSignalDetails> findOpenUserSignals(ProductId productId);
+List<UserSignalDetails> findUserSignals(UserSignalFilter filter);
 
 MeetingId startMeeting(StartMeetingCommand command);
 void recordMeetingMessage(RecordMeetingMessageCommand command);
@@ -79,8 +79,10 @@ publieke statussen zijn:
 `recordSignalInvestigation(...)` registreert de exacte `Verification` en de leesbare uitkomst.
 `linkSignalToEpic(...)` koppelt een exact epic-ID en epicversie. Geen van beide wijzigt de
 oorspronkelijke melding. Een signaal is richting of bewijs, maar nooit rechtstreeks een besluit,
-bug, epic of planningopdracht. `findOpenUserSignals(...)` levert zowel `OPEN` als `IN_REVIEW`; alleen
-`PROCESSED` valt buiten de open lijst.
+bug, epic of planningopdracht. `findUserSignals(...)` ondersteunt minimaal filteren op product-ID,
+status, categorie, urgentie, bron en periode. Zonder statusfilter levert de query ook verwerkte
+signalen, zodat de frontend één controleerbare historie kan tonen. De normale procesinput gebruikt
+een filter op `OPEN` en `IN_REVIEW` en behandelt `PROCESSED` dus niet opnieuw.
 
 ## Meeting
 

@@ -49,8 +49,9 @@ Daarnaast heeft de module deze deterministische command- en query-interface:
 
 ```java
 EpicDetails getEpic(EpicId epicId);
-List<EpicDetails> findAvailableEpics(ProductId productId);
-List<EpicDetails> findActiveEpics(ProductId productId);
+List<EpicDetails> findEpics(EpicFilter filter);
+ProcessSessionDetails getProcessSession(ProcessSessionId processSessionId);
+List<ProcessSessionDetails> findProcessSessions(ProcessSessionFilter filter);
 void claimEpicForPlanning(ClaimEpicForPlanningCommand command);
 void markEpicActive(MarkEpicActiveCommand command);
 void markEpicReadyForVerification(MarkEpicReadyForVerificationCommand command);
@@ -62,6 +63,12 @@ void cancelEpic(CancelEpicCommand command);
 Deze functies starten geen agents. Ze valideren bevoegdheid, verwachte versie en toegestane
 statusovergang en schrijven de wijziging atomair op de eigen `Epic`. Geen command biedt vrije
 schrijftoegang tot epicinhoud of UX.
+
+`findEpics(...)` ondersteunt minimaal filteren op product-ID, één of meer statussen en periode. Zo
+gebruiken processen dezelfde query voor beschikbare of actieve epics en kan de frontend ook
+afgeronde, niet-succesvolle, geannuleerde, vervangen en ingetrokken epics tonen.
+`findProcessSessions(...)` ondersteunt minimaal product, status en periode en sorteert nieuwste
+sessies eerst. De sessiequeries zijn uitsluitend operationeel en wijzigen nooit een epic.
 
 ## Interface met andere modules en services
 

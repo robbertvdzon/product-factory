@@ -81,19 +81,16 @@ incompatibiliteit tussen frontend- en backendcontract wordt als duidelijke techn
 
 ## Productoverzicht
 
-Het hoofdscherm laat in één oogopslag zien:
+Het hoofdscherm blijft bewust rustig. Het laat voor het gekozen product alleen zien:
 
-- het gekozen product, status `ACTIVE` of `INACTIVE` en of dispatching is ingeschakeld;
-- het productdoel en de harde grenzen;
-- de actieve epics en eventuele handmatig urgente epic;
-- de eerste `TODO`-story en de story die `IN_PROGRESS` is;
-- de geordende backlog en open bugs;
-- het huidige kwaliteitsbeeld en de ontwikkeling per kwaliteitsdimensie door de tijd;
-- recente verificaties en belangrijke kwaliteitsrisico's;
-- nieuwe en open gebruikerssignalen;
-- geldige besluiten;
-- agentrollen met geheugen dat aandacht of correctie nodig heeft;
-- aangevraagde of open overleggen.
+- het productdoel;
+- de belangrijkste actieve epic en de story die nu bij Software Factory wordt uitgevoerd;
+- enkele concrete aandachtspunten, zoals een vastgelopen kwaliteitsretry of nieuw signaal;
+- korte links naar de bijbehorende detailschermen.
+
+De productstatus, dispatchinstelling, harde grenzen, volledige epic- en backloglijsten, bugs,
+kwaliteitshistorie, signalen, besluiten, geheugen en overleggen blijven allemaal bereikbaar via hun
+eigen scherm. Ze worden niet nogmaals als compacte dashboards op het hoofdscherm gepropt.
 
 Interne analyses, concepten en agentuitvoer staan hier niet. Permanent rolgeheugen is wel zichtbaar
 in het aparte beheerscherm, omdat de Stakeholder dit moet kunnen controleren en corrigeren.
@@ -133,9 +130,10 @@ AI-taken. Een gequeue'de of lopende taak blijft zichtbaar met de provider, het m
 configuratieversie waarmee zij is aangemaakt. Productie weigert `MOCKED` zowel bij opslaan als bij
 taakaanvraag.
 
-## Inbox
+## Signalen
 
-De Inbox toont `UserSignal`s. Per signaal zijn zichtbaar:
+Het scherm **Signalen** toont `UserSignal`s en gebruikt geen afzonderlijke inboxentiteit. Open,
+onderzochte en verwerkte signalen komen uit `findUserSignals(...)`. Per signaal zijn zichtbaar:
 
 - de oorspronkelijke tekst, bron, context en bijlagen;
 - categorie en urgentie;
@@ -151,9 +149,8 @@ databasetoegang.
 
 Het planningsscherm toont:
 
-- epics per actuele epicstatus;
 - alle open stories op `sequenceNumber`;
-- geannuleerde epics en stories apart van de backlog, met bron en reden;
+- geannuleerde stories apart van de backlog, met bron en reden;
 - bij een door Software Factory geannuleerde story uitleg dat Product Factory de complete epic na
   het overige werk opnieuw op de feitelijke producttoestand beoordeelt;
 - storytype `PRODUCT_STORY` of `BUGFIX`;
@@ -167,9 +164,15 @@ Het planningsscherm toont:
 Er is geen afzonderlijke roadmapentiteit en geen tweede handmatige backlog. De epicstatussen en de
 berekende storylijst zijn de enige bronnen.
 
+Epics staan niet nogmaals als hoofdlijst bij Planning. Het scherm **Ontwerp** gebruikt
+`findEpics(...)` en toont actuele en historische epics per lifecyclestatus. Op epicdetail kan de
+Stakeholder, wanneer de status dat toestaat, de epic met reden laten herprioriteren, intrekken of
+annuleren. Planning toont bij een handmatige prioriteitsactie de reden en de zichtbare doorwerking
+op nog niet verstuurde stories.
+
 ## Detailpagina
 
-Een epic, story, bug, verificatie, kwaliteitssnapshot, signaal of besluit heeft een rustige
+Een epic, story, bug, verificatie, kwaliteitssnapshot, signaal, besluit, meeting of processessie heeft een rustige
 detailpagina. Die toont alleen de velden die bij dat object horen, plus relaties naar bron- en
 vervolgobjecten.
 
@@ -226,13 +229,32 @@ Een handmatige start kiest altijd een product en roept `runProcessSession(produc
 product al een run actief is. De REST-ingang retourneert voor deze botsing bijvoorbeeld HTTP 409.
 Een run voor een ander product blijft wel toegestaan.
 
+De overlegweergave is meer dan een lijst. Een open overleg toont agenda, berichten, gekoppelde
+objecten en open acties. De Stakeholder kan berichten toevoegen en het overleg afsluiten. Daarna
+toont de UI de notulen en per expliciete uitkomst of het bijbehorende command is uitgevoerd of nog
+aandacht nodig heeft. Vanuit een product-, epic-, signaal-, bug- of besluitdetail kan een overleg
+met dat object als bron worden gestart.
+
+## Beheer
+
+Om de dagelijkse navigatie rustig te houden groepeert **Beheer** de minder vaak gebruikte onderdelen:
+
+- **Productinstellingen** — product aanmaken, productopdracht en testconfiguratie aanpassen en
+  dispatching bewust aan- of uitzetten;
+- **Besluiten** — actuele besluiten, peildatum, archief, versies, intrekkingsreden en opvolgers;
+- **Agentgeheugen** — actueel rolgeheugen, contextbudget, historie en add/replace/retract-acties;
+- **Algemene instellingen** — provider, model en `enabled` per `AiJobKey`, plus configuratieversie.
+
+**Operatie** blijft binnen Beheer een afzonderlijk technisch onderdeel. De frontend mag deze
+informatie anders groeperen op mobiel, zolang iedere functie rechtstreeks bereikbaar blijft.
+
 ## Operationele weergave
 
 Technische gebruikers kunnen apart zien:
 
 - het `ImplementationManifest` van de actieve build met gekozen artifact, variant, versie en
   broncommit per capability;
-- de eigen `ProcessSession`s van iedere intelligente module;
+- de eigen `ProcessSession`s van iedere intelligente module en de dispatcher;
 - `PlanningWorkItem`s en `QualityWorkItem`s met status, fout, blokkadereden, `attemptCount` en
   `retryAfter`;
 - `AiTask`s met aanvrager, provider, model, configuratieversie, status en attemptnummer;
@@ -245,6 +267,13 @@ De MVP toont operationele aandachtspunten alleen in deze UI. E-mail, Telegram of
 notificaties vallen buiten de MVP en kunnen later als aparte uitgaande adapter worden toegevoegd.
 - `DeliveryAttempt`s en externe Software Factory-referenties;
 - overgeslagen schedulerbotsingen en idempotente retries.
+
+De operationele weergave heeft minimaal de deelweergaven **Processessies**, **Werkqueues**,
+**AI-uitvoering**, **Dispatcher** en **Versies**. `findProcessSessions(...)` of de gelijkwaardige
+dispatcherquery levert per module en product de lijst, nieuwste eerst. Een sessiedetail toont
+start- en eindtijd, status, leesbare uitkomst, blokkade of fout, implementatie, gebruikte inputs,
+AI-taken en publicaties. Ook een succesvolle no-op en een overgeslagen schedulerbotsing blijven
+zichtbaar, zodat een handmatige run altijd verklaarbaar is.
 
 Deze informatie verklaart wat de automatisering doet, maar verandert nooit de inhoudelijke status
 van een epic, story, bug of verificatie.

@@ -61,7 +61,10 @@ Daarnaast biedt Productplanning deze deterministische commands en read-only quer
 ```java
 StoryDetails getStory(StoryId storyId);
 List<StoryDetails> getBacklog(ProductId productId);
+List<StoryDetails> findStories(StoryFilter filter);
 List<PlanningWorkItemDetails> findPlanningWorkItems(ProductId productId, WorkItemStatus status);
+ProcessSessionDetails getProcessSession(ProcessSessionId processSessionId);
+List<ProcessSessionDetails> findProcessSessions(ProcessSessionFilter filter);
 
 PlanningWorkItemId requestBugfix(RequestBugfixCommand command);
 PlanningWorkItemId requestEpicGapPlanning(RequestEpicGapPlanningCommand command);
@@ -85,6 +88,14 @@ dispatcher. De eerste reserveert atomair hooguit één uitvoerbare story; de twe
 voor een retry dezelfde reservering of annuleert haar wanneer de epic inmiddels is geannuleerd en
 Software Factory aantoonbaar nog geen extern werk heeft. Andere modules krijgen nooit
 schrijftoegang tot `Story` of `PlanningWorkItem`.
+
+De processessiequeries ondersteunen minimaal product, status en periode, leveren de nieuwste
+sessies eerst en zijn read-only. Zij maken zichtbaar welke input en implementatie een run gebruikte,
+wat die publiceerde en waarom die wachtte, blokkeerde of eindigde.
+
+`findStories(...)` ondersteunt minimaal filteren op product-ID, epic-ID, type, één of meer statussen
+en periode. De normale backlog blijft uitsluitend `getBacklog(...)`; de bredere query is nodig voor
+detailrelaties en de aparte frontendhistorie van `DONE` en `CANCELLED` stories.
 
 ## PlanningWorkItem: de queuegrens
 

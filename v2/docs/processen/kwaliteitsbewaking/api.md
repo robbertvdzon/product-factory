@@ -60,11 +60,13 @@ de eigen queue en bugs:
 ```java
 BugDetails getBug(BugId bugId);
 List<BugDetails> findBugs(BugFilter filter);
-List<VerificationDetails> findVerifications(VerificationTarget target);
+List<VerificationDetails> findVerifications(VerificationFilter filter);
 QualitySnapshotDetails getCurrentQuality(ProductId productId);
 List<QualitySnapshotDetails> getQualityHistory(ProductId productId, TimeRange range);
 List<QualityWorkItemDetails> findQualityWorkItems(ProductId productId, WorkItemStatus status);
 List<QualityWorkItemDetails> findRetryableQualityWorkItems();
+ProcessSessionDetails getProcessSession(ProcessSessionId processSessionId);
+List<ProcessSessionDetails> findProcessSessions(ProcessSessionFilter filter);
 QualityWorkItemId requestStoryVerification(RequestStoryVerificationCommand command);
 QualityWorkItemId requestEpicVerification(RequestEpicVerificationCommand command);
 QualityWorkItemId requestBugfixRetest(RequestBugfixRetestCommand command);
@@ -81,9 +83,17 @@ bestaande uitvoerbare bug koppelen. Dezelfde koppeling is idempotent. Een bug ma
 of geannuleerde eerdere poging later opnieuw een bugfixstory krijgen, maar nooit twee tegelijk
 actieve bugfixstories. Geen aanroeper krijgt toegang tot de kwaliteitsrepository.
 
+De processessiequeries ondersteunen minimaal product, status en periode, leveren de nieuwste
+sessies eerst en tonen de gebruikte input-, geheugen-, AI-taak- en publicatiereferenties. Ze zijn
+read-only en staan los van de retrycommands voor `QualityWorkItem`s.
+
 `findBugs(...)` ondersteunt minimaal filteren op product-ID, epic-ID en status. Productplanning
 gebruikt deze query om vóór epicverificatie betrouwbaar vast te stellen dat geen relevante `OPEN`
 bug resteert; het hoeft dat niet uit workitems of verificatielinks af te leiden.
+
+`findVerifications(...)` ondersteunt minimaal filteren op product-ID, doeltype, doel-ID, uitkomst,
+omgeving en periode. Daardoor kunnen processen exact bewijs voor één doel lezen en kan de frontend
+ook recente verificaties en volledige historie tonen.
 
 ## QualityWorkItem: de queuegrens
 
