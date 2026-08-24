@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.auth
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -24,8 +25,14 @@ class GoogleIdentityConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = ["PF_AUTH_REQUIRED"], havingValue = "true")
-    fun googleJwtDecoder(): JwtDecoder = NimbusJwtDecoder
+    fun googleJwtDecoder(restTemplateBuilder: RestTemplateBuilder): JwtDecoder = NimbusJwtDecoder
         .withJwkSetUri("https://www.googleapis.com/oauth2/v3/certs")
+        .restOperations(
+            restTemplateBuilder
+                .connectTimeout(Duration.ofSeconds(3))
+                .readTimeout(Duration.ofSeconds(5))
+                .build(),
+        )
         .build()
         .also { it.setJwtValidator(JwtTimestampValidator(Duration.ofSeconds(60))) }
 }

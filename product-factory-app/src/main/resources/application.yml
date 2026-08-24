@@ -14,18 +14,33 @@ spring:
       validation-timeout: 2000
       idle-timeout: 300000
       max-lifetime: 1200000
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
 server:
   port: ${PF_BACKEND_PORT:8080}
   shutdown: graceful
+  forward-headers-strategy: framework
+  tomcat:
+    connection-timeout: 5s
+
+logging:
+  structured:
+    format:
+      console: logstash
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
         enabled: true
       show-components: always
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db

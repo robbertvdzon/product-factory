@@ -9,6 +9,8 @@ data class AuthenticationStatus(
     val authRequired: Boolean,
     val stakeholderEmail: String? = null,
     val csrfToken: String? = null,
+    val environment: String = "local",
+    val googleClientId: String? = null,
 )
 
 data class AuthenticationError(

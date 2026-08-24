@@ -36,6 +36,9 @@ case "${1:-help}" in
   cache-test)
     exec tools/test-frontend-cache.sh
     ;;
+  deploy-test)
+    exec tools/verify-deployment.sh
+    ;;
   up)
     "$0" verify
     exec docker compose --env-file "$ROOT/secrets.env" up -d
@@ -44,6 +47,6 @@ case "${1:-help}" in
     exec docker compose --env-file "$ROOT/secrets.env" down
     ;;
   *)
-    echo "Gebruik: ./product-factory {verify|backend|frontend|cache-test|up|down}"
+    echo "Gebruik: ./product-factory {verify|backend|frontend|cache-test|deploy-test|up|down}"
     ;;
 esac

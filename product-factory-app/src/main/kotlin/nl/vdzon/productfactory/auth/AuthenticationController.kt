@@ -2,6 +2,8 @@ package nl.vdzon.productfactory.auth
 
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -17,9 +19,15 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/auth")
 class AuthenticationController(
     @Value("\${PF_AUTH_REQUIRED:false}") private val authRequired: Boolean,
+    @Value("\${PF_ENVIRONMENT:local}") private val environment: String,
+    @Value("\${PF_GOOGLE_CLIENT_ID:}") private val googleClientId: String,
     private val verifierProvider: ObjectProvider<GoogleIdentityVerifier>,
     private val sessionServiceProvider: ObjectProvider<ProductFactorySessionService>,
+    meterRegistry: MeterRegistry,
 ) {
+    private val rejectedLogins = Counter.builder("product_factory_authentication_failures")
+        .description("Aantal geweigerde loginpogingen")
+        .register(meterRegistry)
     @PostMapping("/google")
     fun googleLogin(
         @RequestBody body: GoogleLoginRequest,
@@ -28,20 +36,22 @@ class AuthenticationController(
         if (!authRequired) throw LoginRejected("Authenticatie is in deze omgeving uitgeschakeld.")
         val verifier = verifierProvider.getIfAvailable() ?: throw LoginRejected("Login is niet beschikbaar.")
         val sessionService = sessionServiceProvider.getIfAvailable() ?: throw LoginRejected("Login is niet beschikbaar.")
-        return sessionService.create(verifier.verify(body.idToken).email, response)
+        return withRuntimeConfiguration(sessionService.create(verifier.verify(body.idToken).email, response))
     }
 
     @GetMapping("/session")
     fun session(request: HttpServletRequest): AuthenticationStatus {
-        if (!authRequired) return AuthenticationStatus(authenticated = true, authRequired = false)
+        if (!authRequired) {
+            return withRuntimeConfiguration(AuthenticationStatus(authenticated = true, authRequired = false))
+        }
         val resolved = sessionServiceProvider.getIfAvailable()?.resolve(request)
-            ?: return AuthenticationStatus(authenticated = false, authRequired = true)
-        return AuthenticationStatus(
+            ?: return withRuntimeConfiguration(AuthenticationStatus(authenticated = false, authRequired = true))
+        return withRuntimeConfiguration(AuthenticationStatus(
             authenticated = true,
             authRequired = true,
             stakeholderEmail = resolved.stakeholderEmail,
             csrfToken = resolved.csrfToken,
-        )
+        ))
     }
 
     @PostMapping("/logout")
@@ -51,7 +61,15 @@ class AuthenticationController(
     }
 
     @ExceptionHandler(LoginRejected::class)
-    fun rejected(exception: LoginRejected): ResponseEntity<AuthenticationError> = ResponseEntity
-        .status(HttpStatus.UNAUTHORIZED)
-        .body(AuthenticationError("LOGIN_REJECTED", exception.message ?: "Login is geweigerd."))
+    fun rejected(exception: LoginRejected): ResponseEntity<AuthenticationError> {
+        rejectedLogins.increment()
+        return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(AuthenticationError("LOGIN_REJECTED", exception.message ?: "Login is geweigerd."))
+    }
+
+    private fun withRuntimeConfiguration(status: AuthenticationStatus) = status.copy(
+        environment = environment,
+        googleClientId = googleClientId.takeIf { authRequired && it.isNotBlank() },
+    )
 }

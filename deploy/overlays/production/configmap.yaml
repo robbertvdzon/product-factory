@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-factory-config
+data:
+  PF_ENVIRONMENT: production
+  PF_AUTH_REQUIRED: "true"
+  PF_PUBLIC_FRONTEND_URL: https://product-factory.vdzonsoftware.nl
+  PF_PUBLIC_BACKEND_URL: https://product-factory-api.vdzonsoftware.nl
+  PF_DB_URL: jdbc:postgresql://product-factory-postgres:5432/productfactory_v2
+  PF_DB_USERNAME: productfactory_v2
+  PF_SCHEDULES_ENABLED: "false"
+  PF_AI_PROVIDER: DISABLED
+  PF_SOFTWARE_FACTORY_MODE: DISABLED
+  PF_EXTERNAL_MUTATIONS_ALLOWED: "false"

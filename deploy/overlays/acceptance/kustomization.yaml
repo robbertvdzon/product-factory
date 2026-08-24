@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: product-factory-acceptance
+resources:
+  - ../../base
+  - configmap.yaml
+patches:
+  - path: routes-patch.yaml
+images:
+  - name: ghcr.io/robbertvdzon/product-factory-backend
+    newTag: manual-placeholder
+  - name: ghcr.io/robbertvdzon/product-factory-frontend
+    newTag: manual-placeholder

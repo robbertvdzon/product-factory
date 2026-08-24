@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.foundation
 
 import nl.vdzon.productfactory.api.testbed.TestControlService
+import nl.vdzon.productfactory.operations.CorrelationIdFilter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.ObjectProvider
@@ -45,5 +46,23 @@ class FoundationControllerTest(
         assertThat(testControlService.ifAvailable).isNull()
         mockMvc.get("/api/test-control/scenarios")
             .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `correlation id wordt behouden of veilig aangemaakt`() {
+        mockMvc.get("/api/foundation") {
+            header(CorrelationIdFilter.HEADER, "browser-request-123")
+        }.andExpect {
+            status { isOk() }
+            header { string(CorrelationIdFilter.HEADER, "browser-request-123") }
+        }
+
+        val generated = mockMvc.get("/api/foundation") {
+            header(CorrelationIdFilter.HEADER, "ongeldig met spaties")
+        }.andExpect {
+            status { isOk() }
+            header { exists(CorrelationIdFilter.HEADER) }
+        }.andReturn().response.getHeader(CorrelationIdFilter.HEADER)
+        assertThat(generated).isNotEqualTo("ongeldig met spaties")
     }
 }

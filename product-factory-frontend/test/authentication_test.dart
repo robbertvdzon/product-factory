@@ -19,6 +19,8 @@ void main() {
               'authRequired': true,
               'stakeholderEmail': 'stakeholder@example.com',
               'csrfToken': 'csrf-token',
+              'environment': 'production',
+              'googleClientId': 'public-client-id',
             }),
             200,
             headers: {'content-type': 'application/json'},
@@ -32,6 +34,8 @@ void main() {
     await gateway.logout(status.csrfToken);
 
     expect(status.stakeholderEmail, 'stakeholder@example.com');
+    expect(status.environment, 'production');
+    expect(status.googleClientId, 'public-client-id');
     expect(jsonDecode(requests.first.body), {'idToken': 'google-id-token'});
     expect(requests.last.headers['X-PF-CSRF'], 'csrf-token');
   });

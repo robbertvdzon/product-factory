@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: product-factory
+resources:
+  - ../../base
+  - configmap.yaml
+  - database.yaml
+  - sealed-secret-product-factory.yaml
+  - ../../database
+patches:
+  - path: backend-secret-patch.yaml
+images:
+  - name: ghcr.io/robbertvdzon/product-factory-backend
+    newTag: manual-placeholder
+  - name: ghcr.io/robbertvdzon/product-factory-frontend
+    newTag: manual-placeholder

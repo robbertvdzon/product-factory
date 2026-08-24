@@ -1,0 +1,13 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: dashboard-frontend
+spec:
+  host: product-factory-acceptance.vdzonsoftware.nl
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: dashboard-backend
+spec:
+  host: product-factory-api-acceptance.vdzonsoftware.nl

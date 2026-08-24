@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-factory-config
+data:
+  SPRING_PROFILES_ACTIVE: acceptance
+  PF_ENVIRONMENT: acceptance
+  PF_AUTH_REQUIRED: "false"
+  PF_PUBLIC_FRONTEND_URL: https://product-factory-acceptance.vdzonsoftware.nl
+  PF_PUBLIC_BACKEND_URL: https://product-factory-api-acceptance.vdzonsoftware.nl
+  PF_SCHEDULES_ENABLED: "false"
+  PF_AI_PROVIDER: MOCKED
+  PF_SOFTWARE_FACTORY_MODE: MOCKED
+  PF_EXTERNAL_MUTATIONS_ALLOWED: "false"

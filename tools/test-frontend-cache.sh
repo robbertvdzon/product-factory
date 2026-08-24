@@ -14,11 +14,13 @@ grep -q "$bundle_b" "$FRONTEND_ROOT/build/web/flutter_bootstrap.js"
 ! grep -q "$bundle_a" "$FRONTEND_ROOT/build/web/flutter_bootstrap.js"
 
 docker run --rm \
+  --add-host product-factory-backend:127.0.0.1 \
   -v "$FRONTEND_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
   nginx:1.28.0-alpine nginx -t >/dev/null
 
 test_directory="$(mktemp -d)"
 container_id="$(docker run -d --rm -p 127.0.0.1::8080 \
+  --add-host product-factory-backend:127.0.0.1 \
   -v "$FRONTEND_ROOT/build/web:/usr/share/nginx/html:ro" \
   -v "$FRONTEND_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
   nginx:1.28.0-alpine)"

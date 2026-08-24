@@ -169,13 +169,14 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
     if (status?.authenticated == true) {
       return FoundationPage(
         showAcceptanceBanner:
-            !status!.authRequired && AppConfiguration.isAcceptance,
+            !status!.authRequired && status.environment == 'acceptance',
         stakeholderEmail: status.stakeholderEmail,
         onLogout: status.authRequired ? _logout : null,
         versionGateway: widget.versionGateway,
         error: _error,
         frontendVersionSource: widget.frontendVersionSource,
         testControlGateway: widget.testControlGateway,
+        runtimeEnvironment: status.environment,
       );
     }
     return LoginPage(
@@ -183,6 +184,7 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
       error: _error,
       onIdToken: _login,
       googleLoginButtonBuilder: widget.googleLoginButtonBuilder,
+      googleClientId: status?.googleClientId,
     );
   }
 }
@@ -193,6 +195,7 @@ class LoginPage extends StatelessWidget {
     required this.onIdToken,
     this.error,
     this.googleLoginButtonBuilder,
+    this.googleClientId,
     super.key,
   });
 
@@ -200,6 +203,7 @@ class LoginPage extends StatelessWidget {
   final String? error;
   final ValueChanged<String> onIdToken;
   final GoogleLoginButtonBuilder? googleLoginButtonBuilder;
+  final String? googleClientId;
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +239,9 @@ class LoginPage extends StatelessWidget {
                     else
                       (googleLoginButtonBuilder?.call(onIdToken) ??
                           GoogleLoginButton(
-                            clientId: AppConfiguration.googleClientId,
+                            clientId:
+                                googleClientId ??
+                                AppConfiguration.googleClientId,
                             onIdToken: onIdToken,
                           )),
                     if (error != null) ...[
@@ -269,6 +275,7 @@ class FoundationPage extends StatelessWidget {
     this.onReload,
     this.currentBuildIdentity,
     this.testControlGateway,
+    this.runtimeEnvironment,
     super.key,
   });
 
@@ -281,6 +288,7 @@ class FoundationPage extends StatelessWidget {
   final VoidCallback? onReload;
   final BuildIdentity? currentBuildIdentity;
   final TestControlGateway? testControlGateway;
+  final String? runtimeEnvironment;
 
   @override
   Widget build(BuildContext context) => ApplicationShell(
@@ -293,5 +301,6 @@ class FoundationPage extends StatelessWidget {
     onReload: onReload,
     currentBuildIdentity: currentBuildIdentity,
     testControlGateway: testControlGateway,
+    runtimeEnvironment: runtimeEnvironment,
   );
 }

@@ -19,6 +19,7 @@ class ApplicationShell extends StatefulWidget {
     this.onReload,
     this.currentBuildIdentity,
     this.testControlGateway,
+    this.runtimeEnvironment,
     super.key,
   });
 
@@ -31,6 +32,7 @@ class ApplicationShell extends StatefulWidget {
   final VoidCallback? onReload;
   final BuildIdentity? currentBuildIdentity;
   final TestControlGateway? testControlGateway;
+  final String? runtimeEnvironment;
 
   @override
   State<ApplicationShell> createState() => _ApplicationShellState();
@@ -68,7 +70,11 @@ class _ApplicationShellState extends State<ApplicationShell> {
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Chip(
               avatar: const Icon(Icons.public, size: 16),
-              label: Text(_environmentLabel(AppConfiguration.environment)),
+              label: Text(
+                _environmentLabel(
+                  widget.runtimeEnvironment ?? AppConfiguration.environment,
+                ),
+              ),
             ),
           ),
           if (widget.onLogout != null)
@@ -108,6 +114,7 @@ class _ApplicationShellState extends State<ApplicationShell> {
                   1 => ManagementPage(
                     versionGateway: widget.versionGateway,
                     stakeholderEmail: widget.stakeholderEmail,
+                    runtimeEnvironment: widget.runtimeEnvironment,
                   ),
                   _ => AcceptanceTestsPage(
                     gateway:
@@ -186,7 +193,10 @@ class _ApplicationShellState extends State<ApplicationShell> {
       final latest = await source.latest();
       if (!mounted) return;
       if (_updateTracker.shouldNotify(
-        widget.currentBuildIdentity ?? BuildIdentity.frontend(),
+        widget.currentBuildIdentity ??
+            BuildIdentity.frontend(
+              runtimeEnvironment: widget.runtimeEnvironment,
+            ),
         latest,
       )) {
         setState(() => _updateAvailable = true);
@@ -258,11 +268,13 @@ class ManagementPage extends StatefulWidget {
   const ManagementPage({
     required this.versionGateway,
     this.stakeholderEmail,
+    this.runtimeEnvironment,
     super.key,
   });
 
   final VersionGateway versionGateway;
   final String? stakeholderEmail;
+  final String? runtimeEnvironment;
 
   @override
   State<ManagementPage> createState() => _ManagementPageState();
@@ -279,7 +291,9 @@ class _ManagementPageState extends State<ManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    final frontend = BuildIdentity.frontend();
+    final frontend = BuildIdentity.frontend(
+      runtimeEnvironment: widget.runtimeEnvironment,
+    );
     return _PageFrame(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

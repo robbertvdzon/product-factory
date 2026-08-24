@@ -61,7 +61,7 @@ class BuildIdentity {
         buildIdentity: json['backendBuildIdentity'] as String? ?? '',
       );
 
-  factory BuildIdentity.frontend() {
+  factory BuildIdentity.frontend({String? runtimeEnvironment}) {
     final revision = AppConfiguration.gitRevision.toLowerCase();
     final shortRevision = RegExp(r'^[0-9a-f]{40}$').hasMatch(revision)
         ? revision.substring(0, 12)
@@ -75,7 +75,7 @@ class BuildIdentity {
       apiVersion: AppConfiguration.apiVersion,
       gitRevision: revision,
       buildTime: AppConfiguration.buildTime,
-      environment: AppConfiguration.environment,
+      environment: runtimeEnvironment ?? AppConfiguration.environment,
       buildIdentity: version == unknown || shortRevision == unknown
           ? unknown
           : '$version+$shortRevision',

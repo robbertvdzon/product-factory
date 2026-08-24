@@ -69,6 +69,8 @@ class AuthenticationFlowTest(
             jsonPath("$.authRequired") { value(true) }
             jsonPath("$.stakeholderEmail") { value("stakeholder@example.com") }
             jsonPath("$.csrfToken") { isNotEmpty() }
+            jsonPath("$.environment") { value("local") }
+            jsonPath("$.googleClientId") { value("product-factory-client") }
         }.andReturn().response
 
         val sessionCookie = cookie(login, ProductFactorySessionService.SESSION_COOKIE)

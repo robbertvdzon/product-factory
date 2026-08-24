@@ -13,9 +13,24 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: backup
-              image: postgres:17.6-alpine
+              image: quay.io/sclorg/postgresql-16-c9s@sha256:22162c54bc5a00ac54c5d48da193a8a3805e10950b961b36aa121ea6b11ea6ae
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                runAsNonRoot: true
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
               command: ["/bin/sh", "-c"]
               args:
                 - |
@@ -38,8 +53,8 @@ spec:
               env:
                 - name: PF_DB_URL
                   valueFrom:
-                    secretKeyRef:
-                      name: product-factory-secrets
+                    configMapKeyRef:
+                      name: product-factory-config
                       key: PF_DB_URL
                 - name: PGPASSWORD
                   valueFrom:

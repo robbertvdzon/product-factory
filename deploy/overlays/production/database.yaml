@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: product-factory-postgres
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: product-factory-postgres-local-path-scc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:local-path-postgresql
+subjects:
+  - kind: ServiceAccount
+    name: product-factory-postgres
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: product-factory-v2-postgres-data
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: product-factory-v2-backups
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-factory-postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: product-factory-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: product-factory-postgres
+    spec:
+      serviceAccountName: product-factory-postgres
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+        seLinuxOptions:
+          type: spc_t
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: quay.io/sclorg/postgresql-16-c9s@sha256:22162c54bc5a00ac54c5d48da193a8a3805e10950b961b36aa121ea6b11ea6ae
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+          env:
+            - name: POSTGRESQL_DATABASE
+              value: productfactory_v2
+            - name: POSTGRESQL_USER
+              value: productfactory_v2
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-factory-secrets
+                  key: PF_DB_PASSWORD
+          ports:
+            - name: postgres
+              containerPort: 5432
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            exec:
+              command: [pg_isready, -U, productfactory_v2, -d, productfactory_v2]
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, productfactory_v2, -d, productfactory_v2]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, productfactory_v2, -d, productfactory_v2]
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/pgsql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: product-factory-v2-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-factory-postgres
+spec:
+  selector:
+    app.kubernetes.io/name: product-factory-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

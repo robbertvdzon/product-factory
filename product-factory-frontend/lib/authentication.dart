@@ -11,6 +11,8 @@ class AuthenticationStatus {
     required this.authRequired,
     this.stakeholderEmail,
     this.csrfToken,
+    this.environment = 'local',
+    this.googleClientId,
   });
 
   factory AuthenticationStatus.fromJson(Map<String, Object?> json) =>
@@ -19,12 +21,16 @@ class AuthenticationStatus {
         authRequired: json['authRequired'] == true,
         stakeholderEmail: json['stakeholderEmail'] as String?,
         csrfToken: json['csrfToken'] as String?,
+        environment: json['environment'] as String? ?? 'local',
+        googleClientId: json['googleClientId'] as String?,
       );
 
   final bool authenticated;
   final bool authRequired;
   final String? stakeholderEmail;
   final String? csrfToken;
+  final String environment;
+  final String? googleClientId;
 }
 
 abstract interface class AuthenticationGateway {

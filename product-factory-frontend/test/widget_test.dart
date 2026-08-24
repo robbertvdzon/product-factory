@@ -89,6 +89,37 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('backendbevestiging activeert acceptatiebanner en Testbed', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProductFactoryApp(
+        authenticationGateway: FakeAuthenticationGateway(
+          sessionResult: Future.value(
+            const AuthenticationStatus(
+              authenticated: true,
+              authRequired: false,
+              environment: 'acceptance',
+            ),
+          ),
+        ),
+        versionGateway: FakeVersionGateway(),
+        testControlGateway: FakeTestControlGateway(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Acceptatie — synthetische tijdelijke data — authenticatie uit',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Acceptatietesten'), findsOneWidget);
+  });
+
   testWidgets('beheer toont frontend en backendidentiteit op brede schermen', (
     tester,
   ) async {

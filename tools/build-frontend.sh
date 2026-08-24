@@ -8,7 +8,7 @@ application_version="${PF_APPLICATION_VERSION:-0.1.0}"
 git_revision="${PF_GIT_REVISION:-$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)}"
 build_time="${PF_BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 runtime_environment="${PF_ENVIRONMENT:-local}"
-backend_url="${PF_PUBLIC_BACKEND_URL:-http://localhost:8080}"
+backend_url="${PF_PUBLIC_BACKEND_URL-http://localhost:8080}"
 google_client_id="${PF_GOOGLE_CLIENT_ID:-}"
 
 [[ "$application_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Ongeldige applicatieversie." >&2; exit 1; }

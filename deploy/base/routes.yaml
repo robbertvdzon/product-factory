@@ -1,0 +1,29 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: dashboard-frontend
+spec:
+  host: product-factory.vdzonsoftware.nl
+  to:
+    kind: Service
+    name: product-factory-frontend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Allow
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: dashboard-backend
+spec:
+  host: product-factory-api.vdzonsoftware.nl
+  to:
+    kind: Service
+    name: product-factory-backend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Allow
