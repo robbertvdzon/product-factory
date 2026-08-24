@@ -1,6 +1,19 @@
 spring:
   application:
     name: product-factory
+  profiles:
+    default: local
+  flyway:
+    clean-disabled: true
+    validate-on-migrate: true
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 5000
+      validation-timeout: 2000
+      idle-timeout: 300000
+      max-lifetime: 1200000
 
 server:
   port: ${PF_BACKEND_PORT:8080}
@@ -15,3 +28,4 @@ management:
     health:
       probes:
         enabled: true
+      show-components: always

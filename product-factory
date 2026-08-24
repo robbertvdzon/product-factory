@@ -24,6 +24,8 @@ case "${1:-help}" in
     ;;
   backend)
     use_java_21
+    export PF_DB_URL="jdbc:postgresql://localhost:5436/productfactory_v2"
+    export PF_DB_USERNAME="productfactory_v2"
     exec mvn -pl product-factory-app -am spring-boot:run
     ;;
   frontend)
@@ -32,10 +34,10 @@ case "${1:-help}" in
     ;;
   up)
     "$0" verify
-    exec docker compose up -d
+    exec docker compose --env-file "$ROOT/secrets.env" up -d
     ;;
   down)
-    exec docker compose down
+    exec docker compose --env-file "$ROOT/secrets.env" down
     ;;
   *)
     echo "Gebruik: ./product-factory {verify|backend|frontend|up|down}"

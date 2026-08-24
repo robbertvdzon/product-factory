@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: product-factory-database-backup
+spec:
+  schedule: "17 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backup
+              image: postgres:17.6-alpine
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  umask 077
+                  backup_dir=/backups/productfactory-v2
+                  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+                  final="$backup_dir/product-factory-$timestamp.dump"
+                  temporary="$backup_dir/.product-factory-$timestamp.dump.tmp"
+                  checksum_temporary="$temporary.sha256"
+                  trap 'rm -f "$temporary" "$checksum_temporary"' EXIT
+                  mkdir -p "$backup_dir"
+                  pg_dump --format=custom --no-owner --no-privileges --file "$temporary" "$PF_DB_URL"
+                  pg_restore --list "$temporary" >/dev/null
+                  digest="$(sha256sum "$temporary" | awk '{print $1}')"
+                  printf '%s  %s\n' "$digest" "$(basename "$final")" > "$checksum_temporary"
+                  mv "$temporary" "$final"
+                  mv "$checksum_temporary" "$final.sha256"
+                  find "$backup_dir" -type f -mtime +14 -name 'product-factory-*.dump*' -delete
+              env:
+                - name: PF_DB_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: product-factory-secrets
+                      key: PF_DB_URL
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: product-factory-secrets
+                      key: PF_DB_PASSWORD
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: product-factory-v2-backups

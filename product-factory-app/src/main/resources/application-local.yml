@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: ${PF_DB_URL:jdbc:postgresql://localhost:5436/productfactory_v2}
+    username: ${PF_DB_USERNAME:productfactory_v2}
+    password: ${PF_DB_PASSWORD:}
+    hikari:
+      data-source-properties:
+        connectTimeout: 5
+        socketTimeout: 30
+        options: -c statement_timeout=30000
