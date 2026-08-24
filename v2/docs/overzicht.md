@@ -281,7 +281,7 @@ verwerkt alle geconfigureerde producten en kan per product maximaal één nieuwe
 | Gegeven | Betekenis |
 |---|---|
 | `StoryDeliveryPackage` | Volledige momentopname van de story met alle benodigde UX en assets. |
-| Storycommands | Reservering en meldingen `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)` aan Productplanning. |
+| Storycommands | Reservering en meldingen `markStoryAsDispatched(...)`, `markStoryAsDeveloped(...)` en `markStoryAsCancelled(...)` aan Productplanning. |
 | `DeliveryAttempt` | Technische historie van de Software Factory-dispatcher over verzending, response, fout en retry. |
 
 De dispatcher verstuurt niets zolang Software Factory voor dat product nog een openstaande story
@@ -294,6 +294,11 @@ wordt operationeel zichtbaar. Software Factory moet ieder contractgeldig storypa
 Een weigering is een technische contractfout die levering voor dat product blokkeert; zij verandert
 de story niet en maakt geen planningswerk.
 
+Wanneer Software Factory meldt dat extern werk is geannuleerd of verwijderd, roept de dispatcher
+`markStoryAsCancelled(...)` aan. Productplanning zet de story op `CANCELLED`; dit is geen technische
+fout en geen mislukte story. De complete epic wordt later opnieuw getest zodra het overige actuele
+werk klaar is, tenzij de Stakeholder de epic zelf heeft geannuleerd.
+
 ## Wanneer een epic klaar is
 
 Een story gebruikt vier eenvoudige statussen:
@@ -301,15 +306,21 @@ Een story gebruikt vier eenvoudige statussen:
 - `TODO` — klaar voor uitvoering maar nog niet verstuurd;
 - `IN_PROGRESS` — naar Software Factory gestuurd en daar nog open;
 - `DONE` — door Software Factory opgeleverd; dit is nog geen kwaliteitsoordeel;
-- `CANCELLED` — bewust niet meer uitvoeren, met een zichtbare bron en reden.
+- `CANCELLED` — niet meer uitvoeren, met een zichtbare bron en reden; bijvoorbeeld doordat
+  Software Factory de externe story verwijdert of bewust niet uitvoert.
+
+`DONE` betekent hier *finished*. Een story of bugfixstory krijgt nooit `FAILED` of **mislukt** als
+leveringsstatus. Een ontoereikende oplevering blijft `DONE` en krijgt een afgekeurde verificatie.
+Een niet-uitgevoerde story wordt `CANCELLED`.
 
 Een epic gebruikt:
 
 - `AVAILABLE` — complete versie die Productplanning mag kiezen;
 - `IN_PLANNING` — exacte versie is gekozen en bevroren;
 - `ACTIVE` — één of meer stories worden uitgevoerd of hersteld;
-- `VERIFYING` — alle stories en bugfixes zijn opgeleverd en actueel geslaagd geverifieerd; de
-  complete epic wordt gecontroleerd;
+- `VERIFYING` — al het niet-geannuleerde werk is opgeleverd en actueel geslaagd geverifieerd, of
+  geannuleerd extern werk vraagt om een feitelijke herbeoordeling; de complete epic wordt
+  gecontroleerd;
 - `COMPLETED` — de bedoelde gebruikersverbetering is aangetoond;
 - `NOT_SUCCESSFUL` — alles is geleverd, maar het gebruikersresultaat is niet bereikt;
 - `CANCELLED` — een reeds gekozen of actieve epic is bewust gestopt;
@@ -318,10 +329,12 @@ Een epic gebruikt:
 
 Alle stories `DONE` betekent dus nog niet dat de epic klaar is voor epicverificatie. Eerst controleert
 Kwaliteitsbewaking iedere story of bugfix. Zij meldt iedere uitkomst via een snel command aan
-Productplanning. Alleen wanneer alle actuele controles geslaagd zijn en geen open bug of herstelwerk
-resteert, zet Productplanning de epic zonder agent op `VERIFYING` en roept
-`requestEpicVerification(...)` aan. Dat command zet alleen een `QualityWorkItem` in de queue. Tijdens
-een latere kwaliteitsrun wordt de hele epic getest.
+Productplanning. Normaal zet Productplanning de epic alleen op `VERIFYING` als alle actuele
+controles geslaagd zijn en geen open bug of herstelwerk resteert. Wanneer Software Factory een
+`IN_PROGRESS` story `CANCELLED`, volgt na afronding van het overige werk juist een complete
+herbeoordeling van de feitelijke applicatie. Die bepaalt of het geannuleerde werk nog nodig was,
+bijvoorbeeld omdat iemand de wijziging handmatig heeft gedaan. `requestEpicVerification(...)` zet
+alleen een `QualityWorkItem` in de queue; de latere kwaliteitsrun voert de echte controle uit.
 
 Een epiccontrole gebruikt alleen `PASSED`, `NEEDS_WORK`, `BLOCKED` of `NOT_SUCCESSFUL`. Bij
 `NEEDS_WORK` zet Productontwerp de epic terug naar `ACTIVE`: bugs leveren gerichte
@@ -377,17 +390,19 @@ productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen
 
 ## Technische moduleopbouw
 
-Maven vormt de harde grens tussen capabilities. Iedere capability heeft een kleine API-module en
-een implementatiemodule. Een implementatie mag haar eigen API en API-modules van andere
-capabilities gebruiken, maar nooit een andere implementatiemodule. Alleen de ene uitvoerbare
-`product-factory-app` kent implementatie-artifacts.
+Maven vormt de harde grens tussen het publieke contract en de capability-implementaties. Alle
+publieke interfaces en DTO's staan per capabilitypackage in één module `product-factory-api`.
+Iedere implementatie gebruikt die gedeelde API-module, maar nooit een andere implementatiemodule.
+Alleen de ene uitvoerbare `product-factory-app` kent implementatie-artifacts. Door het ene publieke
+API-artifact kunnen publieke contracten elkaar niet via cyclische Maven-dependencies vastzetten.
 
 Productontwerp, Productplanning en Kwaliteitsbewaking kunnen een MVP- en uitgebreide implementatie
 hebben. De main-module kiest tijdens de build exact één implementatie per geactiveerde capability;
-een nog niet geactiveerde capability kan al wel haar publieke API-module hebben. Er bestaat
+een nog niet geactiveerde capability kan al wel haar publieke contract in `product-factory-api`
+hebben. Er bestaat
 geen runtime-toggle en twee varianten schrijven nooit tegelijk dezelfde productdata. Spring
 Modulith wordt uitsluitend binnen een implementatiemodule gebruikt om haar interne functionele
-delen te structureren en te testen. De API-modules gebruiken geen Spring Modulith.
+delen te structureren en te testen. `product-factory-api` gebruikt geen Spring Modulith.
 
 Iedere processessie bewaart haar `implementationId` en `implementationVersion`. Zolang terugkeer
 naar de MVP ondersteund wordt, blijven publieke objecten en het duurzame schema compatibel en zijn
@@ -427,9 +442,9 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
    bevroren provider en model.
 9. Gemiste worker-heartbeats leiden eerst tot een hersteltermijn; retries zijn met leases en fencing
    beschermd tegen oude workers.
-10. Maven bewaakt de harde API/implementatiegrenzen; alle API-modules bestaan vanaf het begin en de
-    ene main-build kiest exact één implementatie per geactiveerde capability. Spring Modulith blijft
-    binnen die implementatie.
+10. Maven bewaakt de harde grens tussen de ene gedeelde API-module en alle implementaties; alle
+    publieke capabilitycontracten bestaan vanaf het begin en de ene main-build kiest exact één
+    implementatie per geactiveerde capability. Spring Modulith blijft binnen die implementatie.
 
 ## Detaildocumenten
 

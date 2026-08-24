@@ -7,7 +7,8 @@ De module bewaart taken en uitvoeringspogingen duurzaam, deelt werk uit aan een 
 voortgang en resultaten. De worker op de laptop onderhoudt geen blijvende WebSocketverbinding meer,
 maar haalt werk via beveiligde HTTPS long polling op.
 
-De capability bestaat uit een Maven-API en één implementatiemodule. Andere implementaties gebruiken
+De capability heeft een publiek contract in `product-factory-api` en één implementatiemodule.
+Andere implementaties gebruiken
 uitsluitend de API; alleen de main-module neemt `ai-execution-impl` op. De implementatie bevat ten
 minste de gescheiden interne Spring Modulith-onderdelen `settings` en `task-execution`. Er zijn geen
 aparte Maven-modules nodig voor algemene instellingen.

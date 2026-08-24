@@ -12,9 +12,11 @@ route afwijken en herhalen de normale stappen niet. Ieder scenario heeft alleen 
 het scenario zelf en het verwachte eindresultaat.
 
 `DONE` betekent bij een story alleen dat Software Factory haar heeft opgeleverd. De actuele
-verificatie wordt apart vastgelegd. Een epic kan pas naar `VERIFYING` wanneer alle bijbehorende
-stories en bugfixstories `DONE` zijn, actueel geslaagd zijn geverifieerd en geen open herstelwerk
-resteert.
+verificatie wordt apart vastgelegd. Een story heeft nooit de leveringsstatus **mislukt**. Normaal kan
+een epic pas naar `VERIFYING` wanneer alle niet-geannuleerde stories en bugfixstories `DONE` zijn,
+actueel geslaagd zijn geverifieerd en geen open herstelwerk resteert. Na een door Software Factory
+geannuleerde story bestaat één bewuste uitzondering: zodra al het overige werk klaar is, wordt de
+feitelijke complete epic opnieuw beoordeeld.
 
 ## 1. Happy flow: van product zonder werk naar een afgeronde epic
 
@@ -135,7 +137,7 @@ storyverificatie. De epic is `ACTIVE`.
 5. De dispatcher en Software Factory leveren de bugfixstory via de normale route.
 6. Productplanning vraagt na oplevering een bugfixhertest aan.
 7. Kwaliteitsbewaking hertest de oorspronkelijke reproduceerstappen. De hertest slaagt, waarna de
-   bug op **Opgelost** komt.
+   bug op `RESOLVED` komt.
 8. Kwaliteitsbewaking zet een nieuwe storyverificatie klaar voor de oorspronkelijke story tegen de
    nieuwe productversie.
 9. Ook die verificatie slaagt. Daarna sluit de route weer aan op de happy flow.
@@ -143,35 +145,67 @@ storyverificatie. De epic is `ACTIVE`.
 ### Eindresultaat
 
 De oorspronkelijke story en de bugfixstory zijn beide `DONE` en actueel geslaagd geverifieerd. De
-bug is **Opgelost**. De epic blijft `ACTIVE` totdat ook al het overige werk is geleverd en
+bug is `RESOLVED`. De epic blijft `ACTIVE` totdat ook al het overige werk is geleverd en
 geverifieerd; daarna kan de normale epicverificatie beginnen.
 
-## 5. Een bugfix wordt afgekeurd
+## 5. Een opgeleverde bugfix lost het probleem niet op
 
 ### Beginsituatie
 
-Een bug heeft precies één gekoppelde bugfixstory. Die story is `DONE` en Kwaliteitsbewaking voert de
+Een `OPEN` bug heeft een gekoppelde bugfixstory. Die story is `DONE` en Kwaliteitsbewaking voert de
 bugfixhertest uit.
 
 ### Scenario
 
 1. Kwaliteitsbewaking stelt vast dat de concrete afwijking na de fix nog bestaat.
 2. Zij publiceert een afgekeurde verificatie voor de bugfixstory.
-3. De oude bug krijgt **Fix mislukt** en verwijst met `successorBugId` naar een nieuwe bug.
-4. De nieuwe uitvoerbare bug bevat `previousBugId`, `failedBugfixStoryId` en dezelfde
-   `originalStoryId`, plus actueel bewijs tegen de nieuwe productversie.
-5. Kwaliteitsbewaking vraagt voor de nieuwe bug `requestBugfix(...)` aan.
-6. Een latere planningsrun maakt voor de nieuwe bug één nieuwe bugfixstory en koppelt die met
-   `linkBugfixStory(newBugId, newStoryId)`.
-7. De nieuwe bugfix doorloopt de gewone leverings- en hertestroute. Na een geslaagde hertest wordt
-   de actuele bug **Opgelost** en wordt de oorspronkelijke productstory opnieuw geverifieerd.
+3. De bug blijft `OPEN`. De opgeleverde bugfixstory blijft `DONE`; er ontstaat geen aparte
+   mislukstatus.
+4. Kwaliteitsbewaking voegt het nieuwe bewijs als een nieuwe versie aan dezelfde bug toe en vraagt
+   voor die bronversie opnieuw idempotent `requestBugfix(...)` aan.
+5. Een latere planningsrun maakt een volgende gewone bugfixstory en koppelt die met
+   `linkBugfixStory(bugId, newStoryId)`. Dat mag omdat de eerdere gekoppelde story al `DONE` is.
+6. De nieuwe bugfix doorloopt de gewone leverings- en hertestroute. Na een geslaagde hertest wordt
+   de bug `RESOLVED` en wordt de oorspronkelijke productstory opnieuw geverifieerd.
 
 ### Eindresultaat
 
-Iedere bug en bugfixstory vertegenwoordigt precies één herstelpoging. De mislukte poging blijft
-historisch zichtbaar en alleen de opvolgbug is actueel open.
+Dezelfde bug blijft de actuele afwijking totdat bewijs haar oplost of ongeldig maakt. Alle
+gekoppelde bugfixstories en verificaties blijven als historie zichtbaar. Per bug is maximaal één
+bugfixstory tegelijk `TODO` of `IN_PROGRESS`.
 
-## 6. Een story of bugfix kan tijdelijk niet worden getest
+## 6. Software Factory annuleert een story
+
+### Beginsituatie
+
+Een story van een `ACTIVE` epic staat `IN_PROGRESS` bij Software Factory. Software Factory
+verwijdert de story of markeert haar bewust als niet uit te voeren, bijvoorbeeld omdat dezelfde
+wijziging handmatig is gedaan.
+
+### Scenario
+
+1. Een dispatchersessie leest de externe status `CANCELLED`.
+2. De dispatcher roept idempotent `markStoryAsCancelled(...)` aan. Productplanning zet de story op
+   `CANCELLED` en bewaart de externe bron, reden en het tijdstip.
+3. Er ontstaat geen storyverificatie of bugfixhertest voor de geannuleerde story, want er is geen
+   oplevering om te testen. De dispatcher mag daarna de volgende backlogstory voor dit product
+   versturen.
+4. Zodra alle overige niet-geannuleerde stories van de epic `DONE` en actueel geslaagd zijn,
+   brengt Productplanning de epic naar `VERIFYING` en vraagt zij een complete epicverificatie aan.
+5. Kwaliteitsbewaking test de feitelijke gebruikersroute in de applicatie.
+6. Is de verbetering ondanks de annulering aanwezig, dan kan de epic `COMPLETED` worden en wordt
+   een eventueel niet meer reproduceerbare bug `RESOLVED`.
+7. Ontbreekt het gedrag nog, dan gaat de epic via `NEEDS_WORK` terug naar `ACTIVE`. Een bestaande
+   bug blijft `OPEN`, of Kwaliteitsbewaking publiceert een nieuwe concrete bug of een dekkingsgat,
+   en vraagt daarna gewoon nieuw planwerk aan.
+
+### Eindresultaat
+
+De annulering wordt als `CANCELLED` geaccepteerd en nooit als **mislukt** vertaald. De epic raakt
+niet permanent geblokkeerd: actueel testbewijs bepaalt of zij klaar is of opnieuw ontwikkelwerk
+nodig heeft.
+
+## 7. Een story of bugfix kan tijdelijk niet worden getest
 
 ### Beginsituatie
 
@@ -198,7 +232,7 @@ benodigde informatie is tijdelijk niet beschikbaar.
 De oplevering wordt niet ten onrechte goedgekeurd of als productfout afgekeurd. De blokkade is
 met volledige retryhistorie zichtbaar en de epic wacht op een echte actuele testuitkomst.
 
-## 7. De epic heeft nog ontwikkelwerk nodig door ontbrekende dekking
+## 8. De epic heeft nog ontwikkelwerk nodig door ontbrekende dekking
 
 ### Beginsituatie
 
@@ -217,7 +251,6 @@ staat op `VERIFYING` en de volledige epiccontrole wordt uitgevoerd.
 5. Een latere Productplanning-sessie maakt aanvullende productstories binnen dezelfde epic en zet
    ze op de backlog.
 6. De aanvullende stories doorlopen dispatcher, Software Factory en storyverificatie via de gewone
-   route.
 7. Wanneer opnieuw al het werk actueel geslaagd is, wordt een nieuwe volledige epicverificatie
    klaargezet.
 
@@ -227,7 +260,7 @@ De oorspronkelijke epic blijft het bevroren contract. Het ontbrekende werk is al
 zichtbaar uitgevoerd en getest. Alleen na een nieuwe geslaagde epicverificatie wordt de epic
 `COMPLETED`.
 
-## 8. Tijdens de epiccontrole wordt een bug gevonden
+## 9. Tijdens de epiccontrole wordt een bug gevonden
 
 ### Beginsituatie
 
@@ -248,7 +281,7 @@ uitgevoerde story niet goed te werken.
 De bug is niet als ontbrekende epicscope behandeld. De bug is aantoonbaar opgelost en de epic
 wordt pas na een nieuwe geslaagde totaalcontrole `COMPLETED`.
 
-## 9. De epiccontrole is tijdelijk geblokkeerd
+## 10. De epiccontrole is tijdelijk geblokkeerd
 
 ### Beginsituatie
 
@@ -268,7 +301,7 @@ De epic staat op `VERIFYING` en Kwaliteitsbewaking kan nog geen verantwoord eind
 De epic wordt niet te vroeg afgesloten en gaat ook niet onnodig terug naar planning. De verificatie
 maakt zichtbaar welk bewijs of welke voorwaarde nog ontbreekt.
 
-## 10. Alles werkt zoals ontworpen, maar de epic bereikt het gebruikersdoel niet
+## 11. Alles werkt zoals ontworpen, maar de epic bereikt het gebruikersdoel niet
 
 ### Beginsituatie
 
@@ -290,7 +323,7 @@ laat zien dat de bedoelde gebruikersverbetering niet is bereikt.
 De epic blijft als historisch eindresultaat `NOT_SUCCESSFUL` en wordt niet heropend. Eventueel
 vervolgwerk begint als een nieuwe epic met een nieuwe, expliciete productrichting.
 
-## 11. De Stakeholder stopt een gekozen epic
+## 12. De Stakeholder stopt een gekozen epic
 
 ### Beginsituatie
 
@@ -316,7 +349,7 @@ De epic en het niet gestarte werk zijn zichtbaar geannuleerd. Als reservering en
 plaatsvinden, bepaalt hun atomaire volgorde of de story al als gestart geldt. Reeds gestart extern
 werk verdwijnt niet stilzwijgend en de epic kan niet per ongeluk alsnog `COMPLETED` worden.
 
-## 12. Software Factory is tijdelijk niet bereikbaar
+## 13. Software Factory is tijdelijk niet bereikbaar
 
 ### Beginsituatie
 

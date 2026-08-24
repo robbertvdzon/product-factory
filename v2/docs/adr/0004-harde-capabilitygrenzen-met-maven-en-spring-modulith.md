@@ -23,16 +23,17 @@ verwisselbare implementaties. Alleen packageconventies zijn daarvoor niet hard g
 Product Factory v2 is één modulair monoliet met één uitvoerbare applicatie en twee niveaus van
 modulariteit:
 
-- iedere capability heeft een kleine publieke Maven-API-module;
+- alle capabilities delen één publieke Maven-module `product-factory-api`, met per capability een
+  eigen contractpackage;
 - iedere concrete variant staat in een afzonderlijke implementatiemodule;
 - alleen `product-factory-app` is composition root en kiest per geactiveerde capability exact één
   implementatie;
-- een API-module bevat uitsluitend publieke serviceinterfaces, commands, resultaten, read-only
+- de API-module bevat uitsluitend publieke serviceinterfaces, commands, resultaten, read-only
   DTO's, filters, ID's, statussen, enums, events en betekenisvolle fouten;
-- een API-module bevat geen persistence, concrete Spring-beans, scheduling, interne state machines
+- de API-module bevat geen persistence, concrete Spring-beans, scheduling, interne state machines
   of implementatiedetails;
-- een implementatiemodule gebruikt een andere capability uitsluitend via haar API-module en heeft
-  nooit een dependency op een andere implementatiemodule;
+- een implementatiemodule gebruikt iedere capability uitsluitend via `product-factory-api` en
+  heeft nooit een dependency op een andere implementatiemodule;
 - Spring Modulith mag binnen een implementatiemodule de interne functionele delen structureren,
   maar vervangt de Maven-grens tussen capabilities niet.
 
@@ -46,7 +47,9 @@ niet toegestaan.
 - Een implementatie kan worden vervangen zonder consumers naar haar interne code te laten wijzen.
 - De applicatie blijft als één geheel te bouwen, testen en deployen; er ontstaat geen operationele
   microservicecomplexiteit.
-- Publieke API's moeten bewust klein en stabiel blijven, omdat een type in zo'n module deel wordt
+- Publieke API's moeten bewust klein en stabiel blijven, omdat een type in deze module deel wordt
   van het contract met andere capabilities.
-- Er ontstaan meer Maven-modules en architectuurtests dan in een ongepartitioneerde applicatie.
-  Dat is geaccepteerde structurele overhead.
+- De ene API-module kan geen cyclische Maven-afhankelijkheid met een andere API-module krijgen.
+  Capability-eigendom wordt daarom aanvullend met packages, contracttests en schrijftests bewaakt.
+- Er ontstaan meer implementatiemodules en architectuurtests dan in een ongepartitioneerde
+  applicatie. Dat is geaccepteerde structurele overhead.

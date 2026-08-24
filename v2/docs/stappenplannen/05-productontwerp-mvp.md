@@ -21,8 +21,9 @@ behapbare epics met UX-ontwerp. Productontwerp maakt geen stories.
 ## Buiten scope
 
 Gebruik geen droom-, onderzoeks- of andere gespecialiseerde agents uit de uitgebreide implementatie.
-Stories, planning, kwaliteitsbewaking en dispatching volgen in latere stappen. Hun API-modules zijn
-al aanwezig, maar hebben in deze release geen actieve implementatieprovider.
+Stories, planning, kwaliteitsbewaking en dispatching volgen in latere stappen. Hun publieke
+contractpackages in `product-factory-api` zijn al aanwezig, maar hebben in deze release geen actieve
+implementatieprovider.
 
 ## Specificaties
 

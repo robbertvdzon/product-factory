@@ -147,9 +147,10 @@ Goedgekeurde `Bug`s en `Verification`s worden atomair en geversioneerd opgeslage
 module de betekenisvolle vervolgcommands uit het publieke contract idempotent aan.
 
 Ook deze implementatie gebruikt voor epicverificatie uitsluitend `PASSED`, `NEEDS_WORK`, `BLOCKED`
-en `NOT_SUCCESSFUL`. Een afgekeurde bugfixhertest sluit de oude bug af als **Fix mislukt**, maakt een
-gekoppelde nieuwe uitvoerbare bug en vraagt daarvoor nieuw bugfixwerk aan. De uitgebreide interne
-rollen veranderen deze publieke route niet.
+en `NOT_SUCCESSFUL`. Een afgekeurde bugfixhertest laat dezelfde bug `OPEN`, laat de opgeleverde
+bugfixstory `DONE` en vraagt voor die bug opnieuw gewoon bugfixwerk aan. Een geannuleerde story
+wordt via de complete feitelijke epicbeoordeling verwerkt. De uitgebreide interne rollen veranderen
+deze publieke route niet.
 
 Na een sessie waarin daadwerkelijk is getest bouwt gewone code precies één `QualitySnapshot` uit de
 gevalideerde publieke gegevens. Vervolgens werkt de module `TestRotation` bij. Een rol kan na

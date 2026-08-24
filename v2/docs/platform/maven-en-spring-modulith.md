@@ -4,83 +4,89 @@ Status: technische architectuurkeuze voor modulegrenzen en vervangbare implement
 
 Product Factory gebruikt twee niveaus van modulariteit met elk een eigen doel:
 
-- **Maven-modules** vormen de harde grens tussen publieke capability-API's, implementaties en de
-  uitvoerbare applicatie;
+- **Maven-modules** vormen de harde grens tussen één gedeeld publiek API-contract,
+  capability-implementaties en de uitvoerbare applicatie;
 - **Spring Modulith** structureert en controleert uitsluitend de binnenkant van een
   implementatiemodule wanneer die intern ingewikkeld genoeg is.
 
-Er is één uitvoerbare `product-factory-app`. Alle publieke API-modules bestaan vanaf het begin. Bij
-het bouwen bevat de app voor iedere op dat moment geactiveerde capability exact één implementatie.
-Een API kan in een eerdere MVP-stap dus al bestaan zonder dat de bijbehorende capability al actief
-is. De applicatie draait nooit twee Productontwerp-implementaties tegelijk.
+Er is één uitvoerbare `product-factory-app` en één publieke Maven-module `product-factory-api`.
+Daarin staan vanaf het begin alle publieke interfaces en DTO's, gegroepeerd per capabilitypackage.
+Deze ene module voorkomt cyclische Maven-dependencies tussen afzonderlijke API-artifacts wanneer
+capabilities over en weer commands en DTO's nodig hebben. Bij het bouwen bevat de app voor iedere
+op dat moment geactiveerde capability exact één implementatie. Een contract kan in een eerdere
+MVP-stap dus al bestaan zonder dat de bijbehorende capability al actief is. De applicatie draait
+nooit twee Productontwerp-implementaties tegelijk.
 
 ## Hoofdstructuur
 
 ```text
 product-factory-parent
 │
-├── product-design-api
+├── product-factory-api
+│   └── capabilitypackages: product, design, planning, quality, memory,
+│                           ai, decisions en dispatcher
+│
 ├── product-design-impl-mvp
 ├── product-design-impl-advanced
 │
-├── product-planning-api
 ├── product-planning-impl-mvp
 ├── product-planning-impl-advanced
 │
-├── quality-api
 ├── quality-impl-mvp
 ├── quality-impl-advanced
 │
-├── agent-memory-api
 ├── agent-memory-impl
-├── ai-execution-api
 ├── ai-execution-impl
 │   ├── intern Modulith-onderdeel: settings
 │   └── intern Modulith-onderdeel: task-execution
-├── decisions-api
 ├── decisions-impl
-├── product-api
 ├── product-impl
-├── software-factory-dispatcher-api
 ├── software-factory-dispatcher-impl
 │
 └── product-factory-app
 ```
 
 De exacte artifactnamen mogen nog veranderen. De grens is belangrijker dan de naam: iedere
-publieke capability heeft een kleine API-module en één of meer verwisselbare implementatiemodules.
-Een eenvoudige capability kan maar één implementatie hebben.
+capability heeft een eigen package met een klein publiek contract in `product-factory-api` en één
+of meer verwisselbare implementatiemodules. Een eenvoudige capability kan maar één implementatie
+hebben.
 
-Alle API-modules bestaan al in de technische fundering. Implementatiemodules worden pas in hun
-eigen MVP-stap toegevoegd en door de app geactiveerd. Een consumer sluit input of commands uit een
-latere capability pas aan zodra daarvoor een echte provider actief is. Productie gebruikt geen
-no-op- of mockimplementatie om een ontbrekende capability te verbergen.
+Alle publieke contracten bestaan al in de technische fundering in die ene API-module.
+Implementatiemodules worden pas in hun eigen MVP-stap toegevoegd en door de app geactiveerd. Een
+consumer sluit input of commands uit een latere capability pas aan zodra daarvoor een echte
+provider actief is. Productie gebruikt geen no-op- of mockimplementatie om een ontbrekende
+capability te verbergen.
 
 ## Dependencyregels
 
 ```text
-API-module                 ──> hooguit andere API-modules
-implementatiemodule        ──> eigen API en API's van andere capabilities
+product-factory-api        -X-> alle implementatiemodules
+implementatiemodule        ──> product-factory-api
 implementatiemodule        -X-> implementatiemodules van andere capabilities
-API-module                 -X-> implementatiemodules
 product-factory-app        ──> exact één implementatie per geactiveerde capability
 ```
 
 Alleen `product-factory-app` mag dependencies op implementatie-artifacts hebben. Daardoor kan code
-uit Productontwerp bijvoorbeeld wel `planning-api` lezen of commands daarop aanroepen, maar nooit
-een Planner-repository, Spring-bean of interne klasse importeren.
+uit Productontwerp bijvoorbeeld wel het publieke planningpackage in `product-factory-api` lezen of
+commands daarop aanroepen, maar nooit een Planner-repository, Spring-bean of interne klasse
+importeren.
 
 Maven Enforcer- en architectuurtests bewaken minimaal:
 
-- geen `*-api` dependency op een `*-impl-*` artifact;
+- geen dependency van `product-factory-api` op een `*-impl-*` artifact;
 - geen implementation-to-implementation dependency;
 - exact één implementatieprovider per in die build geactiveerde capability;
 - geen ontbrekende implementatieprovider voor een geactiveerde capability;
 - geen API-type dat naar een implementatiepackage, JPA-entiteit of intern Spring-component verwijst.
 
-## Inhoud van een API-module
+De gedeelde API-module heft het functionele eigenaarschap niet op. Package- en contracttests
+bewaken dat ieder publiek command bij precies één capability hoort en dat implementaties alleen hun
+eigen duurzame objecten schrijven. Een mogelijke wederzijdse verwijzing tussen publieke DTO's is
+binnen één Maven-module geen buildcyclus.
 
-Een API-module bevat alleen wat een andere Maven-module werkelijk mag kennen:
+## Inhoud van de API-module
+
+`product-factory-api` bevat alleen wat een andere Maven-module werkelijk mag kennen:
 
 - publieke application-serviceinterfaces;
 - commands en commandresultaten;
@@ -89,7 +95,7 @@ Een API-module bevat alleen wat een andere Maven-module werkelijk mag kennen:
 - eventueel expliciete publieke events;
 - betekenisvolle publieke fouten of foutcodes.
 
-Een API-module bevat niet:
+De API-module bevat niet:
 
 - Spring Modulith-configuratie;
 - repositories of database-entiteiten;
@@ -99,16 +105,16 @@ Een API-module bevat niet:
 - concrete Spring-beans;
 - implementatiespecifieke tabellen of clients.
 
-API-modules blijven bij voorkeur ook vrij van Spring Framework. Beanregistratie, transacties,
+De API-module blijft bij voorkeur ook vrij van Spring Framework. Beanregistratie, transacties,
 scheduling en persistence horen bij de implementatie.
 
 ## Inhoud van een implementatiemodule
 
 Een implementatiemodule:
 
-- implementeert de publieke interfaces van haar eigen API-module;
+- implementeert de publieke interfaces van haar capabilitypackage in `product-factory-api`;
 - is enige schrijver van de duurzame objecten die bij die capability horen;
-- gebruikt andere capabilities uitsluitend via hun API-module;
+- gebruikt andere capabilities uitsluitend via hun publieke contract in `product-factory-api`;
 - bevat repositories, transacties, scheduling en technische adapters die intern eigendom zijn;
 - registreert haar publieke implementatiebeans via Spring Boot auto-configuration;
 - verbergt alle overige packages voor de composition root en andere Maven-modules;
@@ -117,8 +123,8 @@ Een implementatiemodule:
 De main-module hoeft geen concrete implementatieklasse in broncode te importeren. Het gekozen
 implementation-artifact levert auto-configuration waarmee de publieke API-beans worden
 geregistreerd. Voor een geactiveerde capability faalt de composition-test zonder precies één
-provider en start de applicatie niet. Een nog niet geactiveerde API-module registreert geen bean en
-mag in een tussenstap zonder implementatie op de classpath staan.
+provider en start de applicatie niet. Een nog niet geactiveerd capabilitycontract registreert geen
+bean en mag in een tussenstap zonder implementatie in `product-factory-api` staan.
 
 ## Spring Modulith binnen een implementatiemodule
 
@@ -140,7 +146,7 @@ product-design-impl-advanced
 ```
 
 Deze interne application modules mogen eigen interne interfaces en events hebben. Zij zijn geen
-nieuwe hoofdprocessen en hun typen verschijnen niet in `product-design-api`.
+nieuwe hoofdprocessen en hun typen verschijnen niet in het publieke `design`-package.
 
 `ai-execution-impl` gebruikt dezelfde aanpak voor de interne onderdelen `settings` en
 `task-execution`. `settings` bezit `AiJobConfiguration`; `task-execution` verwerkt alleen al
@@ -231,8 +237,9 @@ kan de volgende productiebuild opnieuw de MVP selecteren.
 
 ## Testlagen
 
-Iedere verwisselbare capability krijgt bij voorkeur een gedeelde API-contracttestkit. Zowel MVP als
-uitgebreid moet daarmee dezelfde publieke invarianten bewijzen, bijvoorbeeld:
+Iedere verwisselbare capability krijgt bij voorkeur een gedeelde contracttestkit naast
+`product-factory-api`. Zowel MVP als uitgebreid moet daarmee dezelfde publieke invarianten
+bewijzen, bijvoorbeeld:
 
 - dezelfde commands, conflictsituaties en idempotentie;
 - dezelfde publieke statussen en DTO-betekenis;
@@ -250,9 +257,12 @@ Daarbovenop bestaan:
 
 ## Invarianten
 
-- API-modules hebben geen Spring Modulith en kennen geen implementaties.
+- `product-factory-api` heeft geen Spring Modulith en kent geen implementaties.
 - Alleen de main-module heeft Maven-dependencies op implementatiemodules.
-- Implementatiemodules lezen andere capabilities uitsluitend via API-modules.
+- Implementatiemodules lezen alle publieke capabilitycontracten uitsluitend via
+  `product-factory-api`.
+- Er is precies één publieke API-module; er bestaan geen onderling afhankelijke capability-API-
+  artifacts.
 - Spring Modulith moduleert alleen de binnenkant van een implementatiemodule.
 - Eén appbuild bevat per capability exact één actieve implementatie.
 - De implementatiekeuze is buildinformatie en geen productinstelling.

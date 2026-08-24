@@ -14,16 +14,17 @@ Software Factory gebruikt aparte request- en responsemodellen voor onder meer au
 bridge en de Product Factory-integratie. De aparte `factory-contracts`-module bevat alleen lichte
 wiretypes en readers en mag geen Spring- of persistenceafhankelijkheden krijgen.
 
-Product Factory v2 heeft zowel externe HTTP-grenzen als publieke Maven-grenzen tussen
-capabilities. Als een database-entiteit of intern domeinaggregate daar direct wordt blootgesteld,
-wordt iedere interne wijziging onbedoeld een contractwijziging.
+Product Factory v2 heeft zowel externe HTTP-grenzen als publieke capabilitycontracten in de ene
+Maven-module `product-factory-api`. Als een database-entiteit of intern domeinaggregate daar direct
+wordt blootgesteld, wordt iedere interne wijziging onbedoeld een contractwijziging.
 
 ## Decision
 
 Alle publieke grenzen gebruiken expliciete contracttypen:
 
 - HTTP-ingangen en -uitgangen gebruiken request- en response-DTO's;
-- capability-API-modules gebruiken commands, commandresultaten en read-only DTO's;
+- capabilitypackages in `product-factory-api` gebruiken commands, commandresultaten en read-only
+  DTO's;
 - database-entiteiten, repositoryrecords en interne aggregates verlaten hun
   implementatiemodule nooit;
 - DTO's bevatten alleen gegevens die de consumer volgens het contract nodig heeft;
@@ -36,7 +37,8 @@ Alle publieke grenzen gebruiken expliciete contracttypen:
   frontend- of integratieclients.
 
 Een toevallig gelijkvormig domeinobject is geen reden om de DTO weg te laten. Eenvoudige scalars en
-stabiele ID- of enumtypen uit een API-module mogen wel rechtstreeks onderdeel van een contract zijn.
+stabiele ID- of enumtypen uit `product-factory-api` mogen wel rechtstreeks onderdeel van een
+contract zijn.
 
 ## Consequences
 

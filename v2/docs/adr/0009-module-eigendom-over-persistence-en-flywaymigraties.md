@@ -25,7 +25,8 @@ Iedere capability is exclusief eigenaar van haar duurzame data:
 - repositories, persistencerecords, mappings en migraties staan in de owning
   implementatiemodule;
 - alleen die implementatiemodule leest of schrijft haar tabellen rechtstreeks;
-- andere capabilities gebruiken publieke commands en read-only queries uit de API-module;
+- andere capabilities gebruiken publieke commands en read-only queries uit
+  `product-factory-api`;
 - een publieke DTO is geen database-entiteit en verraadt geen tabel- of ORM-structuur;
 - een application service bepaalt de transactiegrens binnen de eigen capability;
 - een flow over meerdere capabilities gebruikt idempotente commands en duurzaam herstelbare

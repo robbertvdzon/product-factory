@@ -4,8 +4,8 @@ Status: eerste ontwerp van de technische adapter en zijn contract.
 
 De Software Factory-dispatcher stuurt steeds de eerste uitvoerbare story naar Software Factory en
 verwerkt externe opleverstatussen. Hij is een apart uitvoerend onderdeel met een eigen schedule en
-een eigen Maven-API/implementatiemodule. Zijn implementatie gebruikt uitsluitend
-`product-planning-api` en andere benodigde API-modules; zij kent geen planningsimplementatie. Hij is
+een eigen implementatiemodule. Zijn implementatie gebruikt uitsluitend de benodigde publieke
+capabilitypackages in `product-factory-api`; zij kent geen planningsimplementatie. Hij is
 geen intelligente procesmodule, gebruikt geen AI-agents en bezit geen productlogica.
 Daarom heeft hij geen `AgentRoleKey`, leest of schrijft hij geen Agentgeheugen en vraagt hij geen
 `AiTask` aan.
@@ -16,7 +16,8 @@ De dispatcher:
 
 - synchroniseert de status van eerder verzonden stories met Software Factory;
 - reserveert de volgende story atomair bij Productplanning voordat een externe call begint;
-- meldt verzending en oplevering via de publieke commands van Productplanning;
+- meldt verzending, oplevering en externe annulering via de publieke commands van
+  Productplanning;
 - verwerkt alle geconfigureerde producten en verstuurt per product maximaal één nieuwe story wanneer
   Software Factory voor dat product geen open werk heeft;
 - bouwt een volledig, onveranderlijk `StoryDeliveryPackage` uit de gekozen `StoryDetails`;
@@ -58,6 +59,10 @@ productstatus toont onder meer open extern werk, eventuele technische blokkade e
 | `StoryDispatchReservationDetails` | Productplanning via `reserveNextStoryForDispatch(...)` | atomair gereserveerde complete storymomentopname die niet meer door annulering kan worden ingehaald |
 | `SoftwareFactoryWork` | externe adapter | actuele externe status en oplevergegevens van eerder verzonden werk |
 
+Voor de productflow vertaalt de adapter de externe toestand minimaal naar `OPEN`, `DONE` of
+`CANCELLED`. Technische timeouts, ongeldige responses en integratiefouten zijn geen externe
+storystatus; zij blijven uitsluitend `DeliveryAttempt`s van de dispatcher.
+
 De dispatcher leest geen Git-repository, acceptatieomgeving of productieomgeving. Alles wat
 Software Factory nodig heeft, moet al zelfstandig in de story staan.
 
@@ -70,6 +75,7 @@ Software Factory nodig heeft, moet al zelfstandig in de story staan.
 | `reserveNextStoryForDispatch(...)` | Productplanning | reserveer atomair hooguit één geldige volgende story en verkrijg de momentopname |
 | `markStoryAsDispatched(...)` | Productplanning | leg extern ID vast en zet de story atomair op `IN_PROGRESS` |
 | `markStoryAsDeveloped(...)` | Productplanning | leg oplevering vast en zet de story atomair op `DONE` |
+| `markStoryAsCancelled(...)` | Productplanning | leg vast dat Software Factory het externe werk niet uitvoert en zet de story op `CANCELLED` |
 
 De dispatcher schrijft niet rechtstreeks in `Story` of `PlanningWorkItem`. Zijn implementatiemodule
 is de enige schrijver van `DeliveryAttempt`; inhoudelijke veranderingen lopen via de publieke
@@ -98,6 +104,7 @@ externe transport uitsluitend JSON ondersteunt.
 synchroniseer eerder verzonden werk
                  │
                  ├── opgeleverd ──> markStoryAsDeveloped(...)
+                 ├── geannuleerd ─> markStoryAsCancelled(...)
                  │
                  ▼
 heeft Software Factory nog open werk voor dit product?
@@ -122,7 +129,8 @@ product dezelfde deterministische stappen uit. Iedere sessie:
 
 1. vraagt de externe status op van stories met `IN_PROGRESS`;
 2. bewaart iedere response of fout als `DeliveryAttempt`;
-3. roept bij een oplevering idempotent `markStoryAsDeveloped(...)` aan;
+3. roept bij een oplevering idempotent `markStoryAsDeveloped(...)` aan en bij extern verwijderd of
+   bewust niet uitgevoerd werk idempotent `markStoryAsCancelled(...)`;
 4. verstuurt niets zolang Software Factory voor dat product nog open werk heeft;
 5. vraagt anders `reserveNextStoryForDispatch(...)` aan; Productplanning kiest atomair de eerste
    afhankelijkheidsvrije `TODO`-story zonder annuleringsmarker en retourneert de onveranderlijke
@@ -141,7 +149,7 @@ normaal afgemaakt.
 Als de backlog leeg is of geen story uitvoerbaar is, eindigt de sessie als normale no-op. Dat is
 geen aanleiding om een intelligent proces te starten.
 
-## Oplevering en verificatiewerk
+## Oplevering, annulering en verificatiewerk
 
 `markStoryAsDeveloped(...)` handelt binnen Productplanning snel en deterministisch de storystatus
 af. Die commandhandler vraagt vervolgens bij Kwaliteitsbewaking storyverificatie of een
@@ -151,6 +159,13 @@ Productplanning de epicverificatie aan.
 
 De dispatcher zelf maakt geen `QualityWorkItem` en beoordeelt niet of de oplevering goed is. Hij
 constateert alleen wat Software Factory als opgeleverd meldt.
+
+Een externe status `CANCELLED` is evenmin een mislukte story. De dispatcher meldt alleen het
+feitelijke externe resultaat via `markStoryAsCancelled(...)`. Productplanning bewaart bron en reden
+op de story en vraagt geen verificatie van de niet-bestaande oplevering aan. Zodra het overige werk
+van de epic klaar is, laat Productplanning Kwaliteitsbewaking de complete epic opnieuw beoordelen.
+De gebruiker kan de wijziging immers ook handmatig hebben gemaakt. Als het gedrag nog ontbreekt,
+ontstaat via de gewone kwaliteitsroute nieuw bugfix- of dekkingswerk.
 
 ## Fouten en herstel
 
@@ -191,7 +206,8 @@ externe story aangemaakt.
 - De dispatcher gebruikt nooit agents.
 - De dispatcher gebruikt geen Agentgeheugen.
 - De dispatcher gebruikt AI-uitvoering niet.
-- De dispatcherimplementation gebruikt Productplanning uitsluitend via `product-planning-api`.
+- De dispatcherimplementation gebruikt Productplanning uitsluitend via het publieke
+  `planning`-contract in `product-factory-api`.
 - Eén sessie verwerkt alle producten die bij de start voor dispatching geconfigureerd zijn.
 - Voor een product staat normaal maximaal één Software Factory-story extern open.
 - Eén sessie verstuurt per product maximaal één nieuwe story.
@@ -201,6 +217,8 @@ externe story aangemaakt.
 - Een story waarvoor annulering vóór de reservering is vastgelegd wordt niet verstuurd; een eerder
   gereserveerde story geldt als gestart.
 - Een storypakket is een onveranderlijke momentopname van één exacte storyversie.
+- Extern geannuleerd werk wordt lokaal `CANCELLED`; de dispatcher gebruikt nooit een status
+  `FAILED` of **mislukt** voor een story.
 - Iedere externe poging heeft een `DeliveryAttempt` en een stabiele idempotentiesleutel.
 - De dispatcher wijzigt geen productinhoud en neemt geen besluit.
 
@@ -212,14 +230,14 @@ Factory. De dispatcher bevat geen testvertakking en gebruikt alleen een ander ge
 endpoint.
 
 De simulator ondersteunt minimaal storyaanmaak, idempotente herhaling, open werk, statusverloop,
-oplevering, uitvoeringsvragen, tijdelijke transportfouten, een verloren response na geslaagde
+oplevering, annulering of verwijdering, uitvoeringsvragen, tijdelijke transportfouten, een verloren response na geslaagde
 aanmaak en een technisch ongeldig of contractbrekend antwoord. Alleen de echte dispatcher vertaalt
 deze antwoorden naar `DeliveryAttempt`s, blokkade en storystatussen; de simulator schrijft nooit
 direct in Productplanning. De contractbreuk is uitsluitend een foutscenario voor de integratie en
 maakt nooit product- of planningswerk.
 
 Op acceptatie kan een tester via het aparte acceptatiescherm een scenario kiezen en bijvoorbeeld
-een externe story afronden of de volgende call laten mislukken. De daaropvolgende
+een externe story afronden, annuleren of de volgende call laten mislukken. De daaropvolgende
 `runDispatchSession()` wordt bewust via de gewone UI gestart. Zie
 [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md).
 

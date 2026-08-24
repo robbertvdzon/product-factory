@@ -18,11 +18,13 @@ kwaliteitshistorie publiceren.
 - Vraag ontbrekend of fout werk via publieke commands bij Productplanning aan; wijzig geen story of
   epic rechtstreeks.
 - Meld iedere gepubliceerde storyverificatie of bugfixhertest via `recordStoryVerification(...)` aan
-  Productplanning. Laat Productplanning pas epicverificatie aanvragen wanneer alle actuele
-  gerichte controles zijn geslaagd en geen herstelwerk resteert.
+  Productplanning. Laat Productplanning in de normale route pas epicverificatie aanvragen wanneer
+  alle actuele gerichte controles zijn geslaagd en geen herstelwerk resteert; documenteer daarnaast
+  de expliciete feitelijke herbeoordeling na een extern geannuleerde story met status `CANCELLED`.
 - Gebruik voor epicverificatie alleen `PASSED`, `NEEDS_WORK`, `BLOCKED` en `NOT_SUCCESSFUL`.
-- Laat een afgekeurde bugfixhertest de oude bug als **Fix mislukt** afsluiten en een gekoppelde
-  nieuwe uitvoerbare bug met nieuw bugfixverzoek publiceren.
+- Laat een afgekeurde bugfixhertest dezelfde bug `OPEN` houden en voor die bug opnieuw een gewone
+  bugfixstory aanvragen. Behandel een `CANCELLED` bugfixstory via een complete feitelijke
+  epicbeoordeling, niet als een mislukte fix.
 - Sluit kwaliteitsinput vanaf deze stap ook aan op Productontwerp en Productplanning.
 - Voeg kwaliteitsbeeld, historie, werkqueue, bewijs en acceptatiescenario's aan de UI toe.
 

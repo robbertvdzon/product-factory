@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2420" height="2280" viewBox="0 0 2420 2280" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont de Maven-API van een capability en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering bevat intern settings en task-execution; task-execution kent geen rollen en distribueert complete taken via een databasequeue aan een laptop- of mockworker. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont het capabilitycontract uit de ene gedeelde Maven-module product-factory-api en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering bevat intern settings en task-execution; task-execution kent geen rollen en distribueert complete taken via een databasequeue aan een laptop- of mockworker. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -25,7 +25,7 @@
 
   <rect width="2420" height="2280" fill="#f8fafc"/>
   <text x="55" y="55" class="title">Product Factory v2 — publieke modulecontracten en eigenaarschap</text>
-  <text x="55" y="88" class="subtitle">Elk blok toont de Maven-API en publieke entiteiten; bij AI-uitvoering zijn de twee interne eigenaarsdelen expliciet zichtbaar.</text>
+  <text x="55" y="88" class="subtitle">Elk blok toont zijn packagecontract uit product-factory-api en publieke entiteiten; AI-uitvoering toont zijn twee interne eigenaarsdelen.</text>
   <path d="M65 125 H155" class="command"/>
   <text x="170" y="130" class="note">command: vraagt de eigenaar om een geldige wijziging</text>
   <path d="M585 125 H675" class="query"/>
@@ -99,7 +99,7 @@
   <text x="700" y="1096" class="api" style="font-size:12px">«command» requestBugfix(...) / requestEpicGapPlanning(...)</text>
   <text x="700" y="1122" class="api" style="font-size:11px">«command» requestEpicReprioritization(...) / requestManualReplan(...)</text>
   <text x="700" y="1148" class="api">«command» cancelStoriesForEpic(...)</text>
-  <text x="700" y="1174" class="api" style="font-size:11px">«command» reserveNextStoryForDispatch / markStoryAsDispatched/Developed</text>
+  <text x="700" y="1174" class="api" style="font-size:10px">«command» reserveNextStoryForDispatch / markStoryAsDispatched/Developed/Cancelled</text>
   <text x="700" y="1200" class="api">«command» recordStoryVerification(...)</text>
   <line x1="700" y1="1236" x2="1210" y2="1236" class="divider" stroke="#a7f3d0"/>
   <text x="700" y="1266" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>

@@ -169,14 +169,14 @@ door Git gevolgd en de actieve routes en images zijn genoteerd zonder secretwaar
 4. Breng de in de bewaartabel genoemde kopieën uit `v2/files` naar hun definitieve paden, werk ze
    daar bij en verwijder daarna de tijdelijke map `v2`.
 5. Maak een nieuwe root-Mavenreactor op Java 21, Kotlin en Spring Boot.
-6. Pas vanaf het begin het API-/implementatiemodulepatroon uit
+6. Pas vanaf het begin het gedeelde-API-/implementatiemodulepatroon uit
    [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md) toe.
-7. Maak alle in het architectuurdocument genoemde publieke `*-api`-modules en leg daarin de volledige
-   command-, query-, DTO-, status- en enumcontracten vast. Voeg nog geen functionele implementaties
-   van toekomstige capabilities toe.
+7. Maak de ene publieke module `product-factory-api` en leg daarin per capabilitypackage de
+   volledige command-, query-, DTO-, status- en enumcontracten vast. Voeg nog geen functionele
+   implementaties van toekomstige capabilities toe.
 8. Maak één main-module als enige Spring Boot composition root. De main-module vereist exact één
-   implementatie per capability die in die release al geactiveerd is; een API zonder geactiveerde
-   implementatie is in een tussenstap toegestaan.
+   implementatie per capability die in die release al geactiveerd is; een capabilitycontract zonder
+   geactiveerde implementatie is in een tussenstap toegestaan.
 9. Maak een nieuwe lege Flutter-webapp of een gelijkwaardig nieuw frontendproject; kopieer geen
    oude widgets of domeinschermen.
 10. Voeg een eenvoudige backendroute en een leeg maar herkenbaar frontendscherm toe.

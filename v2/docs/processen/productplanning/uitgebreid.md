@@ -135,8 +135,9 @@ idempotent `markEpicActive(...)` aan.
 
 Voor iedere bugfixstory bewaart zij daarnaast een herstelbaar uitgaand commandeffect voor
 `linkBugfixStory(bugId, storyId)`. De story wordt pas uitvoerbaar en het workitem pas `DONE` nadat de
-koppeling is bevestigd. Ook de uitgebreide implementatie publiceert uitsluitend productstories en
-bugfixstories.
+koppeling is bevestigd. Per bug mag maximaal één gekoppelde story tegelijk `TODO` of `IN_PROGRESS`
+zijn; een eerdere `DONE`- of `CANCELLED`-story blokkeert een volgende poging niet. Ook de uitgebreide
+implementatie publiceert uitsluitend productstories en bugfixstories.
 
 Een volgende planningsrun ziet nieuw verschenen workitems en epics. De dispatcher draait op haar
 eigen schedule en wordt niet door de agents gestart.

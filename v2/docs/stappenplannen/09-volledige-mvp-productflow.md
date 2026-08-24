@@ -13,13 +13,15 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 - Maak het productoverzicht en de operationele weergave compleet voor de hele MVP.
 - Voeg vaste end-to-endacceptatiescenario's toe voor de normale route, bugs, ontbrekende epicdekking,
   signalen, handmatige prioriteit, workeruitval en externe leveringsfouten.
-- Bewijs dat een epic pas naar `VERIFYING` gaat nadat iedere actuele story- en bugfixcontrole is
-  geslaagd, bij `NEEDS_WORK` naar `ACTIVE` terugkeert en bij `BLOCKED` retrybaar op `VERIFYING`
-  blijft.
+- Bewijs dat een epic in de normale route pas naar `VERIFYING` gaat nadat iedere actuele story- en
+  bugfixcontrole is geslaagd, bij `NEEDS_WORK` naar `ACTIVE` terugkeert en bij `BLOCKED` retrybaar
+  op `VERIFYING` blijft.
 - Bewijs dat kwaliteitsretries de vaste begrensde back-off volgen, zonder maximumpogingen zichtbaar
   blijven en via **Retry now** direct klaarstaan zonder een tweede gelijktijdige kwaliteitsrun.
-- Bewijs dat een mislukte bugfix een afgesloten oude bug en een gekoppelde nieuwe uitvoerbare bug
-  oplevert en daarna opnieuw de gewone bugfixroute volgt.
+- Bewijs dat een opgeleverde maar afgekeurde bugfixstory `DONE` blijft, dezelfde bug `OPEN` blijft
+  en een volgende gewone bugfixstory kan ontstaan.
+- Bewijs dat een door Software Factory geannuleerde story `CANCELLED` wordt en na afronding van het
+  overige werk tot een complete feitelijke epicbeoordeling leidt.
 - Bewijs dat annuleringsmarker en dispatchreservering gelijktijdige planning, annulering en levering
   eenduidig ordenen.
 - Bewijs dat alle geplande functies via zowel schedule als bevoegde UI/REST-start werken.

@@ -170,7 +170,9 @@ kan met dezelfde idempotentiesleutel worden hervat.
 Bij een bugfixstory bewaart dezelfde transactie een intern uitgaand commandeffect voor
 `linkBugfixStory(bugId, storyId)`. De koppeling moet bevestigd zijn voordat de story uitvoerbaar is
 en het bijbehorende `PlanningWorkItem` `DONE` wordt. Een tijdelijke commandfout wordt idempotent
-hervat; Productplanning publiceert uitsluitend productstories en bugfixstories.
+hervat. Per bug mag maximaal één gekoppelde story tegelijk `TODO` of `IN_PROGRESS` zijn; een eerdere
+`DONE`- of `CANCELLED`-story blokkeert een volgende poging niet. Productplanning publiceert
+uitsluitend productstories en bugfixstories.
 
 De eigen schedule van de dispatcher vindt later de eerste uitvoerbare `TODO`-story. De planner start
 de dispatcher niet.

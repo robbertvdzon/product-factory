@@ -154,6 +154,8 @@ Het planningsscherm toont:
 - epics per actuele epicstatus;
 - alle open stories op `sequenceNumber`;
 - geannuleerde epics en stories apart van de backlog, met bron en reden;
+- bij een door Software Factory geannuleerde story uitleg dat Product Factory de complete epic na
+  het overige werk opnieuw op de feitelijke producttoestand beoordeelt;
 - storytype `PRODUCT_STORY` of `BUGFIX`;
 - een tijdelijke dispatchreservering als **Wordt verstuurd**, zonder een vijfde publieke
   storystatus te introduceren;
@@ -250,7 +252,7 @@ De tester kan hier:
 - de omgeving resetten naar vaste initiële testdata;
 - een beschreven AI- of Software Factory-scenario activeren;
 - expliciete externe stappen uitvoeren, zoals een mockworker laten slapen of hervatten, een externe
-  story afronden of de volgende externe call laten mislukken;
+  story afronden of annuleren, of de volgende externe call laten mislukken;
 - daarna via links de normale processessie, dispatcher, backlog, kwaliteit en operationele historie
   bekijken;
 - per scenariostap de verwachte zichtbare uitkomst afvinken.

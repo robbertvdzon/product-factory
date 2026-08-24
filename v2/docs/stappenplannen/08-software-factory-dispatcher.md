@@ -7,8 +7,8 @@ dispatcher te plaatsen.
 
 ## Globale scope
 
-- Implementeer de dispatcherprovider achter de in stap 1 vastgelegde API en de duurzame
-  `DeliveryAttempt`s.
+- Implementeer de dispatcherprovider achter het in stap 1 vastgelegde dispatchercontract in
+  `product-factory-api` en de duurzame `DeliveryAttempt`s.
 - Maak `runDispatchSession()` zowel gepland als handmatig via UI en REST beschikbaar, met maximaal
   één modulebrede uitvoering tegelijk.
 - Verwerk in één sessie alle geconfigureerde producten en verstuur per product alleen de bovenste
@@ -17,7 +17,9 @@ dispatcher te plaatsen.
   eenduidige volgorde hebben en een eerder gelezen `TODO`-story niet alsnog buiten de state machine
   wordt verstuurd.
 - Lever iedere story zelfstandig aan, inclusief acceptatiecriteria, UX en benodigde assets.
-- Verwerk externe status en afronding idempotent via de publieke commands van Productplanning.
+- Verwerk externe verzending, afronding en annulering idempotent via de publieke commands van
+  Productplanning. Een extern geannuleerde story wordt lokaal `CANCELLED` en leidt na het overige
+  werk tot een complete feitelijke epicbeoordeling.
 - Laat tijdelijke leveringsfouten met begrensde retries door de dispatcher zelf afhandelen en maak
   blijvende fouten operationeel zichtbaar.
 - Behandel weigering van een contractgeldig storypakket als technische contractfout: blokkeer het

@@ -7,7 +7,8 @@ agentinstantie is tijdelijk, maar de rol onthoudt bruikbare lessen tussen proces
 Stakeholder kan dit geheugen via de gebruikersinterface bekijken, corrigeren, aanvullen en
 intrekken.
 
-Agentgeheugen is een ondersteunende capability met een kleine Maven-API en een implementatiemodule.
+Agentgeheugen is een ondersteunende capability met een klein publiek contract in
+`product-factory-api` en een implementatiemodule.
 Alleen de implementatie mag intern Spring Modulith gebruiken. De capability heeft geen agents,
 scheduler of `runProcessSession()` en neemt geen productbesluiten. Zij bewaart alleen gevalideerde
 geheugenwijzigingen en levert de actuele projectie voor de input van een agenttaak.

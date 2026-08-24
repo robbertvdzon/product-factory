@@ -172,10 +172,11 @@ publieke contract, zoals `requestBugfix(...)`, `requestEpicGapPlanning(...)`,
 
 Een epicverificatie gebruikt alleen `PASSED`, `NEEDS_WORK`, `BLOCKED` of `NOT_SUCCESSFUL`. Bij
 `NEEDS_WORK` kan dezelfde verificatie zowel bugs als dekkingsgaten bevatten; gewone code stuurt per
-bevinding het bijbehorende gerichte plancommand. Bij een afgekeurde bugfixhertest publiceert gewone
-code een nieuwe opvolgbug, zet de oude bug op **Fix mislukt** en vraagt voor de nieuwe bug een
-bugfix aan. Bij een geslaagde hertest queue't zij de nieuwe verificatie van de oorspronkelijke
-story.
+bevinding het bijbehorende gerichte plancommand. Bij een afgekeurde bugfixhertest blijft de bug
+`OPEN`, blijft de opgeleverde bugfixstory `DONE` en vraagt gewone code voor dezelfde bug opnieuw een
+bugfix aan. Bij een geslaagde hertest wordt de bug `RESOLVED` en queue't zij de nieuwe verificatie
+van de oorspronkelijke story. Een geannuleerde bugfixstory wordt niet als hertest aangeboden; zij
+loopt mee in de complete feitelijke herbeoordeling van de epic.
 
 Na een werkelijk uitgevoerde niet-lege testsessie wordt uit de gevalideerde publieke gegevens
 precies één nieuwe `QualitySnapshot` opgebouwd. Een no-op of uitsluitend technische startfout maakt

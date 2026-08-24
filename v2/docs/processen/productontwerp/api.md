@@ -12,7 +12,7 @@ stappen. Daardoor kunnen de volgende implementaties hetzelfde contract gebruiken
 
 De MVP kan later door de uitgebreide implementatie worden vervangen zonder Productplanning,
 Kwaliteitsbewaking, de frontend of het datacontract aan te passen. Beide zijn afzonderlijke Maven-
-implementatiemodules van dezelfde `product-design-api`; de main-module neemt bij build-time exact
+implementatiemodules van hetzelfde `design`-contract in `product-factory-api`; de main-module neemt bij build-time exact
 één van beide op.
 
 ## Verantwoordelijkheid
@@ -64,8 +64,8 @@ schrijftoegang tot epicinhoud of UX.
 
 ## Interface met andere modules en services
 
-Procesmodules gebruiken alleen de publieke Maven-API-module van een andere capability. Queries
-leveren read-only DTO's uit de betreffende `*-api`-module; een DTO is geen tweede
+Procesmodules gebruiken alleen de betreffende publieke capabilitypackages in
+`product-factory-api`. Queries leveren read-only DTO's uit die gedeelde API-module; een DTO is geen tweede
 database-entiteit. Commands drukken een concrete domeinovergang uit. Productontwerp schrijft
 uitsluitend zijn eigen tabellen. Spring Modulith structureert alleen de binnenkant van de gekozen
 Productontwerp-implementatie.
@@ -134,8 +134,10 @@ Na publicatie van een `AVAILABLE` epic stuurt Productontwerp geen planningsreque
 heeft een eigen schedule en zoekt tijdens een latere processessie zelf naar beschikbare epics.
 
 `markEpicReadyForVerification(...)` is een snelle statusovergang naar `VERIFYING`. Productplanning
-roept dit pas aan wanneer alle niet-geannuleerde stories en bugfixes zijn opgeleverd én hun actuele
-storyverificatie of hertest is geslaagd. Daarna roept Productplanning
+roept dit normaal pas aan wanneer alle niet-geannuleerde stories en bugfixes zijn opgeleverd én hun
+actuele storyverificatie of hertest is geslaagd. Na een door Software Factory geannuleerde story mag
+zij dit ook aanroepen zodra al het overige werk klaar en actueel geslaagd is; de complete controle
+beoordeelt dan of de feitelijke applicatie de epic ondanks de annulering voldoende afdekt. Daarna roept Productplanning
 `requestEpicVerification(epicId, epicVersion, ...)` op Kwaliteitsbewaking aan. Dat command start geen
 agent, maar maakt daar een `QualityWorkItem`.
 
@@ -196,7 +198,7 @@ langlopende processessie nooit een inmiddels geclaimde epic overschrijven.
 
 ```text
 AVAILABLE ──claim──> IN_PLANNING ──stories gepubliceerd──> ACTIVE
-    ├──nieuwere versie──> SUPERSEDED                         ├──alles geleverd en geverifieerd──> VERIFYING
+    ├──nieuwere versie──> SUPERSEDED                         ├──klaar voor complete beoordeling──> VERIFYING
     └──intrekken────────> WITHDRAWN                          │                       │
                                                              │                       ├──geslaagd──────> COMPLETED
                                                              │                       ├──niet geslaagd──> NOT_SUCCESSFUL
@@ -240,8 +242,8 @@ De toestand van de backlog is geen startsein. Als er niets zinvols te doen is, i
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
-- zij dezelfde `product-design-api` implementeert en andere capabilities alleen via hun API-module
-  gebruikt;
+- zij hetzelfde publieke `design`-contract implementeert en andere capabilities alleen via
+  `product-factory-api` gebruikt;
 - iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
 - alleen `runProcessSession()` voor Productontwerp nieuwe AI-taken aanvraagt;
 - maximaal één uitvoering tegelijk loopt; een wachtende logische sessie houdt geen lock vast;

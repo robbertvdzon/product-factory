@@ -12,7 +12,8 @@ implementaties gebruiken daarom hetzelfde contract:
   gespecialiseerde rollen met parallelle voorbereiding en een aparte criticus.
 
 De technische [Software Factory-dispatcher](../software-factory-dispatcher.md) heeft een eigen
-document en eigen Maven-API/implementatiegrens. Hij gebruikt `product-planning-api`, staat los van
+document en eigen implementatiemodule. Hij gebruikt het publieke `planning`-contract in
+`product-factory-api`, staat los van
 de gekozen intelligente planningsimplementatie en gebruikt nooit agents.
 
 ## Verantwoordelijkheid
@@ -66,6 +67,7 @@ PlanningWorkItemId requestManualReplan(RequestManualReplanCommand command);
 StoryDispatchReservationDetails reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand command);
 void markStoryAsDispatched(MarkStoryAsDispatchedCommand command);
 void markStoryAsDeveloped(MarkStoryAsDevelopedCommand command);
+void markStoryAsCancelled(MarkStoryAsCancelledCommand command);
 void recordStoryVerification(RecordStoryVerificationCommand command);
 void cancelStoriesForEpic(CancelStoriesForEpicCommand command);
 ```
@@ -99,8 +101,8 @@ opdracht maken door idempotentie nooit twee workitems.
 
 ## Interface met andere modules en services
 
-Productplanning gebruikt alleen publieke Maven-API-modules. Read-only DTO's staan in de
-betreffende `*-api`-module en zijn geen eigen database-entiteiten. Spring Modulith structureert
+Productplanning gebruikt alleen publieke capabilitypackages uit `product-factory-api`. Read-only
+DTO's staan in die gedeelde API-module en zijn geen eigen database-entiteiten. Spring Modulith structureert
 alleen de binnenkant van de gekozen Productplanning-implementatie.
 
 ### Input
@@ -215,7 +217,12 @@ De storystatussen zijn:
 - `TODO` — compleet, geprioriteerd en nog niet extern aangemaakt;
 - `IN_PROGRESS` — naar Software Factory gestuurd en daar nog open;
 - `DONE` — door Software Factory ontwikkeld en opgeleverd; nog geen kwaliteitsoordeel;
-- `CANCELLED` — bewust niet meer uitvoeren, met bron, tijdstip en reden.
+- `CANCELLED` — niet meer uitvoeren, met bron, tijdstip en reden; bijvoorbeeld doordat de
+  Stakeholder een epic stopte of Software Factory het externe werk verwijderde of annuleerde.
+
+`DONE` is hier de technische betekenis van *finished*: Software Factory heeft de story opgeleverd.
+Een story heeft geen status `FAILED` of **mislukt**. Een functioneel ontoereikende oplevering blijft
+`DONE` en krijgt een afgekeurde verificatie; een niet uitgevoerde externe story wordt `CANCELLED`.
 
 Productplanning wijzigt alleen de volgorde van `TODO`-stories. Een `IN_PROGRESS` story wordt normaal
 niet onderbroken.
@@ -255,6 +262,25 @@ Wanneer de dispatcher een Software Factory-oplevering ziet, roept hij
 3. vraag `requestStoryVerification(...)` aan, of `requestBugfixRetest(...)` bij een bugfix;
 4. laat de epic `ACTIVE`; oplevering alleen is nog geen toestemming voor epicverificatie.
 
+Wanneer de dispatcher ziet dat Software Factory een externe story heeft verwijderd of bewust niet
+uitvoert, roept hij `markStoryAsCancelled(...)` aan. Deze handler start evenmin een agent en:
+
+1. valideert idempotentiesleutel, externe referentie en verwachte storyversie;
+2. zet `IN_PROGRESS` op `CANCELLED` en bewaart bron, reden en tijdstip;
+3. vraagt geen storyverificatie of bugfixhertest aan, omdat niets is opgeleverd;
+4. controleert of de epic zelf niet `CANCELLED` is en alle overige niet-geannuleerde stories van de
+   epic `DONE` en actueel geslaagd geverifieerd zijn;
+5. brengt de epic dan via `markEpicReadyForVerification(...)` naar `VERIFYING` en vraagt een
+   complete `requestEpicVerification(...)` aan, ook wanneer de geannuleerde story bij een nog open
+   bug hoorde.
+
+Bij een epic die de Stakeholder zelf `CANCELLED` heeft, stopt de handler na stap 3 en ontstaat geen
+nieuwe epicverificatie. Anders beoordeelt de complete epiccontrole de feitelijke applicatie.
+Daardoor kan een handmatig gemaakte oplossing worden geaccepteerd. Bestaat het ontbrekende of
+foutieve gedrag nog, dan zet
+Kwaliteitsbewaking de epic terug naar `ACTIVE` en vraagt zij gewoon nieuw bugfix- of
+dekkingswerk aan.
+
 Nadat Kwaliteitsbewaking een storyverificatie of bugfixhertest heeft gepubliceerd, roept zij
 `recordStoryVerification(...)` aan. Deze snelle handler:
 
@@ -264,8 +290,9 @@ Nadat Kwaliteitsbewaking een storyverificatie of bugfixhertest heeft gepubliceer
 3. laat de epic `ACTIVE` bij een afgekeurde of geblokkeerde controle;
 4. controleert bij een geslaagde controle of alle niet-geannuleerde stories `DONE` zijn en iedere
    story of bugfix een geslaagde actuele verificatie heeft;
-5. controleert dat geen open bug en geen `PENDING` of `IN_PROGRESS` bugfix- of dekkingsopdracht voor
-   de epic bestaat;
+5. controleert normaal dat geen open bug en geen `PENDING` of `IN_PROGRESS` bugfix- of
+   dekkingsopdracht voor de epic bestaat; als een externe story `CANCELLED` is, mag in plaats
+   daarvan de hierboven beschreven feitelijke herbeoordeling plaatsvinden;
 6. roept alleen dan idempotent `markEpicReadyForVerification(...)` en daarna
    `requestEpicVerification(...)` aan.
 
@@ -281,14 +308,16 @@ qualitycommands starten evenmin agents; zij maken alleen `QualityWorkItem`s.
 Wanneer Productplanning een bugfixstory publiceert, bewaart zij in dezelfde transactie een
 herstelbaar uitgaand effect voor `linkBugfixStory(bugId, storyId)`. De story wordt pas uitvoerbaar en
 het `PlanningWorkItem` pas `DONE` nadat Kwaliteitsbewaking de koppeling idempotent heeft bevestigd.
-Een afgekeurde bugfixhertest levert een nieuwe bug en daarmee eventueel een nieuwe bugfixstory op;
-de storytypen blijven uitsluitend `PRODUCT_STORY` en `BUGFIX`.
+Per bug mag maximaal één gekoppelde story tegelijk `TODO` of `IN_PROGRESS` zijn. Een eerdere
+`DONE`- of `CANCELLED`-poging blijft historie en blokkeert een volgende gewone bugfixstory niet. Een
+afgekeurde hertest houdt dezelfde bug `OPEN` en kan opnieuw een bugfixverzoek opleveren; de
+storytypen blijven uitsluitend `PRODUCT_STORY` en `BUGFIX`.
 
 ## Grens met de Software Factory-dispatcher
 
 De dispatcher leest status en open werk via Productplanning, reserveert de volgende story via
 `reserveNextStoryForDispatch(...)` en meldt verzending en oplevering via
-`markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)`. De intelligente planner
+`markStoryAsDispatched(...)`, `markStoryAsDeveloped(...)` en `markStoryAsCancelled(...)`. De intelligente planner
 kent geen extern Software Factory-protocol. Pakketvorming, externe statussynchronisatie,
 `DeliveryAttempt`s, retry en idempotentie staan volledig in het
 [dispatcherdocument](../software-factory-dispatcher.md).
@@ -309,8 +338,8 @@ Ook een tijdelijke transport-, configuratie- of autorisatiefout start geen plann
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
-- zij dezelfde `product-planning-api` implementeert en andere capabilities alleen via hun
-  API-module gebruikt;
+- zij hetzelfde publieke `planning`-contract implementeert en andere capabilities alleen via
+  `product-factory-api` gebruikt;
 - iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
 - alleen `runProcessSession()` voor Productplanning nieuwe AI-taken aanvraagt;
 - maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
@@ -320,7 +349,7 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - epic- en bugbronversies exact vastliggen;
 - `sequenceNumber`s productbreed consistent en uniek zijn;
 - bugfixstories pas na de bevestigde natuurlijke koppeling `linkBugfixStory(bugId, storyId)`
-  uitvoerbaar worden;
+  uitvoerbaar worden en per bug maximaal één story tegelijk `TODO` of `IN_PROGRESS` is;
 - een annuleringsmarker latere storypublicatie verhindert en dispatchreservering de gelijktijdige
   grens met annuleren atomair maakt;
 - de eigen procesruntime iedere agent alleen het actuele geheugen van haar vertrouwd geconfigureerde eigen rol

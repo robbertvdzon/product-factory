@@ -51,7 +51,7 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 |---|---|---|
 | product-/overlegmodule | `createProduct`, `updateProductAssignment`, `configureTestableProduct`, `setProductDispatching`, `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `startMeeting`, `recordMeetingMessage`, `closeMeeting` | `getProduct`, `findProducts`, `findDispatchableProducts`, `getProductAssignment`, `getUserSignal`, `findOpenUserSignals`, `getTestableProduct`, `getMeeting`, `findMeetings` |
 | Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `withdrawEpic`, `cancelEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpics` |
-| Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `reserveNextStoryForDispatch`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
+| Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `reserveNextStoryForDispatch`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `markStoryAsCancelled`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
 | Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `retryQualityWorkItem`, `linkBugfixStory(bugId, storyId)` | `getBug`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems`, `findRetryableQualityWorkItems` |
 | Besluitenregister | `createDecision`, `reviseDecision`, `withdrawDecision`, `supersedeDecisions` | `getDecisions(productId, validAt?)`, `getDecisionArchive(productId)` |
 | Agentgeheugen | `addAgentMemory`, `replaceAgentMemory`, `retractAgentMemory` | `getActiveMemory(context)`, `getMemoryAt(productId, role, validAt)`, `getMemoryHistory(productId, role, itemId)` |
@@ -118,9 +118,9 @@ nooit rechtstreeks in de tabel.
 | `Meeting` | product-/overlegmodule | Stakeholder of een proces vraagt een overleg aan; de notulenagent sluit het af | Stakeholder, betrokken processen en frontend | agenda, berichten, gekoppelde objecten, status, notulen en expliciete doorwerking |
 | `Epic` | Productontwerp | Productplanning vraagt planning/statusovergangen; Kwaliteitsbewaking registreert uitkomst; Stakeholder kan intrekken of annuleren | ontwerp, planning, kwaliteit en frontend | complete verbetering met scope, UX, versie en status `AVAILABLE`, `IN_PLANNING`, `ACTIVE`, `VERIFYING`, `COMPLETED`, `NOT_SUCCESSFUL`, `CANCELLED`, `SUPERSEDED` of `WITHDRAWN` |
 | `PlanningWorkItem` | Productplanning | Kwaliteitsbewaking, product-/overlegmodule of bevoegde bediening | Productplanning, operations en frontend | gerichte planningsqueue; type `PLAN_BUGFIX`, `PLAN_EPIC_GAP`, `REPRIORITIZE_EPIC` of `MANUAL_REPLAN`; status `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` of `FAILED` |
-| `Story` | Productplanning | dispatcher meldt verzending/oplevering; Kwaliteitsbewaking meldt een exacte verificatie; Productontwerp vraagt annulering van open stories | planning, dispatcher, kwaliteit en frontend | complete productstory of bugfix met UX, productbreed `sequenceNumber`, leveringsstatus `TODO`, `IN_PROGRESS`, `DONE` of `CANCELLED` en een eventuele actuele verificatiereferentie |
+| `Story` | Productplanning | dispatcher meldt verzending, oplevering of externe annulering; Kwaliteitsbewaking meldt een exacte verificatie; Productontwerp vraagt annulering van open stories | planning, dispatcher, kwaliteit en frontend | complete productstory of bugfix met UX, productbreed `sequenceNumber`, leveringsstatus `TODO`, `IN_PROGRESS`, `DONE` of `CANCELLED` en een eventuele actuele verificatiereferentie; nooit een status **mislukt** |
 | `QualityWorkItem` | Kwaliteitsbewaking | Productplanning of product-/overlegmodule; Stakeholder mag een retry nu klaarzetten | Kwaliteitsbewaking, operations en frontend | duurzame testqueue; type `VERIFY_STORY`, `VERIFY_EPIC`, `RETEST_BUGFIX` of `INVESTIGATE_USER_SIGNAL`; dezelfde vijf werkstatussen plus `attemptCount`, `lastAttemptAt`, `retryable`, `retryAfter` en blokkadereden |
-| `Bug` | Kwaliteitsbewaking | Productplanning mag precies één bugfixstory koppelen | kwaliteit, planning en frontend | reproduceerbare afwijking en één herstelpoging; een mislukte fix sluit deze bug af en verwijst naar een nieuwe opvolgbug |
+| `Bug` | Kwaliteitsbewaking | Productplanning mag opeenvolgende bugfixstories koppelen, maar maximaal één tegelijk actief | kwaliteit, planning en frontend | reproduceerbare afwijking met status `OPEN`, `RESOLVED` of `INVALID`; gekoppelde `DONE`- en `CANCELLED`-stories vormen herstelhistorie |
 | `Verification` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | kwaliteit, ontwerp, planning en frontend | controle van `STORY`, `EPIC` of `USER_SIGNAL`, met doelversie, uitkomst, bewijs en eventuele dekkingsgaten |
 | `QualitySnapshot` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | Productontwerp, Stakeholder en frontend | aantoonbaar kwaliteitsbeeld na één afgeronde niet-lege kwaliteitssessie; vormt samen met eerdere snapshots de historie |
 | `Decision` | Besluitenregister | notulenagent voor de Stakeholder of bevoegde Factorymodule mag aanmaken, herzien, intrekken of vervangen | alle processen via geldige snapshot; Stakeholder en frontend ook via archief | stabiele identiteit, `origin`, state `ACTIVE`, `WITHDRAWN` of `SUPERSEDED`, historie en eventuele opvolger |
@@ -156,7 +156,7 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `StoryDetails` | Productplanning | dispatcher, Kwaliteitsbewaking en frontend | storyinhoud, UX, volgorde, leveringsstatus, eventuele dispatchreservering en actuele verificatiereferentie; read-only |
 | backlogquery | Productplanning uit `Story` | dispatcher en frontend | stories met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | Productplanning uit `PlanningWorkItem` | operations en frontend | planningsopdracht, bron, status, claim, resultaat en fout |
-| `BugDetails` | Kwaliteitsbewaking | Productplanning en frontend | bug, bewijs, ernst en herstelstatus |
+| `BugDetails` | Kwaliteitsbewaking | Productplanning en frontend | bug, bewijs, ernst, status en afgeleide herstelvoortgang uit gekoppelde stories |
 | `VerificationDetails` | Kwaliteitsbewaking | Productontwerp, Productplanning en frontend | doel, uitkomst, bewijs en dekkingsgaten |
 | `QualitySnapshotDetails` | Kwaliteitsbewaking uit `QualitySnapshot` | Productontwerp, Stakeholder en frontend | huidig of historisch kwaliteitsbeeld per dimensie, zonder verborgen totaalscore |
 | `QualityWorkItemDetails` | Kwaliteitsbewaking uit `QualityWorkItem` | operations en frontend | testopdracht, doelversie, status, claim, resultaat, fout, `attemptCount`, `lastAttemptAt`, `retryable`, `retryAfter`, blokkadereden en aandachtlabel |
@@ -238,12 +238,14 @@ planningswerk of gewijzigde storyinhoud op.
 2. Een geplande planningsrun vindt de epic zelf, bevriest haar via `claimEpicForPlanning(...)`, maakt
    alle benodigde stories en zet de epic `ACTIVE`.
 3. De dispatcher reserveert atomair telkens de eerste uitvoerbare `TODO`-story en meldt status via
-   `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)`.
+   `markStoryAsDispatched(...)`, `markStoryAsDeveloped(...)` of
+   `markStoryAsCancelled(...)`.
 4. `markStoryAsDeveloped(...)` zet snel `IN_PROGRESS` naar `DONE` en queue't storyverificatie of een
    bugfixhertest; de epic blijft `ACTIVE`.
 5. Kwaliteitsbewaking publiceert de gerichte verificatie en roept daarna idempotent
-   `recordStoryVerification(...)` aan. Productplanning controleert zonder agent of alle stories en
-   bugfixes `DONE` en actueel geslaagd geverifieerd zijn en of geen open bug of herstelwerk resteert.
+   `recordStoryVerification(...)` aan. Productplanning controleert in de normale route zonder agent
+   of alle niet-geannuleerde stories en bugfixes `DONE` en actueel geslaagd geverifieerd zijn en of
+   geen open bug of herstelwerk resteert.
 6. Alleen als dat zo is, roept Productplanning `markEpicReadyForVerification(...)` en daarna
    `requestEpicVerification(...)` aan. Dit laatste maakt alleen een `VERIFY_EPIC`-workitem.
 7. Een latere kwaliteitsrun test de epic, bewaart een onveranderlijke `Verification`, maakt na de
@@ -255,6 +257,13 @@ planningswerk of gewijzigde storyinhoud op.
    naar `ACTIVE`, `BLOCKED` blijft retrybaar `VERIFYING` en `PASSED` of `NOT_SUCCESSFUL` sluit de
    epic af. Iedere epic doorloopt dit onafhankelijk van andere actieve epics.
 
+Wanneer Software Factory een `IN_PROGRESS` story `CANCELLED`, vraagt Productplanning geen controle
+van die niet-opgeleverde story aan. Zodra al het overige niet-geannuleerde werk klaar en actueel
+geslaagd is, start zij wel de gewone complete epicverificatie, ook als de geannuleerde story een
+bugfix was. Kwaliteitsbewaking beoordeelt de feitelijke applicatie: een handmatige oplossing kan
+slagen; bij een nog bestaande afwijking blijft de bug `OPEN` en ontstaat opnieuw een gewone
+bugfixstory. Een story of bug krijgt nooit de productstatus **mislukt**.
+
 Een nog niet gekozen epic kan `WITHDRAWN` worden zonder storygevolgen. Bij annulering van een reeds
 gekozen epic laat Productontwerp Productplanning eerst duurzaam blokkeren dat nog stories worden
 gepubliceerd of gereserveerd en zet daarna de epic op `CANCELLED`. Niet-gereserveerde `TODO`-stories
@@ -264,14 +273,14 @@ een nieuwe epic, maar wordt niet heropend.
 
 ## Technische vertaling naar Maven en Spring Modulith
 
-- Alle capability-API-modules en hun publieke interfaces worden aan het begin gemaakt. Zij bevatten
-  alleen de genoemde commands, queries en read-only DTO's; geen Spring Modulith, persistence of
-  concrete beans.
-- Iedere implementatiemodule implementeert haar eigen API en gebruikt andere capabilities
-  uitsluitend via hun API-module.
+- Eén `product-factory-api` met alle publieke capabilitypackages en interfaces wordt aan het begin
+  gemaakt. Deze bevat alleen de genoemde commands, queries en read-only DTO's; geen Spring
+  Modulith, persistence of concrete beans.
+- Iedere implementatiemodule implementeert haar eigen capabilitycontract en gebruikt alle andere
+  capabilities uitsluitend via `product-factory-api`.
 - Alleen de ene `product-factory-app` heeft dependencies op implementatiemodules en neemt bij
-  build-time exact één implementatie per op dat moment geactiveerde capability op. Een API mag dus
-  al bestaan voordat haar implementatie in een latere MVP-stap wordt toegevoegd.
+  build-time exact één implementatie per op dat moment geactiveerde capability op. Een publiek
+  contract mag dus al bestaan voordat zijn implementatie in een latere MVP-stap wordt toegevoegd.
 - Spring Modulith structureert en verifieert uitsluitend de interne functionele delen van een
   implementatiemodule; het vervangt de harde Maven-grens niet.
 - Iedere eigenaar beheert in haar gekozen implementatie eigen aggregates, repositories en

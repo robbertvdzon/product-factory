@@ -33,7 +33,8 @@ Iedere implementatiemodule gebruikt de volgende verantwoordelijkheidsverdeling:
   de regel dichter bij de bijbehorende data houdt; zij doen zelf geen externe I/O;
 - **repositories en technische clients** verzorgen uitsluitend persistence of externe communicatie
   en nemen geen productbeslissingen;
-- services gebruiken constructor-injectie en hangen af van publieke capability-API's of interne
+- services gebruiken constructor-injectie en hangen af van publieke capabilitycontracten uit
+  `product-factory-api` of interne
   ports, niet van globale service locators of internals van andere capabilities.
 
 Een controller, scheduler of listener leest of schrijft dus nooit rechtstreeks via een repository

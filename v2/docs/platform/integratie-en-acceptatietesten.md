@@ -164,6 +164,7 @@ De simulator kan:
 - hetzelfde antwoord teruggeven bij herhaling van dezelfde idempotentiesleutel;
 - open werk per product tonen;
 - een story handmatig of automatisch door statusfasen laten lopen;
+- een open story als geannuleerd of verwijderd teruggeven;
 - een uitvoeringsvraag aanbieden en een antwoord bewaren;
 - oplevergegevens teruggeven;
 - een pakket definitief inhoudelijk afwijzen;
@@ -178,6 +179,7 @@ Minimaal worden deze situaties als vaste scenario's meegeleverd:
 | story geaccepteerd | story wordt eerst atomair gereserveerd, één keer extern gemaakt en lokaal `IN_PROGRESS` |
 | nog open werk | dispatcher verstuurt geen volgende backlogstory |
 | story opgeleverd | dispatcher markeert lokaal `DONE` en het juiste kwaliteitswerk ontstaat |
+| story extern geannuleerd | dispatcher markeert lokaal `CANCELLED`; na het overige werk volgt een feitelijke epicbeoordeling zonder storystatus **mislukt** |
 | tijdelijke storing | dezelfde dispatchreservering, `DeliveryAttempt` en begrensde retry zonder dubbel extern werk |
 | response verloren | idempotentie vindt de eerder aangemaakte story terug |
 | contractbreuk of ongeldig antwoord | dispatcher blokkeert het product, meldt de softwarefout operationeel en maakt geen domein- of planningswerk |
@@ -259,7 +261,8 @@ Het scherm bevat:
 - lijst met beschreven vaste scenario's en hun verwachte resultaat;
 - knop om een scenario te activeren;
 - expliciete knoppen voor toegestane vervolgstappen, zoals **AI-worker laten slapen**, **Worker
-  hervatten**, **Software Factory-story afronden** en **Volgende externe call laten mislukken**;
+  hervatten**, **Software Factory-story afronden**, **Software Factory-story annuleren** en
+  **Volgende externe call laten mislukken**;
 - links naar de gewone proces-, backlog-, kwaliteit-, AI-task- en dispatcherweergaven;
 - een tijdlijn van Testbed-interacties met requesttype, status en tijdstip, zonder secrets of
   volledige prompts;
@@ -273,8 +276,10 @@ Vaste kwaliteitsscenario's bewijzen daarnaast dat:
 - **Retry now** historie en telling behoudt, `retryAfter` leegmaakt en één normale kwaliteitsrun
   start of een al actieve run hergebruikt;
 - een `NEEDS_WORK`-epiccontrole bugs, dekkingsgaten of beide naar het juiste plancommand vertaalt;
-- een afgekeurde bugfixhertest de oude bug op **Fix mislukt** zet en een gekoppelde nieuwe bug met
-  een nieuw bugfixverzoek maakt;
+- een afgekeurde bugfixhertest de bug `OPEN` en de opgeleverde story `DONE` laat, waarna voor
+  dezelfde bug een volgende gewone bugfixstory kan worden gepland;
+- een door Software Factory geannuleerde story lokaal `CANCELLED` wordt en na afronding van het
+  overige werk tot een complete feitelijke epicbeoordeling leidt;
 - annulering vóór dispatchreservering geen externe story oplevert en een reservering die eerst wint
   zichtbaar als reeds gestart wordt afgehandeld.
 

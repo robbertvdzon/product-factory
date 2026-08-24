@@ -4,7 +4,8 @@ Status: eerste ontwerp van ondersteunende module en publieke interface.
 
 Het Besluitenregister bewaart alleen grote, blijvende productbesluiten. Het is geen proceslogboek en
 neemt zelf geen besluiten. Het heeft geen agents, scheduler of `runProcessSession()` en is een
-ondersteunende capability met een Maven-API en implementatiemodule. Alleen de implementatie mag
+ondersteunende capability met een publiek contract in `product-factory-api` en een
+implementatiemodule. Alleen de implementatie mag
 intern Spring Modulith gebruiken en bezit de tabellen achter de publieke commands en queries.
 
 ## Wat een besluit is

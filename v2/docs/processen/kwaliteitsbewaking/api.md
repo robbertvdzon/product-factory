@@ -11,7 +11,8 @@ volgende implementaties gebruiken hetzelfde contract:
 - [Kwaliteitsbewaking — uitgebreide implementatie](uitgebreid.md): vier
   gespecialiseerde rollen, parallel testen, testrotatie en leren per agentrol.
 
-Beide zijn afzonderlijke Maven-implementatiemodules van dezelfde `quality-api`. De main-module
+Beide zijn afzonderlijke Maven-implementatiemodules van hetzelfde publieke `quality`-contract in
+`product-factory-api`. De main-module
 neemt bij build-time exact één implementatie op.
 
 ## Verantwoordelijkheid
@@ -71,9 +72,10 @@ void linkBugfixStory(BugId bugId, StoryId storyId);
 De vier `request...`-commands starten geen test en geen agent. Zij valideren de bron en voegen alleen
 een idempotent `PENDING`-werkitem toe. `retryQualityWorkItem(...)` maakt alleen een retrybaar
 workitem direct klaar; de normale UI-/REST-afhandeling start daarna zo nodig de gewone
-`runProcessSession()`. `linkBugfixStory(bugId, storyId)` laat Productplanning één bugfixstory aan een
-bestaande uitvoerbare bug koppelen. De combinatie van beide ID's is de natuurlijke
-idempotentiesleutel. Geen aanroeper krijgt toegang tot de kwaliteitsrepository.
+`runProcessSession()`. `linkBugfixStory(bugId, storyId)` laat Productplanning een bugfixstory aan een
+bestaande uitvoerbare bug koppelen. Dezelfde koppeling is idempotent. Een bug mag na een afgeronde
+of geannuleerde eerdere poging later opnieuw een bugfixstory krijgen, maar nooit twee tegelijk
+actieve bugfixstories. Geen aanroeper krijgt toegang tot de kwaliteitsrepository.
 
 ## QualityWorkItem: de queuegrens
 
@@ -84,7 +86,7 @@ prioriteit, idempotentiesleutel, status, claim, foutinformatie, `attemptCount`, 
 | Type | Normale aanvrager | Betekenis |
 |---|---|---|
 | `VERIFY_STORY` | Productplanning na een relevante storyoplevering | toets storycriteria en regressierisico |
-| `VERIFY_EPIC` | Productplanning nadat alle stories en bugfixes van die epic `DONE` én actueel geslaagd geverifieerd zijn | toets de volledige bevroren epic |
+| `VERIFY_EPIC` | Productplanning nadat al het niet-geannuleerde werk is opgeleverd en geverifieerd, of nadat geannuleerd Software Factory-werk een nieuwe feitelijke beoordeling nodig maakt | toets de volledige bevroren epic tegen de werkende applicatie |
 | `RETEST_BUGFIX` | Productplanning na oplevering van een bugfixstory | herhaal reproductie en aangrenzende controles |
 | `INVESTIGATE_USER_SIGNAL` | product-/overlegmodule | onderzoek een gemeld kwaliteitsprobleem |
 
@@ -124,7 +126,8 @@ volgende vaste batch.
 
 ## Interface met andere modules en services
 
-Kwaliteitsbewaking gebruikt publieke Maven-API-modules en hun read-only DTO's. DTO's zijn geen
+Kwaliteitsbewaking gebruikt publieke capabilitypackages uit `product-factory-api` en hun read-only
+DTO's. DTO's zijn geen
 database-entiteiten. Browser-, log- en testclients zijn interne adapters. Spring Modulith
 structureert alleen de binnenkant van de gekozen Kwaliteitsbewaking-implementatie.
 
@@ -239,13 +242,22 @@ Een story- of bugfixoplevering krijgt:
 - **Geblokkeerd** — controle is door omgeving, toegang of ontbrekende informatie niet mogelijk.
 
 Bij **Afgekeurd** publiceert Kwaliteitsbewaking zo nodig een bug. Het herschrijft de story niet.
+Een story met leveringsstatus `CANCELLED` krijgt geen fictieve storyverificatie: er is immers geen
+oplevering om aan de storycriteria te toetsen. Productplanning laat dan, zodra het overige actuele
+werk van de epic klaar is, de complete epic opnieuw beoordelen op wat werkelijk in de applicatie
+aanwezig is.
 
 ## Epicverificatie
 
 Wanneer een storyverificatie of bugfixhertest is gepubliceerd, meldt Kwaliteitsbewaking de exacte
 uitkomst via `recordStoryVerification(...)` aan Productplanning. Dat command start geen agent.
-Productplanning vraagt pas epicverificatie aan wanneer alle niet-geannuleerde stories en bugfixes
-van de epic `DONE` zijn, iedere actuele controle is geslaagd en geen herstelwerk of open bug resteert.
+Productplanning vraagt normaal pas epicverificatie aan wanneer alle niet-geannuleerde stories en
+bugfixes van de epic `DONE` zijn, iedere actuele controle is geslaagd en geen herstelwerk of open
+bug resteert. Heeft Software Factory een `IN_PROGRESS` story `CANCELLED`, dan geldt een expliciete
+herbeoordelingsroute: zodra alle overige niet-geannuleerde stories klaar en actueel geslaagd zijn,
+mag Productplanning de epic ook met de nog open bevindingen naar `VERIFYING` brengen. Alleen de
+complete test van de feitelijke applicatie bepaalt dan of het geannuleerde werk werkelijk nog nodig
+is. Zo kan een handmatig aangebrachte oplossing slagen en blijft ontbrekend gedrag niet verborgen.
 Een `CANCELLED` epic krijgt geen nieuwe epicverificatie. De controle gebruikt exact de door
 Productontwerp bevroren `EpicDetails` en beoordeelt:
 
@@ -296,7 +308,7 @@ Kwaliteitsbewaking classificeert een ontbrekend of onjuist resultaat vóór publ
 
 | Situatie | Publicatie | Vervolg |
 |---|---|---|
-| Gedrag stond in een uitgevoerde story maar werkt niet volgens de story | `Bug` plus `Verification` met `NEEDS_WORK` bij een epiccontrole | Kwaliteitsbewaking vraagt Productplanning om een bugfix |
+| Gedrag stond in een uitgevoerde story maar werkt niet volgens de story | bestaande `OPEN` bug of nieuwe `Bug`, plus `Verification` met `NEEDS_WORK` bij een epiccontrole | Kwaliteitsbewaking vraagt Productplanning om een bugfix |
 | Gedrag viel duidelijk binnen de bevroren epic, maar er bestond nooit een story voor | `Verification` met ontbrekende dekking | Kwaliteitsbewaking vraagt Productplanning om aanvullend werk |
 | Alles werkt zoals ontworpen, maar de productaanname blijkt onjuist | `Verification` met `NOT_SUCCESSFUL` en een `UserSignal` van categorie `QUALITY_PATTERN` | Productontwerp registreert de uitkomst en leert |
 | Gewenst gedrag valt buiten de bevroren scope | `UserSignal` | Productontwerp kan een vervolgepic maken |
@@ -315,40 +327,41 @@ Een gepubliceerde bug bevat minimaal:
 - screenshot, log, netwerkspoor of ander bewijs;
 - ernst P0, P1, P2 of P3 met reden;
 - relatie met story, epicversie, oplevering en soortgelijke bugs;
-- optioneel `previousBugId` en `failedBugfixStoryId` voor een opvolgbug, en optioneel
-  `successorBugId` op een bug waarvan de fix is mislukt;
 - eventuele bron-gebruikerssignalen;
-- herstelstatus.
+- status `OPEN`, `RESOLVED` of `INVALID`.
 
-De herstelstatus is:
+De bugstatus is bewust klein:
 
-- **Nieuw** — bevinding bestaat intern maar is nog niet reproduceerbaar;
-- **Uitvoerbaar** — reproduceerbaar en compleet genoeg voor een bugfix;
-- **Gepland** — Productplanning heeft er een bugfixstory met status `TODO` voor gepubliceerd;
-- **In herstel** — de bugfixstory heeft status `IN_PROGRESS`;
-- **Hertesten** — de bugfixstory heeft status `DONE` en de fix is opgeleverd;
-- **Opgelost** — de fix is in de juiste omgeving goedgekeurd;
-- **Fix mislukt** — de herstelpoging werkte niet; een gekoppelde opvolgbug beschrijft de actuele
-  afwijking;
-- **Ongeldig** — geen productafwijking, met zichtbare reden.
+- `OPEN` — de reproduceerbare afwijking is nog niet aantoonbaar verdwenen;
+- `RESOLVED` — actueel testbewijs toont aan dat de afwijking niet meer bestaat;
+- `INVALID` — de bevinding bleek geen productafwijking, met zichtbare reden.
 
-Productplanning koppelt precies één bugfixstory via `linkBugfixStory(bugId, storyId)`. De handler
-accepteert dezelfde koppeling idempotent, weigert een andere story voor dezelfde bug en valideert
-dat de story type `BUGFIX` heeft, naar dezelfde bug en hetzelfde product verwijst en de verwachte
-bronversie bevat. Kwaliteitsbewaking kan
-**Gepland**, **In herstel** en **Hertesten** daarna uit `StoryDetails` afleiden en blijft zelf de enige
-schrijver van de duurzame bugstatus.
+Productplanning koppelt een bugfixstory via `linkBugfixStory(bugId, storyId)`. De handler accepteert
+dezelfde koppeling idempotent en valideert dat de bug `OPEN` is. Productplanning is de vertrouwde
+aanroeper en garandeert vóór het command dat de story type `BUGFIX` heeft, hetzelfde bug- en
+product-ID bevat en dat er geen andere bugfixstory voor deze bug `TODO` of `IN_PROGRESS` is;
+Kwaliteitsbewaking roept tijdens deze commandhandler niet synchroon terug naar Productplanning. Een
+eerdere `DONE`- of `CANCELLED`-story blijft historie en blokkeert een volgende herstelstory niet.
+**Gepland**, **In herstel** en **Hertesten** zijn daardoor afgeleide UI-labels uit later gelezen
+`StoryDetails`, geen extra bugstatussen.
 
-Als een bugfixhertest wordt afgekeurd, zet Kwaliteitsbewaking de oorspronkelijke bug op **Fix
-mislukt** en publiceert zij een nieuwe uitvoerbare bug met `previousBugId`,
-`failedBugfixStoryId` en dezelfde `originalStoryId`. De oude bug verwijst met `successorBugId` naar
-de nieuwe bug. Kwaliteitsbewaking vraagt voor die nieuwe bug idempotent `requestBugfix(...)` aan.
-Iedere bug vertegenwoordigt zo precies één concrete afwijking en maximaal één herstelpoging; er is
-geen heropenstatus en vervolgplanning gebruikt opnieuw een gewone bugfixstory.
-**Fix mislukt** is voor de oude bug een historische eindstatus en telt niet nogmaals als actuele
-open bug; de gekoppelde opvolgbug is de enige actuele blokkade voor epicverificatie.
+Als een `DONE` bugfixstory bij de hertest de afwijking niet heeft weggenomen, blijft de bug gewoon
+`OPEN`. De bugfixstory blijft `DONE`: Software Factory heeft haar immers wel opgeleverd. De
+afgekeurde `Verification` legt vast dat die oplevering het probleem niet verhielp en voegt het
+actuele bewijs als een nieuwe bugversie aan dezelfde bug toe. Kwaliteitsbewaking vraagt voor die
+nieuwe bronversie idempotent opnieuw `requestBugfix(...)` aan. Daardoor ontstaat precies één nieuw
+`PlanningWorkItem` en wordt een eerder afgerond bugfixverzoek niet hergebruikt. Een latere
+planningsrun mag daarna een volgende gewone bugfixstory koppelen. Er bestaat geen aparte
+mislukstatus, extra bugconstructie of repair-storytype.
 
-Na een geslaagde bugfixhertest zet Kwaliteitsbewaking de actuele bug op **Opgelost** en
+Wanneer Software Factory een bugfixstory `CANCELLED`, wordt de bug evenmin als mislukt of opgelost
+gemarkeerd. Productplanning vraagt geen hertest van een niet-opgeleverde story aan, maar neemt de
+annulering mee in de herbeoordelingsroute van de complete epic. Blijkt de afwijking daar nog te
+bestaan, dan blijft de bug `OPEN`, krijgt dezelfde bug een nieuwe bewijsversie en kan opnieuw een
+gewone bugfixstory worden gepland. Blijkt zij bijvoorbeeld door een handmatige wijziging verdwenen,
+dan mag actueel bewijs de bug `RESOLVED` maken.
+
+Na een geslaagde bugfixhertest zet Kwaliteitsbewaking de actuele bug op `RESOLVED` en
 maakt zij intern een nieuw idempotent `VERIFY_STORY`-workitem voor de oorspronkelijke story tegen de
 nieuwe productversie. Daardoor vervangt een oude afgekeurde controle niet stilzwijgend het bewijs:
 de oorspronkelijke storycriteria worden na de fix opnieuw actueel aangetoond voordat de epic naar
@@ -388,8 +401,8 @@ of een periodieke kwaliteitscontrole. Een queuecommand is een snelle databasebew
 
 De MVP en iedere latere implementatie moeten garanderen dat:
 
-- zij dezelfde `quality-api` implementeert en andere capabilities alleen via hun API-module
-  gebruikt;
+- zij hetzelfde publieke `quality`-contract implementeert en andere capabilities alleen via
+  `product-factory-api` gebruikt;
 - iedere nieuwe `ProcessSession` de exacte `implementationId` en `implementationVersion` vastlegt;
 - alleen `runProcessSession()` voor Kwaliteitsbewaking nieuwe AI-taken aanvraagt;
 - maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
@@ -398,6 +411,9 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - een handmatige retry historie en `attemptCount` behoudt en nooit een tweede processessie afdwingt;
 - een onbereikbare of kapotte testomgeving niet als productbug wordt gepubliceerd;
 - iedere bug reproduceerbaar is en controleerbaar bewijs bevat;
+- een bugfixstory alleen `TODO`, `IN_PROGRESS`, `DONE` of `CANCELLED` kan zijn en een afgekeurde of
+  geannuleerde poging nooit een aparte mislukstatus maakt;
+- per bug maximaal één gekoppelde bugfixstory tegelijk `TODO` of `IN_PROGRESS` is;
 - iedere verificatie exacte doel-, opleverings-, omgevings- en bronversies bevat;
 - ontbrekende epicdekking binnen de bevroren scope wordt bewezen;
 - ieder gebruikerssignaalonderzoek een expliciete uitkomst of blokkade krijgt;
