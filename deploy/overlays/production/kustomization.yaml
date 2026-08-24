@@ -11,6 +11,6 @@ patches:
   - path: backend-secret-patch.yaml
 images:
   - name: ghcr.io/robbertvdzon/product-factory-backend
-    newTag: manual-placeholder
+    digest: sha256:e042a3e084b5886ed015646b2565cd3bb3cbb878e576c9d577f4eb5d681f92b5
   - name: ghcr.io/robbertvdzon/product-factory-frontend
-    newTag: manual-placeholder
+    digest: sha256:e2acd918ad69572d7d93e9a8c80fb47e886a060060fe30ac0b17e65ecb203cbf
