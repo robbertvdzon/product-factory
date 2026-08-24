@@ -14,7 +14,14 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 - Voeg vaste end-to-endacceptatiescenario's toe voor de normale route, bugs, ontbrekende epicdekking,
   signalen, handmatige prioriteit, workeruitval en externe leveringsfouten.
 - Bewijs dat een epic pas naar `VERIFYING` gaat nadat iedere actuele story- en bugfixcontrole is
-  geslaagd, en bij onvolledigheid of een bouwfout naar `ACTIVE` terugkeert.
+  geslaagd, bij `NEEDS_WORK` naar `ACTIVE` terugkeert en bij `BLOCKED` retrybaar op `VERIFYING`
+  blijft.
+- Bewijs dat kwaliteitsretries de vaste begrensde back-off volgen, zonder maximumpogingen zichtbaar
+  blijven en via **Retry now** direct klaarstaan zonder een tweede gelijktijdige kwaliteitsrun.
+- Bewijs dat een mislukte bugfix een afgesloten oude bug en een gekoppelde nieuwe uitvoerbare bug
+  oplevert en daarna opnieuw de gewone bugfixroute volgt.
+- Bewijs dat annuleringsmarker en dispatchreservering gelijktijdige planning, annulering en levering
+  eenduidig ordenen.
 - Bewijs dat alle geplande functies via zowel schedule als bevoegde UI/REST-start werken.
 - Verifieer dat productie uitsluitend de drie MVP-procesimplementaties selecteert.
 - Werk runbooks, rooktests en documentatie bij op basis van de werkelijk gebouwde route.

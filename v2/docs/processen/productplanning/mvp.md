@@ -37,7 +37,7 @@ De Planner:
 
 - vergelijkt beschikbare epics met productdoel, besluiten en bestaand werk;
 - kiest zo nodig één of meer epics om te claimen;
-- verwerkt bugfix-, dekkingsgat-, reparatie-, prioriteits- en herplanwerk;
+- verwerkt bugfix-, dekkingsgat-, prioriteits- en herplanwerk;
 - verdeelt iedere gekozen epic volledig in kleine, zelfstandig uitvoerbare stories;
 - neemt het relevante bevroren UX-ontwerp zelfstandig in iedere story op;
 - controleert dat de stories samen de volledige epicscope afdekken;
@@ -151,7 +151,10 @@ Gewone code controleert minimaal:
 - geen onbedoelde overlap of onbeantwoorde afhankelijkheid;
 - zelfstandige UX en acceptatiecriteria per story;
 - toegestane storystatusovergangen;
-- unieke en productbrede `sequenceNumber`s voor `TODO`-stories;
+- unieke productbrede `sequenceNumber`s ten opzichte van alle `TODO`- en `IN_PROGRESS`-stories,
+  waarbij alleen `TODO`-stories worden herordend;
+- afwezigheid van een annuleringsmarker voor iedere epic waarvoor nieuwe stories worden
+  gepubliceerd;
 - dat alleen geclaimde workitems als afgehandeld worden gemarkeerd.
 
 Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
@@ -163,6 +166,11 @@ aparte critic-agent; de fout blijft zichtbaar op de processessie en betrokken wo
 Productplanning schrijft stories, storyversies, nieuwe volgorde en workitemresultaten atomair. Voor
 een nieuwe epic roept zij daarna `markEpicActive(...)` aan. Een modulecommand dat tijdelijk faalt,
 kan met dezelfde idempotentiesleutel worden hervat.
+
+Bij een bugfixstory bewaart dezelfde transactie een intern uitgaand commandeffect voor
+`linkBugfixStory(bugId, storyId)`. De koppeling moet bevestigd zijn voordat de story uitvoerbaar is
+en het bijbehorende `PlanningWorkItem` `DONE` wordt. Een tijdelijke commandfout wordt idempotent
+hervat; Productplanning publiceert uitsluitend productstories en bugfixstories.
 
 De eigen schedule van de dispatcher vindt later de eerste uitvoerbare `TODO`-story. De planner start
 de dispatcher niet.

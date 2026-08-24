@@ -40,7 +40,7 @@ De Tester:
 - controleert hoofdroute, belangrijke alternatieven, lege en fouttoestanden;
 - hertest een bugfix vanaf de oorspronkelijke reproduceerstappen;
 - doorloopt bij epicverificatie de volledige bevroren gebruikersverbetering;
-- classificeert een bevinding als bouwfout, ontbrekende epicdekking, nieuwe wens of testblokkade;
+- classificeert een bevinding als bug, ontbrekende epicdekking, nieuwe wens of testblokkade;
 - maakt reproduceerbare bug- en verificatieconcepten met bewijs;
 - geeft een gebruikerssignaalonderzoek altijd een expliciete uitkomst;
 - levert één gestructureerd `QualitySessionDraft` terug.
@@ -75,7 +75,7 @@ AI-uitvoering en vraagt zij een complete taak aan bij
 ## Verloop van één processessie
 
 ```text
-claim run en PENDING QualityWorkItems
+activeer verstreken retries en claim PENDING QualityWorkItems
                   │
                   ▼
 lees exacte doelen, omgeving en productversie
@@ -98,14 +98,17 @@ atomair publiceren + vervolgcommands + QualitySnapshot
 
 ### Stap 1 — claimen en omgeving controleren
 
-Applicatiecode claimt de modulebrede run en alle `PENDING` workitems uit de vaste startmomentopname.
+Applicatiecode zet eerst retrybare `BLOCKED`- of `FAILED`-workitems waarvan `retryAfter` is
+verstreken terug op `PENDING`. Daarna claimt zij de modulebrede run en alle `PENDING` workitems uit de vaste
+startmomentopname.
 Daarna leest zij per opdracht de exacte epic-, story-, bug-, opleverings- en signaalversies plus
 `TestableProductDetails` en het actuele geheugen van `TESTER_MVP`. De processessie legt de exacte
 bron- en geheugenversies vast.
 
 De Tester controleert bereikbaarheid, geteste productversie en accountgrenzen vóór inhoudelijk
-testen. Een onbereikbare omgeving of ontbrekende toegang maakt het workitem `BLOCKED` en wordt nooit
-een productbug.
+testen. Een onbereikbare omgeving of ontbrekende toegang verhoogt `attemptCount`, maakt het
+workitem retrybaar `BLOCKED`, berekent `retryAfter` volgens de vaste back-off en wordt nooit een
+productbug. Een blokkade vóór werkelijk testwerk maakt geen `QualitySnapshot`.
 
 ### Stap 2 — opdrachten ordenen
 
@@ -140,12 +143,11 @@ Bij een mogelijke productafwijking herhaalt de Tester de relevante stappen binne
 vanaf een bekende uitgangssituatie. Het concept bevat werkelijk gedrag, verwacht gedrag, omgeving,
 productversie, bewijs, impact en voorgestelde ernst.
 
-De Tester classificeert ontbrekend gedrag als:
+De Tester classificeert ontbrekend of onjuist gedrag als:
 
-- bouwfout binnen afgesproken storygedrag;
+- bug binnen afgesproken storygedrag;
 - dekkingsgat binnen de bevroren epic zonder bijbehorende story;
 - nieuwe wens buiten de bevroren scope;
-- niet aantoonbaar resultaat;
 - technische of toegangsblokkade.
 
 De agent schrijft nog niets naar de publieke entiteiten en roept geen modulecommands aan.
@@ -168,6 +170,13 @@ publieke contract, zoals `requestBugfix(...)`, `requestEpicGapPlanning(...)`,
 `recordStoryVerification(...)`, `recordEpicVerification(...)` en
 `recordSignalInvestigation(...)`.
 
+Een epicverificatie gebruikt alleen `PASSED`, `NEEDS_WORK`, `BLOCKED` of `NOT_SUCCESSFUL`. Bij
+`NEEDS_WORK` kan dezelfde verificatie zowel bugs als dekkingsgaten bevatten; gewone code stuurt per
+bevinding het bijbehorende gerichte plancommand. Bij een afgekeurde bugfixhertest publiceert gewone
+code een nieuwe opvolgbug, zet de oude bug op **Fix mislukt** en vraagt voor de nieuwe bug een
+bugfix aan. Bij een geslaagde hertest queue't zij de nieuwe verificatie van de oorspronkelijke
+story.
+
 Na een werkelijk uitgevoerde niet-lege testsessie wordt uit de gevalideerde publieke gegevens
 precies één nieuwe `QualitySnapshot` opgebouwd. Een no-op of uitsluitend technische startfout maakt
 geen snapshot.
@@ -189,6 +198,10 @@ De publieke eisen aan bewijs, verificaties, bugs en epicoordelen blijven ongewij
 ## Fouten en hervatten
 
 - Een technische toolfout wordt geen productbevinding.
+- Retrybare blokkades volgen 15 minuten, 1 uur, 4 uur en daarna maximaal 24 uur back-off zonder
+  maximaal aantal domeinpogingen.
+- `retryQualityWorkItem(...)` behoudt `attemptCount` en historie, maakt het item direct `PENDING` en
+  laat de UI daarna zo nodig de normale processessie starten.
 - Een verlopen claim kan met dezelfde inputmomentopname worden hervat.
 - Een gewijzigde doel- of omgevingsversie blokkeert publicatie en wacht op een volgende run.
 - Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt

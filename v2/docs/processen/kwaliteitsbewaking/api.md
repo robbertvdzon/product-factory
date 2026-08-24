@@ -44,13 +44,14 @@ Alleen deze functie mag voor Kwaliteitsbewaking nieuwe taken bij
 [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
 implementatiedetail.
 
-Een run claimt atomair een vaste momentopname van de `PENDING` `QualityWorkItem`s die bij de start
-klaarstaan. Nieuwe verzoeken wachten op de volgende run. Naast deze gerichte queueopdrachten mag de
-run zelf periodiek testwerk kiezen. Zonder queuewerk of periodiek werk eindigt zij als succesvolle
-no-op.
+Aan het begin van een run zet gewone applicatiecode eerst retrybare `BLOCKED`- of `FAILED`-workitems
+waarvan `retryAfter` is verstreken terug op `PENDING`. Daarna claimt de run atomair een vaste momentopname
+van de `PENDING` `QualityWorkItem`s die klaarstaan. Nieuwe verzoeken wachten op de volgende run.
+Naast deze gerichte queueopdrachten mag de run zelf periodiek testwerk kiezen. Zonder queuewerk of
+periodiek werk eindigt zij als succesvolle no-op.
 
-De deterministische publieke functies zijn beperkt tot read-only queries en lifecycle-commands voor
-eigen bugs:
+De deterministische publieke functies zijn beperkt tot read-only queries en gerichte commands voor
+de eigen queue en bugs:
 
 ```java
 BugDetails getBug(BugId bugId);
@@ -58,21 +59,27 @@ List<VerificationDetails> findVerifications(VerificationTarget target);
 QualitySnapshotDetails getCurrentQuality(ProductId productId);
 List<QualitySnapshotDetails> getQualityHistory(ProductId productId, TimeRange range);
 List<QualityWorkItemDetails> findQualityWorkItems(ProductId productId, WorkItemStatus status);
+List<QualityWorkItemDetails> findRetryableQualityWorkItems();
 QualityWorkItemId requestStoryVerification(RequestStoryVerificationCommand command);
 QualityWorkItemId requestEpicVerification(RequestEpicVerificationCommand command);
 QualityWorkItemId requestBugfixRetest(RequestBugfixRetestCommand command);
 QualityWorkItemId requestSignalInvestigation(RequestSignalInvestigationCommand command);
-void linkBugfixStory(LinkBugfixStoryCommand command);
+void retryQualityWorkItem(QualityWorkItemId workItemId);
+void linkBugfixStory(BugId bugId, StoryId storyId);
 ```
 
 De vier `request...`-commands starten geen test en geen agent. Zij valideren de bron en voegen alleen
-een idempotent `PENDING`-werkitem toe. `linkBugfixStory(...)` laat Productplanning alleen een story-ID
-aan een bestaande uitvoerbare bug koppelen. Geen aanroeper krijgt toegang tot de kwaliteitsrepository.
+een idempotent `PENDING`-werkitem toe. `retryQualityWorkItem(...)` maakt alleen een retrybaar
+workitem direct klaar; de normale UI-/REST-afhandeling start daarna zo nodig de gewone
+`runProcessSession()`. `linkBugfixStory(bugId, storyId)` laat Productplanning één bugfixstory aan een
+bestaande uitvoerbare bug koppelen. De combinatie van beide ID's is de natuurlijke
+idempotentiesleutel. Geen aanroeper krijgt toegang tot de kwaliteitsrepository.
 
 ## QualityWorkItem: de queuegrens
 
 Een `QualityWorkItem` bevat work-item-ID, product-ID, type, bron-ID en -versie, doelomgeving,
-prioriteit, idempotentiesleutel, status, claim en eventuele foutinformatie. De typen zijn:
+prioriteit, idempotentiesleutel, status, claim, foutinformatie, `attemptCount`, `lastAttemptAt`,
+`retryable`, `retryAfter` en een eventuele `blockedReason`. De typen zijn:
 
 | Type | Normale aanvrager | Betekenis |
 |---|---|---|
@@ -84,6 +91,36 @@ prioriteit, idempotentiesleutel, status, claim en eventuele foutinformatie. De t
 De statussen zijn `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` en `FAILED`. De commandhandler mag een
 prioriteit overnemen, maar de latere kwaliteitsrun bepaalt zelf de testaanpak. De queue hoort bij
 Kwaliteitsbewaking; Productontwerp bevat geen testqueue.
+
+### Retry en back-off
+
+Een tijdelijke blokkade verwijdert nooit het testwerk. Bij iedere mislukte poging verhoogt
+Kwaliteitsbewaking `attemptCount`, bewaart zij de concrete reden en gebruikt zij dezelfde back-off.
+Een tijdelijk ontbrekende testvoorwaarde wordt retrybaar `BLOCKED`; een uitgeputte technische
+uitvoeringspoging kan retrybaar `FAILED` zijn. Een definitieve contractfout is niet retrybaar en
+heeft daarom geen **Retry now**. De back-off is:
+
+| Mislukte poging | Nieuwe `retryAfter` |
+|---|---|
+| 1 | 15 minuten later |
+| 2 | 1 uur later |
+| 3 | 4 uur later |
+| 4 en verder | 24 uur later |
+
+Er is geen maximaal aantal domeinretries. Vanaf vijf mislukte pogingen toont de UI het afgeleide
+label **Aandacht nodig**, maar het workitem blijft dagelijks herstelbaar. Dit staat los van de
+begrensde technische attempts van één `AiTask` binnen AI-uitvoering.
+
+`findRetryableQualityWorkItems()` geeft alle retrybare `BLOCKED`- en `FAILED`-items productoverstijgend
+terug, primair gesorteerd op `attemptCount` aflopend en daarna op oudste laatste poging. De UI toont
+voor ieder item minimaal product, type, doel, blokkadereden, aantal pogingen, laatste poging en
+`retryAfter`.
+
+`retryQualityWorkItem(...)` behoudt historie en `attemptCount`, maakt `retryAfter` leeg en zet het
+item op `PENDING`. De UI-/REST-use-case roept daarna de normale `runProcessSession()` aan wanneer
+Kwaliteitsbewaking niet al draait. Een gelijktijdige `ProcessAlreadyRunning` betekent voor deze
+use-case alleen dat de bestaande run doorgaat; het workitem blijft veilig `PENDING` voor een
+volgende vaste batch.
 
 ## Interface met andere modules en services
 
@@ -128,7 +165,7 @@ de verificatie vast welke commit is bekeken en welke productversie werkelijk is 
 | `BugDetails` | read-only weergave van een aantoonbare afwijking | werkelijk en verwacht gedrag, reproduceerstappen, omgeving, bewijs, impact, ernst, status en bron-signaal-ID's |
 | `VerificationDetails` | read-only weergave van een story-, epic- of signaalcontrole | doeltype en -versie, uitkomst, omgeving, controles, bewijs, blokkade, ontbrekende dekking en vervolgkoppelingen |
 | `QualitySnapshotDetails` | read-only kwaliteitsbeeld en historie | tijdstip, omgeving, productversie, onderzochte gebieden, dekking, open bugs per ernst, verificatie-uitkomsten, risico's en bron-ID's |
-| `QualityWorkItemDetails` | read-only inzicht in de kwaliteitsqueue | type, doelversie, status, claim, resultaat en fout; geen wijzigbaar requestobject |
+| `QualityWorkItemDetails` | read-only inzicht in de kwaliteitsqueue en retries | type, doelversie, status, claim, resultaat, fout, blokkadereden, `attemptCount`, `lastAttemptAt`, `retryable`, `retryAfter` en afgeleid aandachtlabel; geen wijzigbaar requestobject |
 | `ProcessSession` | operationele historie van de sessie | sessie-ID, product-ID, implementatie-ID en -versie, inputversies, AI-taak-ID's, publicatie-ID's en wacht- of eindstatus |
 | `PlanningWorkItem` bij Productplanning | downstream effect van een gericht herstelcommand; Productplanning maakt en bezit dit object | type bugfix of epicgat, exact bron-ID en -versie, bewijsreferentie en idempotentiesleutel |
 
@@ -221,11 +258,12 @@ Productontwerp bevroren `EpicDetails` en beoordeelt:
 
 De uitkomst is:
 
-- **Geslaagd** — de gebruikersverbetering is aantoonbaar bereikt;
-- **Onvolledig** — gedrag binnen scope of UX ontbreekt;
-- **Niet aantoonbaar** — de uitvoering lijkt compleet, maar bewijs of meting ontbreekt;
-- **Geblokkeerd** — de controle kan niet verantwoord worden afgerond;
-- **Niet geslaagd** — alles werkt zoals ontworpen, maar het bedoelde gebruikersresultaat is niet
+- `PASSED` — de gebruikersverbetering is aangetoond;
+- `NEEDS_WORK` — er is minimaal één concrete bug of aantoonbaar dekkingsgat binnen de bevroren
+  epic;
+- `BLOCKED` — een verantwoord oordeel is tijdelijk niet mogelijk; reden en retry staan op het
+  `QualityWorkItem`;
+- `NOT_SUCCESSFUL` — alles werkt zoals afgesproken, maar het bedoelde gebruikersresultaat is niet
   bereikt.
 
 Kwaliteitsbewaking schrijft eerst een onveranderlijke `Verification` en roept daarna
@@ -236,12 +274,16 @@ Het vervolg per uitkomst is:
 
 | Uitkomst | Epic bij Productontwerp | Bericht aan Productplanning |
 |---|---|---|
-| **Geslaagd** | **Geslaagd** (`COMPLETED`) | geen |
-| **Onvolledig** | terug naar **Actief** | `requestEpicGapPlanning(...)` met verificatie-ID |
-| bouwfout in uitgevoerd storygedrag | terug naar of blijft **Actief** | `requestBugfix(...)` met bug- en verificatie-ID |
-| **Niet aantoonbaar** | blijft **Controleren** | geen; Kwaliteitsbewaking plant later nieuw bewijswerk |
-| **Geblokkeerd** | blijft **Controleren** | geen, tenzij aantoonbaar ontwikkelwerk nodig is |
-| **Niet geslaagd** | **Niet geslaagd** (`NOT_SUCCESSFUL`) | geen; Productontwerp kan vanuit het resultaat een vervolgepic onderzoeken |
+| `PASSED` | `COMPLETED` | geen |
+| `NEEDS_WORK` met bug | terug naar `ACTIVE` | `requestBugfix(...)` per uitvoerbare bug |
+| `NEEDS_WORK` met dekkingsgat | terug naar `ACTIVE` | `requestEpicGapPlanning(...)` met verificatie-ID |
+| `BLOCKED` | blijft `VERIFYING` | geen; hetzelfde workitem volgt het retrybeleid |
+| `NOT_SUCCESSFUL` | `NOT_SUCCESSFUL` | geen; Productontwerp kan vanuit het resultaat een vervolgepic onderzoeken |
+
+Eén `NEEDS_WORK`-verificatie kan zowel bugs als dekkingsgaten bevatten. Productontwerp hoeft de
+bevindingen niet te interpreteren: het registreert de uitkomst en zet de epic terug naar `ACTIVE`.
+Kwaliteitsbewaking stuurt daarnaast per concrete bevinding alleen het gerichte command naar
+Productplanning.
 
 Productplanning krijgt dus geen generiek verificatieresultaat terug. Alleen een gericht plancommand
 betekent dat zij nieuw ontwikkelwerk moet vormen. Gedrag binnen de bevroren scope wordt een
@@ -254,10 +296,9 @@ Kwaliteitsbewaking classificeert een ontbrekend of onjuist resultaat vóór publ
 
 | Situatie | Publicatie | Vervolg |
 |---|---|---|
-| Gedrag stond in een uitgevoerde story maar is verkeerd gebouwd | `Bug` plus `Verification` | Kwaliteitsbewaking vraagt Productplanning om een bugfix |
+| Gedrag stond in een uitgevoerde story maar werkt niet volgens de story | `Bug` plus `Verification` met `NEEDS_WORK` bij een epiccontrole | Kwaliteitsbewaking vraagt Productplanning om een bugfix |
 | Gedrag viel duidelijk binnen de bevroren epic, maar er bestond nooit een story voor | `Verification` met ontbrekende dekking | Kwaliteitsbewaking vraagt Productplanning om aanvullend werk |
-| Alles is geleverd, maar de gebruikersverbetering is nog niet bewezen | `Verification` met **Niet aantoonbaar** | epic blijft op **Controleren** |
-| Alles werkt zoals ontworpen, maar de productaanname blijkt onjuist | `Verification` met **Niet geslaagd** en een `UserSignal` van categorie `QUALITY_PATTERN` | Productontwerp registreert de uitkomst en leert |
+| Alles werkt zoals ontworpen, maar de productaanname blijkt onjuist | `Verification` met `NOT_SUCCESSFUL` en een `UserSignal` van categorie `QUALITY_PATTERN` | Productontwerp registreert de uitkomst en leert |
 | Gewenst gedrag valt buiten de bevroren scope | `UserSignal` | Productontwerp kan een vervolgepic maken |
 
 Kwaliteitsbewaking maakt in geen van deze gevallen zelf een story.
@@ -274,6 +315,8 @@ Een gepubliceerde bug bevat minimaal:
 - screenshot, log, netwerkspoor of ander bewijs;
 - ernst P0, P1, P2 of P3 met reden;
 - relatie met story, epicversie, oplevering en soortgelijke bugs;
+- optioneel `previousBugId` en `failedBugfixStoryId` voor een opvolgbug, en optioneel
+  `successorBugId` op een bug waarvan de fix is mislukt;
 - eventuele bron-gebruikerssignalen;
 - herstelstatus.
 
@@ -285,12 +328,27 @@ De herstelstatus is:
 - **In herstel** — de bugfixstory heeft status `IN_PROGRESS`;
 - **Hertesten** — de bugfixstory heeft status `DONE` en de fix is opgeleverd;
 - **Opgelost** — de fix is in de juiste omgeving goedgekeurd;
-- **Heropend** — de afwijking bestaat nog of is teruggekomen;
+- **Fix mislukt** — de herstelpoging werkte niet; een gekoppelde opvolgbug beschrijft de actuele
+  afwijking;
 - **Ongeldig** — geen productafwijking, met zichtbare reden.
 
-Productplanning koppelt een bugfixstory via `linkBugfixStory(...)`. Kwaliteitsbewaking kan
+Productplanning koppelt precies één bugfixstory via `linkBugfixStory(bugId, storyId)`. De handler
+accepteert dezelfde koppeling idempotent, weigert een andere story voor dezelfde bug en valideert
+dat de story type `BUGFIX` heeft, naar dezelfde bug en hetzelfde product verwijst en de verwachte
+bronversie bevat. Kwaliteitsbewaking kan
 **Gepland**, **In herstel** en **Hertesten** daarna uit `StoryDetails` afleiden en blijft zelf de enige
-schrijver van de duurzame bugstatus. Na een geslaagde bugfixhertest zet zij de bug op **Opgelost** en
+schrijver van de duurzame bugstatus.
+
+Als een bugfixhertest wordt afgekeurd, zet Kwaliteitsbewaking de oorspronkelijke bug op **Fix
+mislukt** en publiceert zij een nieuwe uitvoerbare bug met `previousBugId`,
+`failedBugfixStoryId` en dezelfde `originalStoryId`. De oude bug verwijst met `successorBugId` naar
+de nieuwe bug. Kwaliteitsbewaking vraagt voor die nieuwe bug idempotent `requestBugfix(...)` aan.
+Iedere bug vertegenwoordigt zo precies één concrete afwijking en maximaal één herstelpoging; er is
+geen heropenstatus en vervolgplanning gebruikt opnieuw een gewone bugfixstory.
+**Fix mislukt** is voor de oude bug een historische eindstatus en telt niet nogmaals als actuele
+open bug; de gekoppelde opvolgbug is de enige actuele blokkade voor epicverificatie.
+
+Na een geslaagde bugfixhertest zet Kwaliteitsbewaking de actuele bug op **Opgelost** en
 maakt zij intern een nieuw idempotent `VERIFY_STORY`-workitem voor de oorspronkelijke story tegen de
 nieuwe productversie. Daardoor vervangt een oude afgekeurde controle niet stilzwijgend het bewijs:
 de oorspronkelijke storycriteria worden na de fix opnieuw actueel aangetoond voordat de epic naar
@@ -317,10 +375,10 @@ of een periodieke kwaliteitscontrole. Een queuecommand is een snelle databasebew
 
 ## Fouten, hervatten en idempotentie
 
-- Een storyverificatie is uniek voor story-ID, storyversie, oplevering, geteste productversie en
-  omgeving.
-- Een epicverificatie is uniek voor epic-ID, epicversie en geteste productversie.
-- Een idempotente herhaling voor exact hetzelfde doel maakt geen duplicaat en wijzigt een reeds
+- Eén verificatiepoging is uniek voor workitem-ID en `attemptCount`. Een retry mag voor hetzelfde
+  story- of epicdoel een nieuwe onveranderlijke verificatie publiceren; de historie blijft staan en
+  de actuele referentie wijst naar de nieuwste poging.
+- Een idempotente herhaling binnen dezelfde poging maakt geen duplicaat en wijzigt een reeds
   gepubliceerde verificatie niet.
 - Een technische testfout wordt apart geregistreerd en niet als productbug gepubliceerd.
 - Een sessie kan na een verlopen claim worden hervat met dezelfde inputmomentopname.
@@ -336,6 +394,8 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - alleen `runProcessSession()` voor Kwaliteitsbewaking nieuwe AI-taken aanvraagt;
 - maximaal één uitvoering tegelijk loopt en een wachtende sessie geen technische lock vasthoudt;
 - ieder geclaimd workitem `DONE`, `BLOCKED` of `FAILED` wordt;
+- retrybare workitems zonder maximum volgens de vaste begrensde back-off opnieuw beschikbaar komen;
+- een handmatige retry historie en `attemptCount` behoudt en nooit een tweede processessie afdwingt;
 - een onbereikbare of kapotte testomgeving niet als productbug wordt gepubliceerd;
 - iedere bug reproduceerbaar is en controleerbaar bewijs bevat;
 - iedere verificatie exacte doel-, opleverings-, omgevings- en bronversies bevat;

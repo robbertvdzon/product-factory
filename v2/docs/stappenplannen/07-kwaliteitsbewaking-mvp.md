@@ -10,6 +10,8 @@ kwaliteitshistorie publiceren.
 - Implementeer uitsluitend de MVP-provider achter de in stap 1 vastgelegde
   Kwaliteitsbewaking-API.
 - Implementeer de `QualityWorkItem`-queue en geplande of handmatige `runProcessSession()`.
+- Implementeer zichtbare retryhistorie met `attemptCount`, `retryAfter`, vaste begrensde back-off,
+  onbeperkte domeinretries en **Retry now** zonder dubbele processessie.
 - Laat de tester stories, complete epics, bugfixes en gebruikerssignalen controleren volgens hun
   bevroren context.
 - Bewaar onveranderlijke `Verification`s, `Bug`s en `QualitySnapshot`s.
@@ -18,6 +20,9 @@ kwaliteitshistorie publiceren.
 - Meld iedere gepubliceerde storyverificatie of bugfixhertest via `recordStoryVerification(...)` aan
   Productplanning. Laat Productplanning pas epicverificatie aanvragen wanneer alle actuele
   gerichte controles zijn geslaagd en geen herstelwerk resteert.
+- Gebruik voor epicverificatie alleen `PASSED`, `NEEDS_WORK`, `BLOCKED` en `NOT_SUCCESSFUL`.
+- Laat een afgekeurde bugfixhertest de oude bug als **Fix mislukt** afsluiten en een gekoppelde
+  nieuwe uitvoerbare bug met nieuw bugfixverzoek publiceren.
 - Sluit kwaliteitsinput vanaf deze stap ook aan op Productontwerp en Productplanning.
 - Voeg kwaliteitsbeeld, historie, werkqueue, bewijs en acceptatiescenario's aan de UI toe.
 
@@ -35,6 +40,6 @@ gebouwd. Automatische aanlevering vanuit Software Factory volgt in stap 8.
 
 ## Klaar wanneer
 
-De MVP-tester alle ondersteunde soorten kwaliteitswerk kan verwerken, uitkomsten historisch
-zichtbaar zijn en vervolgwerk bij de juiste eigenaar terechtkomt. Dit werkt met bestuurbare mocks op
-acceptatie en veilig op productie.
+De MVP-tester alle ondersteunde soorten kwaliteitswerk kan verwerken, uitkomsten en retries
+historisch zichtbaar zijn en vervolgwerk bij de juiste eigenaar terechtkomt. Dit werkt met
+bestuurbare mocks op acceptatie en veilig op productie.

@@ -71,7 +71,7 @@ In gewone taal gebeurt het volgende:
    klaargezet.
 9. Kwaliteitsbewaking controleert daarna of het product als geheel echt werkt en of de epic de
    bedoelde verbetering voor de gebruiker heeft bereikt.
-10. Bij een bouwfout komt er een bugfixverzoek. Bij ontbrekend werk binnen de epic komt er een
+10. Bij een bug komt er een bugfixverzoek. Bij ontbrekend werk binnen de epic komt er een
     verzoek voor aanvullende stories. Daarna wordt opnieuw getest.
 11. Bij een geslaagde epiccontrole sluit Productontwerp de epic af.
 
@@ -219,7 +219,9 @@ is.
 epic de bedoelde gebruikersverbetering bereikt.
 
 Een scheduler of bevoegde handmatige aanroep start `runProcessSession()`. De run claimt werk uit de
-eigen `QualityWorkItem`-queue. Een queuecommand start nooit onmiddellijk een tester-agent.
+eigen `QualityWorkItem`-queue. Een queuecommand start nooit onmiddellijk een tester-agent. Aan het
+begin van een run worden retrybare geblokkeerde of mislukte items waarvan `retryAfter` is verstreken weer
+`PENDING` gemaakt.
 
 ### Input
 
@@ -238,10 +240,17 @@ eigen `QualityWorkItem`-queue. Een queuecommand start nooit onmiddellijk een tes
 
 | Gegeven | Betekenis |
 |---|---|
-| `Bug` | Reproduceerbare bouwfout met verwacht en werkelijk gedrag, bewijs en ernst. |
+| `Bug` | Reproduceerbare afwijking met verwacht en werkelijk gedrag, bewijs en ernst. |
 | `Verification` | Onveranderlijk oordeel en bewijs over een story, epic of gebruikerssignaal. |
 | `QualitySnapshot` | Onveranderlijke momentopname na iedere afgeronde niet-lege kwaliteitssessie, met dekking, risico's, bugs en verificatie-uitkomsten. |
+| Kwaliteitsqueuestatus | Read-only zicht op ieder `QualityWorkItem`, inclusief blokkade, pogingen en eerstvolgende retry. |
 | `PlanningWorkItem` bij Productplanning | Kwaliteitsbewaking vraagt de eigenaar om een bugfix of ontbrekende epicdekking te plannen. |
+
+Een tijdelijk geblokkeerd kwaliteitsitem blijft zichtbaar met reden, `attemptCount`, laatste poging
+en `retryAfter`. De back-off is 15 minuten, 1 uur, 4 uur en daarna maximaal 24 uur. Er is geen
+maximaal aantal domeinretries; vanaf vijf pogingen toont de UI **Aandacht nodig**. Met **Retry now**
+maakt de Stakeholder het item direct `PENDING` en start de normale kwaliteitssessie als die nog niet
+loopt. Een bestaande run wordt nooit verdubbeld.
 
 Kwaliteitsbewaking maakt geen stories en wijzigt geen epic. Zij publiceert bewijs en vraagt de
 eigenaar via een betekenisvol command om de geldige vervolgactie.
@@ -264,7 +273,7 @@ verwerkt alle geconfigureerde producten en kan per product maximaal één nieuwe
 | Gegeven | Hoe komt het binnen? | Betekenis |
 |---|---|---|
 | Geconfigureerde producten | Read-only query op de productmodule | De vaste productset die deze sessie verwerkt. |
-| Backlogquery | Read-only query op Productplanning | De eerste uitvoerbare `TODO`-story op `sequenceNumber`. |
+| Dispatchreservering | Atomair command op Productplanning | De eerste uitvoerbare `TODO`-story op `sequenceNumber`, beschermd tegen gelijktijdige annulering. |
 | Externe Software Factory-status | API van Software Factory | Of voor het product nog werk openstaat en of een eerdere story is opgeleverd. |
 
 ### Output
@@ -272,7 +281,7 @@ verwerkt alle geconfigureerde producten en kan per product maximaal één nieuwe
 | Gegeven | Betekenis |
 |---|---|
 | `StoryDeliveryPackage` | Volledige momentopname van de story met alle benodigde UX en assets. |
-| Storycommands | Meldingen `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)` aan Productplanning. |
+| Storycommands | Reservering en meldingen `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)` aan Productplanning. |
 | `DeliveryAttempt` | Technische historie van de Software Factory-dispatcher over verzending, response, fout en retry. |
 
 De dispatcher verstuurt niets zolang Software Factory voor dat product nog een openstaande story
@@ -314,17 +323,20 @@ resteert, zet Productplanning de epic zonder agent op `VERIFYING` en roept
 `requestEpicVerification(...)` aan. Dat command zet alleen een `QualityWorkItem` in de queue. Tijdens
 een latere kwaliteitsrun wordt de hele epic getest.
 
-Bij een bouwfout vraagt Kwaliteitsbewaking bugfixwerk aan. Bij ontbrekend gedrag binnen de bevroren
-scope vraagt zij aanvullende stories voor dezelfde epic aan en zet Productontwerp de epic van
-`VERIFYING` terug naar `ACTIVE`. Na herstel volgen eerst de gerichte storycontroles en daarna opnieuw
-de complete epiccontrole. Alleen Productontwerp verwerkt het epicverificatieresultaat en sluit de
-epic af.
+Een epiccontrole gebruikt alleen `PASSED`, `NEEDS_WORK`, `BLOCKED` of `NOT_SUCCESSFUL`. Bij
+`NEEDS_WORK` zet Productontwerp de epic terug naar `ACTIVE`: bugs leveren gerichte
+bugfixverzoeken op en ontbrekende dekking aanvullende stories. Bij `BLOCKED` blijft de epic
+`VERIFYING` en volgt dezelfde controle het retrybeleid. Na herstel volgen eerst de gerichte
+storycontroles en daarna opnieuw de complete epiccontrole. Alleen Productontwerp verwerkt het
+epicverificatieresultaat en sluit de epic af.
 
 Een `NOT_SUCCESSFUL` epic blijft als historisch eindresultaat bestaan en wordt niet heropend.
 Productontwerp kan tijdens een latere geplande run op basis van de verificatie een nieuwe vervolgepic
 maken. Een `WITHDRAWN` epic was nog niet gekozen en heeft daarom geen stories. Bij een `CANCELLED`
-epic zet Productplanning alle nog niet verstuurde stories direct op `CANCELLED`; een reeds
-`IN_PROGRESS` story loopt normaal af en er wordt geen nieuwe epiccontrole gestart.
+epic bewaart Productplanning een duurzame annuleringsmarker en zet alle niet-gereserveerde `TODO`-
+stories op `CANCELLED`. Daardoor kan een wachtende Planner later niets meer publiceren. Een reeds
+gereserveerde of `IN_PROGRESS` story geldt als gestart en loopt normaal af; er wordt geen nieuwe
+epiccontrole gestart.
 
 ## Overleg en richting
 

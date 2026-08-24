@@ -63,6 +63,7 @@ PlanningWorkItemId requestEpicGapPlanning(RequestEpicGapPlanningCommand command)
 PlanningWorkItemId requestEpicReprioritization(RequestEpicReprioritizationCommand command);
 PlanningWorkItemId requestManualReplan(RequestManualReplanCommand command);
 
+StoryDispatchReservationDetails reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand command);
 void markStoryAsDispatched(MarkStoryAsDispatchedCommand command);
 void markStoryAsDeveloped(MarkStoryAsDevelopedCommand command);
 void recordStoryVerification(RecordStoryVerificationCommand command);
@@ -71,8 +72,10 @@ void cancelStoriesForEpic(CancelStoriesForEpicCommand command);
 
 De vier `request...`-commands starten geen agents en voeren geen inhoudelijke planning uit. Zij
 valideren bron, versie en idempotentiesleutel en voegen alleen een duurzaam `PENDING`-werkitem toe.
-De vier story- en lifecyclecommands zijn eveneens snel en deterministisch. Andere modules krijgen
-nooit schrijftoegang tot `Story` of `PlanningWorkItem`.
+De dispatch-, story- en lifecyclecommands zijn eveneens snel en deterministisch.
+`reserveNextStoryForDispatch(...)` is uitsluitend voor de dispatcher en reserveert atomair hooguit
+één uitvoerbare story. Andere modules krijgen nooit schrijftoegang tot `Story` of
+`PlanningWorkItem`.
 
 ## PlanningWorkItem: de queuegrens
 
@@ -133,9 +136,10 @@ kwaliteitsoordeel.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, leveringsstatus, externe referentie en eventuele actuele verificatiereferentie |
+| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, leveringsstatus, eventuele dispatchreservering, externe referentie en actuele verificatiereferentie |
 | backlogquery | alle uitvoerbare of reeds verzonden stories in volgorde | `StoryDetails` met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | read-only inzicht in de planningsqueue | type, bron, status, claim, resultaat en fout |
+| `StoryDispatchReservationDetails` | tijdelijke read-only reservering voor de dispatcher | reserverings-ID en onveranderlijke momentopname van één uitvoerbare story; geen aparte productentiteit |
 | `ProcessSession` | opgeslagen operationele historie van de intelligente run | implementatie-ID en -versie, geclaimde workitems, inputversies, AI-taak-ID's, publicaties, wacht- of eindstatus en blokkade |
 | `QualityWorkItem` bij Kwaliteitsbewaking | downstream effect van een verificatiecommand; Kwaliteitsbewaking maakt en bezit dit object | type, exact doel-ID en -versie, bron, prioriteit en idempotentiesleutel |
 
@@ -161,7 +165,8 @@ Productontwerp publiceert een complete epic met status `AVAILABLE`. Tijdens een 
 4. bevriest Productontwerp de exacte versie en zet de epic op `IN_PLANNING`;
 5. maakt Productplanning een volledige, samenhangende set stories voor de hele epic;
 6. ordent zij nieuwe stories tussen alle andere `TODO`-stories;
-7. publiceert zij stories atomair en roept `markEpicActive(...)` aan.
+7. controleert zij vlak voor publicatie dat geen duurzame annuleringsmarker voor deze epic bestaat;
+8. publiceert zij stories atomair en roept `markEpicActive(...)` aan.
 
 Meerdere epics mogen tegelijk `IN_PLANNING`, `ACTIVE` of `VERIFYING` zijn. De Stakeholder kan via de
 UI `requestEpicReprioritization(...)` laten aanroepen. Een volgende planningsrun mag die epic
@@ -170,6 +175,8 @@ door.
 
 De globale `sequenceNumber`-volgorde is de enige werkelijke dispatchvolgorde. Stories van
 verschillende epics mogen door elkaar staan. Er is geen tweede roadmap- of backlogentiteit.
+`sequenceNumber`s zijn uniek ten opzichte van alle open `TODO`- én `IN_PROGRESS`-stories; een
+herordening verandert alleen de nummers van `TODO`-stories.
 
 ## Storycontract en backlog
 
@@ -211,8 +218,32 @@ De storystatussen zijn:
 - `CANCELLED` — bewust niet meer uitvoeren, met bron, tijdstip en reden.
 
 Productplanning wijzigt alleen de volgorde van `TODO`-stories. Een `IN_PROGRESS` story wordt normaal
-niet onderbroken. `cancelStoriesForEpic(...)` zet alle `TODO`-stories van een geannuleerde epic
-atomair op `CANCELLED`; een `IN_PROGRESS` story loopt normaal af.
+niet onderbroken.
+
+`cancelStoriesForEpic(...)` bewaart altijd een interne duurzame annuleringsmarker voor epic-ID en
+epicversie, ook als nog geen stories bestaan. In dezelfde transactie zet het alle niet-gereserveerde
+`TODO`-stories op `CANCELLED`. Een latere of op AI wachtende planningssessie mag door de marker geen
+stories meer voor die epic publiceren. Een `IN_PROGRESS` of al voor dispatch gereserveerde story
+geldt als gestart en loopt normaal af.
+
+## Atomaire dispatchreservering
+
+De dispatcher verstuurt geen eerder los gelezen backlogstory. Na synchronisatie van bestaand extern
+werk vraagt zij `reserveNextStoryForDispatch(...)` aan. Productplanning kiest en reserveert in één
+transactie de afhankelijkheidsvrije `TODO`-story met het laagste `sequenceNumber` die compleet is,
+waarvan de bugkoppeling zo nodig bevestigd is en waarvoor geen annuleringsmarker bestaat.
+
+De reservering blijft intern onderdeel van de storyadministratie en levert een onveranderlijke
+`StoryDispatchReservationDetails` op. Bij succesvolle externe aanmaak bevestigt
+`markStoryAsDispatched(...)` dezelfde reservering, legt het externe ID vast en zet de story op
+`IN_PROGRESS`. Bij een tijdelijke externe fout houdt de dispatcher dezelfde reservering en
+idempotentiesleutel voor herstel. Een tweede sessie kan daardoor niet een andere story voor dat
+product passeren.
+
+Annulering en reservering gebruiken dezelfde Productplanning-transactiegrens. Wint annulering, dan
+kan de story niet meer worden gereserveerd. Wint de reservering, dan geldt de story als reeds gestart
+en mag de dispatcher de gereserveerde levering afmaken. Dit is de eenduidige grens voor gelijktijdige
+UI-annulering en dispatch.
 
 ## Snelle opleverstatus en epicverificatie
 
@@ -243,14 +274,21 @@ qualitycommands starten evenmin agents; zij maken alleen `QualityWorkItem`s.
 
 | Bevinding van Kwaliteitsbewaking | Snel command | Later intelligent planwerk |
 |---|---|---|
-| fout in afgesproken storygedrag | `requestBugfix(...)` | maak een bugfixstory |
+| bug in afgesproken storygedrag | `requestBugfix(...)` | maak een bugfixstory |
 | gedrag binnen de bevroren epic had nooit een story | `requestEpicGapPlanning(...)` | maak aanvullende productstories |
-| epic geslaagd, niet aantoonbaar, geblokkeerd of productaanname niet geslaagd | geen | alleen bij een latere expliciete nieuwe aanleiding |
+| epiccontrole geblokkeerd of productaanname niet geslaagd | geen | retry bij blokkade; alleen een nieuwe epic bij een latere expliciete productaanleiding |
+
+Wanneer Productplanning een bugfixstory publiceert, bewaart zij in dezelfde transactie een
+herstelbaar uitgaand effect voor `linkBugfixStory(bugId, storyId)`. De story wordt pas uitvoerbaar en
+het `PlanningWorkItem` pas `DONE` nadat Kwaliteitsbewaking de koppeling idempotent heeft bevestigd.
+Een afgekeurde bugfixhertest levert een nieuwe bug en daarmee eventueel een nieuwe bugfixstory op;
+de storytypen blijven uitsluitend `PRODUCT_STORY` en `BUGFIX`.
 
 ## Grens met de Software Factory-dispatcher
 
-De dispatcher leest de backlog en `StoryDetails` via Productplanning en meldt verzending en
-oplevering via `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)`. De intelligente planner
+De dispatcher leest status en open werk via Productplanning, reserveert de volgende story via
+`reserveNextStoryForDispatch(...)` en meldt verzending en oplevering via
+`markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)`. De intelligente planner
 kent geen extern Software Factory-protocol. Pakketvorming, externe statussynchronisatie,
 `DeliveryAttempt`s, retry en idempotentie staan volledig in het
 [dispatcherdocument](../software-factory-dispatcher.md).
@@ -281,6 +319,10 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - iedere story het volledige Storycontract volgt;
 - epic- en bugbronversies exact vastliggen;
 - `sequenceNumber`s productbreed consistent en uniek zijn;
+- bugfixstories pas na de bevestigde natuurlijke koppeling `linkBugfixStory(bugId, storyId)`
+  uitvoerbaar worden;
+- een annuleringsmarker latere storypublicatie verhindert en dispatchreservering de gelijktijdige
+  grens met annuleren atomair maakt;
 - de eigen procesruntime iedere agent alleen het actuele geheugen van haar vertrouwd geconfigureerde eigen rol
   geeft en de exact gelezen geheugenversies vastlegt;
 - iedere AI-taak een vaste provider, model en configuratieversie heeft en via AI-uitvoering loopt;

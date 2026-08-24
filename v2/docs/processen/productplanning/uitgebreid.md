@@ -59,7 +59,7 @@ claim PENDING workitems, beschikbare epics en inputversies
                       │
              ┌────────┴────────┐
              ▼                 ▼
-       stories per epic   bugfix/gat/reparatie
+       stories per epic      bugfix/gat
              └────────┬────────┘
                       ▼
        Backlogplanner maakt één TODO-volgorde
@@ -97,8 +97,7 @@ Storymakers mogen onafhankelijk werken aan:
 
 - de complete storyset per geclaimde epic;
 - bewezen ontbrekende dekking binnen een bestaande epic;
-- bugfixstories;
-- reparatie van definitief inhoudelijk afgewezen, nog niet verzonden stories.
+- bugfixstories.
 
 Iedere Storymaker levert `StoryDraft`s, zelfstandige `StoryUxSnapshot`s en een `StoryCoverageMap`.
 De maps moeten samen ieder onderdeel van epicscope, UX en succescriteria aantoonbaar afdekken.
@@ -133,6 +132,11 @@ Daarna keurt de criticus goed of blokkeert publicatie.
 Na deterministische contractvalidatie schrijft Productplanning stories, storyversies,
 `sequenceNumber`s en workitemresultaten atomair. Zij roept voor nieuw geplande epics daarna
 idempotent `markEpicActive(...)` aan.
+
+Voor iedere bugfixstory bewaart zij daarnaast een herstelbaar uitgaand commandeffect voor
+`linkBugfixStory(bugId, storyId)`. De story wordt pas uitvoerbaar en het workitem pas `DONE` nadat de
+koppeling is bevestigd. Ook de uitgebreide implementatie publiceert uitsluitend productstories en
+bugfixstories.
 
 Een volgende planningsrun ziet nieuw verschenen workitems en epics. De dispatcher draait op haar
 eigen schedule en wordt niet door de agents gestart.

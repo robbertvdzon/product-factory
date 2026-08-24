@@ -11,8 +11,12 @@ stories en één geordende backlog.
 - Implementeer de `PlanningWorkItem`-queue en geplande of handmatige `runProcessSession()`.
 - Laat de planner een exacte epicversie claimen en opdelen in complete product- of bugfixstories.
 - Bewaar storystatus en `sequenceNumber`; bereken de backlog als alle `TODO`- en `IN_PROGRESS`-stories.
-- Ondersteun de publieke, snelle commands voor levering, afronding, herstelwerk en handmatige
+- Ondersteun de publieke, snelle commands voor levering, bugfix- en dekkingswerk en handmatige
   prioriteitswijziging.
+- Koppel iedere bugfixstory vóór uitvoerbaarheid met `linkBugfixStory(bugId, storyId)` en gebruik
+  uitsluitend de storytypen `PRODUCT_STORY` en `BUGFIX`.
+- Bewaar bij annulering ook zonder bestaande stories een marker die latere publicatie en
+  dispatchreservering blokkeert.
 - Sluit de reeds actieve Productontwerp-implementatie aan. De Kwaliteitsbewaking-API bestaat, maar
   kwaliteitsinputs en -commands worden pas gebruikt nadat haar implementatie in stap 7 actief is.
 - Voeg backlog-, story-, planningwerk- en sessieweergaven plus acceptatiescenario's toe.

@@ -99,7 +99,7 @@
   <text x="700" y="1096" class="api" style="font-size:12px">«command» requestBugfix(...) / requestEpicGapPlanning(...)</text>
   <text x="700" y="1122" class="api" style="font-size:11px">«command» requestEpicReprioritization(...) / requestManualReplan(...)</text>
   <text x="700" y="1148" class="api">«command» cancelStoriesForEpic(...)</text>
-  <text x="700" y="1174" class="api">«command» markStoryAsDispatched/Developed(...)</text>
+  <text x="700" y="1174" class="api" style="font-size:11px">«command» reserveNextStoryForDispatch / markStoryAsDispatched/Developed</text>
   <text x="700" y="1200" class="api">«command» recordStoryVerification(...)</text>
   <line x1="700" y1="1236" x2="1210" y2="1236" class="divider" stroke="#a7f3d0"/>
   <text x="700" y="1266" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
@@ -108,7 +108,7 @@
   <text x="700" y="1358" class="section-title">BELANGRIJKE GRENS</text>
   <text x="700" y="1389" class="note">Alleen Productplanning schrijft Story, status en sequenceNumber.</text>
   <text x="700" y="1413" class="note">Backlog = Story(status TODO of IN_PROGRESS), op sequenceNumber.</text>
-  <text x="700" y="1437" class="note">Queuecommands starten geen agents; lege backlog is geldig.</text>
+  <text x="700" y="1437" class="note">Annuleringsmarker blokkeert publicatie en nieuwe reservering.</text>
 
   <!-- Kwaliteitsbewaking -->
   <g transform="translate(220 0)">
@@ -120,19 +120,19 @@
   <text x="1395" y="302" class="api">«scheduled/manual» runProcessSession()</text>
   <text x="1395" y="334" class="api">«query» getBug(...)</text>
   <text x="1395" y="360" class="api">«query» findVerifications(...)</text>
-  <text x="1395" y="386" class="api" style="font-size:12px">«query» getCurrentQuality/history(...) / findQualityWorkItems(...)</text>
+  <text x="1395" y="386" class="api" style="font-size:11px">«query» quality/history / workitems / retryable workitems</text>
   <text x="1395" y="418" class="api">«command» requestStoryVerification(...)</text>
   <text x="1395" y="444" class="api">«command» requestEpicVerification(...)</text>
   <text x="1395" y="470" class="api">«command» requestBugfixRetest(...)</text>
-  <text x="1395" y="496" class="api">«command» requestSignalInvestigation(...)</text>
-  <text x="1395" y="522" class="api">«command» linkBugfixStory(...)</text>
+  <text x="1395" y="496" class="api" style="font-size:12px">«command» requestSignalInvestigation / retryQualityWorkItem</text>
+  <text x="1395" y="522" class="api">«command» linkBugfixStory(bugId, storyId)</text>
   <line x1="1395" y1="552" x2="1995" y2="552" class="divider" stroke="#ddd6fe"/>
   <text x="1395" y="582" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="1395" y="615" class="entity" style="font-size:13px">QualityWorkItem · Bug · Verification · QualitySnapshot · ProcessSession</text>
   <line x1="1395" y1="644" x2="1995" y2="644" class="divider" stroke="#ddd6fe"/>
   <text x="1395" y="674" class="section-title">BELANGRIJKE GRENS</text>
   <text x="1395" y="705" class="note">Queuecommands bewaren alleen werk; alleen de run vraagt AiTasks aan.</text>
-  <text x="1395" y="729" class="note">Verification richt zich op STORY, EPIC of USER_SIGNAL.</text>
+  <text x="1395" y="729" class="note">Retry: attemptCount · retryAfter · back-off · Retry now.</text>
   <text x="1395" y="753" class="note">Kwaliteitsbewaking schrijft geen Story, Epic of UserSignal.</text>
   <text x="1395" y="801" class="note">Iedere niet-lege testsessie maakt een QualitySnapshot.</text>
   </g>
@@ -168,7 +168,7 @@
   <text x="1395" y="1195" class="entity">DeliveryAttempt</text>
   <line x1="1395" y1="1224" x2="1995" y2="1224" class="divider" stroke="#fed7aa"/>
   <text x="1395" y="1254" class="section-title">GEBRUIKT</text>
-  <text x="1395" y="1285" class="note">Alle geconfigureerde producten · Storyqueries en -commands.</text>
+  <text x="1395" y="1285" class="note">Alle producten · atomaire Story-dispatchreservering.</text>
   <text x="1395" y="1309" class="note">Per product max. één nieuwe story · externe Factory-API.</text>
   <text x="1395" y="1333" class="note">StoryDeliveryPackage is transport, geen entiteit.</text>
   </g>
@@ -218,9 +218,9 @@
   <text x="1260" y="1166" class="flow">story / epic / bugfix-hertest</text>
 
   <path d="M1590 1250 H1235" class="command"/>
-  <text x="1290" y="1236" class="flow">story lifecycle commands</text>
+  <text x="1290" y="1236" class="flow">reserveer + story lifecycle commands</text>
   <path d="M1235 1035 H1590" class="query"/>
-  <text x="1365" y="1021" class="flow">eerste TODO StoryDetails</text>
+  <text x="1365" y="1021" class="flow">StoryDispatchReservationDetails</text>
 
   <path d="M1750 1340 V1410" class="command"/>
   <text x="1597" y="1380" class="flow">StoryDeliveryPackage</text>

@@ -155,6 +155,8 @@ Het planningsscherm toont:
 - alle open stories op `sequenceNumber`;
 - geannuleerde epics en stories apart van de backlog, met bron en reden;
 - storytype `PRODUCT_STORY` of `BUGFIX`;
+- een tijdelijke dispatchreservering als **Wordt verstuurd**, zonder een vijfde publieke
+  storystatus te introduceren;
 - de reden voor een handmatige prioriteitswijziging;
 - de Software Factory-status van de verzonden story en een eventuele technische dispatchblokkade.
 
@@ -177,6 +179,26 @@ De kwaliteitsweergave gebruikt `getCurrentQuality(...)` en `getQualityHistory(..
 ondoorzichtige totaalscore, maar tijdlijnen voor onder meer kritieke bugs, onderzochte routes,
 verificatie-uitkomsten, verouderde dekking en blokkades.
 
+### Kwaliteitsretries
+
+De kwaliteitsweergave bevat een vaste lijst **Opnieuw te proberen testwerk** uit
+`findRetryableQualityWorkItems()`. Ieder retrybaar workitem is zichtbaar; de items met het hoogste
+`attemptCount` staan bovenaan en bij een gelijke waarde staat de oudste laatste poging eerst. Per
+item toont de UI minimaal product, type, doel, blokkadereden, aantal pogingen, laatste poging,
+`retryAfter` en vanaf vijf pogingen **Aandacht nodig**.
+
+Ieder retrybaar item heeft de actie **Retry now**. De UI:
+
+1. roept `retryQualityWorkItem(...)` aan; historie en `attemptCount` blijven staan, `retryAfter`
+   wordt leeggemaakt en het item wordt `PENDING`;
+2. start daarna de normale `runProcessSession()` van Kwaliteitsbewaking als die nog niet draait;
+3. behandelt een gelijktijdige `ProcessAlreadyRunning` hier als bevestiging dat de kwaliteitsrun al
+   bezig is, niet als verloren retry.
+
+Een workitem dat na de vaste batchselectie `PENDING` is geworden, wacht zichtbaar op de volgende
+run. De knop start nooit rechtstreeks een agent en maakt nooit een tweede gelijktijdige
+kwaliteitssessie.
+
 ## Overleggen en richting geven
 
 De Stakeholder kan vanuit het product of een detailpagina een overleg starten. Het overlegscherm
@@ -191,6 +213,7 @@ Snelle acties mogen ook rechtstreeks het juiste command aanbieden, bijvoorbeeld:
 - een urgente epic laten herprioriteren;
 - een beschikbare epic intrekken of een actieve epic annuleren;
 - iedere normaal geplande proces- of dispatchersessie handmatig starten;
+- retrybaar testwerk met **Retry now** direct klaarzetten en zo nodig de kwaliteitsrun starten;
 - geheugen van een gekozen agentrol toevoegen, vervangen of intrekken.
 
 Een handmatige `runProcessSession()` of `runDispatchSession()` geeft een duidelijke fout als in die
@@ -203,7 +226,8 @@ Technische gebruikers kunnen apart zien:
 - het `ImplementationManifest` van de actieve build met gekozen artifact, variant, versie en
   broncommit per capability;
 - de eigen `ProcessSession`s van iedere intelligente module;
-- `PlanningWorkItem`s en `QualityWorkItem`s met status en fout;
+- `PlanningWorkItem`s en `QualityWorkItem`s met status, fout, blokkadereden, `attemptCount` en
+  `retryAfter`;
 - `AiTask`s met aanvrager, provider, model, configuratieversie, status en attemptnummer;
 - veilige AI-voortgang, laatste heartbeat, lease, hersteltermijn en retryreden;
 - laptop- en mockworkers met capabilities, capaciteit en laatste aanwezigheid;

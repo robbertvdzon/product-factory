@@ -179,10 +179,15 @@ Zodra `claimEpicForPlanning(...)` een exact epic-ID en versienummer heeft gekoze
 - wordt nieuwe kennis eventueel een nieuwe vervolgepic;
 - kan stoppen alleen via de daarvoor bedoelde lifecyclecommands.
 
-Een door de Stakeholder bewust gestopte gekozen epic krijgt via `cancelEpic(...)` status
-`CANCELLED`. Productontwerp roept daarna idempotent `cancelStoriesForEpic(...)` op Productplanning
-aan. Productplanning annuleert alleen `TODO`-stories; een `IN_PROGRESS` story loopt normaal af. Een
-ingetrokken nog niet gekozen epic heeft geen stories.
+Bij `cancelEpic(...)` legt Productontwerp eerst een duurzame interne annuleringsoperatie vast en
+roept het idempotent `cancelStoriesForEpic(...)` op Productplanning aan. Productplanning bewaart ook
+zonder bestaande stories een annuleringsmarker, zodat een wachtende Planner later niets meer kan
+publiceren. Na bevestiging zet Productontwerp de epic op `CANCELLED`. De herstelbare operatie maakt
+deze volgorde na een crash af.
+
+Productplanning annuleert alleen niet-gereserveerde `TODO`-stories. Een `IN_PROGRESS` of reeds voor
+dispatch gereserveerde story geldt als gestart en loopt normaal af. Annulering en reservering worden
+binnen Productplanning atomair geordend. Een ingetrokken nog niet gekozen epic heeft geen stories.
 
 Productontwerp controleert status en verwacht versienummer in dezelfde transactie. Zo kan een
 langlopende processessie nooit een inmiddels geclaimde epic overschrijven.
@@ -203,9 +208,10 @@ Meerdere epics mogen tegelijkertijd in planning, actief of in verificatie zijn.
 
 Een epic met `NOT_SUCCESSFUL` blijft als historisch eindresultaat bestaan en wordt niet heropend.
 Een latere Productontwerp-sessie kan uit de verificatie een nieuwe vervolgepic maken. Een
-`CANCELLED` epic krijgt geen complete epicverificatie meer. Bij een onvolledige epic of een bouwfout
-zet `recordEpicVerification(...)` de epic van `VERIFYING` terug naar `ACTIVE`; gericht bugfix- of
-dekkingswerk blijft binnen dezelfde bevroren epic.
+`CANCELLED` epic krijgt geen complete epicverificatie meer. Bij een epicuitkomst `NEEDS_WORK` zet
+`recordEpicVerification(...)` de epic van `VERIFYING` terug naar `ACTIVE`; gerichte bugs en
+dekkingsgaten uit de verificatie blijven binnen dezelfde bevroren epic. Bij `BLOCKED` blijft de epic
+`VERIFYING` terwijl Kwaliteitsbewaking het workitem later opnieuw probeert.
 
 ## Wanneer Productontwerp draait
 

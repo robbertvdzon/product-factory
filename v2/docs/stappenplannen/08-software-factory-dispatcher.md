@@ -13,6 +13,9 @@ dispatcher te plaatsen.
   één modulebrede uitvoering tegelijk.
 - Verwerk in één sessie alle geconfigureerde producten en verstuur per product alleen de bovenste
   uitvoerbare story wanneer Software Factory voor dat product geen open story heeft.
+- Reserveer die story eerst atomair bij Productplanning, zodat annulering en verzending een
+  eenduidige volgorde hebben en een eerder gelezen `TODO`-story niet alsnog buiten de state machine
+  wordt verstuurd.
 - Lever iedere story zelfstandig aan, inclusief acceptatiecriteria, UX en benodigde assets.
 - Verwerk externe status en afronding idempotent via de publieke commands van Productplanning.
 - Laat tijdelijke leveringsfouten met begrensde retries door de dispatcher zelf afhandelen en maak

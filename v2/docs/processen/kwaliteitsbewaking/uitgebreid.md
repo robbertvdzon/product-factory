@@ -96,7 +96,8 @@ de publicatiestap schrijft publieke entiteiten.
 
 ### Stap 1 — claimen en agenda kiezen
 
-Applicatiecode claimt de modulebrede run en vaste batch `QualityWorkItem`s. De Testcoördinator leest:
+Applicatiecode activeert eerst retrybare `BLOCKED`- of `FAILED`-items waarvan `retryAfter` is verstreken en
+claimt daarna de modulebrede run en vaste batch `QualityWorkItem`s. De Testcoördinator leest:
 
 - exacte epic-, story-, bug-, opleverings- en signaalversies;
 - testomgevingen, productversie, toegestane accounts en datagrenzen;
@@ -104,8 +105,8 @@ Applicatiecode claimt de modulebrede run en vaste batch `QualityWorkItem`s. De T
 - teststrategie, rotatie en bekende risico's;
 - zo nodig read-only Git-code, tests en documentatie.
 
-De coördinator maakt één begrensde `TestAgenda`. Een onbereikbare omgeving wordt een blokkade en
-geen productbug.
+De coördinator maakt één begrensde `TestAgenda`. Een onbereikbare omgeving wordt met verhoogd
+`attemptCount` en de vaste begrensde back-off een retrybare blokkade en geen productbug.
 
 ### Stap 2 — parallel testen
 
@@ -129,7 +130,7 @@ verificatie.
 De Verificatiecriticus en bugtriager:
 
 - reproduceert mogelijke bugs onafhankelijk;
-- controleert of ontbrekend gedrag een bouwfout, dekkingsgat, nieuwe wens of blokkade is;
+- controleert of ontbrekend gedrag een bug, dekkingsgat, nieuwe wens of blokkade is;
 - zoekt duplicaten en verwante patronen;
 - vergelijkt epic, UX, alle stories en werkelijk gedrag in een `EpicCoverageAssessment`;
 - bepaalt ernst en gebruikersimpact;
@@ -144,6 +145,11 @@ criticus of blokkeert het resultaat.
 
 Goedgekeurde `Bug`s en `Verification`s worden atomair en geversioneerd opgeslagen. Daarna roept de
 module de betekenisvolle vervolgcommands uit het publieke contract idempotent aan.
+
+Ook deze implementatie gebruikt voor epicverificatie uitsluitend `PASSED`, `NEEDS_WORK`, `BLOCKED`
+en `NOT_SUCCESSFUL`. Een afgekeurde bugfixhertest sluit de oude bug af als **Fix mislukt**, maakt een
+gekoppelde nieuwe uitvoerbare bug en vraagt daarvoor nieuw bugfixwerk aan. De uitgebreide interne
+rollen veranderen deze publieke route niet.
 
 Na een sessie waarin daadwerkelijk is getest bouwt gewone code precies één `QualitySnapshot` uit de
 gevalideerde publieke gegevens. Vervolgens werkt de module `TestRotation` bij. Een rol kan na

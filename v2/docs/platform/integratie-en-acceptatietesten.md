@@ -175,10 +175,10 @@ Minimaal worden deze situaties als vaste scenario's meegeleverd:
 
 | Situatie | Te bewijzen gedrag |
 |---|---|
-| story geaccepteerd | story wordt één keer extern gemaakt en lokaal `IN_PROGRESS` |
+| story geaccepteerd | story wordt eerst atomair gereserveerd, één keer extern gemaakt en lokaal `IN_PROGRESS` |
 | nog open werk | dispatcher verstuurt geen volgende backlogstory |
 | story opgeleverd | dispatcher markeert lokaal `DONE` en het juiste kwaliteitswerk ontstaat |
-| tijdelijke storing | `DeliveryAttempt` en begrensde retry zonder dubbel extern werk |
+| tijdelijke storing | dezelfde dispatchreservering, `DeliveryAttempt` en begrensde retry zonder dubbel extern werk |
 | response verloren | idempotentie vindt de eerder aangemaakte story terug |
 | contractbreuk of ongeldig antwoord | dispatcher blokkeert het product, meldt de softwarefout operationeel en maakt geen domein- of planningswerk |
 | uitvoeringsvraag | antwoordflow is zichtbaar zonder echte Software Factory |
@@ -204,6 +204,8 @@ De basisdataset bevat minimaal:
 - epics in relevante statussen;
 - geprioriteerde productstories en bugfixstories in `TODO`, `IN_PROGRESS`, `DONE` en `CANCELLED`;
 - `PlanningWorkItem`s en `QualityWorkItem`s in relevante statussen;
+- retrybare `QualityWorkItem`s met verschillende `attemptCount`s, blokkaderedenen en
+  `retryAfter`-tijdstippen, waaronder minimaal één item met **Aandacht nodig**;
 - bugs, verificaties en meerdere `QualitySnapshot`s voor een zichtbare tijdlijn;
 - een overleg met notulen en doorwerking;
 - versieerbaar geheugen voor meerdere agentrollen;
@@ -262,6 +264,19 @@ Het scherm bevat:
 - een tijdlijn van Testbed-interacties met requesttype, status en tijdstip, zonder secrets of
   volledige prompts;
 - een checklist met de verwachte zichtbare uitkomst per stap.
+
+Vaste kwaliteitsscenario's bewijzen daarnaast dat:
+
+- verstreken `retryAfter` een retrybaar workitem bij de volgende kwaliteitsrun opnieuw `PENDING`
+  maakt;
+- de lijst met retrybaar testwerk op hoogste `attemptCount` staat;
+- **Retry now** historie en telling behoudt, `retryAfter` leegmaakt en één normale kwaliteitsrun
+  start of een al actieve run hergebruikt;
+- een `NEEDS_WORK`-epiccontrole bugs, dekkingsgaten of beide naar het juiste plancommand vertaalt;
+- een afgekeurde bugfixhertest de oude bug op **Fix mislukt** zet en een gekoppelde nieuwe bug met
+  een nieuw bugfixverzoek maakt;
+- annulering vóór dispatchreservering geen externe story oplevert en een reservering die eerst wint
+  zichtbaar als reeds gestart wordt afgehandeld.
 
 De UI maakt geen vrije mockresponse-JSON de normale route. Vaste, versieerbare scenario's houden
 acceptatietests herhaalbaar. Een technische beheerweergave mag voor diagnose wel de veilige

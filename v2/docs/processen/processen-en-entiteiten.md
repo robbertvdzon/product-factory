@@ -51,8 +51,8 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 |---|---|---|
 | product-/overlegmodule | `createProduct`, `updateProductAssignment`, `configureTestableProduct`, `setProductDispatching`, `submitUserSignal`, `markUserSignalInReview`, `recordSignalInvestigation`, `linkSignalToEpic`, `startMeeting`, `recordMeetingMessage`, `closeMeeting` | `getProduct`, `findProducts`, `findDispatchableProducts`, `getProductAssignment`, `getUserSignal`, `findOpenUserSignals`, `getTestableProduct`, `getMeeting`, `findMeetings` |
 | Productontwerp | `claimEpicForPlanning`, `markEpicActive`, `markEpicReadyForVerification`, `recordEpicVerification`, `withdrawEpic`, `cancelEpic` | `getEpic`, `findAvailableEpics`, `findActiveEpics` |
-| Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
-| Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `linkBugfixStory` | `getBug`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems` |
+| Productplanning | `requestBugfix`, `requestEpicGapPlanning`, `requestEpicReprioritization`, `requestManualReplan`, `reserveNextStoryForDispatch`, `markStoryAsDispatched`, `markStoryAsDeveloped`, `recordStoryVerification`, `cancelStoriesForEpic` | `getStory`, `getBacklog`, `findPlanningWorkItems` |
+| Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `retryQualityWorkItem`, `linkBugfixStory(bugId, storyId)` | `getBug`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems`, `findRetryableQualityWorkItems` |
 | Besluitenregister | `createDecision`, `reviseDecision`, `withdrawDecision`, `supersedeDecisions` | `getDecisions(productId, validAt?)`, `getDecisionArchive(productId)` |
 | Agentgeheugen | `addAgentMemory`, `replaceAgentMemory`, `retractAgentMemory` | `getActiveMemory(context)`, `getMemoryAt(productId, role, validAt)`, `getMemoryHistory(productId, role, itemId)` |
 | AI-uitvoering | `updateAiJobConfiguration`, `requestAiTask`, `cancelAiTask`; aparte workercommands voor claim, heartbeat, progress, complete en fail | `getAiJobConfiguration`, `getAiJobConfigurations`, `getAiTask`, `getAiTaskResult`, `findAiTasks` |
@@ -119,8 +119,8 @@ nooit rechtstreeks in de tabel.
 | `Epic` | Productontwerp | Productplanning vraagt planning/statusovergangen; Kwaliteitsbewaking registreert uitkomst; Stakeholder kan intrekken of annuleren | ontwerp, planning, kwaliteit en frontend | complete verbetering met scope, UX, versie en status `AVAILABLE`, `IN_PLANNING`, `ACTIVE`, `VERIFYING`, `COMPLETED`, `NOT_SUCCESSFUL`, `CANCELLED`, `SUPERSEDED` of `WITHDRAWN` |
 | `PlanningWorkItem` | Productplanning | Kwaliteitsbewaking, product-/overlegmodule of bevoegde bediening | Productplanning, operations en frontend | gerichte planningsqueue; type `PLAN_BUGFIX`, `PLAN_EPIC_GAP`, `REPRIORITIZE_EPIC` of `MANUAL_REPLAN`; status `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` of `FAILED` |
 | `Story` | Productplanning | dispatcher meldt verzending/oplevering; Kwaliteitsbewaking meldt een exacte verificatie; Productontwerp vraagt annulering van open stories | planning, dispatcher, kwaliteit en frontend | complete productstory of bugfix met UX, productbreed `sequenceNumber`, leveringsstatus `TODO`, `IN_PROGRESS`, `DONE` of `CANCELLED` en een eventuele actuele verificatiereferentie |
-| `QualityWorkItem` | Kwaliteitsbewaking | Productplanning of product-/overlegmodule | Kwaliteitsbewaking, operations en frontend | duurzame testqueue; type `VERIFY_STORY`, `VERIFY_EPIC`, `RETEST_BUGFIX` of `INVESTIGATE_USER_SIGNAL`; dezelfde vijf werkstatussen |
-| `Bug` | Kwaliteitsbewaking | Productplanning mag een bugfixstory koppelen | kwaliteit, planning en frontend | reproduceerbare afwijking, bewijs, ernst en herstelstatus |
+| `QualityWorkItem` | Kwaliteitsbewaking | Productplanning of product-/overlegmodule; Stakeholder mag een retry nu klaarzetten | Kwaliteitsbewaking, operations en frontend | duurzame testqueue; type `VERIFY_STORY`, `VERIFY_EPIC`, `RETEST_BUGFIX` of `INVESTIGATE_USER_SIGNAL`; dezelfde vijf werkstatussen plus `attemptCount`, `lastAttemptAt`, `retryable`, `retryAfter` en blokkadereden |
+| `Bug` | Kwaliteitsbewaking | Productplanning mag precies één bugfixstory koppelen | kwaliteit, planning en frontend | reproduceerbare afwijking en één herstelpoging; een mislukte fix sluit deze bug af en verwijst naar een nieuwe opvolgbug |
 | `Verification` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | kwaliteit, ontwerp, planning en frontend | controle van `STORY`, `EPIC` of `USER_SIGNAL`, met doelversie, uitkomst, bewijs en eventuele dekkingsgaten |
 | `QualitySnapshot` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | Productontwerp, Stakeholder en frontend | aantoonbaar kwaliteitsbeeld na één afgeronde niet-lege kwaliteitssessie; vormt samen met eerdere snapshots de historie |
 | `Decision` | Besluitenregister | notulenagent voor de Stakeholder of bevoegde Factorymodule mag aanmaken, herzien, intrekken of vervangen | alle processen via geldige snapshot; Stakeholder en frontend ook via archief | stabiele identiteit, `origin`, state `ACTIVE`, `WITHDRAWN` of `SUPERSEDED`, historie en eventuele opvolger |
@@ -153,13 +153,14 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `UserSignalDetails` | productmodule | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | bronmelding, status, uitkomst en koppelingen |
 | `MeetingDetails` | product-/overlegmodule | Stakeholder, betrokken processen en frontend | agenda, gesprek, status, gekoppelde objecten, notulen en doorwerking |
 | `EpicDetails` | Productontwerp | Productplanning, Kwaliteitsbewaking en frontend | epicinhoud, UX, versie en status; read-only |
-| `StoryDetails` | Productplanning | dispatcher, Kwaliteitsbewaking en frontend | storyinhoud, UX, volgorde, leveringsstatus en eventuele actuele verificatiereferentie; read-only |
+| `StoryDetails` | Productplanning | dispatcher, Kwaliteitsbewaking en frontend | storyinhoud, UX, volgorde, leveringsstatus, eventuele dispatchreservering en actuele verificatiereferentie; read-only |
 | backlogquery | Productplanning uit `Story` | dispatcher en frontend | stories met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | Productplanning uit `PlanningWorkItem` | operations en frontend | planningsopdracht, bron, status, claim, resultaat en fout |
 | `BugDetails` | Kwaliteitsbewaking | Productplanning en frontend | bug, bewijs, ernst en herstelstatus |
 | `VerificationDetails` | Kwaliteitsbewaking | Productontwerp, Productplanning en frontend | doel, uitkomst, bewijs en dekkingsgaten |
 | `QualitySnapshotDetails` | Kwaliteitsbewaking uit `QualitySnapshot` | Productontwerp, Stakeholder en frontend | huidig of historisch kwaliteitsbeeld per dimensie, zonder verborgen totaalscore |
-| `QualityWorkItemDetails` | Kwaliteitsbewaking uit `QualityWorkItem` | operations en frontend | testopdracht, doelversie, status, claim, resultaat en fout |
+| `QualityWorkItemDetails` | Kwaliteitsbewaking uit `QualityWorkItem` | operations en frontend | testopdracht, doelversie, status, claim, resultaat, fout, `attemptCount`, `lastAttemptAt`, `retryable`, `retryAfter`, blokkadereden en aandachtlabel |
+| `StoryDispatchReservationDetails` | Productplanning uit de intern gereserveerde story | dispatcher | reserverings-ID en onveranderlijke storymomentopname; geen duurzame publieke productentiteit |
 | `DecisionDto` | Besluitenregister uit de versie die op `validAt` geldig is | alle processen, Stakeholder en normale frontend | platte actuele of historische momentopname; geen andere versies en geen op dat moment ongeldige besluiten |
 | `DecisionHistoryDto` | Besluitenregister uit `Decision` plus alle `DecisionDetails` | uitsluitend frontend en audit | actieve, ingetrokken en vervangen besluiten, alle versies, reden en opvolgingsrelatie |
 | `AgentMemoryItemDetails` | Agentgeheugen uit de actuele versie | uitsluitend de bijbehorende agentrol; Stakeholder en frontend ook voor beheer | actueel geheugenitem met exacte versie, titel, inhoud, actor en reden |
@@ -204,10 +205,14 @@ De twee domeinprocesqueues zijn wel duurzame entiteiten:
 
 - `PlanningWorkItem` vertelt Productplanning welk gericht bugfix-, dekkings-, prioriteits- of
   herplanwerk een latere run moet doen; gewone beschikbare epics ontdekt de planner zelf;
-- `QualityWorkItem` vertelt Kwaliteitsbewaking welk gericht testwerk een latere run moet doen.
+- `QualityWorkItem` vertelt Kwaliteitsbewaking welk gericht testwerk een latere run moet doen en
+  bewaart iedere retry met reden, telling en eerstvolgend tijdstip.
 
 Een queuecommand retourneert zodra het idempotente record is opgeslagen. Het start geen agents.
-Iedere run claimt een stabiele batch; nieuw werk wacht tot de volgende run.
+Iedere run activeert eerst verstreken kwaliteitsretries en claimt daarna een stabiele batch; nieuw
+werk wacht tot de volgende run. De kwaliteitsback-off is 15 minuten, 1 uur, 4 uur en daarna 24 uur
+zonder maximaal aantal domeinretries. **Retry now** maakt een item direct `PENDING` en laat de UI
+daarna alleen wanneer nodig de normale kwaliteitsrun starten.
 
 Daarnaast bestaat de generieke `AiTask`-queue. Een procesrun zet daar alleen complete technische
 agenttaken in. Een laptop- of mockworker claimt taken via HTTPS, niet via directe databasetoegang.
@@ -232,7 +237,7 @@ planningswerk of gewijzigde storyinhoud op.
 1. Productontwerp publiceert een complete `AVAILABLE` epic en stuurt geen command naar planning.
 2. Een geplande planningsrun vindt de epic zelf, bevriest haar via `claimEpicForPlanning(...)`, maakt
    alle benodigde stories en zet de epic `ACTIVE`.
-3. De dispatcher verstuurt telkens de eerste uitvoerbare `TODO`-story en meldt status via
+3. De dispatcher reserveert atomair telkens de eerste uitvoerbare `TODO`-story en meldt status via
    `markStoryAsDispatched(...)` en `markStoryAsDeveloped(...)`.
 4. `markStoryAsDeveloped(...)` zet snel `IN_PROGRESS` naar `DONE` en queue't storyverificatie of een
    bugfixhertest; de epic blijft `ACTIVE`.
@@ -246,14 +251,16 @@ planningswerk of gewijzigde storyinhoud op.
    Productontwerp aan.
 8. Alleen bij nieuw ontwikkelwerk roept Kwaliteitsbewaking `requestBugfix(...)` of
    `requestEpicGapPlanning(...)` aan; deze commands zetten werk in de planningsqueue.
-9. Productontwerp blijft enige schrijver van de epicstatus. Een onvolledige epic of bouwfout gaat
-   van `VERIFYING` terug naar `ACTIVE`; een geslaagde of definitief niet geslaagde epic wordt
-   afgesloten. Iedere epic doorloopt dit onafhankelijk van andere actieve epics.
+9. Productontwerp blijft enige schrijver van de epicstatus. `NEEDS_WORK` gaat van `VERIFYING` terug
+   naar `ACTIVE`, `BLOCKED` blijft retrybaar `VERIFYING` en `PASSED` of `NOT_SUCCESSFUL` sluit de
+   epic af. Iedere epic doorloopt dit onafhankelijk van andere actieve epics.
 
 Een nog niet gekozen epic kan `WITHDRAWN` worden zonder storygevolgen. Bij annulering van een reeds
-gekozen epic zet Productontwerp haar op `CANCELLED` en vraagt Productplanning direct alle `TODO`-
-stories op `CANCELLED` te zetten; `IN_PROGRESS` loopt normaal af. Een `NOT_SUCCESSFUL` epic blijft
-historisch gesloten en kan later aanleiding zijn voor een nieuwe epic, maar wordt niet heropend.
+gekozen epic laat Productontwerp Productplanning eerst duurzaam blokkeren dat nog stories worden
+gepubliceerd of gereserveerd en zet daarna de epic op `CANCELLED`. Niet-gereserveerde `TODO`-stories
+worden `CANCELLED`; een reeds gereserveerde of `IN_PROGRESS` story geldt als gestart en loopt
+normaal af. Een `NOT_SUCCESSFUL` epic blijft historisch gesloten en kan later aanleiding zijn voor
+een nieuwe epic, maar wordt niet heropend.
 
 ## Technische vertaling naar Maven en Spring Modulith
 

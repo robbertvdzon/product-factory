@@ -15,6 +15,7 @@ Daarom heeft hij geen `AgentRoleKey`, leest of schrijft hij geen Agentgeheugen e
 De dispatcher:
 
 - synchroniseert de status van eerder verzonden stories met Software Factory;
+- reserveert de volgende story atomair bij Productplanning voordat een externe call begint;
 - meldt verzending en oplevering via de publieke commands van Productplanning;
 - verwerkt alle geconfigureerde producten en verstuurt per product maximaal één nieuwe story wanneer
   Software Factory voor dat product geen open werk heeft;
@@ -53,9 +54,8 @@ productstatus toont onder meer open extern werk, eventuele technische blokkade e
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
 | geconfigureerde-productenquery | productmodule | alle producten waarvoor dispatching actief is |
-| backlogquery | Productplanning | alle `TODO`- en `IN_PROGRESS`-stories in `sequenceNumber`-volgorde |
-| `StoryDetails` | Productplanning | complete storyinhoud, UX, assets, afhankelijkheden, status en externe referentie |
-| `EpicDetails` | Productontwerp | controle dat de bijbehorende epic niet `CANCELLED` is |
+| backlog- en statusqueries | Productplanning | open lokaal en extern gekoppeld werk in `sequenceNumber`-volgorde |
+| `StoryDispatchReservationDetails` | Productplanning via `reserveNextStoryForDispatch(...)` | atomair gereserveerde complete storymomentopname die niet meer door annulering kan worden ingehaald |
 | `SoftwareFactoryWork` | externe adapter | actuele externe status en oplevergegevens van eerder verzonden werk |
 
 De dispatcher leest geen Git-repository, acceptatieomgeving of productieomgeving. Alles wat
@@ -67,6 +67,7 @@ Software Factory nodig heeft, moet al zelfstandig in de story staan.
 |---|---|---|
 | `StoryDeliveryPackage` | tijdelijk transportobject van de dispatcher | volledige, onveranderlijke story voor Software Factory |
 | `DeliveryAttempt` | Software Factory-dispatcher | technische historie van request, response, fout, retry en idempotentiesleutel |
+| `reserveNextStoryForDispatch(...)` | Productplanning | reserveer atomair hooguit één geldige volgende story en verkrijg de momentopname |
 | `markStoryAsDispatched(...)` | Productplanning | leg extern ID vast en zet de story atomair op `IN_PROGRESS` |
 | `markStoryAsDeveloped(...)` | Productplanning | leg oplevering vast en zet de story atomair op `DONE` |
 
@@ -104,7 +105,7 @@ heeft Software Factory nog open werk voor dit product?
           ja ────┴──── nee
           │              │
         no-op            ▼
-              eerste uitvoerbare TODO-story
+              reserveNextStoryForDispatch(...)
                          │
                          ▼
               StoryDeliveryPackage vormen
@@ -123,12 +124,19 @@ product dezelfde deterministische stappen uit. Iedere sessie:
 2. bewaart iedere response of fout als `DeliveryAttempt`;
 3. roept bij een oplevering idempotent `markStoryAsDeveloped(...)` aan;
 4. verstuurt niets zolang Software Factory voor dat product nog open werk heeft;
-5. kiest anders atomair de afhankelijke-vrije `TODO`-story met het laagste `sequenceNumber` waarvan
-   de epic niet `CANCELLED` is;
+5. vraagt anders `reserveNextStoryForDispatch(...)` aan; Productplanning kiest atomair de eerste
+   afhankelijkheidsvrije `TODO`-story zonder annuleringsmarker en retourneert de onveranderlijke
+   reservering;
 6. vormt zonder inhoudelijke beslissing het pakket;
 7. maakt met een stabiele idempotentiesleutel voor dit product maximaal één externe Software
    Factory-story;
-8. roept `markStoryAsDispatched(...)` aan met extern ID en verwachte storyversie.
+8. roept `markStoryAsDispatched(...)` aan met reserverings-ID, extern ID en verwachte storyversie.
+
+Bij een tijdelijke externe fout blijft dezelfde reservering bij dezelfde idempotentiesleutel horen.
+Een volgende sessie herstelt of probeert precies die levering opnieuw en passeert haar niet met een
+andere backlogstory. Als annulering de Productplanning-transactie vóór de reservering wint, ontstaat
+geen reservering. Wint de reservering, dan geldt de story als reeds gestart en wordt die levering
+normaal afgemaakt.
 
 Als de backlog leeg is of geen story uitvoerbaar is, eindigt de sessie als normale no-op. Dat is
 geen aanleiding om een intelligent proces te starten.
@@ -159,8 +167,10 @@ De dispatcher maakt nooit blind een duplicaat.
 
 ### Configuratie- of autorisatiefout
 
-De dispatcher blokkeert de levering en maakt een operationele melding. De story blijft `TODO` als
-geen extern werk bestaat. Er start geen planningsagent en er ontstaat geen inhoudelijk workitem.
+De dispatcher blokkeert de levering en maakt een operationele melding. Als al een dispatchreservering
+bestaat, blijft die met hetzelfde storypakket en dezelfde idempotentiesleutel bewaard totdat de
+configuratie is hersteld. De story blijft `TODO` zolang geen extern werk bestaat. Er start geen
+planningsagent en er ontstaat geen inhoudelijk workitem.
 
 ### Onverwachte contractbreuk door Software Factory
 
@@ -185,9 +195,11 @@ externe story aangemaakt.
 - Eén sessie verwerkt alle producten die bij de start voor dispatching geconfigureerd zijn.
 - Voor een product staat normaal maximaal één Software Factory-story extern open.
 - Eén sessie verstuurt per product maximaal één nieuwe story.
-- Alleen een afhankelijke-vrije `TODO`-story kan worden verstuurd.
+- Alleen een door Productplanning gereserveerde, afhankelijkheidsvrije `TODO`-story kan worden
+  verstuurd.
 - Het laagste geldige `sequenceNumber` bepaalt de keuze.
-- Een story van een `CANCELLED` epic wordt niet verstuurd.
+- Een story waarvoor annulering vóór de reservering is vastgelegd wordt niet verstuurd; een eerder
+  gereserveerde story geldt als gestart.
 - Een storypakket is een onveranderlijke momentopname van één exacte storyversie.
 - Iedere externe poging heeft een `DeliveryAttempt` en een stabiele idempotentiesleutel.
 - De dispatcher wijzigt geen productinhoud en neemt geen besluit.
