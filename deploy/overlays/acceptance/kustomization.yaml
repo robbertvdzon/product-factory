@@ -8,6 +8,6 @@ patches:
   - path: routes-patch.yaml
 images:
   - name: ghcr.io/robbertvdzon/product-factory-backend
-    digest: sha256:51c5ab21e64c744568575232c318cf6e453bf0d41a490f1c3343f731c3a5a570
+    digest: sha256:d06a724a42c4dc5bb223ba653b6a5b39e7a87e9c2a8012db63c2e7037037a72d
   - name: ghcr.io/robbertvdzon/product-factory-frontend
-    digest: sha256:6c1a70a11f07349c8a871bcaa8c42aab3b3b8adefb49971646ebbe9ad4ab2214
+    digest: sha256:353610ba2737a7428499c38c047955e6ab72e99f43926c9b0b7dddbe587132ed
