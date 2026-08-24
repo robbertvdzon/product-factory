@@ -22,4 +22,8 @@ class EnvironmentMetadataRepository(
         now,
         key,
     ) == 1
+
+    fun deleteAll() {
+        jdbcTemplate.update("DELETE FROM environment_metadata")
+    }
 }

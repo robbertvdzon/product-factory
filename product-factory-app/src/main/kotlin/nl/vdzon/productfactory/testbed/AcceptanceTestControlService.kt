@@ -1,0 +1,149 @@
+package nl.vdzon.productfactory.testbed
+
+import nl.vdzon.productfactory.api.testbed.AcceptanceFixtureContext
+import nl.vdzon.productfactory.api.testbed.AcceptanceFixtureContributor
+import nl.vdzon.productfactory.api.testbed.ActivateTestScenarioCommand
+import nl.vdzon.productfactory.api.testbed.AdvanceTestScenarioCommand
+import nl.vdzon.productfactory.api.testbed.InjectTestFaultCommand
+import nl.vdzon.productfactory.api.testbed.ResetAcceptanceEnvironmentCommand
+import nl.vdzon.productfactory.api.testbed.TestControlService
+import nl.vdzon.productfactory.api.testbed.TestScenarioDetails
+import nl.vdzon.productfactory.api.testbed.TestScenarioLock
+import nl.vdzon.productfactory.api.testbed.TestScenarioSummary
+import org.springframework.boot.ApplicationArguments
+import org.springframework.boot.ApplicationRunner
+import org.springframework.context.annotation.Profile
+import org.springframework.core.annotation.Order
+import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionTemplate
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicReference
+
+@Service
+@Profile("acceptance")
+@Order(100)
+class AcceptanceTestControlService(
+    contributors: List<AcceptanceFixtureContributor>,
+    private val transactionTemplate: TransactionTemplate,
+    private val clock: Clock,
+) : TestControlService, ApplicationRunner {
+    private val contributors = contributors.sortedWith(compareBy({ it.order }, { it.key }))
+    private val scenarios = listOf(
+        TestScenarioSummary(
+            key = "foundation-clean",
+            version = "1",
+            title = "Schone technische fundering",
+            description = "Herhaalbare synthetische basisdata zonder functionele processen.",
+        ),
+        TestScenarioSummary(
+            key = "outbound-mutations-blocked",
+            version = "1",
+            title = "Externe mutaties geblokkeerd",
+            description = "Bewijst dat acceptatie geen echte AI- of Software Factory-mutaties uitvoert.",
+        ),
+    )
+    private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
+
+    override fun run(args: ApplicationArguments) {
+        resetAcceptanceEnvironment(ResetAcceptanceEnvironmentCommand(scenarios.first().key, "startup"))
+    }
+
+    override fun getActiveScenario(): TestScenarioDetails = currentDetails()
+
+    override fun getAvailableScenarios(): List<TestScenarioSummary> = scenarios
+
+    @Synchronized
+    override fun resetAcceptanceEnvironment(command: ResetAcceptanceEnvironmentCommand) {
+        validateBrowserSession(command.browserSessionId)
+        val scenario = scenario(command.scenarioKey)
+        val now = clock.instant()
+        val lock = if (command.browserSessionId == STARTUP_SESSION) {
+            null
+        } else {
+            acquireLock(command.browserSessionId, now)
+        }
+        transactionTemplate.executeWithoutResult {
+            val context = AcceptanceFixtureContext(DATASET_VERSION, scenario.key)
+            contributors.forEach { it.reset(context) }
+        }
+        active.set(details(scenario, now, lock))
+    }
+
+    override fun activateScenario(command: ActivateTestScenarioCommand) {
+        resetAcceptanceEnvironment(ResetAcceptanceEnvironmentCommand(command.scenarioKey, command.browserSessionId))
+    }
+
+    @Synchronized
+    override fun advanceScenario(command: AdvanceTestScenarioCommand) {
+        validateBrowserSession(command.browserSessionId)
+        val current = requireLock(command.browserSessionId)
+        check(current.currentStep == command.expectedStep) { "Het acceptatiescenario is intussen gewijzigd." }
+        active.set(current.copy(currentStep = current.currentStep + 1, lock = renewedLock(command.browserSessionId)))
+    }
+
+    @Synchronized
+    override fun injectTestFault(command: InjectTestFaultCommand) {
+        validateBrowserSession(command.browserSessionId)
+        requireLock(command.browserSessionId)
+        check(command.faultKey == "next-outbound-mutation-blocked") { "Onbekende begrensde testfout." }
+        active.updateAndGet { it.copy(lock = renewedLock(command.browserSessionId)) }
+    }
+
+    private fun scenario(key: String): TestScenarioSummary = scenarios.singleOrNull { it.key == key }
+        ?: throw IllegalArgumentException("Onbekend acceptatiescenario.")
+
+    private fun validateBrowserSession(value: String) {
+        require(BROWSER_SESSION.matches(value)) { "Ongeldige acceptatie-browsersessie." }
+    }
+
+    private fun currentDetails(): TestScenarioDetails {
+        val current = active.get()
+        val lock = current.lock
+        if (lock != null && !lock.expiresAt.isAfter(clock.instant())) {
+            val unlocked = current.copy(lock = null)
+            active.compareAndSet(current, unlocked)
+            return active.get()
+        }
+        return current
+    }
+
+    private fun acquireLock(browserSessionId: String, now: Instant): TestScenarioLock {
+        val currentLock = currentDetails().lock
+        check(currentLock == null || currentLock.browserSessionId == browserSessionId) {
+            "Het acceptatiescenario wordt al door een andere browsersessie bestuurd."
+        }
+        return TestScenarioLock(browserSessionId, currentLock?.acquiredAt ?: now, now.plus(LOCK_DURATION))
+    }
+
+    private fun requireLock(browserSessionId: String): TestScenarioDetails {
+        val current = currentDetails()
+        check(current.lock?.browserSessionId == browserSessionId) {
+            "Deze browsersessie heeft geen actieve scenariolock."
+        }
+        return current
+    }
+
+    private fun renewedLock(browserSessionId: String): TestScenarioLock {
+        val current = active.get().lock
+        return TestScenarioLock(browserSessionId, current?.acquiredAt ?: clock.instant(), clock.instant().plus(LOCK_DURATION))
+    }
+
+    private fun details(scenario: TestScenarioSummary, activatedAt: Instant, lock: TestScenarioLock? = null) = TestScenarioDetails(
+        scenario = scenario,
+        datasetVersion = DATASET_VERSION,
+        testbedVersion = TESTBED_VERSION,
+        activatedAt = activatedAt,
+        currentStep = 0,
+        lock = lock,
+    )
+
+    companion object {
+        private const val DATASET_VERSION = "foundation-v1"
+        private const val TESTBED_VERSION = "0.1.0"
+        private const val STARTUP_SESSION = "startup"
+        private val LOCK_DURATION = Duration.ofMinutes(15)
+        private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")
+    }
+}

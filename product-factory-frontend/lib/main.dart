@@ -3,9 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'application_shell.dart';
 import 'authentication.dart';
+import 'build_identity.dart';
 import 'configuration.dart';
 import 'google_login_button.dart';
+import 'frontend_version_monitor.dart';
+import 'testbed.dart';
 
 void main() {
   runApp(ProductFactoryApp(federatedSignOut: GoogleSignIn.instance.signOut));
@@ -20,11 +24,17 @@ class ProductFactoryApp extends StatelessWidget {
     this.authenticationGateway,
     this.googleLoginButtonBuilder,
     this.federatedSignOut,
+    this.versionGateway,
+    this.frontendVersionSource,
+    this.testControlGateway,
   });
 
   final AuthenticationGateway? authenticationGateway;
   final GoogleLoginButtonBuilder? googleLoginButtonBuilder;
   final Future<void> Function()? federatedSignOut;
+  final VersionGateway? versionGateway;
+  final FrontendVersionSource? frontendVersionSource;
+  final TestControlGateway? testControlGateway;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +50,9 @@ class ProductFactoryApp extends StatelessWidget {
         gateway: authenticationGateway ?? HttpAuthenticationGateway(),
         googleLoginButtonBuilder: googleLoginButtonBuilder,
         federatedSignOut: federatedSignOut,
+        versionGateway: versionGateway ?? HttpVersionGateway(),
+        frontendVersionSource: frontendVersionSource,
+        testControlGateway: testControlGateway,
       ),
     );
   }
@@ -50,12 +63,18 @@ class AuthenticationGate extends StatefulWidget {
     required this.gateway,
     this.googleLoginButtonBuilder,
     this.federatedSignOut,
+    required this.versionGateway,
+    this.frontendVersionSource,
+    this.testControlGateway,
     super.key,
   });
 
   final AuthenticationGateway gateway;
   final GoogleLoginButtonBuilder? googleLoginButtonBuilder;
   final Future<void> Function()? federatedSignOut;
+  final VersionGateway versionGateway;
+  final FrontendVersionSource? frontendVersionSource;
+  final TestControlGateway? testControlGateway;
 
   @override
   State<AuthenticationGate> createState() => _AuthenticationGateState();
@@ -125,12 +144,38 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final status = _status;
+    if (status == null && _error != null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_off, size: 48),
+                const SizedBox(height: 16),
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _loadSession,
+                  child: const Text('Opnieuw proberen'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     if (status?.authenticated == true) {
       return FoundationPage(
         showAcceptanceBanner:
             !status!.authRequired && AppConfiguration.isAcceptance,
         stakeholderEmail: status.stakeholderEmail,
         onLogout: status.authRequired ? _logout : null,
+        versionGateway: widget.versionGateway,
+        error: _error,
+        frontendVersionSource: widget.frontendVersionSource,
+        testControlGateway: widget.testControlGateway,
       );
     }
     return LoginPage(
@@ -218,94 +263,35 @@ class FoundationPage extends StatelessWidget {
     this.showAcceptanceBanner = false,
     this.stakeholderEmail,
     this.onLogout,
+    this.versionGateway,
+    this.error,
+    this.frontendVersionSource,
+    this.onReload,
+    this.currentBuildIdentity,
+    this.testControlGateway,
     super.key,
   });
 
   final bool showAcceptanceBanner;
   final String? stakeholderEmail;
   final VoidCallback? onLogout;
+  final VersionGateway? versionGateway;
+  final String? error;
+  final FrontendVersionSource? frontendVersionSource;
+  final VoidCallback? onReload;
+  final BuildIdentity? currentBuildIdentity;
+  final TestControlGateway? testControlGateway;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Product Factory'),
-        actions: [
-          TextButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.info_outline),
-            label: const Text('Beheer'),
-          ),
-          if (onLogout != null)
-            IconButton(
-              onPressed: onLogout,
-              tooltip: 'Uitloggen',
-              icon: const Icon(Icons.logout),
-            ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (showAcceptanceBanner)
-            Container(
-              width: double.infinity,
-              color: const Color(0xffffe08a),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: const Text(
-                'Acceptatie — synthetische tijdelijke data — authenticatie uit',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final horizontalPadding = constraints.maxWidth < 600
-                    ? 20.0
-                    : 48.0;
-                return SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: 40,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1120),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Technische fundering',
-                          style: Theme.of(context).textTheme.displaySmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Product Factory wordt opnieuw opgebouwd. De veilige technische basis is beschikbaar; functionele processen worden in volgende releases toegevoegd.',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                height: 1.45,
-                                color: const Color(0xff334155),
-                              ),
-                        ),
-                        const SizedBox(height: 32),
-                        const Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text(
-                              'Nog geen functionele procesmodule actief',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ApplicationShell(
+    showAcceptanceBanner: showAcceptanceBanner,
+    stakeholderEmail: stakeholderEmail,
+    onLogout: onLogout,
+    versionGateway: versionGateway ?? HttpVersionGateway(),
+    error: error,
+    frontendVersionSource: frontendVersionSource,
+    onReload: onReload,
+    currentBuildIdentity: currentBuildIdentity,
+    testControlGateway: testControlGateway,
+  );
 }

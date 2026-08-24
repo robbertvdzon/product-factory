@@ -36,7 +36,9 @@ jobs:
           flutter-version: '3.44.6'
           cache: true
       - working-directory: product-factory-frontend
-        run: flutter pub get && flutter analyze && flutter test && flutter build web --release --pwa-strategy=none
+        run: flutter pub get && flutter analyze && flutter test
+      - run: tools/build-frontend.sh
+      - run: tools/test-frontend-cache.sh
 
   repository-verification:
     name: Repository verification

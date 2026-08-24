@@ -21,6 +21,7 @@ case "${1:-help}" in
     use_java_21
     mvn -B --no-transfer-progress verify
     (cd product-factory-frontend && flutter pub get && flutter analyze && flutter test)
+    tools/build-frontend.sh
     ;;
   backend)
     use_java_21
@@ -32,6 +33,9 @@ case "${1:-help}" in
     cd product-factory-frontend
     exec flutter run -d chrome --web-port 8082
     ;;
+  cache-test)
+    exec tools/test-frontend-cache.sh
+    ;;
   up)
     "$0" verify
     exec docker compose --env-file "$ROOT/secrets.env" up -d
@@ -40,6 +44,6 @@ case "${1:-help}" in
     exec docker compose --env-file "$ROOT/secrets.env" down
     ;;
   *)
-    echo "Gebruik: ./product-factory {verify|backend|frontend|up|down}"
+    echo "Gebruik: ./product-factory {verify|backend|frontend|cache-test|up|down}"
     ;;
 esac

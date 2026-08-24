@@ -7,3 +7,12 @@ data class FoundationStatus(
     val state: FoundationState,
     val message: String,
 )
+
+data class BuildIdentity(
+    val applicationVersion: String,
+    val apiVersion: String,
+    val gitRevision: String,
+    val buildTime: String,
+    val environment: String,
+    val backendBuildIdentity: String,
+)
