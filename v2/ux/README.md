@@ -15,6 +15,13 @@ python3 -m http.server 8080
 
 Open daarna `http://localhost:8080`.
 
+## Schermafbeeldingen
+
+De map [screenshots](screenshots/README.md) bevat vaste desktop- en mobiele referentiebeelden die
+rechtstreeks uit dit prototype zijn opgenomen. Gebruik ze bij de frontendbouw voor visuele richting,
+schermhiërarchie en responsive gedrag. Het klikbare prototype en de functionele documentatie blijven
+leidend wanneer een screenshot daarvan afwijkt.
+
 ## Ontwerpkeuzes
 
 - Het overzicht toont alleen het productdoel, het actuele werk en maximaal enkele aandachtspunten.
