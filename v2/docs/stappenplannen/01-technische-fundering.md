@@ -68,6 +68,23 @@ onderbrengen van die bestanden op hun definitieve plek bestaat geen map `v2` mee
    stap 10 automatiseert deze doorstroom voor volgende pushes naar `main`.
 10. Noem de nieuwe applicatie en de nieuwe modules overal gewoon `product-factory`.
 
+## Uitvoeringsmandaat en stopvoorwaarden
+
+Een expliciete opdracht om **dit volledige stappenplan uit te voeren** omvat de noodzakelijke
+repositorywijzigingen, het maken en pushen van de bewaartag en commits, het aanmaken van de nieuwe
+v2-database-infrastructuur en de handmatige deployments naar acceptatie en productie in stap 9.
+Een opdracht voor slechts één stap geeft geen toestemming voor latere stappen.
+
+Het verwijderen van de oude v1-database, de oude database-PVC of de laatste bruikbare backup valt
+nooit onder dit plan. Daarvoor blijft een afzonderlijke, expliciete opdracht nodig. Stop bovendien
+vóór de eerste destructieve repositorywijziging wanneer geen veilige bestemming of
+encryptieontvanger voor de reservekopie van `secrets.env` kan worden vastgesteld. Vraag dan alleen
+die ontbrekende informatie; zet de uitvoering daarna vanaf hetzelfde controlepunt voort.
+
+Ontbrekende toegang tot een extern systeem is eveneens een stopvoorwaarde wanneer die toegang niet
+uit bestaande lokale configuratie, de repository of de actieve clustercontext kan worden afgeleid.
+Toon bij zo'n controle nooit credentials of tokens in uitvoer.
+
 ## Technische v1-lessen die behouden blijven
 
 De oude code is geen contract. Alleen deze technische lessen worden opnieuw geïmplementeerd:
@@ -154,7 +171,9 @@ gestuurd.
 5. Valideer de backup met `pg_restore --list` en maak een SHA-256-checksum.
 6. Controleer dat `secrets.env` bestaat, gitignored is en bestandsrechten `0600` heeft.
 7. Maak buiten de repository een versleutelde reservekopie van `secrets.env`; leg geen waarde vast
-   in logs of documentatie.
+   in logs of documentatie. Gebruik alleen een ondubbelzinnig bestaande bestemming en
+   encryptieontvanger. Als die niet veilig kunnen worden vastgesteld, stop dan hier en vraag de
+   stakeholder om deze twee gegevens.
 8. Inventariseer welke huidige Cloudflare-, Argo CD- en OpenShiftobjecten de productie- en
    acceptatiehostnamen bedienen.
 
@@ -168,7 +187,9 @@ door Git gevolgd en de actieve routes en images zijn genoteerd zonder secretwaar
 3. Verwijder de oude functionele broncode, tests, migraties en workspaceonderdelen.
 4. Breng de in de bewaartabel genoemde kopieën uit `v2/files` naar hun definitieve paden, werk ze
    daar bij en verwijder daarna de tijdelijke map `v2`.
-5. Maak een nieuwe root-Mavenreactor op Java 21, Kotlin en Spring Boot.
+5. Maak een nieuwe root-Mavenreactor op Java 21, Kotlin en Spring Boot. Pin Java 21 expliciet in de
+   lokale bouwinstructies en CI-toolchain; vertrouw niet op de standaard-Java van de machine. Laat
+   de build vroeg en duidelijk falen wanneer Maven een andere Java-hoofdversie gebruikt.
 6. Pas vanaf het begin het gedeelde-API-/implementatiemodulepatroon uit
    [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md) toe.
 7. Maak de ene publieke module `product-factory-api` en leg daarin per capabilitypackage de
@@ -216,6 +237,24 @@ Begin minimaal met:
 
 AI-worker- en Software Factory-secrets worden pas actief wanneer die modules worden gebouwd, maar
 mogen alvast als lege, niet-verplichte placeholders gedocumenteerd worden.
+
+Migreer bestaande v1-instellingen doelbewust volgens deze tabel. Een bestaand veld behouden betekent
+niet dat zijn waarde in logs, documentatie, een patch of Git mag verschijnen.
+
+| Bestaande instelling | Actie | Reden |
+|---|---|---|
+| `PF_GOOGLE_CLIENT_ID` | Hergebruiken als de ingestelde productiehostname en Google-configuratie nog geldig zijn | Dit is de OAuth-clientidentiteit, geen gebruikers- of sessietoken |
+| `PF_ADMIN_EMAILS` | Hergebruiken en naar de nieuwe gesloten stakeholder-allowlist migreren | Dezelfde stakeholder houdt toegang tot alle producten |
+| `PF_DASHBOARD_REMEMBER_SECRET` | Niet hergebruiken; genereer een nieuwe sterke `PF_SESSION_SIGNING_SECRET` | Alle v1-sessies moeten bij de vervanging ongeldig worden |
+| `PF_DB_PASSWORD` | Niet hergebruiken; genereer een nieuw wachtwoord voor gebruiker en database `productfactory_v2` | De nieuwe productiedatabase blijft technisch geïsoleerd van v1 |
+| `PF_SOFTWARE_FACTORY_TOKEN` | In `secrets.env` behouden maar nog niet activeren | Deze technische fundering bevat nog geen dispatcher |
+| `PF_AGENT_WORKER_TOKEN` | In `secrets.env` behouden maar nog niet activeren | Deze technische fundering bevat nog geen AI-uitvoering |
+| `PF_WORKSPACE_GITHUB_TOKEN` | Na een repositorybrede gebruikscontrole uit het actuele secretcontract en `secrets.env` verwijderen | v2 heeft geen workspace en leest alleen publieke Git-repositories |
+
+Google ID-tokens zijn kortlevende loginbewijzen en worden bij iedere login opnieuw verkregen. Neem
+geen bestaand Google ID-token, Product Factory-bearertoken of andere v1-gebruikerssessie over. Andere
+in v1 aangetroffen secrets worden niet automatisch hergebruikt: behoud ze tijdelijk buiten het
+actieve contract en beoordeel ze pas wanneer de bijbehorende capability wordt geïmplementeerd.
 
 **Verificatie:** configuratieprioriteit heeft tests, productie faalt bij ontbrekende verplichte
 waarden, acceptatie bevat geen productiesecrets en een gerenderd manifest toont geen plaintext
@@ -265,7 +304,8 @@ de PostgreSQL-smoketest slaagt en een backup kan werkelijk worden teruggezet.
 2. Valideer handtekening via de officiële Google JWK-set, issuer, audience, verloopdatum en
    `email_verified`.
 3. Controleer het e-mailadres tegen een expliciete, gesloten allowlist.
-4. Maak na geldige login een eigen begrensde Product Factory-sessie.
+4. Maak na geldige login een nieuwe, begrensde Product Factory-sessie met de nieuwe
+   sessieondertekeningssleutel en een nieuwe cookienaam. Accepteer geen v1-sessievorm of v1-token.
 5. Bewaar de sessie bij voorkeur in een `Secure`, `HttpOnly`, `SameSite` cookie. Sta de lokale
    niet-secure variant alleen in het expliciete lokale profiel toe.
 6. Beveilig alle muterende en gegevensroutes standaard. Alleen login-, logout-, health- en beperkte
@@ -403,6 +443,9 @@ mutaties en productie weigert mock-, reset- en seedfunctionaliteit.
 13. Deploy eerst handmatig naar acceptatie en voer daar de rooktests uit. Promoveer daarna bewust
     exact dezelfde image-digests handmatig naar productie. Activeer in deze stap nog geen
     automatische deployment vanaf `main`.
+14. Laat de oude v1-database en database-PVC ook na een geslaagde productiepromotie bestaan. Alleen
+    de nieuwe applicatie en routes worden actief; het verwijderen van oude data is geen onderdeel
+    van deze stap.
 
 **Verificatie:** `kubectl kustomize` rendert beide overlays, policychecks vinden geen plaintext
 secrets of rootcontainer, probes worden gezond en beide omgevingen tonen de juiste identiteit.
