@@ -23,7 +23,7 @@ komen nooit uit agentoutput of vrije prompttekst. Een agent kan daardoor geen an
 product opgeven om daar geheugen te lezen of te wijzigen.
 
 De Stakeholder vormt de enige uitzondering op de rolgrens. Via een bevoegde UI-command kan de
-Stakeholder het geheugen van iedere rol binnen het eigen product beheren. De actor blijft dan de
+globale Stakeholder het geheugen van iedere rol binnen ieder product beheren. De actor blijft dan de
 Stakeholder; de UI of een overlegagent wordt niet als beslisser geregistreerd.
 
 ## Waar geheugen voor bedoeld is
@@ -121,7 +121,7 @@ aan; een technische retry maakt geen dubbele versie.
 
 ### De Stakeholder via de UI
 
-De Stakeholder kan voor iedere zichtbare agentrol binnen het product:
+De globale Stakeholder kan voor iedere zichtbare agentrol binnen ieder product:
 
 - een item toevoegen;
 - titel en inhoud vervangen door een nieuwe versie;

@@ -77,7 +77,7 @@ prioriteit, idempotentiesleutel, status, claim en eventuele foutinformatie. De t
 | Type | Normale aanvrager | Betekenis |
 |---|---|---|
 | `VERIFY_STORY` | Productplanning na een relevante storyoplevering | toets storycriteria en regressierisico |
-| `VERIFY_EPIC` | Productplanning nadat alle stories van die epic `DONE` zijn | toets de volledige bevroren epic |
+| `VERIFY_EPIC` | Productplanning nadat alle stories en bugfixes van die epic `DONE` én actueel geslaagd geverifieerd zijn | toets de volledige bevroren epic |
 | `RETEST_BUGFIX` | Productplanning na oplevering van een bugfixstory | herhaal reproductie en aangrenzende controles |
 | `INVESTIGATE_USER_SIGNAL` | product-/overlegmodule | onderzoek een gemeld kwaliteitsprobleem |
 
@@ -103,7 +103,7 @@ structureert alleen de binnenkant van de gekozen Kwaliteitsbewaking-implementati
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
 | `QualityWorkItem` | Kwaliteitsbewaking | duurzame gerichte testopdracht die de run claimt |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
-| `AiJobConfigurationDetails` | Algemene instellingen | actuele provider en model voor het soort kwaliteitsjob; bevroren op iedere nieuwe taak |
+| `AiJobConfigurationDetails` | AI-uitvoering (`settings`) | actuele provider en model voor het soort kwaliteitsjob; bevroren op iedere nieuwe taak |
 | `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte
@@ -135,8 +135,9 @@ de verificatie vast welke commit is bekeken en welke productversie werkelijk is 
 Kwaliteitsbewaking schrijft `ProcessSession` uitsluitend voor zijn eigen sessies. De
 scheduler roept alleen de procesfunctie aan; scheduler en frontend wijzigen het sessieresultaat niet.
 
-Alleen Kwaliteitsbewaking schrijft `Bug` en `Verification`. Zij vraagt Productplanning via
-`requestBugfix(...)` of `requestEpicGapPlanning(...)` om vervolgwerk, Productontwerp via
+Alleen Kwaliteitsbewaking schrijft `Bug` en `Verification`. Zij meldt een gerichte storyuitkomst via
+`recordStoryVerification(...)` en vraagt Productplanning via `requestBugfix(...)` of
+`requestEpicGapPlanning(...)` om vervolgwerk. Zij vraagt Productontwerp via
 `recordEpicVerification(...)` om een epicuitkomst vast te leggen en de productmodule via
 `recordSignalInvestigation(...)` om een gebruikerssignaal bij te werken. Geen ontvangende module
 kan de onderliggende verificatie of het bewijs veranderen.
@@ -204,9 +205,12 @@ Bij **Afgekeurd** publiceert Kwaliteitsbewaking zo nodig een bug. Het herschrijf
 
 ## Epicverificatie
 
-Wanneer alle niet-geannuleerde stories van een niet-geannuleerde epic op `DONE` staan, is dat alleen
-het startsein voor de epiccontrole. Een `CANCELLED` epic krijgt geen nieuwe epicverificatie. De
-controle gebruikt exact de door Productontwerp bevroren `EpicDetails` en beoordeelt:
+Wanneer een storyverificatie of bugfixhertest is gepubliceerd, meldt Kwaliteitsbewaking de exacte
+uitkomst via `recordStoryVerification(...)` aan Productplanning. Dat command start geen agent.
+Productplanning vraagt pas epicverificatie aan wanneer alle niet-geannuleerde stories en bugfixes
+van de epic `DONE` zijn, iedere actuele controle is geslaagd en geen herstelwerk of open bug resteert.
+Een `CANCELLED` epic krijgt geen nieuwe epicverificatie. De controle gebruikt exact de door
+Productontwerp bevroren `EpicDetails` en beoordeelt:
 
 - de volledige gebruikersroute, niet alleen losse schermen;
 - alle relevante UX-toestanden en overgangen;
@@ -286,7 +290,11 @@ De herstelstatus is:
 
 Productplanning koppelt een bugfixstory via `linkBugfixStory(...)`. Kwaliteitsbewaking kan
 **Gepland**, **In herstel** en **Hertesten** daarna uit `StoryDetails` afleiden en blijft zelf de enige
-schrijver van de duurzame bugstatus.
+schrijver van de duurzame bugstatus. Na een geslaagde bugfixhertest zet zij de bug op **Opgelost** en
+maakt zij intern een nieuw idempotent `VERIFY_STORY`-workitem voor de oorspronkelijke story tegen de
+nieuwe productversie. Daardoor vervangt een oude afgekeurde controle niet stilzwijgend het bewijs:
+de oorspronkelijke storycriteria worden na de fix opnieuw actueel aangetoond voordat de epic naar
+`VERIFYING` kan.
 
 ## Ontbrekende epicdekking
 
@@ -309,7 +317,8 @@ of een periodieke kwaliteitscontrole. Een queuecommand is een snelle databasebew
 
 ## Fouten, hervatten en idempotentie
 
-- Een storyverificatie is uniek voor story-ID, storyversie, oplevering en omgeving.
+- Een storyverificatie is uniek voor story-ID, storyversie, oplevering, geteste productversie en
+  omgeving.
 - Een epicverificatie is uniek voor epic-ID, epicversie en geteste productversie.
 - Een idempotente herhaling voor exact hetzelfde doel maakt geen duplicaat en wijzigt een reeds
   gepubliceerde verificatie niet.

@@ -2,23 +2,26 @@
 
 ## Doel
 
-Laat één Planner-agent beschikbare epics en gericht herstelwerk omzetten in zelfstandige stories en
-één geordende backlog.
+Laat één Planner-agent beschikbare epics en reeds beschikbaar gericht werk omzetten in zelfstandige
+stories en één geordende backlog.
 
 ## Globale scope
 
-- Implementeer de publieke Productplanning-API en uitsluitend de MVP-implementatiemodule.
+- Implementeer uitsluitend de MVP-provider achter de in stap 1 vastgelegde Productplanning-API.
 - Implementeer de `PlanningWorkItem`-queue en geplande of handmatige `runProcessSession()`.
 - Laat de planner een exacte epicversie claimen en opdelen in complete product- of bugfixstories.
 - Bewaar storystatus en `sequenceNumber`; bereken de backlog als alle `TODO`- en `IN_PROGRESS`-stories.
 - Ondersteun de publieke, snelle commands voor levering, afronding, herstelwerk en handmatige
   prioriteitswijziging.
+- Sluit de reeds actieve Productontwerp-implementatie aan. De Kwaliteitsbewaking-API bestaat, maar
+  kwaliteitsinputs en -commands worden pas gebruikt nadat haar implementatie in stap 7 actief is.
 - Voeg backlog-, story-, planningwerk- en sessieweergaven plus acceptatiescenario's toe.
 
 ## Buiten scope
 
 De uitgebreide plannerrollen worden niet gebouwd. Deze stap verstuurt nog geen story naar Software
-Factory en voert nog geen intelligente kwaliteitscontrole uit.
+Factory en voert nog geen intelligente kwaliteitscontrole uit. De Kwaliteitsbewaking-API heeft in
+deze release nog geen actieve implementatieprovider.
 
 ## Specificaties
 

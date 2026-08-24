@@ -180,7 +180,7 @@ Minimaal worden deze situaties als vaste scenario's meegeleverd:
 | story opgeleverd | dispatcher markeert lokaal `DONE` en het juiste kwaliteitswerk ontstaat |
 | tijdelijke storing | `DeliveryAttempt` en begrensde retry zonder dubbel extern werk |
 | response verloren | idempotentie vindt de eerder aangemaakte story terug |
-| definitieve pakketafwijzing | één idempotent `REPAIR_STORY`-workitem ontstaat |
+| contractbreuk of ongeldig antwoord | dispatcher blokkeert het product, meldt de softwarefout operationeel en maakt geen domein- of planningswerk |
 | uitvoeringsvraag | antwoordflow is zichtbaar zonder echte Software Factory |
 | extern foutstadium | operationele fout blijft bij dispatcher en verandert geen storyinhoud |
 

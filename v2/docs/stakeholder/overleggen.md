@@ -1,7 +1,7 @@
 # Product Factory v2 — overleggen met de Stakeholder
 
 Dit document beschrijft hoe de Stakeholder richting geeft en hoe een gesprek controleerbaar
-doorwerkt in Product Factory. Per product is er één Stakeholder: de klant voor wie het product wordt
+doorwerkt in Product Factory. Er is één globale Stakeholder: de klant voor wie alle producten worden
 gemaakt. De Stakeholder is een actor en geen eigen domeinentiteit.
 
 ## Verantwoordelijkheid
@@ -106,6 +106,7 @@ andere normale processtap is geen besluit.
 ## Gerelateerde documenten
 
 - [Overzicht](../overzicht.md)
+- [Product- en overleg-API](product-en-overleg-api.md)
 - [Processen en entiteiten](../processen/processen-en-entiteiten.md)
 - [Besluitenregister](../gedeelde-modules/besluitenregister.md)
 - [Kwaliteitsbewaking-API](../processen/kwaliteitsbewaking/api.md)

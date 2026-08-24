@@ -13,6 +13,9 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 - Maak het productoverzicht en de operationele weergave compleet voor de hele MVP.
 - Voeg vaste end-to-endacceptatiescenario's toe voor de normale route, bugs, ontbrekende epicdekking,
   signalen, handmatige prioriteit, workeruitval en externe leveringsfouten.
+- Bewijs dat een epic pas naar `VERIFYING` gaat nadat iedere actuele story- en bugfixcontrole is
+  geslaagd, en bij onvolledigheid of een bouwfout naar `ACTIVE` terugkeert.
+- Bewijs dat alle geplande functies via zowel schedule als bevoegde UI/REST-start werken.
 - Verifieer dat productie uitsluitend de drie MVP-procesimplementaties selecteert.
 - Werk runbooks, rooktests en documentatie bij op basis van de werkelijk gebouwde route.
 

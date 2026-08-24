@@ -171,11 +171,16 @@ door Git gevolgd en de actieve routes en images zijn genoteerd zonder secretwaar
 5. Maak een nieuwe root-Mavenreactor op Java 21, Kotlin en Spring Boot.
 6. Pas vanaf het begin het API-/implementatiemodulepatroon uit
    [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md) toe.
-7. Maak één main-module als enige Spring Boot composition root.
-8. Maak een nieuwe lege Flutter-webapp of een gelijkwaardig nieuw frontendproject; kopieer geen
+7. Maak alle in het architectuurdocument genoemde publieke `*-api`-modules en leg daarin de volledige
+   command-, query-, DTO-, status- en enumcontracten vast. Voeg nog geen functionele implementaties
+   van toekomstige capabilities toe.
+8. Maak één main-module als enige Spring Boot composition root. De main-module vereist exact één
+   implementatie per capability die in die release al geactiveerd is; een API zonder geactiveerde
+   implementatie is in een tussenstap toegestaan.
+9. Maak een nieuwe lege Flutter-webapp of een gelijkwaardig nieuw frontendproject; kopieer geen
    oude widgets of domeinschermen.
-9. Voeg een eenvoudige backendroute en een leeg maar herkenbaar frontendscherm toe.
-10. Schakel de oude automatische imagepromotie en deployment uit voordat de eerste opschoningscommit
+10. Voeg een eenvoudige backendroute en een leeg maar herkenbaar frontendscherm toe.
+11. Schakel de oude automatische imagepromotie en deployment uit voordat de eerste opschoningscommit
     wordt gepusht. Laat bestaande OpenShift-resources ongemoeid totdat stap 9 ze bewust vervangt.
 
 Gebruik geen `v1`, `v2`, `legacy` of `new` in de definitieve modulenamen.
@@ -362,14 +367,16 @@ Volg [Integratie- en acceptatietesten](../platform/integratie-en-acceptatieteste
 1. Start acceptatie met in-memory database en een vaste synthetische catalogus.
 2. Schakel automatische schedules standaard uit.
 3. Schakel authenticatie expliciet uit en toon de acceptatiebanner overal.
-4. Gebruik `MockAiWorker` en `MockSoftwareFactory` via dezelfde publieke contracten als productie.
+4. Maak alleen het Testbed-raamwerk, de Test Control API, fixturecontributorgrens en veilige
+   omgevingsblokkades. Reserveer de al bestaande publieke contracten voor `MockAiWorker` en
+   `MockSoftwareFactory`, maar implementeer hun gedrag pas in respectievelijk stap 4 en stap 8.
 5. Laat Testbed nooit rechtstreeks in moduletabellen schrijven.
 6. Maak reset en scenariokeuze alleen in acceptatie beschikbaar; productie registreert deze
    endpoints en beans niet.
 7. Blokkeer uitgaande mutaties naar echte AI- of Software Factory-services vanuit acceptatie.
 8. Publieke Gitrepositories mogen later read-only worden gebruikt.
-9. Voeg scenario's toe voor succes, vertraging, timeout, crash/leaseverlies, foutresultaat,
-   idempotente herhaling en herstel.
+9. Voeg alleen funderingsscenario's toe voor reset, vaste data, omgevingisolatie en verboden echte
+   uitgaande mutaties. Functionele AI- en Software Factory-scenario's volgen bij hun capability.
 
 In deze technische release mogen de domeinscenario's nog minimaal zijn. De Testbed-infrastructuur,
 omgevingisolatie en productieblokkades moeten wel volledig bestaan.

@@ -11,15 +11,19 @@ voeren.
 - Bewaak dat een agentrol uitsluitend haar eigen actuele geheugen kan lezen en wijzigen.
 - Geef de Stakeholder via de UI toegang tot alle rolgeheugens, historie en correctiecommands.
 - Implementeer de algemene AI-instellingen per `AiJobKey`, inclusief provider, model of mockprofiel,
-  inschakeling en configuratieversie.
-- Registreer alvast alleen de MVP-agentrollen en MVP-jobkeys die in stappen 5 tot en met 7 nodig
-  zijn.
+  inschakeling en configuratieversie, als intern `settings`-onderdeel van `ai-execution-impl`.
+- Neem `ai-execution-impl` vanaf deze stap als enige provider van de AI-uitvoeringscapability in de
+  app op. Alleen het interne `settings`-onderdeel is al functioneel; de taakqueue en workerroute
+  worden in stap 4 toegevoegd.
+- Registreer de gespreks- en notulenrollen voor stap 4 en de MVP-agentrollen en MVP-jobkeys die in
+  stappen 5 tot en met 7 nodig zijn.
 - Voeg acceptatiedata en tests voor versiehistorie, autorisatie en configuratiewijzigingen toe.
 
 ## Buiten scope
 
-Er worden nog geen AI-taken gequeue'd of door een worker uitgevoerd. De uitgebreide agentrollen en
-hun modelinstellingen worden nog niet geregistreerd.
+Er worden nog geen AI-taken gequeue'd of door een worker uitgevoerd. Een poging via de al bestaande
+taak-API faalt expliciet met `CapabilityNotAvailable`; zij wordt nooit stilzwijgend genegeerd. De
+uitgebreide agentrollen en hun modelinstellingen worden nog niet geregistreerd.
 
 ## Specificaties
 
@@ -30,6 +34,6 @@ hun modelinstellingen worden nog niet geregistreerd.
 
 ## Klaar wanneer
 
-De Stakeholder kan MVP-rolgeheugen en AI-jobinstellingen veilig beheren, iedere wijziging is
+De ene globale Stakeholder kan overleg- en MVP-rolgeheugen en AI-jobinstellingen veilig beheren, iedere wijziging is
 historisch reconstrueerbaar en de rolgrenzen zijn automatisch getest. De versie is op acceptatie en
 productie gedeployed.

@@ -7,13 +7,18 @@ kwaliteitshistorie publiceren.
 
 ## Globale scope
 
-- Implementeer de publieke Kwaliteitsbewaking-API en uitsluitend de MVP-implementatiemodule.
+- Implementeer uitsluitend de MVP-provider achter de in stap 1 vastgelegde
+  Kwaliteitsbewaking-API.
 - Implementeer de `QualityWorkItem`-queue en geplande of handmatige `runProcessSession()`.
 - Laat de tester stories, complete epics, bugfixes en gebruikerssignalen controleren volgens hun
   bevroren context.
 - Bewaar onveranderlijke `Verification`s, `Bug`s en `QualitySnapshot`s.
 - Vraag ontbrekend of fout werk via publieke commands bij Productplanning aan; wijzig geen story of
   epic rechtstreeks.
+- Meld iedere gepubliceerde storyverificatie of bugfixhertest via `recordStoryVerification(...)` aan
+  Productplanning. Laat Productplanning pas epicverificatie aanvragen wanneer alle actuele
+  gerichte controles zijn geslaagd en geen herstelwerk resteert.
+- Sluit kwaliteitsinput vanaf deze stap ook aan op Productontwerp en Productplanning.
 - Voeg kwaliteitsbeeld, historie, werkqueue, bewijs en acceptatiescenario's aan de UI toe.
 
 ## Buiten scope

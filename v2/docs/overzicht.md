@@ -1,16 +1,18 @@
 # Product Factory v2 — overzicht
 
-Product Factory helpt één product steeds verder te verbeteren. De klant voor wie het product wordt
-gemaakt is de **Stakeholder**. Die geeft het doel en de richting aan. Product Factory onderzoekt,
-ontwerpt, plant en controleert het werk. Software Factory bouwt de stories één voor één.
+Product Factory helpt één of meer producten steeds verder te verbeteren. Er is precies één
+**Stakeholder** voor de hele Product Factory. Deze klant geeft voor alle producten het doel en de
+richting aan. Product Factory onderzoekt, ontwerpt, plant en controleert het werk. Software Factory
+bouwt de stories één voor één.
 
 Dit document beschrijft de hele route in eenvoudige taal. De precieze module-interfaces, agents,
 queues en interne werking staan in de documenten onderaan.
 
 ## De Stakeholder is de klant
 
-Per product is er één Stakeholder: de klant voor wie we het product maken. De Stakeholder is een
-actor en wordt niet als apart productobject opgeslagen.
+Er is één globale Stakeholder: de klant voor wie we alle producten maken. De Stakeholder is een
+actor en wordt niet als apart productobject opgeslagen. Dezelfde Stakeholder beheert dus ieder
+product en mag ook Product Factory-brede instellingen wijzigen.
 
 De Stakeholder communiceert met Product Factory via de gebruikersinterface. De UI vertaalt iedere
 actie naar een publiek command op de module die het betrokken productobject bezit; de Stakeholder
@@ -22,7 +24,8 @@ De Stakeholder:
 - kan feedback, zorgen, kansen en testtoegang leveren;
 - kan de richting en prioriteit op ieder moment corrigeren;
 - neemt grote beslissingen die langdurig richting geven;
-- kan een Factory-besluit later aanpassen of intrekken.
+- kan een Factory-besluit later aanpassen of intrekken;
+- beheert de globale AI-provider- en modelinstellingen.
 
 Agents mogen adviseren, doorvragen en gevolgen uitleggen. De expliciete wil van de Stakeholder is
 uiteindelijk leidend. Binnen die richting mag Product Factory gewone, omkeerbare proceskeuzes zelf
@@ -36,7 +39,7 @@ werkdocumenten, prompts en agentadministratie horen hier niet bij.
 
 | Begrip | Eenvoudige betekenis |
 |---|---|
-| `Product` | Het product waaraan Product Factory werkt. |
+| `Product` | Het product waaraan Product Factory werkt, inclusief of het actief is en dispatching aanstaat. |
 | `ProductAssignment` | Het doel, de doelgroep, de harde grenzen en de publieke Git-URL van het product. |
 | `UserSignal` | Feedback, een probleem, zorg, kans of observatie, met zichtbare verwerking en uitkomst. |
 | `Decision` | Een grote, blijvende keuze die meerdere toekomstige sessies richting geeft. |
@@ -63,10 +66,11 @@ In gewone taal gebeurt het volgende:
 6. De dispatcher stuurt de bovenste uitvoerbare story naar Software Factory.
 7. Wanneer Software Factory de story heeft opgeleverd, wordt de story `DONE` en kan gericht
    testwerk worden klaargezet.
-8. Wanneer alle stories van een niet-geannuleerde epic zijn opgeleverd, wordt een controle van de
-   complete epic klaargezet.
-9. Kwaliteitsbewaking controleert of het product echt werkt en of de epic de bedoelde verbetering
-   voor de gebruiker heeft bereikt.
+8. Kwaliteitsbewaking controleert iedere opgeleverde story of bugfix. Pas wanneer alle actuele
+   controles binnen een niet-geannuleerde epic geslaagd zijn, wordt de complete epiccontrole
+   klaargezet.
+9. Kwaliteitsbewaking controleert daarna of het product als geheel echt werkt en of de epic de
+   bedoelde verbetering voor de gebruiker heeft bereikt.
 10. Bij een bouwfout komt er een bugfixverzoek. Bij ontbrekend werk binnen de epic komt er een
     verzoek voor aanvullende stories. Daarna wordt opnieuw getest.
 11. Bij een geslaagde epiccontrole sluit Productontwerp de epic af.
@@ -109,7 +113,8 @@ dezelfde sessie zodra het resultaat klaarstaat. Bij een handmatige start van een
 wordt diezelfde sessie veilig gecontroleerd en niet als tweede sessie gestart.
 
 De Software Factory-dispatcher is het vierde uitvoerende onderdeel, maar geen intelligent proces. Hij
-gebruikt geen agents en neemt geen productbesluiten.
+gebruikt geen agents en neemt geen productbesluiten. Net als ieder gepland onderdeel kan hij ook
+bevoegd via UI of REST worden gestart.
 
 Het Agentgeheugen is een ondersteunende module en geen vijfde proces. Iedere agentrol leest bij een
 taak uitsluitend haar eigen actuele geheugen. De Stakeholder kan alle rolgeheugens via de UI
@@ -121,9 +126,10 @@ een databasequeue. De laptopworker haalt via HTTPS werk op en meldt heartbeat, v
 het eindresultaat terug.
 
 Welke provider en welk model een bepaald soort agentjob gebruikt, staat in de algemene instellingen
-in de database. Een proces leest die configuratie vóór het queueën. De gekozen waarden en
-configuratieversie worden op de taak bevroren, zodat een latere instellingenwijziging geen lopende
-taak verandert.
+van de AI-uitvoeringscapability in de database. Dit is daar een afzonderlijk intern
+Spring Modulith-onderdeel; de generieke taakqueue kiest of interpreteert het model niet. Een proces
+leest de configuratie vóór het queueën. De gekozen waarden en configuratieversie worden op de taak
+bevroren, zodat een latere instellingenwijziging geen lopende taak verandert.
 
 Naast een processessie mogen modules snelle publieke commands en read-only queries aanbieden. Een
 command zoals `requestEpicVerification(...)` start geen agent: het bewaart alleen werk in de queue
@@ -164,7 +170,8 @@ Interne analyses, bronnen, concepten en agentuitvoer blijven binnen Productontwe
 werkwijze de module gebruikt, is niet zichtbaar voor de andere modules.
 
 Wanneer Productontwerp AI nodig heeft, verzamelt het zelf de complete taakinput en alleen het
-geheugen van de uit te voeren eigen rol. Algemene instellingen leveren provider en model.
+geheugen van de uit te voeren eigen rol. Het interne `settings`-onderdeel van AI-uitvoering levert
+provider en model.
 AI-uitvoering bewaart en distribueert die opaque taak; het begrijpt niet dat de taak over een epic
 gaat.
 
@@ -181,7 +188,7 @@ ontbreken, is de run een geldige no-op.
 
 | Gegeven | Hoe komt het binnen? | Betekenis |
 |---|---|---|
-| `PlanningWorkItem` | Via een snel, idempotent requestcommand | Een gericht verzoek voor een bugfix, ontbrekende dekking, storyreparatie, prioriteit of handmatige herplanning. |
+| `PlanningWorkItem` | Via een snel, idempotent requestcommand | Een gericht verzoek voor een bugfix, ontbrekende dekking, prioriteit of handmatige herplanning. |
 | Beschikbare `Epic`s | Read-only query op Productontwerp | De planner kiest en bevriest zelf een exacte epicversie. |
 | `Bug` en `Verification` | Read-only queries op Kwaliteitsbewaking | Bewijs voor herstelwerk of ontbrekende epicdekking. |
 | `ProductAssignment` en geldige `Decision`s | Read-only queries | Het productdoel, de grenzen en blijvende keuzes. |
@@ -245,16 +252,18 @@ een AI-taak is alleen de technische uitvoering van één stap binnen die process
 
 ## Software Factory-dispatcher als black box
 
-**Doel:** steeds precies één geschikte story naar Software Factory sturen en de leveringsstatus
-terugmelden aan Productplanning.
+**Doel:** voor ieder product steeds precies één geschikte story tegelijk naar Software Factory
+sturen en de leveringsstatus terugmelden aan Productplanning.
 
-De scheduler start `runDispatchSession()`. De dispatcher gebruikt geen agents, heeft geen
-productlogica en beheert geen eigen productentiteiten.
+De scheduler of een bevoegde handmatige UI-/REST-actie start `runDispatchSession()`. De dispatcher
+gebruikt geen agents, heeft geen productlogica en beheert geen eigen productentiteiten. Eén sessie
+verwerkt alle geconfigureerde producten en kan per product maximaal één nieuwe story versturen.
 
 ### Input
 
 | Gegeven | Hoe komt het binnen? | Betekenis |
 |---|---|---|
+| Geconfigureerde producten | Read-only query op de productmodule | De vaste productset die deze sessie verwerkt. |
 | Backlogquery | Read-only query op Productplanning | De eerste uitvoerbare `TODO`-story op `sequenceNumber`. |
 | Externe Software Factory-status | API van Software Factory | Of voor het product nog werk openstaat en of een eerdere story is opgeleverd. |
 
@@ -272,8 +281,9 @@ storypakket.
 
 Een tijdelijke dispatchfout handelt de dispatcher zelf af met een `DeliveryAttempt`, gecontroleerde
 retry en dezelfde idempotentiesleutel. Een configuratie- of autorisatiefout blokkeert de levering en
-wordt operationeel zichtbaar. Alleen wanneer Software Factory de story-inhoud definitief afwijst,
-maakt Productplanning intern een `REPAIR_STORY`-workitem; de dispatcher verzint nooit zelf inhoud.
+wordt operationeel zichtbaar. Software Factory moet ieder contractgeldig storypakket accepteren.
+Een weigering is een technische contractfout die levering voor dat product blokkeert; zij verandert
+de story niet en maakt geen planningswerk.
 
 ## Wanneer een epic klaar is
 
@@ -289,20 +299,26 @@ Een epic gebruikt:
 - `AVAILABLE` — complete versie die Productplanning mag kiezen;
 - `IN_PLANNING` — exacte versie is gekozen en bevroren;
 - `ACTIVE` — één of meer stories worden uitgevoerd of hersteld;
-- `VERIFYING` — alle geplande stories zijn klaar en de complete epic wordt gecontroleerd;
+- `VERIFYING` — alle stories en bugfixes zijn opgeleverd en actueel geslaagd geverifieerd; de
+  complete epic wordt gecontroleerd;
 - `COMPLETED` — de bedoelde gebruikersverbetering is aangetoond;
 - `NOT_SUCCESSFUL` — alles is geleverd, maar het gebruikersresultaat is niet bereikt;
 - `CANCELLED` — een reeds gekozen of actieve epic is bewust gestopt;
 - `SUPERSEDED` — een nog niet gekozen epicversie is door een nieuwere versie vervangen;
 - `WITHDRAWN` — een nog niet gekozen epic is bewust ingetrokken.
 
-Alle stories `DONE` betekent dus nog niet automatisch dat de epic is geslaagd. Productplanning zet
-de epic zonder agent op `VERIFYING` en roept `requestEpicVerification(...)` aan. Dat command zet
-alleen een `QualityWorkItem` in de queue. Tijdens een latere kwaliteitsrun wordt de hele epic getest.
+Alle stories `DONE` betekent dus nog niet dat de epic klaar is voor epicverificatie. Eerst controleert
+Kwaliteitsbewaking iedere story of bugfix. Zij meldt iedere uitkomst via een snel command aan
+Productplanning. Alleen wanneer alle actuele controles geslaagd zijn en geen open bug of herstelwerk
+resteert, zet Productplanning de epic zonder agent op `VERIFYING` en roept
+`requestEpicVerification(...)` aan. Dat command zet alleen een `QualityWorkItem` in de queue. Tijdens
+een latere kwaliteitsrun wordt de hele epic getest.
 
 Bij een bouwfout vraagt Kwaliteitsbewaking bugfixwerk aan. Bij ontbrekend gedrag binnen de bevroren
-scope vraagt zij aanvullende stories voor dezelfde epic aan. Na herstel volgt opnieuw controle.
-Alleen Productontwerp verwerkt het verificatieresultaat en sluit de epic af.
+scope vraagt zij aanvullende stories voor dezelfde epic aan en zet Productontwerp de epic van
+`VERIFYING` terug naar `ACTIVE`. Na herstel volgen eerst de gerichte storycontroles en daarna opnieuw
+de complete epiccontrole. Alleen Productontwerp verwerkt het epicverificatieresultaat en sluit de
+epic af.
 
 Een `NOT_SUCCESSFUL` epic blijft als historisch eindresultaat bestaan en wordt niet heropend.
 Productontwerp kan tijdens een latere geplande run op basis van de verificatie een nieuwe vervolgepic
@@ -355,7 +371,8 @@ capabilities gebruiken, maar nooit een andere implementatiemodule. Alleen de ene
 `product-factory-app` kent implementatie-artifacts.
 
 Productontwerp, Productplanning en Kwaliteitsbewaking kunnen een MVP- en uitgebreide implementatie
-hebben. De main-module kiest tijdens de build exact één implementatie per capability; er bestaat
+hebben. De main-module kiest tijdens de build exact één implementatie per geactiveerde capability;
+een nog niet geactiveerde capability kan al wel haar publieke API-module hebben. Er bestaat
 geen runtime-toggle en twee varianten schrijven nooit tegelijk dezelfde productdata. Spring
 Modulith wordt uitsluitend binnen een implementatiemodule gebruikt om haar interne functionele
 delen te structureren en te testen. De API-modules gebruiken geen Spring Modulith.
@@ -398,8 +415,9 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
    bevroren provider en model.
 9. Gemiste worker-heartbeats leiden eerst tot een hersteltermijn; retries zijn met leases en fencing
    beschermd tegen oude workers.
-10. Maven bewaakt de harde API/implementatiegrenzen; de ene main-build kiest exact één implementatie
-    per capability en Spring Modulith blijft binnen die implementatie.
+10. Maven bewaakt de harde API/implementatiegrenzen; alle API-modules bestaan vanaf het begin en de
+    ene main-build kiest exact één implementatie per geactiveerde capability. Spring Modulith blijft
+    binnen die implementatie.
 
 ## Detaildocumenten
 
@@ -423,6 +441,7 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 
 ### Stakeholderbediening
 
+- [Product- en overleg-API](stakeholder/product-en-overleg-api.md)
 - [Frontend](stakeholder/frontend.md)
 - [Overleggen met de Stakeholder](stakeholder/overleggen.md)
 

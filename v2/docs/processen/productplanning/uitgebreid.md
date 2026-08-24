@@ -153,8 +153,9 @@ interne geheugen is dus geen verborgen uitvoeringscontract.
 
 De uitgebreide implementatie gebruikt exact dezelfde
 [Software Factory-dispatcher](../software-factory-dispatcher.md) als de MVP. Technische retries,
-statussynchronisatie en `DeliveryAttempt`s lopen buiten de agents. Alleen een definitieve
-inhoudelijke afwijzing maakt een `REPAIR_STORY`-workitem voor een latere intelligente run.
+statussynchronisatie en `DeliveryAttempt`s lopen buiten de agents. Software Factory accepteert ieder
+contractgeldig storypakket. Een weigering wordt als technische contractfout zichtbaar en maakt geen
+planningswerk.
 
 ## Hervatten en interne idempotentie
 

@@ -66,8 +66,9 @@ gedeelde module [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md). De pro
 actuele items van deze rol toe en registreert de exact gelezen geheugenversies. De agent kan geen
 andere rolnaam of ander rolgeheugen kiezen.
 
-De procesruntime leest voor `PRODUCT_DESIGN.CREATE_EPIC` provider en model uit Algemene instellingen en
-vraagt daarna een complete taak aan bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). De processessie bewaart
+De procesruntime leest voor `PRODUCT_DESIGN.CREATE_EPIC` provider en model uit het interne
+`settings`-onderdeel van AI-uitvoering en vraagt daarna een complete taak aan bij
+[AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). De processessie bewaart
 het taak-ID, wordt `WAITING_FOR_AI` en keert terug. Een volgende run verwerkt het resultaat; de
 laptopworker kent de Productontwerper-rol niet.
 

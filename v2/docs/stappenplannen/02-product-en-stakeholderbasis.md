@@ -7,9 +7,12 @@ Deze stap levert de publieke productbasis waarop alle latere modules voortbouwen
 
 ## Globale scope
 
-- Implementeer `Product`, `ProductAssignment` en `UserSignal` met hun publieke commands en queries.
+- Implementeer `product-impl` als provider achter de in stap 1 vastgelegde product-/overleg-API,
+  met `Product`, `ProductAssignment`, `TestableProductConfiguration` en `UserSignal`, inclusief de
+  expliciete dispatchinginstelling per product.
 - Implementeer het Besluitenregister, inclusief actuele besluiten, historie, intrekken en vervangen.
 - Implementeer overleggen, notulen en de gecontroleerde verwerking van stakeholderuitkomsten.
+- Leg vast dat één globale Stakeholder alle producten en Product Factory-brede instellingen beheert.
 - Voeg de bijbehorende product-, inbox-, besluiten- en overlegschermen aan de frontend toe.
 - Toon herkomst, status en historie via de publieke module-API's; schrijf nooit vanuit de UI in
   moduletabellen.
@@ -26,6 +29,7 @@ overleguitkomst zonder AI via dezelfde publieke commands worden geregistreerd.
 - [Overzicht](../overzicht.md)
 - [Processen en entiteiten](../processen/processen-en-entiteiten.md)
 - [Besluitenregister](../gedeelde-modules/besluitenregister.md)
+- [Product- en overleg-API](../stakeholder/product-en-overleg-api.md)
 - [Overleggen met de Stakeholder](../stakeholder/overleggen.md)
 - [Frontend](../stakeholder/frontend.md)
 

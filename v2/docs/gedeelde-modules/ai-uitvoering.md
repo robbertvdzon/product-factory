@@ -8,8 +8,9 @@ voortgang en resultaten. De worker op de laptop onderhoudt geen blijvende WebSoc
 maar haalt werk via beveiligde HTTPS long polling op.
 
 De capability bestaat uit een Maven-API en één implementatiemodule. Andere implementaties gebruiken
-uitsluitend de API; alleen de main-module neemt `ai-execution-impl` op. Eventuele interne Spring
-Modulith-delen blijven volledig binnen die implementatie.
+uitsluitend de API; alleen de main-module neemt `ai-execution-impl` op. De implementatie bevat ten
+minste de gescheiden interne Spring Modulith-onderdelen `settings` en `task-execution`. Er zijn geen
+aparte Maven-modules nodig voor algemene instellingen.
 
 De module is volledig generiek. Zij kent geen Productontwerper, Planner, Tester, overlegrol, epic,
 story of andere productbetekenis. De aanroeper levert een complete, onveranderlijke taak met alle
@@ -19,6 +20,7 @@ benodigde data, de gekozen provider, het gekozen model en het verwachte uitvoerc
 
 AI-uitvoering is eigenaar en enige schrijver van:
 
+- `AiJobConfiguration` — de globale provider- en modelkeuze per opaque `AiJobKey`;
 - `AiTask` — de duurzame queueopdracht en actuele taakstatus;
 - `AiTaskAttempt` — één geclaimde uitvoeringspoging met lease en fencing token;
 - `AiTaskResult` — het ene geaccepteerde, onveranderlijke eindresultaat;
@@ -50,19 +52,21 @@ De module doet nadrukkelijk niet het volgende:
 | Onderdeel | Verantwoordelijkheid |
 |---|---|
 | aanvragende procesmodule | bepaalt wat de agent moet doen, verzamelt alle input en het eigen rolgeheugen, kiest een `AiJobKey` en valideert later de domeinuitkomst |
-| Algemene instellingen | vertaalt de `AiJobKey` naar actuele provider en model |
-| AI-uitvoering | bewaart en distribueert de complete taak, bewaakt uitvoering en levert het technische resultaat terug |
+| AI-uitvoering — intern `settings` | vertaalt de opaque `AiJobKey` naar actuele provider en model zonder de rol- of productbetekenis te kennen |
+| AI-uitvoering — intern `task-execution` | bewaart en distribueert de complete taak, bewaakt uitvoering en levert het technische resultaat terug; kiest zelf nooit provider of model |
 | laptopworker of mockworker | claimt een taak, start precies de gevraagde provider en rapporteert heartbeat, voortgang en resultaat |
 | Agentgeheugen | levert uitsluitend aan de vertrouwde aanvragende rol haar eigen actuele geheugen; AI-uitvoering kent de rol niet |
 
 ## Algemene AI-jobinstellingen
 
-De algemene instellingen staan duurzaam in de database en zijn niet productspecifiek. Iedere
-inhoudelijke agentjob heeft een stabiele `AiJobKey`, bijvoorbeeld:
+De algemene instellingen zijn een intern onderdeel van de AI-uitvoeringscapability. Zij staan
+duurzaam in de database en zijn niet productspecifiek. Iedere inhoudelijke agentjob heeft een
+stabiele `AiJobKey`, bijvoorbeeld:
 
 - `PRODUCT_DESIGN.CREATE_EPIC`;
 - `PLANNING.SLICE_EPIC`;
 - `QUALITY.VERIFY_EPIC`;
+- `MEETING.CONVERSE`;
 - `MEETING.SUMMARIZE`.
 
 Een jobkey benoemt een soort opdracht en is geen agentrol. Eén rol kan meerdere jobkeys gebruiken en
@@ -88,17 +92,18 @@ List<AiJobConfigurationDetails> getAiJobConfigurations();
 void updateAiJobConfiguration(UpdateAiJobConfigurationCommand command);
 ```
 
-Een bevoegde beheerder of Stakeholder kan provider en model in het scherm **Algemene instellingen**
-wijzigen. Een proces leest de configuratie vlak voordat het een taak aanvraagt en zet `provider`,
-`model`, `jobKey` en `configurationVersion` als vaste waarden op de `AiTask`.
+De ene globale Stakeholder of een bevoegde beheerder kan provider en model in het scherm
+**Algemene instellingen** wijzigen. Een proces leest de configuratie vlak voordat het een taak
+aanvraagt en zet `provider`, `model`, `jobKey` en `configurationVersion` als vaste waarden op de
+`AiTask`.
 
 Een al gequeue'de of lopende taak verandert dus nooit mee met een instellingenwijziging. Alleen een
 nieuwe taak gebruikt de nieuwe provider of het nieuwe model. Een retry van dezelfde technische taak
 behoudt eveneens de oorspronkelijke momentopname; bewust opnieuw uitvoeren met andere instellingen
 vereist een nieuwe taak-ID en idempotentiesleutel.
 
-AI-uitvoering controleert alleen dat provider en model technisch geldig en toegestaan zijn. Zij
-vraagt de configuratie niet zelf op en interpreteert de jobkey niet.
+Het interne `task-execution` controleert alleen dat de aangeleverde provider en het model technisch
+geldig en toegestaan zijn. Het vraagt de configuratie niet zelf op en interpreteert de jobkey niet.
 
 ## Publieke module-interface voor aanvragers
 

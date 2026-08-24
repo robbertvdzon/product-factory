@@ -83,6 +83,7 @@ incompatibiliteit tussen frontend- en backendcontract wordt als duidelijke techn
 
 Het hoofdscherm laat in één oogopslag zien:
 
+- het gekozen product, status `ACTIVE` of `INACTIVE` en of dispatching is ingeschakeld;
 - het productdoel en de harde grenzen;
 - de actieve epics en eventuele handmatig urgente epic;
 - de eerste `TODO`-story en de story die `IN_PROGRESS` is;
@@ -100,7 +101,7 @@ in het aparte beheerscherm, omdat de Stakeholder dit moet kunnen controleren en 
 ## Agentgeheugen
 
 Het scherm **Agentgeheugen** groepeert geheugen per proces en stabiele agentrol. Een rol ziet nooit
-het geheugen van een andere rol, maar de Stakeholder mag binnen het eigen product alle rollen
+het geheugen van een andere rol, maar de globale Stakeholder mag binnen ieder product alle rollen
 beheren.
 
 Per rol toont de frontend:
@@ -121,7 +122,7 @@ frontend schrijft nooit rechtstreeks in de geheugentabellen.
 ## Algemene AI-instellingen
 
 Het scherm **Algemene instellingen** bevat een tabel met alle geregistreerde `AiJobKey`s. Per job
-kan een bevoegde Stakeholder of beheerder kiezen:
+kan de ene globale Stakeholder of een bevoegde beheerder kiezen:
 
 - provider `CODEX`, `CLAUDE` of, buiten productie, `MOCKED`;
 - het model of mockprofiel;
@@ -155,7 +156,7 @@ Het planningsscherm toont:
 - geannuleerde epics en stories apart van de backlog, met bron en reden;
 - storytype `PRODUCT_STORY` of `BUGFIX`;
 - de reden voor een handmatige prioriteitswijziging;
-- de Software Factory-status van de verzonden story.
+- de Software Factory-status van de verzonden story en een eventuele technische dispatchblokkade.
 
 Er is geen afzonderlijke roadmapentiteit en geen tweede handmatige backlog. De epicstatussen en de
 berekende storylijst zijn de enige bronnen.
@@ -184,15 +185,16 @@ toont agenda, berichten, gekoppelde objecten, status, notulen en de expliciete d
 Snelle acties mogen ook rechtstreeks het juiste command aanbieden, bijvoorbeeld:
 
 - productopdracht aanpassen;
+- dispatching voor een product bewust in- of uitschakelen;
 - gebruikerssignaal indienen;
 - een grote blijvende keuze via een overleg als besluit vastleggen;
 - een urgente epic laten herprioriteren;
 - een beschikbare epic intrekken of een actieve epic annuleren;
-- een processessie handmatig starten;
+- iedere normaal geplande proces- of dispatchersessie handmatig starten;
 - geheugen van een gekozen agentrol toevoegen, vervangen of intrekken.
 
-Een handmatige `runProcessSession()` geeft een duidelijke fout als in die module al een run actief
-is.
+Een handmatige `runProcessSession()` of `runDispatchSession()` geeft een duidelijke fout als in die
+module al een run actief is. De REST-ingang retourneert voor deze botsing bijvoorbeeld HTTP 409.
 
 ## Operationele weergave
 
@@ -214,7 +216,7 @@ van een epic, story, bug of verificatie.
 ## Acceptatietesten
 
 Alleen in de acceptatieomgeving toont de frontend het scherm **Acceptatietesten** en op iedere pagina
-een herkenbare banner **synthetische tijdelijke data — authenticatie uit**. Het scherm bedient
+de vaste banner **Acceptatie — synthetische tijdelijke data — authenticatie uit**. Het scherm bedient
 Product Factory Testbed via een acceptance-only Test Control API; het schrijft niet rechtstreeks in
 de Product Factory-database.
 
@@ -230,14 +232,16 @@ De tester kan hier:
 - per scenariostap de verwachte zichtbare uitkomst afvinken.
 
 De UI biedt vaste, versieerbare scenario's in plaats van vrije scripts of willekeurige
-mockresponse-JSON. Automatische schedules staan in acceptatie standaard uit. Processen en dispatcher
-worden via hun bestaande handmatige acties gestart, zodat iedere overgang goed te volgen is. Reset
+mockresponse-JSON. Automatische schedules staan in acceptatie standaard uit. Alle functies die
+normaal gepland draaien, inclusief processen en dispatcher, worden via hun gewone handmatige acties
+gestart, zodat iedere overgang goed te volgen is. Reset
 waarschuwt dat alle tijdelijke acceptatiewijzigingen verdwijnen en is technisch onmogelijk in
 productie.
 
 ## Gerelateerde documenten
 
 - [Overzicht](../overzicht.md)
+- [Product- en overleg-API](product-en-overleg-api.md)
 - [Technische basis](../platform/technische-basis.md)
 - [Deployment en operatie](../platform/deployment-en-operatie.md)
 - [Processen en entiteiten](../processen/processen-en-entiteiten.md)

@@ -125,13 +125,13 @@ Applicatiecode roept voor iedere gekozen epic `claimEpicForPlanning(...)` aan. M
 een versiewijziging of gelijktijdige statusovergang, dan wordt voor die epic niets gepubliceerd. De
 overige epics en geclaimde workitems kunnen nog wel worden afgehandeld.
 
-### Stap 3 — dezelfde agent maakt het complete plan
+### Stap 3 — dezelfde agentrol maakt het complete plan
 
-Dezelfde Planner-taak ontvangt de bevestigde epicversie en maakt vervolgens:
+Een volgende complete `AiTask` voor dezelfde Plannerrol en processessie ontvangt de bevestigde
+epicversie en maakt vervolgens:
 
 - de volledige storyset voor de gekozen epic;
 - gerichte bugfix- en dekkingsgatstories;
-- een gerepareerde versie van een definitief afgewezen, nog niet verzonden story;
 - de definitieve volgorde van alle bestaande en nieuwe `TODO`-stories.
 
 Bij een `REPRIORITIZE_EPIC` kan het resultaat uitsluitend een nieuwe volgorde zijn als er al complete
@@ -181,9 +181,10 @@ atomische productbrede volgorde.
 
 ## Dispatcher
 
-De MVP gebruikt ongewijzigd de [Software Factory-dispatcher](../software-factory-dispatcher.md). Retry,
-idempotentie, opleverstatus en definitieve inhoudelijke afwijzing worden volledig door die
-deterministische adapter afgehandeld en starten geen Planner-agent.
+De MVP gebruikt ongewijzigd de [Software Factory-dispatcher](../software-factory-dispatcher.md).
+Retry, idempotentie en opleverstatus worden volledig door die deterministische adapter afgehandeld
+en starten geen Planner-agent. Software Factory accepteert ieder contractgeldig storypakket; een
+weigering is een technische contractfout en verandert nooit de storyinhoud.
 
 ## Wanneer de MVP voldoende is
 

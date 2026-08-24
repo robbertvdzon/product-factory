@@ -67,8 +67,9 @@ Het permanente geheugen van de rol `TESTER_MVP` staat in
 agenttaak toe en registreert de exact gelezen geheugenversies. De Tester kan geen geheugen van een
 andere rol opvragen.
 
-Voor de Tester-job leest de procesruntime provider en model uit Algemene instellingen en vraagt zij een
-complete taak aan bij [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). De processessie wacht duurzaam met
+Voor de Tester-job leest de procesruntime provider en model uit het interne `settings`-onderdeel van
+AI-uitvoering en vraagt zij een complete taak aan bij
+[AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). De processessie wacht duurzaam met
 `WAITING_FOR_AI`; een volgende run verwerkt het resultaat zonder een dubbele taak te maken.
 
 ## Verloop van één processessie
@@ -164,7 +165,8 @@ Gewone code controleert minimaal:
 
 Geldige bugs en verificaties worden atomair gepubliceerd. Daarna volgen precies de commands uit het
 publieke contract, zoals `requestBugfix(...)`, `requestEpicGapPlanning(...)`,
-`recordEpicVerification(...)` en `recordSignalInvestigation(...)`.
+`recordStoryVerification(...)`, `recordEpicVerification(...)` en
+`recordSignalInvestigation(...)`.
 
 Na een werkelijk uitgevoerde niet-lege testsessie wordt uit de gevalideerde publieke gegevens
 precies één nieuwe `QualitySnapshot` opgebouwd. Een no-op of uitsluitend technische startfout maakt

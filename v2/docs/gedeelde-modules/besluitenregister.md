@@ -143,10 +143,11 @@ geen algemene setter en een aanroeper schrijft nooit rechtstreeks in `Decision` 
 De normale query levert een platte momentopname en nooit het interne aggregate:
 
 ```java
+List<DecisionDto> getDecisions(ProductId productId);
 List<DecisionDto> getDecisions(ProductId productId, Timestamp validAt);
 ```
 
-`validAt` is optioneel en staat standaard op het huidige tijdstip. Zonder datum krijgt de aanroeper
+De overload zonder `validAt` gebruikt het huidige tijdstip. Zonder datum krijgt de aanroeper
 alle besluiten die nu geldig zijn. Met een datum in het verleden krijgt zij alle besluiten die op
 dat moment geldig waren. Dit is vooral bedoeld om later te reconstrueren waarom het product een
 bepaalde richting volgde.

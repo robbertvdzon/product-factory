@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2420" height="2280" viewBox="0 0 2420 2280" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont de Maven-API van een capability en de publieke entiteiten van de tijdens de build gekozen implementatie; interne Spring Modulith-modules zijn verborgen. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering kent geen rollen en distribueert complete taken via een databasequeue aan een laptop- of mockworker. De Stakeholder is een actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont de Maven-API van een capability en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering bevat intern settings en task-execution; task-execution kent geen rollen en distribueert complete taken via een databasequeue aan een laptop- of mockworker. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -25,7 +25,7 @@
 
   <rect width="2420" height="2280" fill="#f8fafc"/>
   <text x="55" y="55" class="title">Product Factory v2 — publieke modulecontracten en eigenaarschap</text>
-  <text x="55" y="88" class="subtitle">Elk blok toont de Maven-API en publieke entiteiten van de gekozen implementatie; interne Spring Modulith-modules blijven verborgen.</text>
+  <text x="55" y="88" class="subtitle">Elk blok toont de Maven-API en publieke entiteiten; bij AI-uitvoering zijn de twee interne eigenaarsdelen expliciet zichtbaar.</text>
   <path d="M65 125 H155" class="command"/>
   <text x="170" y="130" class="note">command: vraagt de eigenaar om een geldige wijziging</text>
   <path d="M585 125 H675" class="query"/>
@@ -35,7 +35,7 @@
   <!-- Stakeholder actor -->
   <circle cx="260" cy="177" r="25" fill="#fef9c3" stroke="#ca8a04" stroke-width="3"/>
   <path d="M260 202 V236 M225 217 H295 M260 236 L232 260 M260 236 L288 260" fill="none" stroke="#ca8a04" stroke-width="3" stroke-linecap="round"/>
-  <text x="315" y="185" class="module-title" style="font-size:20px">Stakeholder</text>
+  <text x="315" y="185" class="module-title" style="font-size:20px">Globale Stakeholder</text>
   <path d="M260 260 V292" class="command"/>
   <text x="278" y="281" class="flow">via gebruikersinterface en commands</text>
 
@@ -45,16 +45,16 @@
   <path d="M55 337 V357 H580 V337" fill="#e2e8f0"/>
   <text x="80" y="335" class="module-title">Product en overleg</text>
   <text x="80" y="387" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="80" y="417" class="api">«command» updateProductAssignment(...)</text>
-  <text x="80" y="443" class="api">«command» configureTestableProduct(...)</text>
+  <text x="80" y="417" class="api" style="font-size:12px">«command» createProduct(...) / updateProductAssignment(...)</text>
+  <text x="80" y="443" class="api" style="font-size:12px">«command» configureTestableProduct(...) / setProductDispatching(...)</text>
   <text x="80" y="469" class="api">«command» submitUserSignal(...)</text>
   <text x="80" y="495" class="api">«command» markUserSignalInReview(...)</text>
   <text x="80" y="521" class="api">«command» recordSignalInvestigation(...)</text>
   <text x="80" y="547" class="api">«command» linkSignalToEpic(...)</text>
   <text x="80" y="573" class="api" style="font-size:12px">«command» start/record/closeMeeting(...)</text>
-  <text x="80" y="605" class="api">«query» getProductAssignment(...)</text>
-  <text x="80" y="631" class="api">«query» getUserSignal(...) / findOpenUserSignals(...)</text>
-  <text x="80" y="657" class="api">«query» getTestableProduct(...)</text>
+  <text x="80" y="605" class="api" style="font-size:12px">«query» get/findProduct(...) / findDispatchableProducts()</text>
+  <text x="80" y="631" class="api" style="font-size:12px">«query» getProductAssignment(...) / getTestableProduct(...)</text>
+  <text x="80" y="657" class="api" style="font-size:12px">«query» getUserSignal(...) / findOpenUserSignals(...)</text>
   <text x="80" y="683" class="api">«query» getMeeting(...) / findMeetings(...)</text>
   <line x1="80" y1="735" x2="555" y2="735" class="divider" stroke="#cbd5e1"/>
   <text x="80" y="765" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
@@ -100,6 +100,7 @@
   <text x="700" y="1122" class="api" style="font-size:11px">«command» requestEpicReprioritization(...) / requestManualReplan(...)</text>
   <text x="700" y="1148" class="api">«command» cancelStoriesForEpic(...)</text>
   <text x="700" y="1174" class="api">«command» markStoryAsDispatched/Developed(...)</text>
+  <text x="700" y="1200" class="api">«command» recordStoryVerification(...)</text>
   <line x1="700" y1="1236" x2="1210" y2="1236" class="divider" stroke="#a7f3d0"/>
   <text x="700" y="1266" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="700" y="1299" class="entity">PlanningWorkItem · Story · ProcessSession</text>
@@ -160,15 +161,16 @@
   <path d="M1370 1002 V1022 H2020 V1002" fill="#ffedd5"/>
   <text x="1395" y="1000" class="module-title">Software Factory-dispatcher</text>
   <text x="1395" y="1052" class="section-title">PUBLIEKE INTERFACE</text>
-  <text x="1395" y="1082" class="api">«scheduled» runDispatchSession()</text>
-  <line x1="1395" y1="1112" x2="1995" y2="1112" class="divider" stroke="#fed7aa"/>
-  <text x="1395" y="1142" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
-  <text x="1395" y="1175" class="entity">DeliveryAttempt</text>
-  <line x1="1395" y1="1204" x2="1995" y2="1204" class="divider" stroke="#fed7aa"/>
-  <text x="1395" y="1234" class="section-title">GEBRUIKT</text>
-  <text x="1395" y="1265" class="note">Storyqueries en storycommands van Productplanning.</text>
-  <text x="1395" y="1289" class="note">Externe Software Factory API.</text>
-  <text x="1395" y="1313" class="note">StoryDeliveryPackage is transport, geen entiteit.</text>
+  <text x="1395" y="1082" class="api">«scheduled/manual» runDispatchSession()</text>
+  <text x="1395" y="1108" class="api" style="font-size:12px">«query» getDispatchStatus(...) / findDeliveryAttempts(...)</text>
+  <line x1="1395" y1="1132" x2="1995" y2="1132" class="divider" stroke="#fed7aa"/>
+  <text x="1395" y="1162" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
+  <text x="1395" y="1195" class="entity">DeliveryAttempt</text>
+  <line x1="1395" y1="1224" x2="1995" y2="1224" class="divider" stroke="#fed7aa"/>
+  <text x="1395" y="1254" class="section-title">GEBRUIKT</text>
+  <text x="1395" y="1285" class="note">Alle geconfigureerde producten · Storyqueries en -commands.</text>
+  <text x="1395" y="1309" class="note">Per product max. één nieuwe story · externe Factory-API.</text>
+  <text x="1395" y="1333" class="note">StoryDeliveryPackage is transport, geen entiteit.</text>
   </g>
 
   <!-- Software Factory external system -->
@@ -206,8 +208,8 @@
   <text x="1370" y="650" class="flow">recordEpicVerification(...)</text>
 
   <path d="M1590 760 H1510 V1102 H1235" class="command"/>
-  <text x="1260" y="1068" class="flow">queue naar planning</text>
-  <text x="1260" y="1088" class="flow">requestBugfix / requestEpicGapPlanning</text>
+  <text x="1260" y="1068" class="flow">commands naar planning</text>
+  <text x="1260" y="1088" class="flow">requestBugfix / requestGap / recordStoryVerification</text>
   <path d="M1235 1044 H1415 V800 H1590" class="query"/>
   <text x="1435" y="786" class="flow">StoryDetails</text>
 
@@ -240,7 +242,7 @@
   <text x="80" y="1702" class="api">«query» getActiveMemory(AgentExecutionContext)</text>
   <text x="80" y="1728" class="api" style="font-size:12px">«query» getMemoryAt(...) / getMemoryHistory(...)</text>
   <text x="790" y="1702" class="api" style="font-size:12px">«command» addAgentMemory(...) / replaceAgentMemory(...) / retractAgentMemory(...)</text>
-  <text x="790" y="1728" class="note">Agent: alleen eigen rol · Stakeholder: alle rollen van het eigen product</text>
+  <text x="790" y="1728" class="note">Agent: alleen eigen rol · globale Stakeholder: alle rollen van ieder product</text>
   <line x1="80" y1="1760" x2="2340" y2="1760" class="divider" stroke="#99f6e4"/>
   <text x="80" y="1790" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="80" y="1823" class="entity">AgentMemoryItem · AgentMemoryVersion · AgentMemoryRetraction</text>
@@ -260,11 +262,13 @@
   <path d="M225 260 H25 V1715 H55" class="command"/>
   <text x="72" y="1560" class="flow">Stakeholder beheert ieder rolgeheugen via de UI</text>
 
-  <!-- General AI settings -->
+  <!-- One AI-execution capability with two internal Modulith parts -->
+  <rect x="35" y="1875" width="1835" height="370" rx="22" fill="none" stroke="#4338ca" stroke-width="2.5" stroke-dasharray="10 7"/>
+  <text x="55" y="1902" class="section-title">ÉÉN MAVEN-CAPABILITY: AI-UITVOERING</text>
   <rect x="55" y="1910" width="570" height="315" rx="18" fill="#fdf4ff" stroke="#a21caf" stroke-width="3"/>
   <rect x="55" y="1910" width="570" height="62" rx="18" fill="#fae8ff"/>
   <path d="M55 1952 V1972 H625 V1952" fill="#fae8ff"/>
-  <text x="80" y="1950" class="module-title">Algemene instellingen</text>
+  <text x="80" y="1950" class="module-title">settings «intern Modulith»</text>
   <text x="80" y="2002" class="section-title">PUBLIEKE INTERFACE</text>
   <text x="80" y="2032" class="api">«query» getAiJobConfiguration(jobKey)</text>
   <text x="80" y="2058" class="api">«query» getAiJobConfigurations()</text>
@@ -274,11 +278,11 @@
   <text x="80" y="2175" class="entity">AiJobConfiguration</text>
   <text x="80" y="2203" class="note">jobKey → provider + model + configuratieversie</text>
 
-  <!-- Generic AI execution module -->
+  <!-- Generic task-execution part -->
   <rect x="670" y="1910" width="1180" height="315" rx="18" fill="#eef2ff" stroke="#4338ca" stroke-width="3"/>
   <rect x="670" y="1910" width="1180" height="62" rx="18" fill="#e0e7ff"/>
   <path d="M670 1952 V1972 H1850 V1952" fill="#e0e7ff"/>
-  <text x="695" y="1950" class="module-title">AI-uitvoering — generieke duurzame queue</text>
+  <text x="695" y="1950" class="module-title">task-execution «intern Modulith» — generieke queue</text>
   <text x="695" y="2002" class="section-title">PUBLIEKE INTERFACE</text>
   <text x="695" y="2032" class="api">«command» requestAiTask(...) / cancelAiTask(...)</text>
   <text x="695" y="2058" class="api">«query» getAiTask(...) / getAiTaskResult(...) / findAiTasks(...)</text>

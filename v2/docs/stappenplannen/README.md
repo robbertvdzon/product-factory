@@ -25,6 +25,9 @@ niet.
 
 ## Algemene regels voor iedere stap
 
+- Stap 1 maakt alle publieke capability-API-modules en hun interfaces. Latere stappen voegen per
+  capability de echte implementatie toe of maken haar volgende interne onderdeel functioneel en
+  activeren dat bewust in `product-factory-app`.
 - Bouw alleen wat voor die stap nodig is en loop niet vooruit op latere capabilities.
 - Gebruik de gekoppelde API- en ontwerpdocumenten als specificatie; kopieer die inhoud niet naar het
   stappenplan.

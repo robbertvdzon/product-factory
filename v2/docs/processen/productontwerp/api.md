@@ -82,7 +82,7 @@ Productontwerp-implementatie.
 | `QualitySnapshotDetails` | Kwaliteitsbewaking-query | huidig kwaliteitsbeeld en historische ontwikkeling van dekking, bugs, risico's en verificaties |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, testaccounts en toegangsgrenzen |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
-| `AiJobConfigurationDetails` | Algemene instellingen | actuele provider en model voor het soort agenttaak; deze waarden worden op iedere nieuwe taak bevroren |
+| `AiJobConfigurationDetails` | AI-uitvoering (`settings`) | actuele provider en model voor het soort agenttaak; deze waarden worden op iedere nieuwe taak bevroren |
 | `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
 
 Voor iedere gebruikte publicatie legt de module bron-ID en bronversie vast. Dezelfde versie wordt
@@ -127,14 +127,17 @@ signaalafhandeling of normale ontwerpkeuze is geen besluit.
 
 Alleen Productontwerp schrijft de `Epic`. Productplanning claimt een exacte versie via
 `claimEpicForPlanning(...)`; dat command bevriest die versie atomair. Kwaliteitsbewaking registreert
-de afsluitende uitkomst via `recordEpicVerification(...)`. Geen van beide kan inhoud of UX wijzigen.
+de epicverificatie-uitkomst via `recordEpicVerification(...)`. Geen van beide kan inhoud of UX
+wijzigen.
 
 Na publicatie van een `AVAILABLE` epic stuurt Productontwerp geen planningsrequest. Productplanning
 heeft een eigen schedule en zoekt tijdens een latere processessie zelf naar beschikbare epics.
 
-`markEpicReadyForVerification(...)` is een snelle statusovergang naar `VERIFYING`.
-Productplanning roept daarna `requestEpicVerification(epicId, epicVersion, ...)` op
-Kwaliteitsbewaking aan. Dat command start geen agent, maar maakt daar een `QualityWorkItem`.
+`markEpicReadyForVerification(...)` is een snelle statusovergang naar `VERIFYING`. Productplanning
+roept dit pas aan wanneer alle niet-geannuleerde stories en bugfixes zijn opgeleverd én hun actuele
+storyverificatie of hertest is geslaagd. Daarna roept Productplanning
+`requestEpicVerification(epicId, epicVersion, ...)` op Kwaliteitsbewaking aan. Dat command start geen
+agent, maar maakt daar een `QualityWorkItem`.
 
 ## Epiccontract
 
@@ -188,10 +191,11 @@ langlopende processessie nooit een inmiddels geclaimde epic overschrijven.
 
 ```text
 AVAILABLE ──claim──> IN_PLANNING ──stories gepubliceerd──> ACTIVE
-    ├──nieuwere versie──> SUPERSEDED                         ├──alles geleverd──> VERIFYING
+    ├──nieuwere versie──> SUPERSEDED                         ├──alles geleverd en geverifieerd──> VERIFYING
     └──intrekken────────> WITHDRAWN                          │                       │
-                                                             │                       └──verificatie──> COMPLETED
-                                                             │                                         of NOT_SUCCESSFUL
+                                                             │                       ├──geslaagd──────> COMPLETED
+                                                             │                       ├──niet geslaagd──> NOT_SUCCESSFUL
+                                                             │                       └──herstel nodig──> ACTIVE
                                                              └──annuleren──────────> CANCELLED
 ```
 
@@ -199,7 +203,9 @@ Meerdere epics mogen tegelijkertijd in planning, actief of in verificatie zijn.
 
 Een epic met `NOT_SUCCESSFUL` blijft als historisch eindresultaat bestaan en wordt niet heropend.
 Een latere Productontwerp-sessie kan uit de verificatie een nieuwe vervolgepic maken. Een
-`CANCELLED` epic krijgt geen complete epicverificatie meer.
+`CANCELLED` epic krijgt geen complete epicverificatie meer. Bij een onvolledige epic of een bouwfout
+zet `recordEpicVerification(...)` de epic van `VERIFYING` terug naar `ACTIVE`; gericht bugfix- of
+dekkingswerk blijft binnen dezelfde bevroren epic.
 
 ## Wanneer Productontwerp draait
 

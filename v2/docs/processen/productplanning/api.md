@@ -65,13 +65,14 @@ PlanningWorkItemId requestManualReplan(RequestManualReplanCommand command);
 
 void markStoryAsDispatched(MarkStoryAsDispatchedCommand command);
 void markStoryAsDeveloped(MarkStoryAsDevelopedCommand command);
+void recordStoryVerification(RecordStoryVerificationCommand command);
 void cancelStoriesForEpic(CancelStoriesForEpicCommand command);
 ```
 
 De vier `request...`-commands starten geen agents en voeren geen inhoudelijke planning uit. Zij
 valideren bron, versie en idempotentiesleutel en voegen alleen een duurzaam `PENDING`-werkitem toe.
-De drie storycommands zijn eveneens snel en deterministisch. Andere modules krijgen nooit
-schrijftoegang tot `Story` of `PlanningWorkItem`.
+De vier story- en lifecyclecommands zijn eveneens snel en deterministisch. Andere modules krijgen
+nooit schrijftoegang tot `Story` of `PlanningWorkItem`.
 
 ## PlanningWorkItem: de queuegrens
 
@@ -89,7 +90,6 @@ Een `PlanningWorkItem` bevat minimaal:
 | `PLAN_EPIC_GAP` | Kwaliteitsbewaking via `requestEpicGapPlanning(...)` | maak stories voor gedrag dat al binnen de bevroren epic viel, maar nooit in een story stond |
 | `REPRIORITIZE_EPIC` | product-/overlegmodule via `requestEpicReprioritization(...)` | geef een door de Stakeholder aangewezen epic voorrang en herschik zo nodig `TODO`-stories |
 | `MANUAL_REPLAN` | bevoegde productbediening via `requestManualReplan(...)` | vraag een expliciete herbeoordeling aan zonder zelf stories te schrijven |
-| `REPAIR_STORY` | dispatcher na definitieve inhoudelijke afwijzing door Software Factory | herstel een nog niet verstuurde story; geen retry van een transportfout |
 
 De statussen zijn `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` en `FAILED`. Eenzelfde bronversie en
 opdracht maken door idempotentie nooit twee workitems.
@@ -112,7 +112,7 @@ alleen de binnenkant van de gekozen Productplanning-implementatie.
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor ontbrekend gedrag binnen een bevroren epic |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, accounts en toegangsgrenzen |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
-| `AiJobConfigurationDetails` | Algemene instellingen | actuele provider en model voor het soort planningsjob; bevroren op iedere nieuwe taak |
+| `AiJobConfigurationDetails` | AI-uitvoering (`settings`) | actuele provider en model voor het soort planningsjob; bevroren op iedere nieuwe taak |
 | `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
 
 Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug zonder thread of lock
@@ -133,7 +133,7 @@ kwaliteitsoordeel.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, status en externe referentie |
+| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, `sequenceNumber`, leveringsstatus, externe referentie en eventuele actuele verificatiereferentie |
 | backlogquery | alle uitvoerbare of reeds verzonden stories in volgorde | `StoryDetails` met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | read-only inzicht in de planningsqueue | type, bron, status, claim, resultaat en fout |
 | `ProcessSession` | opgeslagen operationele historie van de intelligente run | implementatie-ID en -versie, geclaimde workitems, inputversies, AI-taak-ID's, publicaties, wacht- of eindstatus en blokkade |
@@ -144,9 +144,12 @@ agentuitvoer steken de modulegrens niet over. Permanent leren loopt uitsluitend 
 van [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md): een agent kan alleen geheugen van zijn eigen rol lezen en
 wijzigen.
 
-Na storyoplevering vraagt Productplanning via `requestStoryVerification(...)`,
-`requestBugfixRetest(...)` of `requestEpicVerification(...)` aan Kwaliteitsbewaking om werk klaar te
-zetten. Kwaliteitsbewaking maakt en bezit het resulterende `QualityWorkItem`.
+Na storyoplevering vraagt Productplanning via `requestStoryVerification(...)` of
+`requestBugfixRetest(...)` aan Kwaliteitsbewaking om werk klaar te zetten. Kwaliteitsbewaking maakt
+en bezit het resulterende `QualityWorkItem`. Na publicatie van de uitkomst meldt Kwaliteitsbewaking
+de exacte verificatie idempotent via `recordStoryVerification(...)`. Pas wanneer alle stories en
+bugfixes binnen de epic een geslaagde actuele verificatie hebben, vraagt Productplanning via
+`requestEpicVerification(...)` de complete epiccontrole aan.
 
 ## Een epic plannen
 
@@ -198,7 +201,7 @@ order by sequence_number
 ```
 
 Een lege backlog is geldig en start geen proces. Nieuwe stories ontstaan alleen uit een zelf
-gekozen `AVAILABLE` epic of gericht gequeue'd herstel- of herplanningswerk.
+gekozen `AVAILABLE` epic of gericht gequeue'd bugfix-, dekkings- of herplanningswerk.
 
 De storystatussen zijn:
 
@@ -219,9 +222,21 @@ Wanneer de dispatcher een Software Factory-oplevering ziet, roept hij
 1. valideer idempotentiesleutel, externe referentie en verwachte storyversie;
 2. zet de story van `IN_PROGRESS` naar `DONE` en bewaar de oplevervelden;
 3. vraag `requestStoryVerification(...)` aan, of `requestBugfixRetest(...)` bij een bugfix;
-4. controleer met een databasequery of binnen die epic nog `TODO`- of `IN_PROGRESS`-stories bestaan;
-5. zo niet en als de epic niet `CANCELLED` is, roep `markEpicReadyForVerification(...)` aan;
-6. roep daarna idempotent `requestEpicVerification(...)` aan.
+4. laat de epic `ACTIVE`; oplevering alleen is nog geen toestemming voor epicverificatie.
+
+Nadat Kwaliteitsbewaking een storyverificatie of bugfixhertest heeft gepubliceerd, roept zij
+`recordStoryVerification(...)` aan. Deze snelle handler:
+
+1. valideert storyversie, verificatie-ID, doelversie, uitkomst en idempotentiesleutel;
+2. legt op de story alleen de actuele verificatiereferentie en uitkomst vast; de leveringsstatus
+   blijft `DONE`;
+3. laat de epic `ACTIVE` bij een afgekeurde of geblokkeerde controle;
+4. controleert bij een geslaagde controle of alle niet-geannuleerde stories `DONE` zijn en iedere
+   story of bugfix een geslaagde actuele verificatie heeft;
+5. controleert dat geen open bug en geen `PENDING` of `IN_PROGRESS` bugfix- of dekkingsopdracht voor
+   de epic bestaat;
+6. roept alleen dan idempotent `markEpicReadyForVerification(...)` en daarna
+   `requestEpicVerification(...)` aan.
 
 Deze stappen zijn geen planning en hebben geen AI-agent of `PlanningWorkItem` nodig. De
 qualitycommands starten evenmin agents; zij maken alleen `QualityWorkItem`s.
@@ -240,9 +255,9 @@ kent geen extern Software Factory-protocol. Pakketvorming, externe statussynchro
 `DeliveryAttempt`s, retry en idempotentie staan volledig in het
 [dispatcherdocument](../software-factory-dispatcher.md).
 
-Alleen een definitieve inhoudelijke afwijzing van een pakket levert intern een idempotent
-`REPAIR_STORY`-workitem op. Een tijdelijke transport-, configuratie- of autorisatiefout start geen
-planningsagent.
+Software Factory accepteert ieder contractgeldig `StoryDeliveryPackage`. Een weigering is daarom
+een fout in de integratie of Software Factory en levert nooit planwerk of een aangepaste story op.
+Ook een tijdelijke transport-, configuratie- of autorisatiefout start geen planningsagent.
 
 ## Fouten en idempotentie
 
