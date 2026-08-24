@@ -56,5 +56,7 @@ grep -qi '^X-Content-Type-Options: nosniff' "$test_directory/index.headers"
 grep -qi '^X-Frame-Options: DENY' "$test_directory/index.headers"
 grep -qi '^Referrer-Policy: same-origin' "$test_directory/index.headers"
 grep -qi '^Content-Security-Policy:' "$test_directory/index.headers"
+grep -qi "script-src.*'wasm-unsafe-eval'" "$test_directory/index.headers"
+grep -qi "font-src.*https://fonts.gstatic.com" "$test_directory/index.headers"
 
 printf 'cachetest: %s -> %s\n' "$bundle_a" "$bundle_b"
