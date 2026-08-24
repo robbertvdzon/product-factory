@@ -43,7 +43,7 @@ werkdocumenten, prompts en agentadministratie horen hier niet bij.
 | `ProductAssignment` | Het doel, de doelgroep, de harde grenzen en de publieke Git-URL van het product. |
 | `UserSignal` | Feedback, een probleem, zorg, kans of observatie, met zichtbare verwerking en uitkomst. |
 | `Decision` | Een grote, blijvende keuze die meerdere toekomstige sessies richting geeft. |
-| `Epic` | Een complete en behapbare gebruikersverbetering, inclusief scope, succescriteria en UX-ontwerp. |
+| `Epic` | Een concreet probleem met een duidelijke oplossing, richting, eventuele UX, testbare acceptatiecriteria en uitleg over behapbaarheid. |
 | `Story` | Eén zelfstandig uitvoerbaar stuk productwerk of bugfixwerk voor Software Factory. |
 | `Bug` | Een reproduceerbare afwijking tussen verwacht en werkelijk gedrag. |
 | `Verification` | Onveranderlijk bewijs en een oordeel over een story, epic of gebruikerssignaal. |
@@ -60,7 +60,8 @@ In gewone taal gebeurt het volgende:
 
 1. De Stakeholder legt uit voor wie het product is, wat het moet bereiken en welke grenzen gelden.
 2. Feedback, zorgen en kansen worden als gebruikerssignalen bewaard.
-3. Productontwerp onderzoekt het product en maakt een complete epic met het benodigde UX-ontwerp.
+3. Productontwerp onderzoekt het product en maakt een complete epic; UX is onderdeel van de epic
+   wanneer zichtbaar gedrag of interactie verandert.
 4. Productplanning bevriest de gekozen epicversie en verdeelt de hele epic in zelfstandige stories.
 5. Alle stories met status `TODO` of `IN_PROGRESS` vormen samen één geprioriteerde backlog.
 6. De dispatcher stuurt de bovenste uitvoerbare story naar Software Factory.
@@ -162,8 +163,7 @@ van de ontvangende module. Een latere `runProcessSession(productId)` pakt dat we
 
 ## Productontwerp als black box
 
-**Doel:** complete, duidelijke en behapbare epics met UX ontwerpen. Productontwerp maakt geen
-stories.
+**Doel:** complete, duidelijke en behapbare epics ontwerpen. Productontwerp maakt geen stories.
 
 Productontwerp wordt alleen door de scheduler of door een bevoegde handmatige UI-/REST-aanroep
 gestart. Het heeft geen inkomende werkqueue en kiest tijdens een run zelf welk nuttig ontwerpwerk het
@@ -186,7 +186,7 @@ doet.
 
 | Gegeven | Betekenis |
 |---|---|
-| `Epic` | De gekozen gebruikersverbetering, inclusief status, eenduidige scope, bewijs, risico's, succescriteria en compleet UX-ontwerp. |
+| `Epic` | Technische metadata plus probleem, oplossing, relatie met productdoel of besluiten, eventueel UX-ontwerp, testbare acceptatiecriteria en uitleg over behapbaarheid. |
 
 Productontwerp mag een beschikbare epic nog verbeteren. Zodra Productplanning een exacte epicversie
 kiest, wordt die versie bevroren en niet meer aangepast.
@@ -392,8 +392,8 @@ dispatchretry eveneens `CANCELLED` als Software Factory aantoonbaar nog geen ext
 wordt geen nieuwe epiccontrole gestart.
 
 `NOT_SUCCESSFUL` is alleen toegestaan wanneer de functionaliteit volgens afspraak werkt én
-beschikbaar bewijs een toetsbaar epicsuccescriterium aantoonbaar weerlegt. Ontbrekende gegevens of
-een nog niet gedeployde versie geven `BLOCKED`, geen productoordeel. Langdurige gebruiksdoelen die
+beschikbaar bewijs een testbaar acceptatiecriterium van de epic aantoonbaar weerlegt. Ontbrekende
+gegevens of een nog niet gedeployde versie geven `BLOCKED`, geen productoordeel. Langdurige gebruiksdoelen die
 niet tijdens een test te meten zijn worden later als gebruikerssignaal gevolgd en houden de
 technische epicafronding niet willekeurig tegen.
 
@@ -487,7 +487,7 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 ## Tien hoofdregels
 
 1. De Stakeholder is de klant en diens expliciete richting is leidend.
-2. Productontwerp maakt complete epics met UX, maar geen stories.
+2. Productontwerp maakt complete epics, met UX wanneer die nodig is, maar geen stories.
 3. Productplanning maakt en ordent alle stories; de backlog is alleen een query op open stories.
 4. Kwaliteitsbewaking levert bewijs en bugs, maar maakt geen stories en wijzigt geen epics.
 5. Alleen `runProcessSession(productId)` mag voor een intelligent proces AI-taken aanvragen; de

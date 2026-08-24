@@ -158,8 +158,8 @@ Kwaliteitsbewaking-implementatie.
 | `ProductAssignmentDetails` | productmodule | productgrenzen en publieke Git-URL van het product |
 | `TestableProductDetails` | productmodule | omgevingen, routes, toegestane accounts, databereik en testgrenzen |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende privacy-, veiligheids- of productgrenzen die het testen beïnvloeden |
-| `EpicDetails` | Productontwerp | bevroren scope, UX, succescriteria en status van de geclaimde versie |
-| `StoryDetails` | Productplanning | type, storyversie, status, `deliveredCommitSha`, overige oplevergegevens, acceptatiecriteria en zelfstandige UX |
+| `EpicDetails` | Productontwerp | bevroren probleem, oplossing, richtingsrelaties, eventuele UX, acceptatiecriteria, behapbaarheid en status |
+| `StoryDetails` | Productplanning | type, storyversie, status, `deliveredCommitSha`, overige oplevergegevens, acceptatiecriteria en eventuele zelfstandige UX |
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
 | `QualityWorkItem` | Kwaliteitsbewaking | duurzame gerichte testopdracht die de run claimt |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
@@ -293,12 +293,11 @@ is. Zo kan een handmatig aangebrachte oplossing slagen en blijft ontbrekend gedr
 Een `CANCELLED` epic krijgt geen nieuwe epicverificatie. De controle gebruikt exact de door
 Productontwerp bevroren `EpicDetails` en beoordeelt:
 
-- de volledige gebruikersroute, niet alleen losse schermen;
-- alle relevante UX-toestanden en overgangen;
-- de expliciete scope in en uit;
-- toegankelijkheid, privacy en andere kwaliteitsgrenzen;
-- samenhang tussen de geleverde stories;
-- de succescriteria en de merkbare verbetering voor de gebruiker.
+- of de werkende oplossing het beschreven probleem oplost;
+- de functionele werking en grenzen uit `solution`;
+- het UX-ontwerp, wanneer dat aanwezig is;
+- alle testbare `acceptanceCriteria`;
+- de samenhang tussen de geleverde stories.
 
 De uitkomst is:
 
@@ -307,8 +306,8 @@ De uitkomst is:
   epic;
 - `BLOCKED` — een verantwoord oordeel is tijdelijk niet mogelijk; reden en retry staan op het
   `QualityWorkItem`;
-- `NOT_SUCCESSFUL` — alles werkt zoals afgesproken, maar beschikbaar bewijs weerlegt een vooraf
-  toetsbaar succescriterium van de epic.
+- `NOT_SUCCESSFUL` — de oplossing werkt functioneel zoals afgesproken, maar beschikbaar bewijs
+  weerlegt een vooraf testbaar acceptatiecriterium over het beoogde productresultaat.
 
 `NOT_SUCCESSFUL` vereist dus positief, herleidbaar bewijs. Ontbrekende gebruiksdata, een onbereikbare
 meetbron of een nog niet gedeployde commit geven `BLOCKED`. Een abstract langetermijndoel zonder
@@ -335,9 +334,10 @@ Kwaliteitsbewaking stuurt daarnaast per concrete bevinding alleen het gerichte c
 Productplanning.
 
 Productplanning krijgt dus geen generiek verificatieresultaat terug. Alleen een gericht plancommand
-betekent dat zij nieuw ontwikkelwerk moet vormen. Gedrag binnen de bevroren scope wordt een
-aanvullende story of bugfixstory binnen dezelfde epic. Alleen een nieuwe wens buiten scope of een
-onjuiste productaanname kan later tot een nieuwe vervolgepic leiden.
+betekent dat zij nieuw ontwikkelwerk moet vormen. Gedrag dat aantoonbaar door `solution`,
+`uxDesign` of `acceptanceCriteria` wordt vereist, wordt een aanvullende story of bugfixstory binnen
+dezelfde epic. Alleen een nieuwe wens buiten deze epic of een onjuiste productaanname kan later tot
+een nieuwe vervolgepic leiden.
 
 ## Bug, ontbrekende dekking of nieuwe productkans
 
@@ -346,9 +346,9 @@ Kwaliteitsbewaking classificeert een ontbrekend of onjuist resultaat vóór publ
 | Situatie | Publicatie | Vervolg |
 |---|---|---|
 | Gedrag stond in een uitgevoerde story maar werkt niet volgens de story | bestaande `OPEN` bug of nieuwe `Bug`, plus `Verification` met `NEEDS_WORK` bij een epiccontrole | Kwaliteitsbewaking vraagt Productplanning om een bugfix |
-| Gedrag viel duidelijk binnen de bevroren epic, maar er bestond nooit een story voor | `Verification` met ontbrekende dekking | Kwaliteitsbewaking vraagt Productplanning om aanvullend werk |
+| De bevroren oplossing, UX of acceptatiecriteria vereisten gedrag waarvoor nooit een story bestond | `Verification` met ontbrekende dekking | Kwaliteitsbewaking vraagt Productplanning om aanvullend werk |
 | Alles werkt zoals ontworpen en toetsbaar bewijs weerlegt de productaanname | `Verification` met `NOT_SUCCESSFUL` en een `UserSignal` van categorie `QUALITY_PATTERN` | Productontwerp registreert de uitkomst en leert |
-| Gewenst gedrag valt buiten de bevroren scope | `UserSignal` | Productontwerp kan een vervolgepic maken |
+| Gewenst gedrag wordt niet door de bevroren epicinhoud vereist | `UserSignal` | Productontwerp kan een vervolgepic maken |
 
 Kwaliteitsbewaking maakt in geen van deze gevallen zelf een story.
 
@@ -407,7 +407,8 @@ de oorspronkelijke storycriteria worden na de fix opnieuw actueel aangetoond voo
 ## Ontbrekende epicdekking
 
 Een dekkingsgat is geen afzonderlijke entiteit meer. Een epicverificatie kan één of meer gestructureerde
-dekkingsgaten bevatten met scope- of UX-verwijzing, gebruikersimpact, ontbrekend gedrag en bewijs.
+dekkingsgaten bevatten met verwijzing naar `solution`, `uxDesign` of `acceptanceCriteria`, plus
+gebruikersimpact, ontbrekend gedrag en bewijs.
 Kwaliteitsbewaking roept `requestEpicGapPlanning(...)` aan met het verificatie-ID. Productplanning
 maakt tijdens een processessie de aanvullende stories; een latere verificatie toont of het gat is
 opgelost. Zo blijft het bewijs historisch intact zonder een tweede lifecycle naast epic en story.
@@ -456,7 +457,7 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - iedere story- of bugfixverificatie de vereiste `deliveredCommitSha` vergelijkt met de werkelijk
   gedeployde revision en bij achterlopende deployment `BLOCKED` blijft;
 - iedere verificatie exacte doel-, opleverings-, omgevings- en bronversies bevat;
-- ontbrekende epicdekking binnen de bevroren scope wordt bewezen;
+- ontbrekende epicdekking binnen de bevroren oplossing, UX of acceptatiecriteria wordt bewezen;
 - ieder gebruikerssignaalonderzoek een expliciete uitkomst of blokkade krijgt;
 - de eigen procesruntime iedere agent alleen het actuele geheugen van haar eigen rol geeft en de exact gelezen
   geheugenversies vastlegt;

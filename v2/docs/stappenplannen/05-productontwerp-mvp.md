@@ -3,7 +3,7 @@
 ## Doel
 
 Laat één Productontwerperagent alle relevante productinput verwerken tot complete, duidelijke en
-behapbare epics met UX-ontwerp. Productontwerp maakt geen stories.
+behapbare epics, met UX-ontwerp wanneer dat nodig is. Productontwerp maakt geen stories.
 
 ## Globale scope
 
@@ -15,7 +15,9 @@ behapbare epics met UX-ontwerp. Productontwerp maakt geen stories.
 - Gebruik in deze tussenstap alleen input van reeds geactiveerde capabilities. De API-contracten van
   Productplanning en Kwaliteitsbewaking bestaan al, maar hun input is pas beschikbaar en wordt pas
   aangesloten wanneer hun implementaties in stap 6 en 7 actief worden.
-- Valideer en bewaar complete epics, inclusief scope, gebruikersverbetering, succescriteria en UX.
+- Valideer en bewaar alleen het vereenvoudigde Epiccontract: probleem, oplossing,
+  richtingsrelaties, eventueel UX, testbare acceptatiecriteria en uitleg over behapbaarheid, plus
+  technische metadata.
 - Ondersteun het verbeteren van nog beschikbare epics en het bevriezen van opgepakte versies.
 - Voeg epicoverzicht, detail, sessiestatus en acceptatiescenario's aan de UI toe.
 

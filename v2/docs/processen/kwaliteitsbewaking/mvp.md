@@ -133,7 +133,8 @@ Per opdracht voert dezelfde Tester het passende minimale maar volledige werk uit
 
 - **story** — acceptatiecriteria, hoofdroute en relevante lege, laad- en fouttoestanden;
 - **bugfix** — oorspronkelijke reproductie, verwacht herstel en aangrenzende regressie;
-- **epic** — complete route, bevroren UX, samenhang tussen stories, grenzen en succescriteria;
+- **epic** — probleem en oplossing, eventuele bevroren UX, acceptatiecriteria en samenhang tussen
+  stories;
 - **gebruikerssignaal** — gemelde situatie reproduceren en één publieke signaaluitkomst kiezen;
 - **periodiek** — een vooraf geconfigureerde kleine set kritieke gebruikersroutes.
 
@@ -157,8 +158,8 @@ productversie, bewijs, impact en voorgestelde ernst.
 De Tester classificeert ontbrekend of onjuist gedrag als:
 
 - bug binnen afgesproken storygedrag;
-- dekkingsgat binnen de bevroren epic zonder bijbehorende story;
-- nieuwe wens buiten de bevroren scope;
+- dekkingsgat in de bevroren oplossing, UX of acceptatiecriteria zonder bijbehorende story;
+- nieuwe wens buiten de bevroren epicinhoud;
 - technische of toegangsblokkade.
 
 De agent schrijft nog niets naar de publieke entiteiten en roept geen modulecommands aan.
@@ -171,7 +172,7 @@ Gewone code controleert minimaal:
 - toegestane verificatie-uitkomst voor het doeltype;
 - reproduceerstappen en bewijs voor iedere publieke bug;
 - onderbouwing van ernst en gebruikersimpact;
-- dat een dekkingsgat aantoonbaar binnen de bevroren epic valt;
+- dat een dekkingsgat aantoonbaar door `solution`, `uxDesign` of `acceptanceCriteria` wordt vereist;
 - dat een nieuwe wens niet als bug of dekkingsgat wordt gepubliceerd;
 - verwijdering of afscherming van secrets en persoonsgegevens;
 - idempotentiesleutels voor publicaties en vervolgcommands.
@@ -190,8 +191,9 @@ van de oorspronkelijke story. Een geannuleerde bugfixstory wordt niet als hertes
 loopt mee in de complete feitelijke herbeoordeling van de epic.
 
 De MVP gebruikt `NOT_SUCCESSFUL` alleen wanneer alle afgesproken functionaliteit werkt en
-beschikbaar, herleidbaar bewijs een vooraf toetsbaar epicsuccescriterium weerlegt. Ontbrekende
-gebruiksdata, een onbereikbare meetbron of een achterlopende deployment geven `BLOCKED`.
+beschikbaar, herleidbaar bewijs een vooraf testbaar acceptatiecriterium over het beoogde
+productresultaat weerlegt. Ontbrekende gebruiksdata, een onbereikbare meetbron of een achterlopende
+deployment geven `BLOCKED`.
 
 Na een werkelijk uitgevoerde niet-lege testsessie wordt uit de gevalideerde publieke gegevens
 precies één nieuwe `QualitySnapshot` voor het product van die sessie opgebouwd. Een no-op of

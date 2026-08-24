@@ -30,8 +30,9 @@ acceptatieomgeving. Er zijn nog geen epics en geen stories. De backlog is dus le
 1. Productontwerp wordt volgens schedule of handmatig gestart.
 2. Productontwerp leest onder andere de productopdracht, geldige besluiten, gebruikerssignalen,
    huidige code, documentatie en de werkende applicatie.
-3. Productontwerp publiceert één complete epic met status `AVAILABLE`. De epic bevat een duidelijke
-   gebruikersverbetering, eenduidige scope, succescriteria en het volledige benodigde UX-ontwerp.
+3. Productontwerp publiceert één complete epic met status `AVAILABLE`. De epic bevat een concreet
+   probleem, een duidelijke oplossing, haar relatie met productdoel of besluiten, testbare
+   acceptatiecriteria, uitleg over behapbaarheid en waar nodig het UX-ontwerp.
 4. Een latere Productplanning-sessie vindt de epic zelf. Productontwerp hoeft planning niet te
    starten en stuurt geen planningsrequest.
 5. Productplanning claimt de exacte epicversie. De epic gaat van `AVAILABLE` naar `IN_PLANNING` en
@@ -243,8 +244,8 @@ staat op `VERIFYING` en de volledige epiccontrole wordt uitgevoerd.
 
 ### Scenario
 
-1. Kwaliteitsbewaking stelt vast dat gedrag of UX binnen de bevroren epicscope ontbreekt en dat er
-   nooit een story voor bestond.
+1. Kwaliteitsbewaking stelt vast dat gedrag uit de bevroren oplossing, UX of acceptatiecriteria
+   ontbreekt en dat daarvoor nooit een story bestond.
 2. Kwaliteitsbewaking bewaart een epicverificatie met uitkomst `NEEDS_WORK` en beschrijft het
    dekkingsgat met bewijs.
 3. Kwaliteitsbewaking meldt de uitkomst bij Productontwerp. Productontwerp zet de epic terug op
@@ -281,7 +282,7 @@ uitgevoerde story niet goed te werken.
 
 ### Eindresultaat
 
-De bug is niet als ontbrekende epicscope behandeld. De bug is aantoonbaar opgelost en de epic
+De bug is niet als ontbrekende epicdekking behandeld. De bug is aantoonbaar opgelost en de epic
 wordt pas na een nieuwe geslaagde totaalcontrole `COMPLETED`.
 
 ## 10. De epiccontrole is tijdelijk geblokkeerd
@@ -308,9 +309,9 @@ maakt zichtbaar welk bewijs of welke voorwaarde nog ontbreekt.
 
 ### Beginsituatie
 
-De epic staat op `VERIFYING`. Alle afgesproken functionaliteit werkt en een vooraf toetsbaar
-succescriterium heeft een beschikbare meetbron, maar de volledige controle levert positief bewijs
-dat de bedoelde gebruikersverbetering niet is bereikt.
+De epic staat op `VERIFYING`. Alle afgesproken functionaliteit werkt en een vooraf testbaar
+acceptatiecriterium heeft een beschikbare meetbron, maar de volledige controle levert positief
+bewijs dat de bedoelde gebruikersverbetering niet is bereikt.
 
 ### Scenario
 

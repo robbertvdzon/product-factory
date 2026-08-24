@@ -97,7 +97,7 @@ Het pakket bevat minimaal:
 - stabiel story-ID, storyversie, product-ID en type;
 - zelfstandig gebruikersgedrag en gebruikerswaarde;
 - alle acceptatiecriteria;
-- het relevante volledige UX-ontwerp en alle schermtoestanden;
+- waar de story UX bevat: het relevante volledige UX-ontwerp en alle schermtoestanden;
 - tekstuele assets als UTF-8 en binaire assets met MIME-type, grootte, hash en transportencoding;
 - afhankelijkheden en technische grenzen;
 - exacte epic-, bug- en andere bronversies;

@@ -28,8 +28,9 @@ publieke output en geen roadmapitem. Nieuwe kennis verandert nooit rechtstreeks 
 zij leidt tot een nieuwe versie van een beschikbare epic of een nieuwe vervolgepic.
 
 Een los idee blijft eveneens intern. Het kan worden bewaard, samengevoegd, afgewezen of verder
-onderzocht. Pas wanneer probleem, gebruikersverbetering, scope, UX en succescriteria compleet zijn,
-publiceert Productontwerp een `Epic` volgens het publieke contract.
+onderzocht. Pas wanneer probleem, oplossing, richtingsrelaties, eventueel benodigde UX, testbare
+acceptatiecriteria en behapbaarheid compleet zijn, publiceert Productontwerp een `Epic` volgens het
+publieke contract.
 
 ## Interne entiteiten
 
@@ -65,7 +66,8 @@ Een volledige processessie kan zeven vaste agentrollen gebruiken:
 5. **UX-ontwerper** — maakt de volledige gebruikersroute, toestanden en ontwerpassets.
 6. **Technisch verkenner** — onderzoekt haalbaarheid, afhankelijkheden en risico's zonder de bouw
    voor Software Factory voor te schrijven.
-7. **Epiccriticus** — controleert bewijs, scope, UX-volledigheid, gebruikerswaarde en behapbaarheid.
+7. **Epiccriticus** — controleert onderbouwing, oplossingsgrens, eventuele UX, gebruikerswaarde en
+   behapbaarheid.
 
 Niet iedere sessie start alle rollen. Een kleine herziening van een beschikbare epic kan volstaan
 met de leider, UX-ontwerper, technisch verkenner en criticus. Een nieuwe productrichting kan alle
@@ -88,7 +90,8 @@ De module kiest precies één hoofdsoort per aanroep:
 
 1. **Richting onderzoeken** — nieuw bewijs verzamelen en de verre richting herijken.
 2. **Kans onderzoeken** — een signaal of hypothese tot een beslisbare kandidaat maken.
-3. **Epic ontwerpen** — probleem, scope, UX, techniek en succescriteria uitwerken.
+3. **Epic ontwerpen** — probleem, oplossing, richtingsrelaties, eventuele UX, acceptatiecriteria en
+   behapbaarheid uitwerken.
 4. **Epic herzien** — alleen een nog `AVAILABLE` epic als nieuwe versie publiceren.
 5. **Resultaat verwerken** — verificatie of kwaliteitspatroon verwerken in productkennis of een
    vervolgepic.
@@ -160,23 +163,24 @@ niet wijzigen.
 
 ### Stap 3 — epic en UX ontwerpen
 
-De UX-ontwerper en technisch verkenner werken vanuit hetzelfde probleem, dezelfde scope en dezelfde
-gewenste uitkomst. Het UX-ontwerp wordt onderdeel van de epicversie en is geen los document zonder
-eigenaar.
+De UX-ontwerper en technisch verkenner werken vanuit hetzelfde probleem en dezelfde voorgestelde
+oplossing. Wanneer zichtbaar gedrag of interactie verandert, wordt het UX-ontwerp onderdeel van de
+epicversie; zonder UX-impact blijft `uxDesign` leeg.
 
 De epic moet scherp genoeg zijn dat Productplanning haar volledig in zelfstandig leverbare stories
-kan verdelen. Het aantal stories is geen ontwerpcriterium. De scope vormt wel één eenduidige
-gebruikersverbetering en blijft behapbaar voor planning, uitvoering en verificatie.
+kan verdelen. Het aantal stories is geen ontwerpcriterium. `solution` beschrijft wel duidelijk wat
+er wel en niet bij hoort en `slicabilityRationale` maakt de behapbaarheid expliciet.
 
 ### Stap 4 — kritiek en atomair publiceren
 
 De Epiccriticus controleert minimaal:
 
-- één duidelijke gebruikersverbetering;
-- eenduidige scope in en uit;
+- één concreet probleem en één duidelijke oplossing;
+- een geldige relatie met productdoel en/of besluiten;
+- dat de oplossing haar functionele werking, grens en verwachte verbetering uitlegt;
 - voldoende bewijs en zichtbare onzekerheid;
-- complete hoofdroute en belangrijke UX-toestanden;
-- testbare succescriteria;
+- UX wanneer zichtbaar gedrag of interactie verandert;
+- testbare acceptatiecriteria;
 - toegankelijkheid, privacy, veiligheid en onderhoudslast;
 - aannemelijke technische uitvoerbaarheid;
 - behapbaarheid voor Productplanning;
@@ -197,8 +201,8 @@ Verificaties, kwaliteitsontwikkeling en uitkomsten van uitgevoerde epics kunnen 
 ontwerpwerk. Het wijzigt nooit rechtstreeks een gekozen epic.
 
 Meerdere leerresultaten kunnen een nieuwe `DirectionSnapshot`, een nieuwe kans of een vervolgepic
-voeden. Zij zijn niet zichtbaar voor andere modules of de gewone frontend. De relevante onderbouwing
-van een gepubliceerde epic wordt wel in die epic opgenomen.
+voeden. Zij zijn niet zichtbaar voor andere modules of de gewone frontend. Zij worden ook geen
+extra velden van een gepubliceerde epic; de epic zelf blijft beperkt tot het publieke contract.
 
 Een agentrol kan na succesvolle validatie daarnaast een geheugenactie voor haar eigen rol
 voorstellen: toevoegen, vervangen of intrekken. Gewone applicatiecode valideert en schrijft die

@@ -131,7 +131,7 @@ alleen de binnenkant van de gekozen Productplanning-implementatie.
 | `PlanningWorkItem` | Productplanning | duurzame opdracht die de run claimt; andere modules kunnen alleen een aanvraagcommand doen |
 | `ProductAssignmentDetails` | productmodule | productidentiteit, grenzen en publieke Git-URL |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote blijvende keuzes die de planning begrenzen; geen directe opdracht om een epic, bug of story te kiezen |
-| `EpicDetails` | Productontwerp | exacte epicversie, gebruikerswaarde, scope, UX, succescriteria en status |
+| `EpicDetails` | Productontwerp | exacte metadata, probleem, oplossing, richtingsrelaties, eventueel UX-ontwerp, acceptatiecriteria en behapbaarheid |
 | `BugDetails` en `findBugs(...)` | Kwaliteitsbewaking | uitvoerbare bug inclusief ernst, bewijs en versie; open bugs per product, epic en status kunnen betrouwbaar worden gevonden |
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor ontbrekend gedrag binnen een bevroren epic |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, accounts en toegangsgrenzen |
@@ -159,7 +159,7 @@ kwaliteitsoordeel.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, UX, afhankelijkheden, `sequenceNumber`, leveringsstatus, eventuele dispatchreservering, externe referentie, `deliveredCommitSha` en actuele verificatiereferentie |
+| `StoryDetails` | read-only weergave van een zelfstandig uitvoerbare productstory of bugfix | type, bronrelaties, epicversie, gedrag, acceptatiecriteria, eventuele UX, afhankelijkheden, `sequenceNumber`, leveringsstatus, eventuele dispatchreservering, externe referentie, `deliveredCommitSha` en actuele verificatiereferentie |
 | backlogquery | alle uitvoerbare of reeds verzonden stories in volgorde | `StoryDetails` met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
 | `PlanningWorkItemDetails` | read-only inzicht in de planningsqueue | type, bron, status, claim, resultaat en fout |
 | `StoryDispatchReservationDetails` | tijdelijke read-only reservering voor de dispatcher | reserverings-ID, geldigheid en onveranderlijke momentopname van één uitvoerbare story; geen aparte productentiteit |
@@ -221,8 +221,10 @@ Een `Story` bevat minimaal:
 - bug-ID en bugversie voor een bugfix;
 - klein zichtbaar gebruikersgedrag, waarde en duidelijke acceptatiecriteria;
 - hoofd-, lege, laad-, fout- en uitzonderingssituaties;
-- een zelfstandige momentopname van het relevante deel van het bevroren UX-ontwerp;
-- gebruikersflow, schermen, componenten, interacties, responsive gedrag en toegankelijkheid;
+- wanneer de story zichtbaar gedrag of interactie verandert: een zelfstandige momentopname van het
+  relevante deel van het bevroren UX-ontwerp;
+- waar UX van toepassing is: gebruikersflow, schermen, componenten, interacties, responsive gedrag
+  en toegankelijkheid;
 - benodigde tekstuele en binaire ontwerpassets met naam, MIME-type, grootte en hash;
 - expliciete afhankelijkheden als story-ID's en bekende technische grenzen zonder implementatie
   voor te schrijven;
@@ -355,7 +357,7 @@ qualitycommands starten evenmin agents; zij maken alleen `QualityWorkItem`s.
 | Bevinding van Kwaliteitsbewaking | Snel command | Later intelligent planwerk |
 |---|---|---|
 | bug in afgesproken storygedrag | `requestBugfix(...)` | maak een bugfixstory |
-| gedrag binnen de bevroren epic had nooit een story | `requestEpicGapPlanning(...)` | maak aanvullende productstories |
+| gedrag uit de bevroren oplossing, UX of acceptatiecriteria had nooit een story | `requestEpicGapPlanning(...)` | maak aanvullende productstories |
 | epiccontrole geblokkeerd of productaanname niet geslaagd | geen | retry bij blokkade; alleen een nieuwe epic bij een latere expliciete productaanleiding |
 
 Wanneer Productplanning een bugfixstory publiceert, bewaart zij in dezelfde transactie een

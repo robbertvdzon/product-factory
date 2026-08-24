@@ -17,7 +17,7 @@ niet.
 | 2 | [Product- en stakeholderbasis](02-product-en-stakeholderbasis.md) | Productopdracht, signalen, besluiten en overleggen zijn via de UI bruikbaar. |
 | 3 | [Agentgeheugen en AI-instellingen](03-agentgeheugen-en-ai-instellingen.md) | Rollen hebben beheersbaar permanent geheugen en AI-jobs hebben centrale modelkeuzes. |
 | 4 | [AI-uitvoering](04-ai-uitvoering.md) | Echte AI-taken gaan duurzaam naar de laptopworker; mocks worden server-side uitgevoerd. |
-| 5 | [Productontwerp MVP](05-productontwerp-mvp.md) | Eén ontwerperagent zet alle relevante input om in complete epics met UX. |
+| 5 | [Productontwerp MVP](05-productontwerp-mvp.md) | Eén ontwerperagent zet relevante input om in complete, behapbare epics met UX waar nodig. |
 | 6 | [Productplanning MVP](06-productplanning-mvp.md) | Eén planneragent maakt uitvoerbare stories en een geordende backlog. |
 | 7 | [Kwaliteitsbewaking MVP](07-kwaliteitsbewaking-mvp.md) | Eén testeragent levert verificaties, bugs en kwaliteitshistorie. |
 | 8 | [Software Factory-dispatcher](08-software-factory-dispatcher.md) | Stories worden één voor één geleverd en opleveringen worden verwerkt. |

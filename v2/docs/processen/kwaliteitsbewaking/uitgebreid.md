@@ -117,7 +117,7 @@ De Functionele tester controleert:
 - storyacceptatiecriteria, hoofdroute en relevante alternatieven;
 - lege, laad-, fout- en uitzonderingssituaties;
 - oorspronkelijke reproduceerstappen bij een bugfix;
-- volledige route, storysamenhang, UX en succescriteria bij een epiccontrole;
+- probleem, oplossing, storysamenhang, eventuele UX en acceptatiecriteria bij een epiccontrole;
 - de concrete gemelde situatie bij een gebruikerssignaal.
 
 De Kwaliteitsspecialist kiest risicogestuurd relevante dimensies. Een kleine storysessie hoeft niet

@@ -18,7 +18,8 @@ Naast de publieke module-entiteiten kan de uitgebreide implementatie gebruiken:
 - `EpicCandidateSet` en `EpicSelectionAssessment` — vergelijking en onderbouwing bij epicselectie;
 - `StoryDraft` — conceptstory vóór publicatie;
 - `StoryUxSnapshot` — tijdelijk samengesteld zelfstandig UX-deel;
-- `StoryCoverageMap` — relatie tussen epicscope, succescriteria en conceptstories;
+- `StoryCoverageMap` — relatie tussen epicoplossing, acceptatiecriteria, eventuele UX en
+  conceptstories;
 - `StoryCandidateSet` en `PriorityAssessment` — vergelijking van bestaand en nieuw werk;
 - `StoryOrderDraft` — voorgestelde productbrede `TODO`-volgorde;
 
@@ -101,8 +102,9 @@ Storymakers mogen onafhankelijk werken aan:
 - bewezen ontbrekende dekking binnen een bestaande epic;
 - bugfixstories.
 
-Iedere Storymaker levert `StoryDraft`s, zelfstandige `StoryUxSnapshot`s en een `StoryCoverageMap`.
-De maps moeten samen ieder onderdeel van epicscope, UX en succescriteria aantoonbaar afdekken.
+Iedere Storymaker levert `StoryDraft`s, waar nodig zelfstandige `StoryUxSnapshot`s en een
+`StoryCoverageMap`. De maps moeten samen de volledige oplossing, alle acceptatiecriteria en het
+eventuele UX-ontwerp aantoonbaar afdekken.
 
 ### Stap 3 — productbreed ordenen
 
@@ -180,7 +182,7 @@ Een uitgebreide planningsrun voor één product is klaar wanneer:
 
 - ieder geclaimd workitem `DONE`, `BLOCKED` of `FAILED` is;
 - iedere nieuwe story zelfstandig uitvoerbaar is;
-- de coverage maps de volledige epicscope aantoonbaar afdekken;
+- de coverage maps de volledige oplossing, acceptatiecriteria en eventuele UX aantoonbaar afdekken;
 - epic-, bug- en verificatieversies exact vastliggen;
 - de Planningscriticus de inhoud en volgorde heeft goedgekeurd;
 - productbrede `sequenceNumber`s consistent zijn;

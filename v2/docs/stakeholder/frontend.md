@@ -178,7 +178,8 @@ Een epic, story, bug, verificatie, kwaliteitssnapshot, signaal, besluit, meeting
 detailpagina. Die toont alleen de velden die bij dat object horen, plus relaties naar bron- en
 vervolgobjecten.
 
-Een epic toont onder meer scope, gebruikersverbetering, succescriteria en het actuele UX-ontwerp.
+Een epic toont probleem, oplossing, relatie met productdoel of besluiten, eventueel het actuele
+UX-ontwerp, testbare acceptatiecriteria en uitleg over de behapbaarheid.
 Een story toont zelfstandig alle relevante UX en assets die ook naar Software Factory worden
 verstuurd. Een verificatie toont omgeving, controles, oordeel en bewijs. Een besluit toont normaal
 alleen de geldige tekst; een aparte archiefweergave toont eerdere versies, ingetrokken besluiten en

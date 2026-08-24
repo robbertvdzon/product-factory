@@ -18,11 +18,11 @@ implementatiemodules van hetzelfde `design`-contract in `product-factory-api`; d
 ## Verantwoordelijkheid
 
 Productontwerp zet relevante productinformatie om in complete, behapbare epicdefinities. Iedere
-gepubliceerde epic beschrijft één eenduidige gebruikersverbetering en bevat duidelijke scope, het
-benodigde UX-ontwerp en toetsbare succescriteria.
+gepubliceerde epic beschrijft één eenduidig probleem, de gekozen oplossing, de relatie met de
+productrichting, eventueel het benodigde UX-ontwerp en testbare acceptatiecriteria.
 
 Productontwerp maakt geen stories en beheert geen backlog. De module is eigenaar en enige schrijver
-van de complete `Epic`: inhoud, UX, versie en levenscyclusstatus. Andere modules gebruiken alleen de
+van de complete `Epic`: inhoud, versie en levenscyclusstatus. Andere modules gebruiken alleen de
 publieke commands en read-only queries en krijgen nooit toegang tot de epicrepository.
 
 ## Publieke module-interface
@@ -63,7 +63,7 @@ void cancelEpic(CancelEpicCommand command);
 
 Deze functies starten geen agents. Ze valideren bevoegdheid, verwachte versie en toegestane
 statusovergang en schrijven de wijziging atomair op de eigen `Epic`. Geen command biedt vrije
-schrijftoegang tot epicinhoud of UX.
+schrijftoegang tot de epicinhoud.
 
 `findEpics(...)` ondersteunt minimaal filteren op product-ID, één of meer statussen en periode. Zo
 gebruiken processen dezelfde query voor beschikbare of actieve epics en kan de frontend ook
@@ -104,8 +104,8 @@ de resultaten nog ontbreken, blijft zij zonder nieuwe taken aan te maken wachten
 
 Bij een inhoudelijke sessie lost Productontwerp de publieke Gitref uit de productopdracht read-only
 op naar een exacte commit-SHA en bevriest die in de taakinput. De servermodule checkt de repository
-niet zelf uit en commit of pusht nooit. De gebruikte commit-SHA kan als bronverwijzing bij de sessie
-of epic worden vastgelegd; ruwe repository-inhoud steekt de modulegrens niet over.
+niet zelf uit en commit of pusht nooit. De gebruikte commit-SHA wordt bij de processessie
+vastgelegd; ruwe repository-inhoud steekt de modulegrens niet over.
 
 Voor een agenttaak bevriest Productontwerp de publieke Git-URL en exacte commit-SHA. Bij een echte
 `CODEX`- of `CLAUDE`-taak checkt de laptopworker die SHA zelf uit in de tijdelijke Dockeromgeving van
@@ -125,7 +125,7 @@ productmodule en krijgt nooit directe schrijftoegang tot het signaal.
 
 | Contract | Betekenis | Minimale inhoud |
 |---|---|---|
-| `EpicDetails` | read-only weergave van één complete gebruikersverbetering | versie, status, probleem, doelgroep, uitkomst, scope in/uit, bewijs, UX, succescriteria, risico's, afhankelijkheden en bron-signaal-ID's |
+| `EpicDetails` | read-only weergave van één complete gebruikersverbetering | technische metadata plus probleem, oplossing, richtingsrelaties, eventueel UX-ontwerp, testbare acceptatiecriteria en uitleg over behapbaarheid |
 | `ProcessSession` | opgeslagen operationele historie van de sessie | sessie-ID, product-ID, implementatie-ID en -versie, gebruikte inputversies, AI-taak-ID's, publicatie-ID's, wacht- of eindstatus en blokkade |
 
 De enige inhoudelijke overdracht naar Productplanning is `EpicDetails`. Interne analyses,
@@ -143,7 +143,7 @@ signaalafhandeling of normale ontwerpkeuze is geen besluit.
 
 Alleen Productontwerp schrijft de `Epic`. Productplanning claimt een exacte versie via
 `claimEpicForPlanning(...)`; dat command bevriest die versie atomair. Kwaliteitsbewaking registreert
-de epicverificatie-uitkomst via `recordEpicVerification(...)`. Geen van beide kan inhoud of UX
+de epicverificatie-uitkomst via `recordEpicVerification(...)`. Geen van beide kan de epicinhoud
 wijzigen.
 
 Na publicatie van een `AVAILABLE` epic stuurt Productontwerp geen planningsrequest. Productplanning
@@ -159,30 +159,39 @@ agent, maar maakt daar een `QualityWorkItem`.
 
 ## Epiccontract
 
-Een beschikbare epicdefinitie bevat minimaal:
+`EpicDetails` bevat eerst de technische metadata die nodig is voor eigenaarschap, versiebevriezing
+en de publieke levenscyclus:
 
-- stabiel epic-ID, product-ID en versienummer;
-- de gebruiker en situatie waarvoor de epic bedoeld is;
-- het aantoonbare probleem of de kans;
-- één merkbare gewenste gebruikersverbetering;
-- expliciete scope: wat hoort er wel en niet bij;
-- relatie met productdoel en geldige besluiten;
-- bewijs, bronnen, aannames en relevante tegenspraak;
-- het volledige actuele UX-ontwerp;
-- hoofdroute, alternatieve routes en schermtoestanden;
-- lege, laad-, fout- en uitzonderingssituaties;
-- toegankelijkheids-, privacy- en kwaliteitsgrenzen;
-- bekende technische risico's en afhankelijkheden;
-- succescriteria en hoe Kwaliteitsbewaking die kan toetsen;
-- waarom de epic behapbaar genoeg is om in kleine stories te verdelen.
+- `id`;
+- `productId`;
+- `version`;
+- `status`.
+
+De inhoud van een beschikbare epicdefinitie bestaat uitsluitend uit:
+
+- `problem` — het concrete gebruikersprobleem dat moet worden opgelost;
+- `solution` — wat de voorgestelde oplossing is, hoe zij functioneel moet werken, wat er wel en niet
+  bij hoort en waarom zij het probleem oplost;
+- `directionReferences` — de relatie met het productdoel en/of relevante geldige besluiten, als
+  verwijzing naar de gebruikte productopdrachtversie of besluit-ID met een korte uitleg;
+- `uxDesign` — optioneel; verplicht wanneer de oplossing zichtbaar gedrag of interactie verandert
+  en afwezig wanneer geen UX-ontwerp nodig is;
+- `acceptanceCriteria` — een lijst concrete, observeerbare en testbare voorwaarden waaronder de
+  oplossing is geslaagd;
+- `slicabilityRationale` — waarom de epic behapbaar genoeg is om door Productplanning in kleine,
+  zelfstandig uitvoerbare stories te worden verdeeld.
+
+Doelgroep, routes, toestanden, grenzen, bewijs, risico's en afhankelijkheden worden geen losse
+publieke epicvelden. Alleen informatie die voor deze epic werkelijk nodig is, wordt verwerkt in
+`problem`, `solution`, `uxDesign` of `acceptanceCriteria`. Onderzoek, bronnen, aannames en
+technische verkenningen blijven interne sessie-informatie.
 
 Productontwerp beschrijft geen storylijst. Een mogelijke slice mag de behapbaarheid uitleggen, maar
 is geen vooraf geschreven backlog.
 
-Ieder succescriterium benoemt ook de observeerbare bron waarmee Kwaliteitsbewaking het kan toetsen,
-zoals gedrag op een geconfigureerde omgeving of een expliciet beschikbare meetbron. Een abstract
-langetermijndoel zonder tijdens verificatie beschikbaar bewijs kan richting geven, maar mag niet de
-enige voorwaarde zijn om deze epic af te ronden.
+Ieder acceptatiecriterium is tijdens verificatie aantoonbaar via gedrag op een geconfigureerde
+omgeving of een andere expliciet beschikbare meetbron. Een abstract langetermijndoel zonder
+beschikbaar bewijs kan richting geven, maar is geen acceptatiecriterium voor deze epic.
 
 ## Versies en bevriezing
 
@@ -198,7 +207,7 @@ Zodra `claimEpicForPlanning(...)` een exact epic-ID en versienummer heeft gekoze
 
 - wordt die versie het vaste uitvoerings- en testcontract;
 - kan dezelfde gekozen epic niet inhoudelijk worden herzien;
-- blijven scope en UX ongewijzigd;
+- blijft de volledige epicinhoud ongewijzigd;
 - wordt nieuwe kennis eventueel een nieuwe vervolgepic;
 - kan stoppen alleen via de daarvoor bedoelde lifecyclecommands.
 

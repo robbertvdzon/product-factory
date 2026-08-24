@@ -40,8 +40,9 @@ De Planner:
 - kiest zo nodig één of meer epics om te claimen;
 - verwerkt bugfix-, dekkingsgat-, prioriteits- en herplanwerk;
 - verdeelt iedere gekozen epic volledig in kleine, zelfstandig uitvoerbare stories;
-- neemt het relevante bevroren UX-ontwerp zelfstandig in iedere story op;
-- controleert dat de stories samen de volledige epicscope afdekken;
+- neemt het relevante bevroren UX-ontwerp zelfstandig op in iedere story waarop UX van toepassing
+  is;
+- controleert dat de stories samen de volledige oplossing en alle acceptatiecriteria afdekken;
 - combineert productstories en bugfixstories tot één productbrede `TODO`-volgorde;
 - geeft per belangrijke prioriteitskeuze een korte, controleerbare reden;
 - retourneert één gestructureerd `PlanningDraft`.
@@ -151,9 +152,10 @@ Gewone code controleert minimaal:
 
 - alle verplichte velden uit het Storycontract;
 - exacte epic-, bug- en verificatieversies;
-- volledige dekking van iedere nieuw geplande epic;
+- volledige dekking van oplossing, acceptatiecriteria en eventuele UX van iedere nieuw geplande
+  epic;
 - geen onbedoelde overlap of onbeantwoorde afhankelijkheid;
-- zelfstandige UX en acceptatiecriteria per story;
+- zelfstandige acceptatiecriteria en, waar van toepassing, UX per story;
 - toegestane storystatusovergangen;
 - unieke productbrede `sequenceNumber`s ten opzichte van alle `TODO`- en `IN_PROGRESS`-stories,
   waarbij alleen `TODO`-stories worden herordend;

@@ -19,7 +19,8 @@ concreet tekort laat zien, hoeft een onderdeel uit de
 - De agent beoordeelt alle relevante beschikbare input in één samenhangende context.
 - De mogelijke inhoudelijke uitkomst is: geen epic, één nieuwe epic of één nieuwe versie van een
   nog `AVAILABLE` epic.
-- De agent maakt probleem, scope, UX, succescriteria en risico's zelf compleet.
+- De agent maakt probleem, oplossing, richtingsrelaties, eventueel UX, testbare acceptatiecriteria
+  en de uitleg over behapbaarheid compleet.
 - De agent maakt nooit stories.
 - Gewone applicatiecode verzamelt input, valideert het contract en schrijft atomair naar de database.
 - Er worden geen interne onderzoeksvragen, kansenlijsten of productdromen duurzaam opgeslagen.
@@ -41,9 +42,10 @@ De Productontwerper:
 - leest zo nodig code en documentatie uit de publieke Git-repository;
 - bekijkt zo nodig acceptatie en veilige delen van productie;
 - kiest één duidelijke gebruikersverbetering;
-- maakt de complete epicscope en het volledige benodigde UX-ontwerp;
-- formuleert toetsbare succescriteria;
-- geeft aan welke aannames, bronnen, risico's en afhankelijkheden gelden;
+- beschrijft de oplossing, haar functionele werking en duidelijke grens;
+- maakt het benodigde UX-ontwerp wanneer zichtbaar gedrag of interactie verandert;
+- formuleert testbare acceptatiecriteria en de relatie met productdoel of besluiten;
+- legt uit waarom Productplanning de epic in kleine zelfstandige stories kan verdelen;
 - levert gestructureerd een `EpicDraft` of een gemotiveerde no-op terug.
 
 `EpicDraft` is alleen een tijdelijk object tijdens de sessie en krijgt in de MVP geen eigen tabel.
@@ -152,12 +154,14 @@ De agent kan geen statusovergang of databasewijziging rechtstreeks uitvoeren.
 Gewone code controleert minimaal:
 
 - alle verplichte velden uit het Epiccontract;
-- precies één duidelijke gebruikersverbetering;
-- expliciete scope in en uit;
-- volledig UX-ontwerp, inclusief belangrijke toestanden;
-- toetsbare succescriteria;
+- één concreet probleem en één duidelijke oplossing;
+- dat `solution` functionele werking, grens en de reden waarom zij het probleem oplost bevat;
+- minimaal één geldige relatie met productdoel en/of besluit;
+- een UX-ontwerp wanneer de oplossing zichtbaar gedrag of interactie verandert;
+- concrete, observeerbare acceptatiecriteria;
+- een overtuigende uitleg dat de epic in kleine zelfstandige stories kan worden verdeeld;
 - afwezigheid van stories of een vooraf gemaakte backlog;
-- product-ID, bronrelaties en geldige besluiten;
+- product-ID en geldige richtingsreferenties;
 - dat een herziene epic nog steeds `AVAILABLE` is en de verwachte versie heeft.
 
 Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
@@ -186,17 +190,17 @@ de `AVAILABLE` epic.
 - geen meerdere soorten ontwerpsessies;
 - geen autonome Factory-besluiten vanuit intern onderzoek.
 
-Bronnen en aannames die nodig zijn om een epic te begrijpen, staan wel in de epic zelf. Het weglaten
-van intern onderzoek verlaagt dus niet de eisen aan de publieke epic.
+Bronnen, aannames en technische verkenningen mogen aan de interne processessie gekoppeld blijven,
+maar worden geen extra publieke epicvelden. De gepubliceerde epic moet zonder die interne stukken
+begrijpelijk en testbaar zijn.
 
 ## Wanneer de MVP voldoende is
 
 De MVP is bruikbaar zolang één agent consequent:
 
 - complete, niet-overlappende epics maakt;
-- voldoende goede UX opneemt;
+- voldoende goede UX opneemt wanneer die nodig is;
 - de bestaande applicatie correct begrijpt;
-- belangrijke tegenspraak en risico's niet mist;
 - epics maakt die Productplanning zonder aanvullende uitleg kan opdelen.
 
 Terugkerende, meetbare tekortkomingen bepalen welk uitgebreid onderdeel als eerste nodig is. Een
