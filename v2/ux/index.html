@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Product Factory — UX-concept</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Hoofdnavigatie">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span><strong>Product Factory</strong><small>Van inzicht naar verbetering</small></span>
+      </div>
+
+      <nav class="nav-list">
+        <button class="nav-item active" data-view="overview"><span aria-hidden="true">⌂</span>Overzicht</button>
+        <button class="nav-item" data-view="planning"><span aria-hidden="true">≡</span>Planning</button>
+        <button class="nav-item" data-view="quality"><span aria-hidden="true">◇</span>Kwaliteit <b class="nav-count">3</b></button>
+        <button class="nav-item" data-view="inbox"><span aria-hidden="true">○</span>Inbox <b class="nav-count">4</b></button>
+        <button class="nav-item" data-view="decisions"><span aria-hidden="true">✓</span>Besluiten</button>
+        <button class="nav-item" data-view="meetings"><span aria-hidden="true">◌</span>Overleggen</button>
+      </nav>
+
+      <div class="sidebar-section-label">Techniek</div>
+      <nav class="nav-list">
+        <button class="nav-item" data-view="operations"><span aria-hidden="true">⌁</span>Operatie <b class="nav-dot" title="Aandacht nodig"></b></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="avatar" aria-hidden="true">RV</div>
+        <div><strong>Robbert</strong><small>Stakeholder</small></div>
+        <button class="icon-button" title="Instellingen" aria-label="Instellingen">⚙</button>
+      </div>
+    </aside>
+
+    <div class="page-area">
+      <header class="topbar">
+        <button class="menu-button" aria-label="Menu openen" aria-expanded="false">☰</button>
+        <button class="product-switcher" aria-label="Product kiezen">
+          <span class="product-avatar">HK</span>
+          <span><small>Product</small><strong>HKH</strong></span>
+          <span aria-hidden="true">⌄</span>
+        </button>
+        <div class="topbar-spacer"></div>
+        <span class="environment"><i></i> Productie</span>
+        <button class="top-action" data-action="new-signal">+ Signaal</button>
+      </header>
+
+      <main>
+        <section class="view active" id="view-overview" aria-labelledby="overview-title">
+          <div class="page-heading">
+            <div><p class="eyebrow">Maandag 24 augustus</p><h1 id="overview-title">Goedemorgen, Robbert</h1><p>Dit gebeurt er nu rond HKH.</p></div>
+            <button class="secondary-action" data-action="start-meeting">Nieuw overleg</button>
+          </div>
+
+          <article class="product-direction">
+            <div><span class="kicker">Productrichting</span><h2>Iedere bezoeker vindt zonder twijfel de juiste hulp</h2><p>HKH maakt complexe informatie begrijpelijk en geeft mensen vertrouwen in hun volgende stap.</p></div>
+            <button class="text-button" data-view="decisions">Bekijk richting →</button>
+          </article>
+
+          <div class="overview-layout">
+            <div class="overview-primary">
+              <article class="surface now-card">
+                <div class="surface-heading"><div><span class="kicker">Nu in uitvoering</span><h2>Een rustiger aanvraagproces op mobiel</h2></div><span class="status-chip active">Actief</span></div>
+                <p class="muted">Epic EP-014 · 6 van 9 stories opgeleverd</p>
+                <div class="progress-track" aria-label="6 van 9 stories opgeleverd"><span style="width:66%"></span></div>
+                <div class="delivery-row">
+                  <div class="delivery-icon" aria-hidden="true">↗</div>
+                  <div><small>Software Factory bouwt nu</small><strong>ST-087 · Bevestiging na verzenden verbeteren</strong><span>Gestart om 09:42 · 38 minuten bezig</span></div>
+                  <span class="status-chip progress">In uitvoering</span>
+                </div>
+                <div class="next-row"><span>Hierna</span><strong>ST-088 · Foutmelding met herstelactie</strong><small>#12 in backlog</small></div>
+                <button class="text-button" data-view="planning">Open planning →</button>
+              </article>
+
+              <article class="surface">
+                <div class="surface-heading"><div><span class="kicker">Productcyclus</span><h2>Van ontwerp naar bewezen verbetering</h2></div><span class="updated">2 min geleden</span></div>
+                <ol class="process-rail">
+                  <li class="done"><i>✓</i><div><strong>Ontworpen</strong><span>Epic en UX compleet</span></div></li>
+                  <li class="current"><i>2</i><div><strong>Gepland & gebouwd</strong><span>6 van 9 stories klaar</span></div></li>
+                  <li><i>3</i><div><strong>Gecontroleerd</strong><span>5 stories bewezen</span></div></li>
+                  <li><i>4</i><div><strong>Verbetering bewezen</strong><span>Epiccontrole volgt</span></div></li>
+                </ol>
+              </article>
+            </div>
+
+            <aside class="overview-secondary">
+              <article class="surface quality-summary">
+                <div class="surface-heading"><div><span class="kicker">Kwaliteitsbeeld</span><h2>Stabiel, met aandacht</h2></div><span class="trend-up">↗</span></div>
+                <div class="quality-number"><strong>2</strong><span>open bugs<br><small>geen kritiek</small></span></div>
+                <svg viewBox="0 0 320 92" role="img" aria-label="Kwaliteitstrend stijgt geleidelijk">
+                  <path class="chart-area" d="M8 76 C45 72,55 55,92 59 S145 44,172 48 S225 30,252 35 S290 18,312 20 L312 88 L8 88 Z"></path>
+                  <path class="chart-line" d="M8 76 C45 72,55 55,92 59 S145 44,172 48 S225 30,252 35 S290 18,312 20"></path>
+                </svg>
+                <div class="quality-legend"><span>6 weken geleden</span><span>Vandaag</span></div>
+                <button class="text-button" data-view="quality">Bekijk kwaliteit →</button>
+              </article>
+
+              <article class="surface attention-card">
+                <div class="surface-heading"><div><span class="kicker">Aandacht</span><h2>3 testtaken wachten</h2></div><span class="status-chip warning">Actie</span></div>
+                <button class="attention-item" data-view="quality"><span><b>7 pogingen</b><strong>Mobiele Safari-route</strong><small>Testaccount niet bereikbaar</small></span><span>→</span></button>
+                <button class="attention-item" data-view="inbox"><span><b class="signal-label">Nieuw signaal</b><strong>Formulier voelt onduidelijk</strong><small>Vandaag, 08:31</small></span><span>→</span></button>
+              </article>
+            </aside>
+          </div>
+
+          <section class="section-block">
+            <div class="section-heading"><div><span class="kicker">Komende verbeteringen</span><h2>Epics in voorbereiding</h2></div><button class="text-button" data-view="planning">Alle epics →</button></div>
+            <div class="epic-grid">
+              <article class="epic-card"><span class="status-chip available">Beschikbaar</span><h3>Documenten begrijpelijk vergelijken</h3><p>Mensen zien sneller welk document bij hun situatie past.</p><footer><span>4 signalen</span><span>UX compleet</span></footer></article>
+              <article class="epic-card"><span class="status-chip planning">In planning</span><h3>Persoonlijke voortgang terugvinden</h3><p>Een bezoeker kan later veilig verder waar die gebleven was.</p><footer><span>2 besluiten</span><span>Planner bezig</span></footer></article>
+              <article class="epic-card"><span class="status-chip verifying">Controle</span><h3>Zoeken zonder vaktaal</h3><p>De nieuwe zoekroute wordt als complete gebruikersreis getest.</p><footer><span>8 stories klaar</span><span>Test loopt</span></footer></article>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-planning" aria-labelledby="planning-title">
+          <div class="page-heading"><div><p class="eyebrow">Productplanning</p><h1 id="planning-title">Werk in een uitlegbare volgorde</h1><p>Epics geven richting. De backlog is de actuele lijst open stories.</p></div><button class="secondary-action" data-action="run-planning">Planning starten</button></div>
+
+          <div class="planning-summary">
+            <div><small>Open stories</small><strong>18</strong><span>over 3 epics</span></div>
+            <div><small>Software Factory</small><strong>1</strong><span>story actief</span></div>
+            <div><small>Klaar voor verzending</small><strong>12</strong><span>6 wachten op afhankelijkheid</span></div>
+          </div>
+
+          <div class="planning-layout">
+            <section class="surface epic-list-panel">
+              <div class="surface-heading"><div><span class="kicker">Epics</span><h2>Actief en beschikbaar</h2></div></div>
+              <article class="epic-list-item selected"><div><span class="status-chip active">Actief</span><h3>Een rustiger aanvraagproces op mobiel</h3><p>6 van 9 stories opgeleverd · prioriteit 1</p></div><button class="small-action" data-action="prioritize">Heeft voorrang</button></article>
+              <article class="epic-list-item"><div><span class="status-chip planning">In planning</span><h3>Persoonlijke voortgang terugvinden</h3><p>Planner maakt de storyset · prioriteit 2</p></div><button class="small-action" data-action="prioritize">Voorrang geven</button></article>
+              <article class="epic-list-item"><div><span class="status-chip available">Beschikbaar</span><h3>Documenten begrijpelijk vergelijken</h3><p>UX compleet · nog niet opgepakt</p></div><button class="small-action" data-action="prioritize">Voorrang geven</button></article>
+              <article class="epic-list-item"><div><span class="status-chip verifying">Controle</span><h3>Zoeken zonder vaktaal</h3><p>Alle stories bewezen · epiccontrole loopt</p></div><button class="small-action" data-action="open-epic">Bekijken</button></article>
+            </section>
+
+            <section class="surface backlog-panel">
+              <div class="surface-heading"><div><span class="kicker">Backlog</span><h2>Volgende stories</h2></div><span class="updated">Op volgorde</span></div>
+              <div class="backlog-list" role="list">
+                <button class="story-row in-progress" data-story="ST-087"><span class="sequence">10</span><span class="story-state-icon">↗</span><span class="story-copy"><strong>Bevestiging na verzenden verbeteren</strong><small>EP-014 · Productstory</small></span><span class="status-chip progress">In uitvoering</span></button>
+                <button class="story-row" data-story="ST-088"><span class="sequence">11</span><span class="story-state-icon">•</span><span class="story-copy"><strong>Foutmelding met herstelactie</strong><small>EP-014 · Productstory</small></span><span class="status-chip todo">Te doen</span></button>
+                <button class="story-row reserved" data-story="ST-091"><span class="sequence">12</span><span class="story-state-icon">⇢</span><span class="story-copy"><strong>Focus behouden na terugnavigeren</strong><small>EP-014 · Productstory</small></span><span class="status-chip reserved">Wordt verstuurd</span></button>
+                <button class="story-row" data-story="ST-096"><span class="sequence">13</span><span class="story-state-icon bug">!</span><span class="story-copy"><strong>Herstel dubbele bevestigingsmail</strong><small>EP-011 · Bugfix · P1</small></span><span class="status-chip todo">Te doen</span></button>
+                <button class="story-row blocked" data-story="ST-102"><span class="sequence">14</span><span class="story-state-icon">•</span><span class="story-copy"><strong>Voortgang veilig bewaren</strong><small>EP-016 · wacht op ST-101</small></span><span class="status-chip waiting">Wacht</span></button>
+              </div>
+              <p class="panel-note">Alle `TODO`- en `IN_PROGRESS`-stories staan in deze lijst. Alleen Productplanning bepaalt de volgorde.</p>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-quality" aria-labelledby="quality-title">
+          <div class="page-heading"><div><p class="eyebrow">Kwaliteitsbewaking</p><h1 id="quality-title">Wat weten we dat echt werkt?</h1><p>Bewijs, blokkades en ontwikkeling door de tijd.</p></div><button class="secondary-action" data-action="run-quality">Kwaliteitsrun starten</button></div>
+
+          <div class="quality-layout">
+            <article class="surface quality-history">
+              <div class="surface-heading"><div><span class="kicker">Zes weken</span><h2>Kwaliteit ontwikkelt positief</h2></div><button class="period-button">6 weken⌄</button></div>
+              <div class="quality-score-row"><div><strong>0</strong><span>kritieke bugs</span></div><div><strong>2</strong><span>open bugs</span></div><div><strong>87%</strong><span>kernroutes recent getest</span></div></div>
+              <svg class="large-chart" viewBox="0 0 720 210" role="img" aria-label="Kwaliteitshistorie over zes weken">
+                <g class="grid-lines"><line x1="44" y1="40" x2="700" y2="40"></line><line x1="44" y1="95" x2="700" y2="95"></line><line x1="44" y1="150" x2="700" y2="150"></line></g>
+                <path class="chart-area" d="M44 158 C110 142 140 151 202 128 S310 116 360 100 S455 82 515 88 S620 55 700 48 L700 180 L44 180 Z"></path>
+                <path class="chart-line" d="M44 158 C110 142 140 151 202 128 S310 116 360 100 S455 82 515 88 S620 55 700 48"></path>
+                <g class="chart-points"><circle cx="44" cy="158" r="5"></circle><circle cx="202" cy="128" r="5"></circle><circle cx="360" cy="100" r="5"></circle><circle cx="515" cy="88" r="5"></circle><circle cx="700" cy="48" r="6"></circle></g>
+                <g class="chart-labels"><text x="44" y="204">20 jul</text><text x="202" y="204">27 jul</text><text x="360" y="204">3 aug</text><text x="515" y="204">10 aug</text><text x="700" y="204" text-anchor="end">Vandaag</text></g>
+              </svg>
+            </article>
+
+            <section class="surface retry-panel">
+              <div class="surface-heading"><div><span class="kicker">Opnieuw proberen</span><h2>Testwerk met aandacht</h2></div><span class="status-chip warning">3 items</span></div>
+              <p class="muted">Meeste pogingen staan bovenaan. Retry now behoudt de volledige historie.</p>
+              <div class="retry-list">
+                <article class="retry-item" data-retry-id="QW-031"><div class="attempt-badge high"><strong>7</strong><span>pogingen</span></div><div class="retry-copy"><strong>Mobiele Safari-route</strong><span>Epiccontrole · EP-011</span><small>Testaccount niet bereikbaar · opnieuw om 13:15</small></div><button class="small-action primary retry-button">Retry now</button></article>
+                <article class="retry-item" data-retry-id="QW-044"><div class="attempt-badge"><strong>4</strong><span>pogingen</span></div><div class="retry-copy"><strong>Bevestigingsmail ontvangen</strong><span>Storycontrole · ST-082</span><small>Mailserver reageert niet · opnieuw morgen 09:00</small></div><button class="small-action primary retry-button">Retry now</button></article>
+                <article class="retry-item" data-retry-id="QW-052"><div class="attempt-badge"><strong>2</strong><span>pogingen</span></div><div class="retry-copy"><strong>Herstel dubbele mail</strong><span>Bugfixhertest · ST-096</span><small>Deploy nog niet zichtbaar · opnieuw om 11:45</small></div><button class="small-action primary retry-button">Retry now</button></article>
+              </div>
+            </section>
+          </div>
+
+          <div class="two-column-section">
+            <section class="surface"><div class="surface-heading"><div><span class="kicker">Open bugs</span><h2>Concrete afwijkingen</h2></div><button class="text-button">Alle bugs →</button></div>
+              <div class="simple-list"><button><span class="severity p1">P1</span><span><strong>Bevestigingsmail wordt soms dubbel verzonden</strong><small>In herstel · bugfix ST-096</small></span><span>→</span></button><button><span class="severity p2">P2</span><span><strong>Focus springt na terugnavigeren</strong><small>Gepland · story ST-091</small></span><span>→</span></button></div>
+            </section>
+            <section class="surface"><div class="surface-heading"><div><span class="kicker">Recent bewezen</span><h2>Verificaties</h2></div><button class="text-button">Historie →</button></div>
+              <div class="simple-list"><button><span class="verification-icon">✓</span><span><strong>Adresgegevens blijven bewaard</strong><small>Story ST-081 · vandaag 09:16</small></span><span>→</span></button><button><span class="verification-icon">✓</span><span><strong>Zoeken zonder vaktaal</strong><small>Epic EP-009 · gisteren</small></span><span>→</span></button></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-inbox" aria-labelledby="inbox-title">
+          <div class="page-heading"><div><p class="eyebrow">Inbox</p><h1 id="inbox-title">Wat mensen ons vertellen</h1><p>De oorspronkelijke melding blijft zichtbaar; onderzoek en doorwerking staan ernaast.</p></div><button class="primary-action" data-action="new-signal">Nieuw signaal</button></div>
+          <div class="master-detail">
+            <section class="surface master-list">
+              <button class="signal-row selected"><span class="signal-source">Klantgesprek</span><strong>Formulier voelt onduidelijk op mobiel</strong><p>“Ik wist niet of mijn aanvraag al verzonden was.”</p><footer><span class="status-chip open">Open</span><time>Vandaag 08:31</time></footer></button>
+              <button class="signal-row"><span class="signal-source">Support</span><strong>Bevestigingsmail soms dubbel</strong><p>Drie meldingen in de afgelopen week.</p><footer><span class="status-chip review">In onderzoek</span><time>Gisteren</time></footer></button>
+              <button class="signal-row"><span class="signal-source">Overleg #M-18</span><strong>Meer aandacht voor begrijpelijke taal</strong><p>Stakeholder wil vaktermen structureel vermijden.</p><footer><span class="status-chip processed">Verwerkt</span><time>18 aug</time></footer></button>
+            </section>
+            <article class="surface detail-panel">
+              <div class="detail-header"><div><span class="status-chip open">Open</span><h2>Formulier voelt onduidelijk op mobiel</h2><p>Ingediend via klantgesprek · vandaag om 08:31</p></div><button class="icon-button">•••</button></div>
+              <blockquote>“Ik wist niet of mijn aanvraag al verzonden was. Op mijn telefoon bleef ik twijfelen of ik nog een keer moest drukken.”</blockquote>
+              <dl class="detail-grid"><div><dt>Categorie</dt><dd>Kwaliteitszorg</dd></div><div><dt>Urgentie</dt><dd>Normaal</dd></div><div><dt>Productgebied</dt><dd>Aanvraag</dd></div><div><dt>Bron</dt><dd>Klantgesprek #K-204</dd></div></dl>
+              <div class="detail-action-box"><span class="detail-action-icon">◇</span><div><strong>Laat Kwaliteitsbewaking dit onderzoeken</strong><p>Er wordt een testopdracht klaargezet. Dit signaal bepaalt niet vooraf wat de uitkomst is.</p></div><button class="primary-action" data-action="investigate">Onderzoek aanvragen</button></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-decisions" aria-labelledby="decisions-title">
+          <div class="page-heading"><div><p class="eyebrow">Besluiten</p><h1 id="decisions-title">De keuzes die richting geven</h1><p>Alleen grote, blijvende keuzes. Gewone processtappen staan hier niet.</p></div><button class="secondary-action" data-action="start-meeting">Besluit bespreken</button></div>
+          <section class="surface decision-panel">
+            <div class="surface-heading"><div><span class="kicker">Geldig op 24 augustus 2026</span><h2>Actuele besluiten</h2></div><button class="period-button">Peildatum wijzigen</button></div>
+            <div class="decision-list">
+              <article><span class="decision-kind">Product</span><h3>We schrijven voor mensen zonder vakkennis</h3><p>Alle primaire routes gebruiken gewone taal. Een vakterm krijgt uitleg op de plek waar die nodig is.</p><footer><span>Stakeholderbesluit</span><span>Geldig sinds 12 mei 2026</span><button>Historie</button></footer></article>
+              <article><span class="decision-kind technical">Techniek</span><h3>Persoonlijke gegevens blijven in PostgreSQL</h3><p>Nieuwe productdata wordt relationeel opgeslagen en volgt de vastgelegde bewaartermijnen.</p><footer><span>Factorybesluit</span><span>Geldig sinds 3 juni 2026</span><button>Historie</button></footer></article>
+              <article><span class="decision-kind privacy">Privacy</span><h3>Productietesten wijzigen nooit echte klantdata</h3><p>Processen gebruiken alleen veilige read-only routes of expliciete testaccounts.</p><footer><span>Stakeholderbesluit</span><span>Geldig sinds 21 juni 2026</span><button>Historie</button></footer></article>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-meetings" aria-labelledby="meetings-title">
+          <div class="page-heading"><div><p class="eyebrow">Overleggen</p><h1 id="meetings-title">Samen richting geven</h1><p>Van gesprek naar expliciete signalen, besluiten en acties.</p></div><button class="primary-action" data-action="start-meeting">Nieuw overleg</button></div>
+          <div class="meeting-grid">
+            <article class="surface next-meeting"><span class="status-chip open">Open</span><p class="meeting-date">Vandaag · 14:30</p><h2>Mobiele aanvraagroute bespreken</h2><p>Aanleiding: drie signalen en één terugkerende testblokkade.</p><div class="meeting-links"><span>EP-014</span><span>3 signalen</span><span>QW-031</span></div><button class="primary-action" data-action="join-meeting">Overleg openen</button></article>
+            <section class="surface"><div class="surface-heading"><div><span class="kicker">Eerder</span><h2>Afgeronde overleggen</h2></div></div><div class="meeting-list"><button><time>18 aug</time><span><strong>Begrijpelijke taal als vaste richting</strong><small>2 signalen · 1 besluit · afgerond</small></span><span>→</span></button><button><time>4 aug</time><span><strong>Prioriteit mobiele aanvraag</strong><small>Epic EP-014 kreeg voorrang · afgerond</small></span><span>→</span></button><button><time>21 jul</time><span><strong>Productietesten en privacy</strong><small>1 besluit · afgerond</small></span><span>→</span></button></div></section>
+          </div>
+        </section>
+
+        <section class="view" id="view-operations" aria-labelledby="operations-title">
+          <div class="page-heading"><div><p class="eyebrow">Operatie</p><h1 id="operations-title">Automatisering die je kunt volgen</h1><p>Technische status staat apart van de productwaarheid.</p></div><span class="environment"><i></i> Alle systemen bereikbaar</span></div>
+
+          <section class="process-grid">
+            <article class="process-card"><div class="process-icon design">✦</div><div><span class="status-chip idle">Wacht</span><h2>Productontwerp</h2><p>Laatste run vandaag 07:00 · 1 epic gemaakt</p></div><button class="small-action process-run">Nu starten</button></article>
+            <article class="process-card"><div class="process-icon planning">≡</div><div><span class="status-chip progress">Wacht op AI</span><h2>Productplanning</h2><p>Sessie PS-188 · taak 2 van 2</p></div><button class="small-action">Bekijken</button></article>
+            <article class="process-card"><div class="process-icon quality">◇</div><div><span class="status-chip warning">3 retries</span><h2>Kwaliteitsbewaking</h2><p>Laatste run 10:05 · volgende 11:05</p></div><button class="small-action process-run">Nu starten</button></article>
+            <article class="process-card"><div class="process-icon dispatch">↗</div><div><span class="status-chip active">Actief</span><h2>Dispatcher</h2><p>1 story bij Software Factory · geen fouten</p></div><button class="small-action process-run">Nu starten</button></article>
+          </section>
+
+          <div class="operations-layout">
+            <section class="surface"><div class="surface-heading"><div><span class="kicker">AI-uitvoering</span><h2>Taken en worker</h2></div><span class="status-chip active">Laptop online</span></div>
+              <div class="worker-row"><span class="worker-pulse"></span><div><strong>Robberts MacBook Pro</strong><small>Laatste heartbeat 12 sec geleden · 1 van 2 plekken actief</small></div><span>CODEX · CLAUDE</span></div>
+              <div class="task-table"><div class="task-table-head"><span>Taak</span><span>Model</span><span>Status</span><span>Gestart</span></div><div><span><strong>Planning stories EP-016</strong><small>Productplanning · PS-188</small></span><span>Codex · gpt-5</span><span class="status-chip progress">Bezig 62%</span><span>10:18</span></div><div><span><strong>Epic ontwerpen</strong><small>Productontwerp · PS-187</small></span><span>Claude · Sonnet</span><span class="status-chip processed">Klaar</span><span>07:02</span></div></div>
+            </section>
+
+            <section class="surface"><div class="surface-heading"><div><span class="kicker">Software Factory</span><h2>Levering</h2></div><span class="status-chip active">Verbonden</span></div>
+              <div class="factory-status"><div class="factory-graphic"><span>PF</span><i>→</i><span>SF</span></div><strong>ST-087 wordt ontwikkeld</strong><p>Extern ID SF-1038 · 38 minuten actief</p><div class="progress-track"><span style="width:48%"></span></div></div>
+              <button class="text-button">Bekijk leveringshistorie →</button>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop" hidden></div>
+  <aside class="story-drawer" aria-hidden="true" aria-labelledby="story-drawer-title">
+    <div class="drawer-header"><div><span class="status-chip todo">Te doen</span><p>Story ST-088 · EP-014</p></div><button class="drawer-close" aria-label="Sluiten">×</button></div>
+    <div class="drawer-content"><h2 id="story-drawer-title">Foutmelding met herstelactie</h2><p class="lead">Als verzenden niet lukt, ziet de bezoeker wat er gebeurde en kan die veilig opnieuw proberen.</p><section><h3>Gebruikersresultaat</h3><p>De bezoeker verliest geen ingevulde gegevens en weet dat de aanvraag nog niet is verzonden.</p></section><section><h3>Acceptatiecriteria</h3><ul><li>De foutmelding staat direct bij de hoofdactie.</li><li>Ingevulde gegevens blijven ongewijzigd.</li><li>Opnieuw proberen maakt nooit een dubbele aanvraag.</li><li>Toetsenbordfocus gaat naar de foutmelding.</li></ul></section><section><h3>UX-overdracht</h3><div class="ux-wireframe"><div class="phone"><span></span><div class="fake-title"></div><div class="fake-line"></div><div class="fake-line short"></div><div class="fake-error">Verzenden lukte niet<br><b>Probeer opnieuw</b></div><div class="fake-button"></div></div><div><strong>Mobiel · fouttoestand</strong><p>Behoud de formuliercontext. Gebruik geen los foutscherm.</p><small>SVG-ontwerp en tokens staan volledig in de story.</small></div></div></section></div>
+  </aside>
+
+  <div class="modal-backdrop" hidden></div>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+    <button class="modal-close" aria-label="Sluiten">×</button><span class="modal-icon">✦</span><h2 id="modal-title">Nieuw signaal</h2><p>Leg een observatie vast. De oorspronkelijke tekst blijft ongewijzigd.</p><label>Wat wil je meegeven?<textarea rows="5" placeholder="Beschrijf wat je zag, hoorde of belangrijk vindt..."></textarea></label><div class="modal-actions"><button class="secondary-action modal-cancel">Annuleren</button><button class="primary-action modal-confirm">Signaal bewaren</button></div>
+  </section>
+
+  <div class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
