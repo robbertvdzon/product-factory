@@ -23,6 +23,7 @@ class GoogleLoginButton extends StatefulWidget {
 class _GoogleLoginButtonState extends State<GoogleLoginButton> {
   StreamSubscription<GoogleSignInAuthenticationEvent>? _events;
   String? _error;
+  bool _initialized = false;
 
   @override
   void initState() {
@@ -38,6 +39,8 @@ class _GoogleLoginButtonState extends State<GoogleLoginButton> {
     final signIn = GoogleSignIn.instance;
     try {
       await signIn.initialize(clientId: widget.clientId);
+      if (!mounted) return;
+      setState(() => _initialized = true);
       _events = signIn.authenticationEvents.listen(
         (event) {
           if (event is GoogleSignInAuthenticationEventSignIn) {
@@ -69,13 +72,29 @@ class _GoogleLoginButtonState extends State<GoogleLoginButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) {
+    final error = _error;
+    if (kIsWeb) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_initialized) web.renderGoogleButton(),
+          if (error != null) ...[
+            if (_initialized) const SizedBox(height: 12),
+            Text(
+              error,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ],
+      );
+    }
+    if (error != null) {
       return Text(
-        _error!,
+        error,
         style: TextStyle(color: Theme.of(context).colorScheme.error),
       );
     }
-    if (kIsWeb) return web.renderGoogleButton();
     return FilledButton(
       onPressed: () => GoogleSignIn.instance.authenticate(),
       child: const Text('Inloggen met Google'),
