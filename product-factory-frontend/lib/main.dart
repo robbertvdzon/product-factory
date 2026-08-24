@@ -1,11 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+import 'authentication.dart';
+import 'configuration.dart';
+import 'google_login_button.dart';
 
 void main() {
-  runApp(const ProductFactoryApp());
+  runApp(ProductFactoryApp(federatedSignOut: GoogleSignIn.instance.signOut));
 }
 
+typedef GoogleLoginButtonBuilder =
+    Widget Function(ValueChanged<String> onIdToken);
+
 class ProductFactoryApp extends StatelessWidget {
-  const ProductFactoryApp({super.key});
+  const ProductFactoryApp({
+    super.key,
+    this.authenticationGateway,
+    this.googleLoginButtonBuilder,
+    this.federatedSignOut,
+  });
+
+  final AuthenticationGateway? authenticationGateway;
+  final GoogleLoginButtonBuilder? googleLoginButtonBuilder;
+  final Future<void> Function()? federatedSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -13,19 +32,198 @@ class ProductFactoryApp extends StatelessWidget {
       title: 'Product Factory',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff155e75),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff155e75)),
         scaffoldBackgroundColor: const Color(0xfff6f8f8),
         useMaterial3: true,
       ),
-      home: const FoundationPage(),
+      home: AuthenticationGate(
+        gateway: authenticationGateway ?? HttpAuthenticationGateway(),
+        googleLoginButtonBuilder: googleLoginButtonBuilder,
+        federatedSignOut: federatedSignOut,
+      ),
+    );
+  }
+}
+
+class AuthenticationGate extends StatefulWidget {
+  const AuthenticationGate({
+    required this.gateway,
+    this.googleLoginButtonBuilder,
+    this.federatedSignOut,
+    super.key,
+  });
+
+  final AuthenticationGateway gateway;
+  final GoogleLoginButtonBuilder? googleLoginButtonBuilder;
+  final Future<void> Function()? federatedSignOut;
+
+  @override
+  State<AuthenticationGate> createState() => _AuthenticationGateState();
+}
+
+class _AuthenticationGateState extends State<AuthenticationGate> {
+  AuthenticationStatus? _status;
+  String? _error;
+  bool _busy = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadSession());
+  }
+
+  Future<void> _loadSession() async => _perform(widget.gateway.session);
+
+  Future<void> _login(String idToken) async =>
+      _perform(() => widget.gateway.googleLogin(idToken));
+
+  Future<void> _logout() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.gateway.logout(_status?.csrfToken);
+      await widget.federatedSignOut?.call();
+      if (!mounted) return;
+      setState(
+        () => _status = const AuthenticationStatus(
+          authenticated: false,
+          authRequired: true,
+        ),
+      );
+    } on AuthenticationFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _error = failure.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _perform(
+    Future<AuthenticationStatus> Function() operation,
+  ) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final status = await operation();
+      if (!mounted) return;
+      setState(() => _status = status);
+    } on AuthenticationFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _error = failure.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_busy && _status == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final status = _status;
+    if (status?.authenticated == true) {
+      return FoundationPage(
+        showAcceptanceBanner:
+            !status!.authRequired && AppConfiguration.isAcceptance,
+        stakeholderEmail: status.stakeholderEmail,
+        onLogout: status.authRequired ? _logout : null,
+      );
+    }
+    return LoginPage(
+      busy: _busy,
+      error: _error,
+      onIdToken: _login,
+      googleLoginButtonBuilder: widget.googleLoginButtonBuilder,
+    );
+  }
+}
+
+class LoginPage extends StatelessWidget {
+  const LoginPage({
+    required this.busy,
+    required this.onIdToken,
+    this.error,
+    this.googleLoginButtonBuilder,
+    super.key,
+  });
+
+  final bool busy;
+  final String? error;
+  final ValueChanged<String> onIdToken;
+  final GoogleLoginButtonBuilder? googleLoginButtonBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.factory_outlined,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Product Factory',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Log in met het toegestane Google-account om verder te gaan.',
+                    ),
+                    const SizedBox(height: 24),
+                    if (busy)
+                      const CircularProgressIndicator()
+                    else
+                      (googleLoginButtonBuilder?.call(onIdToken) ??
+                          GoogleLoginButton(
+                            clientId: AppConfiguration.googleClientId,
+                            onIdToken: onIdToken,
+                          )),
+                    if (error != null) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
 class FoundationPage extends StatelessWidget {
-  const FoundationPage({super.key});
+  const FoundationPage({
+    this.showAcceptanceBanner = false,
+    this.stakeholderEmail,
+    this.onLogout,
+    super.key,
+  });
+
+  final bool showAcceptanceBanner;
+  final String? stakeholderEmail;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -38,75 +236,75 @@ class FoundationPage extends StatelessWidget {
             icon: const Icon(Icons.info_outline),
             label: const Text('Beheer'),
           ),
+          if (onLogout != null)
+            IconButton(
+              onPressed: onLogout,
+              tooltip: 'Uitloggen',
+              icon: const Icon(Icons.logout),
+            ),
           const SizedBox(width: 8),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final horizontalPadding = constraints.maxWidth < 600 ? 20.0 : 48.0;
-          return SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: 40,
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Technische fundering',
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Product Factory wordt opnieuw opgebouwd. De veilige technische basis is beschikbaar; functionele processen worden in volgende releases toegevoegd.',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          height: 1.45,
-                          color: const Color(0xff334155),
-                        ),
-                  ),
-                  const SizedBox(height: 32),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.construction_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 16),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Nog geen functionele procesmodule actief',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Deze lege productpagina is bewust herkenbaar en bruikbaar terwijl authenticatie, configuratie en operationele voorzieningen worden aangesloten.',
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+      body: Column(
+        children: [
+          if (showAcceptanceBanner)
+            Container(
+              width: double.infinity,
+              color: const Color(0xffffe08a),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: const Text(
+                'Acceptatie — synthetische tijdelijke data — authenticatie uit',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-          );
-        },
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final horizontalPadding = constraints.maxWidth < 600
+                    ? 20.0
+                    : 48.0;
+                return SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: 40,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1120),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Technische fundering',
+                          style: Theme.of(context).textTheme.displaySmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Product Factory wordt opnieuw opgebouwd. De veilige technische basis is beschikbaar; functionele processen worden in volgende releases toegevoegd.',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                height: 1.45,
+                                color: const Color(0xff334155),
+                              ),
+                        ),
+                        const SizedBox(height: 32),
+                        const Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'Nog geen functionele procesmodule actief',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

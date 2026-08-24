@@ -38,6 +38,12 @@ De frontend:
 - maakt onderscheid tussen niet ingelogd, niet bevoegd en een technische fout;
 - bewaart geen Google-token of applicatiesessie in leesbare productdata of logging.
 
+De webimplementatie rendert de officiële Google Identity Services-knop. Een ontvangen ID-token
+wordt direct bij de backend omgewisseld en niet in browseropslag bewaard. De centrale API-client
+stuurt de HttpOnly-sessiecookie met credentials en voegt bij mutaties de door de backend uitgegeven
+CSRF-header toe. Logout trekt eerst de Product Factory-sessie in en meldt daarna ook de lokale
+Google Sign-In-client af, zodat een stille heraanmelding niet direct opnieuw inlogt.
+
 Acceptatie schakelt authenticatie expliciet uit. Op iedere pagina staat daar de vaste banner
 **Acceptatie — synthetische tijdelijke data — authenticatie uit**. Productie kan niet in deze modus
 starten. Het backendcontract en secretbeheer staan in [Technische basis](../platform/technische-basis.md).

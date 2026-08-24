@@ -138,6 +138,14 @@ webapp is een `Secure`, `HttpOnly`, `SameSite` cookie. Het lokale profiel mag al
 niet-secure variant gebruiken. Cookieauthenticatie controleert toegestane origins en beschermt
 muterende requests tegen CSRF.
 
+De concrete fundering gebruikt `POST /api/auth/google` uitsluitend voor het omwisselen van het
+kortlevende Google ID-token. Daarna bevat `PF_SESSION` alleen een willekeurige sessie-identiteit en
+HMAC-handtekening; de actieve sessie, verloopdatum en intrekking staan in de database. Per
+Stakeholder blijft maximaal één actieve sessie van twaalf uur bestaan. `PF_SESSION` is `HttpOnly`
+en de afzonderlijke `PF_CSRF`-cookie wordt tegen een hash in de database gecontroleerd via de
+header `X-PF-CSRF`. `GET /api/auth/session` en `POST /api/auth/logout` leveren respectievelijk
+sessiestatus en intrekking zonder een Google-token of sessiegeheim te loggen.
+
 Alle productdata en muterende routes zijn standaard beveiligd. Alleen login, logout, health en een
 beperkte versiequery mogen publiek zijn. Productie start niet wanneer authenticatie verplicht is
 maar client-id, allowlist of sessiesleutel ontbreekt. Tokens, cookies en volledige persoonlijke
