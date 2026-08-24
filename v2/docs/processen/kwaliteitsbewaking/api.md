@@ -161,10 +161,16 @@ Kwaliteitsbewaking-implementatie.
 | `EpicDetails` | Productontwerp | bevroren titel, samenvatting, probleem, oplossing, richtingsrelaties, eventuele UX, acceptatiecriteria, behapbaarheid en status |
 | `StoryDetails` | Productplanning | titel, samenvatting, volledige storyinhoud, type, storyversie, status, `deliveredCommitSha`, overige oplevergegevens, acceptatiecriteria en eventuele zelfstandige UX |
 | `UserSignalDetails` | productmodule | oorspronkelijke melding plus actuele status en resultaatkoppelingen; categorie `QUALITY_CONCERN` vraagt extra onderzoek |
+| `StakeholderQuestionDetails` | product-/overlegmodule | open vragen en beantwoorde vragen die door precies de uitgevoerde kwaliteitsrol zijn gesteld |
 | `QualityWorkItem` | Kwaliteitsbewaking | duurzame gerichte testopdracht die de run claimt |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
 | `AiJobConfigurationDetails` | AI-uitvoering (`settings`) | actuele provider en model voor het soort kwaliteitsjob; bevroren op iedere nieuwe taak |
 | `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
+
+Een Tester of andere kwaliteitsrol kan in haar gestructureerde resultaat een tijdelijke vraag aan
+de Stakeholder voorstellen. Vertrouwde procescode publiceert die idempotent via
+`askStakeholder(...)` met de echte rol en processessie. De vraag staat niet in Agentgeheugen. Een
+later antwoord wordt uitsluitend aan een volgende taak van diezelfde rol toegevoegd.
 
 De module leest daarnaast eigen bugs en testhistorie. Iedere sessie legt de gebruikte
 contractversies, exact gelezen geheugenversies en exacte geteste omgeving vast. Permanent leren

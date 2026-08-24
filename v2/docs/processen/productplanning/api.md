@@ -134,10 +134,16 @@ alleen de binnenkant van de gekozen Productplanning-implementatie.
 | `EpicDetails` | Productontwerp | exacte metadata, titel, samenvatting, probleem, oplossing, richtingsrelaties, eventueel UX-ontwerp, acceptatiecriteria en behapbaarheid |
 | `BugDetails` en `findBugs(...)` | Kwaliteitsbewaking | uitvoerbare bug met titel, samenvatting, volledige afwijkingsinformatie, ernst, bewijs en versie; open bugs per product, epic en status kunnen betrouwbaar worden gevonden |
 | `VerificationDetails` | Kwaliteitsbewaking | bewijs voor ontbrekend gedrag binnen een bevroren epic |
+| `StakeholderQuestionDetails` | product-/overlegmodule | open vragen en beantwoorde vragen die door precies de uitgevoerde planningsrol zijn gesteld |
 | `TestableProductDetails` | productmodule | acceptatie- en eventueel productieomgeving, veilige routes, accounts en toegangsgrenzen |
 | `AgentMemoryItemDetails` | Agentgeheugen | alleen de actuele geheugenitems van de agentrol die op dat moment wordt uitgevoerd |
 | `AiJobConfigurationDetails` | AI-uitvoering (`settings`) | actuele provider en model voor het soort planningsjob; bevroren op iedere nieuwe taak |
 | `AiTaskResultDetails` | AI-uitvoering | opaque resultaat van een eerder door deze processessie aangevraagde taak |
+
+Een planningsagent kan in haar gestructureerde resultaat een tijdelijke vraag aan de Stakeholder
+voorstellen. Vertrouwde procescode publiceert die idempotent via `askStakeholder(...)` met de echte
+rol en processessie. De vraag staat niet in Agentgeheugen. Een later antwoord wordt uitsluitend aan
+een volgende taak van diezelfde rol toegevoegd.
 
 Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug zonder thread of lock
 vast te houden. Een volgende run voor hetzelfde product hervat dezelfde sessie. Ontbreken de

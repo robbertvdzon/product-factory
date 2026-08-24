@@ -30,8 +30,13 @@ uitvoeren, zonder dat AI-uitvoering productobjecten of agentrollen hoeft te begr
 - Voeg de server-side mockexecutor, voorbereide mockantwoorden en bestuurbare acceptance-only
   endpoints toe. Een mocktaak gebruikt geen laptop, workerlease of Dockercontainer.
 - Maak taakstatus en veilige voortgang zichtbaar in de operationele frontendweergave.
-- Activeer de gespreks- en notulenagent uit de product-/overlegmodule via dezelfde generieke
-  AI-taakroute en de in stap 3 geregistreerde rollen en jobkeys.
+- Activeer de Meeting Agent en notulenagent uit de product-/overlegmodule via dezelfde generieke
+  AI-taakroute en de in stap 3 geregistreerde rollen en jobkeys. Hun complete opaque taak bevat de
+  actieve rolcatalogus, het productbrede meetingsnapshot en open Stakeholdervragen; AI-uitvoering
+  begrijpt deze inhoud niet.
+- Laat de Meeting Agent op een optioneel gekozen doelrol antwoorden zonder een echte procesagent te
+  starten. Laat de notulenagent beantwoorde vragen registreren en blijvende lessen via de atomaire
+  Agentgeheugen-meetingbatch over meerdere rollen verwerken.
 
 ## Buiten scope
 
@@ -53,5 +58,6 @@ Een generieke echte taak kan door de laptopworker worden uitgevoerd en na een wo
 eenduidig worden hervat of opnieuw beschikbaar worden gemaakt. Een mocktaak kan zonder draaiende
 laptop volledig server-side worden afgehandeld. Tijdelijk workerverlies leidt niet tot een hangende
 taak of twee geldige afrondingen en alle relevante scenario's zijn op acceptatie bestuurbaar. Een
-overleg kan de gespreks- en notulenagent via deze route gebruiken. Dezelfde servermodule staat
-veilig op productie, waar `MOCKED` niet beschikbaar is.
+overleg kan de Meeting Agent en notulenagent via deze route gebruiken, gericht vanuit een gekozen
+rol antwoorden, vragen afsluiten en controleerbare productbrede geheugenwijzigingen verwerken.
+Dezelfde servermodule staat veilig op productie, waar `MOCKED` niet beschikbaar is.

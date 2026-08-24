@@ -14,9 +14,9 @@ niet.
 | Stap | Plan | Resultaat |
 |---|---|---|
 | 1 | [Technische fundering](01-technische-fundering.md) | Een schoon, veilig en deploybaar technisch fundament zonder proceslogica. |
-| 2 | [Product- en stakeholderbasis](02-product-en-stakeholderbasis.md) | Productopdracht, signalen, besluiten en overleggen zijn via de UI bruikbaar. |
-| 3 | [Agentgeheugen en AI-instellingen](03-agentgeheugen-en-ai-instellingen.md) | Rollen hebben beheersbaar permanent geheugen en AI-jobs hebben centrale modelkeuzes. |
-| 4 | [AI-uitvoering](04-ai-uitvoering.md) | Echte AI-taken gaan duurzaam naar de laptopworker; mocks worden server-side uitgevoerd. |
+| 2 | [Product- en stakeholderbasis](02-product-en-stakeholderbasis.md) | Productopdracht, signalen, agentvragen, besluiten en overleggen zijn via de UI bruikbaar. |
+| 3 | [Agentgeheugen en AI-instellingen](03-agentgeheugen-en-ai-instellingen.md) | Rollen hebben een catalogus en beheersbaar permanent geheugen; AI-jobs hebben centrale modelkeuzes. |
+| 4 | [AI-uitvoering](04-ai-uitvoering.md) | AI-taken en rolgerichte overleggen werken duurzaam; mocks worden server-side uitgevoerd. |
 | 5 | [Productontwerp MVP](05-productontwerp-mvp.md) | Eén ontwerperagent zet relevante input om in complete, behapbare epics met UX waar nodig. |
 | 6 | [Productplanning MVP](06-productplanning-mvp.md) | Eén planneragent maakt uitvoerbare stories en een geordende backlog. |
 | 7 | [Kwaliteitsbewaking MVP](07-kwaliteitsbewaking-mvp.md) | Eén testeragent levert verificaties, bugs en kwaliteitshistorie. |

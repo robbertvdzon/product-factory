@@ -6,8 +6,8 @@ Status: publiek contract voor productgegevens, gebruikerssignalen en overleggen.
 
 De product-/overlegmodule bewaart de richting en invoer die de ene globale Stakeholder via de
 gebruikersinterface aan Product Factory geeft. Zij is eigenaar en enige schrijver van `Product`,
-`ProductAssignment`, `TestableProductConfiguration`, `ProcessScheduleConfiguration`, `UserSignal`
-en `Meeting`.
+`ProductAssignment`, `TestableProductConfiguration`, `ProcessScheduleConfiguration`, `UserSignal`,
+`StakeholderQuestion` en `Meeting`.
 
 Andere modules gebruiken uitsluitend deze API. Zij krijgen geen repositorytoegang en wijzigen deze
 entiteiten alleen via betekenisvolle commands. De module maakt geen epics, stories, bugs,
@@ -39,6 +39,12 @@ void recordSignalInvestigation(RecordSignalInvestigationCommand command);
 void linkSignalToEpic(LinkSignalToEpicCommand command);
 UserSignalDetails getUserSignal(UserSignalId userSignalId);
 List<UserSignalDetails> findUserSignals(UserSignalFilter filter);
+
+StakeholderQuestionId askStakeholder(AskStakeholderCommand command);
+void recordStakeholderAnswer(RecordStakeholderAnswerCommand command);
+void withdrawStakeholderQuestion(WithdrawStakeholderQuestionCommand command);
+StakeholderQuestionDetails getStakeholderQuestion(StakeholderQuestionId questionId);
+List<StakeholderQuestionDetails> findStakeholderQuestions(StakeholderQuestionFilter filter);
 
 MeetingId startMeeting(StartMeetingCommand command);
 void recordMeetingMessage(RecordMeetingMessageCommand command);
@@ -142,26 +148,59 @@ een filter op `OPEN` en `IN_REVIEW` en behandelt `PROCESSED` dus niet opnieuw.
 Een `Meeting` bevat product-ID, aanleiding, agenda, gekoppelde objecten, deelnemers, berichten,
 status, notulen en de expliciete doorwerking. De statussen zijn `REQUESTED`, `OPEN` en `CLOSED`.
 
+Een `StakeholderQuestion` bevat een tijdelijke vraag van één vertrouwd vastgelegde agentrol,
+context, bronprocessessie, gekoppelde objecten en status `OPEN`, `ANSWERED` of `WITHDRAWN`. Bij een
+antwoord bewaart zij antwoordtekst, meeting-ID, berichtreferentie en tijdstip. De vraag is geen
+permanent geheugenitem. `findStakeholderQuestions(...)` kan minimaal filteren op product, vragende
+rol en status. Open vragen worden automatisch onderdeel van de agenda en context van een bestaand
+of volgend overleg voor dat product.
+
+`askStakeholder(...)` wordt alleen vanuit vertrouwde procescode aangeroepen. Die code vult product,
+vragende rol, processessie en idempotentiesleutel in; vrije agentoutput kan geen rol nabootsen. Het
+command start geen overleg, processessie of AI-taak. Een agent kan een nog open eigen vraag via
+dezelfde vertrouwde context intrekken wanneer zij niet meer relevant is.
+
+`recordStakeholderAnswer(...)` is alleen geldig vanuit de gecontroleerde notulenafhandeling. Het
+command vereist een nog open vraag, een meeting van hetzelfde product en een exact bericht van de
+Stakeholder als antwoordbron. Een technische retry met dezelfde idempotentiesleutel verandert het
+antwoord niet en maakt geen tweede beantwoording.
+
 Een overleg kan vanaf stap 4 complete taken bij AI-uitvoering aanvragen voor de gespreks- en
-notulenagent. Dat gebeurt buiten de drie intelligente processessies. De overlegafhandeling leest
-voor iedere taak uitsluitend het eigen rolgeheugen en de globale `AiJobConfiguration` en levert een
-complete opaque taak aan AI-uitvoering. AI-uitvoering kent de overlegrollen niet.
+notulenagent. Dat gebeurt buiten de drie intelligente processessies. De overlegafhandeling vraagt
+bij Agentgeheugen met een vertrouwde `MeetingExecutionContext` de actieve rolcatalogus en één
+snapshot van alle actuele rolgeheugens van precies dit product op. Zij combineert dit met open
+Stakeholdervragen, relevante publieke productgegevens en de globale `AiJobConfiguration` en levert
+een complete opaque taak aan AI-uitvoering. AI-uitvoering kent de overlegrollen en deze bijzondere
+leesbevoegdheid niet.
+
+Een meetingbericht van de Stakeholder kan een optionele `targetAgentRole` hebben. De Meeting Agent
+gebruikt de rolbeschrijving en het actuele geheugen om expliciet vanuit die rol te antwoorden. Hij
+is één super-agent en start geen echte Productontwerp-, Planner- of Testeragent. Zijn antwoord
+registreert `senderRole = MEETING_AGENT` en optioneel `representedAgentRole`, zodat de auditbron
+eerlijk blijft.
 
 `closeMeeting(...)` legt notulen en iedere afzonderlijke doorwerking idempotent vast. De module
-voert die doorwerking alleen uit via het publieke command van de entiteiteigenaar. Een transcript
-wijzigt nooit stilzwijgend productdata.
+markeert beantwoorde `StakeholderQuestion`s met de exacte meeting- en berichtbron en voert andere
+doorwerking alleen uit via het publieke command van de entiteiteigenaar. Voor blijvende lessen mag
+de notulenagent via één gevalideerde batch geheugen van meerdere actieve rollen toevoegen,
+vervangen of intrekken. Deze wijzigingen hebben geen extra menselijke goedkeuringsstap, maar zijn
+append-only, aan het meeting-ID gekoppeld en achteraf door de Stakeholder corrigeerbaar. Een
+transcript wijzigt nooit stilzwijgend overige productdata.
 
 ## Invarianten
 
 - Er bestaat één globale Stakeholder voor alle producten.
 - Iedere entiteit heeft binnen deze module één repository en één schrijver.
 - Broninhoud van een `UserSignal` en vastgelegde meetingberichten worden niet overschreven.
+- Een tijdelijke Stakeholdervraag staat niet in permanent rolgeheugen en heeft precies één
+  vertrouwd vastgelegde vragende rol.
 - Algemene AI-instellingen horen bij AI-uitvoering en niet bij deze module.
 - De frontend gebruikt exact dezelfde commands en queries als andere aanroepers.
 - Per product en `ScheduledProcess` bestaat precies één geversioneerde scheduleconfiguratie.
 - Een schedule start uitsluitend de bestaande publieke runfunctie en bevat geen product- of
   agentlogica.
-- Overlegagents schrijven nooit rechtstreeks in een andere module.
+- Overlegagents schrijven nooit rechtstreeks in een andere module; de notulenagent gebruikt voor
+  productbrede rolgeheugenwijzigingen uitsluitend de speciale gevalideerde Agentgeheugen-batch.
 
 ## Gerelateerde documenten
 

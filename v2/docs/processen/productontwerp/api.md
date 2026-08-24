@@ -86,6 +86,7 @@ Productontwerp-implementatie.
 | `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote, blijvende Stakeholder- en Factorybesluiten die het ontwerp begrenzen |
 | `UserSignalDetails` | productmodule | oorspronkelijke feedback plus actuele status, uitkomst en resultaatkoppelingen |
+| `StakeholderQuestionDetails` | product-/overlegmodule | open vragen en beantwoorde vragen die door precies de uitgevoerde ontwerp-rol zijn gesteld |
 | `StoryDetails` | Productplanning-query | titel, samenvatting en volledige storyinhoud; wat Software Factory heeft opgeleverd en welke story bij een epic hoort |
 | `VerificationDetails` | Kwaliteitsbewaking-query | of de bedoelde gebruikersverbetering is bereikt en welk bewijs daarbij hoort |
 | `QualitySnapshotDetails` | Kwaliteitsbewaking-query | huidig kwaliteitsbeeld en historische ontwikkeling van dekking, bugs, risico's en verificaties |
@@ -96,6 +97,11 @@ Productontwerp-implementatie.
 
 Voor iedere gebruikte publicatie legt de module bron-ID en bronversie vast. Dezelfde versie wordt
 niet tweemaal als nieuwe input behandeld.
+
+Een ontwerpagent kan in haar gestructureerde resultaat een tijdelijke vraag aan de Stakeholder
+voorstellen. Vertrouwde procescode publiceert die idempotent via `askStakeholder(...)` met de echte
+rol en processessie. De vraag staat niet in Agentgeheugen. Een later antwoord wordt bij een volgende
+taak van diezelfde rol als meetingcontext aangeboden.
 
 Een processessie die op AI wacht, bewaart haar taak-ID's en status `WAITING_FOR_AI` en geeft de
 aanroep terug. Een volgende geplande of handmatige `runProcessSession(productId)` hervat dezelfde

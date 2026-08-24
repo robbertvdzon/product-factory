@@ -499,6 +499,40 @@ Ieder product en proces kan een eigen begrijpelijk automatisch ritme hebben, inc
 tijden per dag en meerdere regels met andere dagen en tijden. Er zijn geen cronexpressies in de UI,
 geen dubbele geplande starts en uitschakelen blokkeert de handmatige bediening niet.
 
+## 19. Een agentvraag wordt tijdens een overleg beantwoord
+
+### Beginsituatie
+
+Een Tester heeft tijdens een kwaliteitssessie een vraag voor de Stakeholder voorgesteld. Vertrouwde
+procescode heeft één `StakeholderQuestion` met de echte Testerrol, context en bronprocessessie
+opgeslagen. De vraag staat `OPEN` en is geen permanent geheugenitem.
+
+### Scenario
+
+1. De open vraag verschijnt in **Vragen van agents** en automatisch op de agenda van het volgende
+   overleg voor dit product.
+2. De Stakeholder opent het overleg. De Meeting Agent krijgt de actieve rolcatalogus, alle actuele
+   rolgeheugens van alleen dit product, open vragen en relevante publieke productgegevens.
+3. De Stakeholder beantwoordt de Testervraag en stelt daarna zelf een bericht specifiek aan de
+   Plannerrol.
+4. De Meeting Agent beantwoordt dat bericht herkenbaar vanuit de Plannerrol en start geen echte
+   Plannerprocessessie.
+5. Bij afsluiting maakt de notulenagent notulen, koppelt het antwoord en het bronbericht aan de
+   `StakeholderQuestion` en zet haar op `ANSWERED`.
+6. De notulenagent leidt uit het gesprek één blijvende testles en één blijvende planningsles af. De
+   product-/overlegruntime past beide wijzigingen met één idempotente, atomaire meetingbatch toe op
+   de juiste rolgeheugens.
+7. Een volgende Tester- of Plannertaak krijgt uitsluitend het eigen actuele rolgeheugen en voor de
+   Tester daarnaast het beantwoorde vraagresultaat. Beide procesagents kunnen het andere
+   rolgeheugen niet lezen.
+
+### Eindresultaat
+
+De tijdelijke vraag is zichtbaar beantwoord en herleidbaar tot het overleg. De relevante blijvende
+lessen staan versieerbaar bij de juiste rollen, inclusief meetingbron en notulenagent als
+registrator. De Stakeholder kan iedere geheugenwijziging later corrigeren zonder dat een
+procesagent ooit productbreed geheugen kreeg.
+
 ## Brondocumenten
 
 - [Overzicht](overzicht.md)
@@ -508,4 +542,6 @@ geen dubbele geplande starts en uitschakelen blokkeert de handmatige bediening n
 - [Kwaliteitsbewaking-API](processen/kwaliteitsbewaking/api.md)
 - [Processen en entiteiten](processen/processen-en-entiteiten.md)
 - [Product- en overlegmodule-API](stakeholder/product-en-overleg-api.md)
+- [Overleggen met de Stakeholder](stakeholder/overleggen.md)
+- [Agentgeheugen](gedeelde-modules/agentgeheugen.md)
 - [Integratie- en acceptatietesten](platform/integratie-en-acceptatietesten.md)

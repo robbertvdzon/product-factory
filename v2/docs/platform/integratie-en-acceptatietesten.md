@@ -227,8 +227,10 @@ De basisdataset bevat minimaal:
 - retrybare `QualityWorkItem`s met verschillende `attemptCount`s, blokkaderedenen en
   `retryAfter`-tijdstippen, waaronder minimaal één item met **Aandacht nodig**;
 - bugs, verificaties en meerdere `QualitySnapshot`s voor een zichtbare tijdlijn;
-- een overleg met notulen en doorwerking;
+- een overleg met algemene en rolgerichte berichten, open en beantwoorde Stakeholdervragen,
+  notulen en doorwerking;
 - versieerbaar geheugen voor meerdere agentrollen;
+- een actieve rolcatalogus en aan een overleg gekoppelde geheugenwijzigingen voor meerdere rollen;
 - alle `AiJobConfiguration`s op provider `MOCKED` en voorbereide mockantwoorden voor de vaste
   beginscenario's;
 - voorbeeldhistorie voor `ProcessSession`, `AiTask`, attempts en `DeliveryAttempt`.
@@ -380,6 +382,8 @@ De productgerichte integratie- en acceptatieomgeving bewijst onder meer:
 - modulecontracten en databaseovergangen;
 - duurzame AI-taak- en resultaatverwerking met bestuurbare server-side mockoutput;
 - dispatchercontract, idempotentie en foutafhandeling;
+- agentvraag, automatische overlegagenda, rolgericht antwoord, beantwoording en atomaire
+  geheugenwijzigingen voor meerdere rollen zonder dat gewone procesagents elkaars geheugen zien;
 - end-to-end UI-flows met voorspelbare externe reacties;
 - historie, resetbaarheid en operationele zichtbaarheid.
 

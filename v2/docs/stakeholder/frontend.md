@@ -97,9 +97,10 @@ in het aparte beheerscherm, omdat de Stakeholder dit moet kunnen controleren en 
 
 ## Agentgeheugen
 
-Het scherm **Agentgeheugen** groepeert geheugen per proces en stabiele agentrol. Een rol ziet nooit
-het geheugen van een andere rol, maar de globale Stakeholder mag binnen ieder product alle rollen
-beheren.
+Het scherm **Agentgeheugen** groepeert geheugen per proces en stabiele agentrol. Een gewone
+procesagent ziet nooit het geheugen van een andere rol, maar de globale Stakeholder mag binnen ieder
+product alle rollen beheren. De gecontroleerde overleguitzondering wordt alleen door Meeting Agent
+en notulenagent gebruikt en geeft geen nieuwe UI-actor toegang.
 
 Per rol toont de frontend:
 
@@ -110,7 +111,11 @@ Per rol toont de frontend:
 - een peildatum om de toen actieve set te reconstrueren;
 - de volledige append-only versiegeschiedenis;
 - actor, wijzigingsreden en geldigheidsperiode;
-- welke processessies een exacte geheugenversie hebben gelezen.
+- welke processessies en overleggen een exacte geheugenversie hebben gelezen.
+
+De rolweergave komt uit de actieve rolcatalogus en toont naast naam en sleutel ook capability,
+verantwoordelijkheden en grenzen. Bij wijzigingen door een notulenagent toont de historie het
+bronoverleg, de reden en de rol waarop de wijziging is toegepast.
 
 Vervangen overschrijft de oude inhoud niet en intrekken verwijdert geen historie. Commands bevatten
 de verwachte actuele versie, zodat een gelijktijdige wijziging als conflict zichtbaar wordt. De
@@ -220,7 +225,13 @@ kwaliteitssessie.
 ## Overleggen en richting geven
 
 De Stakeholder kan vanuit het product of een detailpagina een overleg starten. Het overlegscherm
-toont agenda, berichten, gekoppelde objecten, status, notulen en de expliciete doorwerking.
+toont agenda, berichten, gekoppelde objecten, open en beantwoorde agentvragen, status, notulen en de
+expliciete doorwerking.
+
+Per product is een lijst **Vragen van agents** beschikbaar. Deze toont minimaal vraag, vragende rol,
+context, gekoppelde objecten, bronprocessessie, leeftijd en status `OPEN`, `ANSWERED` of
+`WITHDRAWN`. Open vragen staan bovenaan en worden automatisch aan de agenda van een bestaand of
+volgend overleg toegevoegd. Een vraag verdwijnt niet doordat zij in een agenda staat.
 
 Snelle acties mogen ook rechtstreeks het juiste command aanbieden, bijvoorbeeld:
 
@@ -241,10 +252,17 @@ product al een run actief is. De REST-ingang retourneert voor deze botsing bijvo
 Een run voor een ander product blijft wel toegestaan.
 
 De overlegweergave is meer dan een lijst. Een open overleg toont agenda, berichten, gekoppelde
-objecten en open acties. De Stakeholder kan berichten toevoegen en het overleg afsluiten. Daarna
-toont de UI de notulen en per expliciete uitkomst of het bijbehorende command is uitgevoerd of nog
-aandacht nodig heeft. Vanuit een product-, epic-, signaal-, bug- of besluitdetail kan een overleg
-met dat object als bron worden gestart.
+objecten, open vragen en open acties. Bij ieder Stakeholderbericht kan **Product Factory als geheel**
+of één actieve agentrol als geadresseerde worden gekozen. Het antwoord noemt zichtbaar het gekozen
+rolperspectief. Technisch antwoordt steeds dezelfde Meeting Agent; de UI suggereert niet dat een
+procesagent live is gestart.
+
+De Stakeholder kan berichten toevoegen en het overleg afsluiten. Daarna toont de UI de notulen, de
+vragen die zijn beantwoord en per expliciete uitkomst of het bijbehorende command is uitgevoerd of
+nog aandacht nodig heeft. Ook toont zij per agentrol welke geheugenitems de notulenagent heeft
+toegevoegd, vervangen of ingetrokken. Daarvoor is geen aparte goedkeuringsstap nodig; de bestaande
+geheugenpagina biedt correctie en volledige historie. Vanuit een product-, epic-, signaal-, bug- of
+besluitdetail kan een overleg met dat object als bron worden gestart.
 
 ## Beheer
 

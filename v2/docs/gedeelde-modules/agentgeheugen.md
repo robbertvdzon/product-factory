@@ -15,17 +15,25 @@ geheugenwijzigingen en levert de actuele projectie voor de input van een agentta
 
 ## Hoofdregel
 
-> Een agent leest en wijzigt uitsluitend het geheugen van zijn eigen stabiele agentrol binnen het
-> product van de huidige processessie.
+> Een gewone procesagent leest en wijzigt uitsluitend het geheugen van zijn eigen stabiele
+> agentrol binnen het product van de huidige processessie.
 
 De aanvragende procesruntime bepaalt `productId` en `agentRole` uit de vertrouwde
 `AgentExecutionContext`. Deze waarden
 komen nooit uit agentoutput of vrije prompttekst. Een agent kan daardoor geen andere rol of ander
 product opgeven om daar geheugen te lezen of te wijzigen.
 
-De Stakeholder vormt de enige uitzondering op de rolgrens. Via een bevoegde UI-command kan de
-globale Stakeholder het geheugen van iedere rol binnen ieder product beheren. De actor blijft dan de
-Stakeholder; de UI of een overlegagent wordt niet als beslisser geregistreerd.
+Er zijn drie expliciete, vertrouwde uitzonderingen op de rolgrens:
+
+- de globale Stakeholder mag via bevoegde UI-commands ieder rolgeheugen beheren;
+- de Meeting Agent mag tijdens één overleg het actuele geheugen van alle actieve rollen van precies
+  dat product lezen;
+- de notulenagent mag bij afsluiting dezelfde productbrede geheugensnapshot lezen en
+  controleerbare wijzigingen voor meerdere rollen als één idempotente batch laten toepassen.
+
+Deze uitzonderingen gebruiken een door de product-/overlegruntime gemaakte
+`MeetingExecutionContext`. Een vrij agentantwoord kan deze context, het product of de toegestane
+rollen niet kiezen. Gewone procesagents krijgen deze API nooit aangeboden.
 
 ## Waar geheugen voor bedoeld is
 
@@ -43,6 +51,7 @@ eigen domeineigenaar:
 - productdoel en harde grenzen in `ProductAssignment`;
 - grote blijvende keuzes in `Decision`;
 - feedback en observaties in `UserSignal`;
+- tijdelijke vragen en antwoorden in `StakeholderQuestion` en `Meeting`;
 - afgesproken productwerk in `Epic` en `Story`;
 - aangetoonde kwaliteit in `Bug`, `Verification` en `QualitySnapshot`.
 
@@ -67,6 +76,24 @@ sleutel en een wijzigbare weergavenaam. Als een rol werkelijk wordt vervangen, g
 via een expliciete, controleerbare geheugenmigratie; de nieuwe rol leest nooit automatisch het
 geheugen van de oude rol.
 
+## Rolcatalogus
+
+Iedere gekozen procesimplementatie registreert bij het opbouwen van de applicatie haar actieve
+agentrollen in één publieke rolcatalogus van Agentgeheugen. Een `AgentRoleDefinitionDetails` bevat
+minimaal:
+
+- stabiele `AgentRoleKey` en menselijke weergavenaam;
+- eigenaar/capability en implementatievariant;
+- doel en verantwoordelijkheden van de rol;
+- expliciete grenzen: wat de rol niet beslist of wijzigt;
+- of de rol voor het gekozen product actief is.
+
+`getAgentRoleCatalog(productId)` geeft alleen rollen terug die voor dat product en de gekozen
+implementaties actief zijn. De Meeting Agent gebruikt deze definities om een gerichte vraag
+herkenbaar vanuit de juiste rol te beantwoorden. De catalogus is geen vrij wijzigbaar agentgeheugen:
+de definities komen uit vertrouwde implementatieregistratie en agents kunnen hun eigen rol of
+bevoegdheden niet herschrijven.
+
 ## Publieke module-interface
 
 Andere modules gebruiken alleen deze publieke API:
@@ -88,9 +115,15 @@ List<AgentMemoryVersionDetails> getMemoryHistory(
     MemoryItemId memoryItemId
 );
 
+List<AgentRoleDefinitionDetails> getAgentRoleCatalog(ProductId productId);
+MeetingMemorySnapshot getMeetingMemorySnapshot(MeetingExecutionContext context);
+
 MemoryItemId addAgentMemory(AddAgentMemoryCommand command);
 MemoryVersionId replaceAgentMemory(ReplaceAgentMemoryCommand command);
 void retractAgentMemory(RetractAgentMemoryCommand command);
+MeetingMemoryChangeResult applyMeetingMemoryChanges(
+    ApplyMeetingMemoryChangesCommand command
+);
 ```
 
 `getActiveMemory(...)` is de enige normale agentquery. Zij accepteert een vertrouwde
@@ -100,9 +133,14 @@ procesuitvoering die de agenttaak samenstelt.
 De historische queries zijn bestemd voor Stakeholder-UI, audit en beheer. Een gewone agenttaak krijgt
 geen ingetrokken of vervangen versies en kan geen peildatum kiezen.
 
+`getMeetingMemorySnapshot(...)` is uitsluitend beschikbaar aan de product-/overlegmodule met een
+geldige open meeting en levert de rolcatalogus plus alle actuele geheugenitems van precies dat
+product. De snapshot bevat de exacte versie-ID's en wordt op de overlegtaak vastgezet. Een Meeting
+Agent kan geen ander product kiezen en krijgt geen historische of ingetrokken inhoud.
+
 ## Wie mag schrijven
 
-Er zijn twee schrijfbronnen:
+Er zijn drie schrijfbronnen:
 
 ### De eigen agentrol
 
@@ -131,9 +169,27 @@ De globale Stakeholder kan voor iedere zichtbare agentrol binnen ieder product:
 - een korte verplichte wijzigingsreden opgeven.
 
 De UI roept dezelfde commands aan, maar met `actorType = STAKEHOLDER`. Een overlegagent mag deze
-commands namens de Stakeholder alleen aanbieden wanneer de Stakeholder tijdens het overleg
-expliciet om de geheugenwijziging vraagt. De overlegagent is dan registrator; de actor blijft de
-Stakeholder.
+commands niet gebruiken om een gewone agentwijziging na te bootsen.
+
+### De notulenagent na een overleg
+
+De notulenagent kan uit een afgerond gesprek compacte, blijvende lessen voor meerdere rollen
+afleiden. De product-/overlegruntime zet die voorstellen om in één
+`ApplyMeetingMemoryChangesCommand` met:
+
+- product-ID, meeting-ID en notulentaak-ID uit vertrouwde context;
+- per wijziging de doelrol, actie `ADD`, `REPLACE` of `RETRACT`, inhoud, reden en bij vervangen of
+  intrekken de verwachte actuele versie;
+- één idempotentiesleutel voor de volledige batch.
+
+Agentgeheugen controleert dat de meeting gesloten is, iedere doelrol in de actieve rolcatalogus
+staat en iedere verwachte versie nog actueel is. De batch wordt atomair toegepast of volledig als
+conflict afgewezen. Iedere versie krijgt `actorType = MEETING_MINUTES_AGENT` en het meeting-ID als
+bron. Een menselijke goedkeuringsstap is niet vereist; de Stakeholder ziet de veranderingen bij de
+notulen en kan ze via de gewone versieerbare UI corrigeren.
+
+Losse antwoorden, tijdelijke open vragen en normale productstatus horen niet in deze batch. Zij
+blijven respectievelijk bij `StakeholderQuestion` of hun eigen domeineigenaar.
 
 ## Datamodel
 
@@ -241,7 +297,13 @@ Hierdoor is later precies te reconstrueren met welk geheugen een antwoord tot st
 geheugenwijziging tijdens de taak geldt pas voor een volgende agenttaak, niet met terugwerkende kracht
 voor de lopende inputmomentopname.
 
-Parallelle agents hebben ieder hun eigen rolgeheugen. Zij delen tijdelijke resultaten uitsluitend
+De overlegafhandeling volgt een afzonderlijke, beperkte route: zij maakt een vertrouwde
+`MeetingExecutionContext`, vraagt één productbreed snapshot op en legt alle gebruikte rol- en
+geheugenversies op de meeting en opaque `AiTask` vast. Alleen `MEETING.CONVERSE` en
+`MEETING.SUMMARIZE` gebruiken dit snapshot. AI-uitvoering ziet nog steeds slechts complete opaque
+data en kent de rollen of de uitzonderingsbevoegdheid niet.
+
+Parallelle procesagents hebben ieder hun eigen rolgeheugen. Zij delen tijdelijke resultaten uitsluitend
 via de expliciete handoffs van de processessie en lezen nooit elkaars permanente geheugen.
 
 De aanvragende procesruntime neemt de geselecteerde eigen geheugenversies op in de complete opaque
@@ -292,11 +354,14 @@ processen en agentrollen. Per rol toont de UI:
 - een peildatumkiezer;
 - de volledige versiegeschiedenis per geheugenlijn;
 - actor, wijzigingsreden en geldigheidsperiode;
-- processessies die een exacte geheugenversie hebben gelezen.
+- processessies en overleggen die een exacte geheugenversie hebben gelezen.
 
 De frontend schrijft nooit rechtstreeks in de geheugentabellen. Zij gebruikt publieke queries en
 commands en toont een conflict wanneer een item intussen door een agent of de Stakeholder is
 vervangen. Replace- en retractcommands bevatten daarom altijd de verwachte actuele versie-ID.
+
+Bij een gesloten overleg toont de frontend daarnaast per rol welke geheugenregels door de
+notulenagent zijn toegevoegd, vervangen of ingetrokken, met meetinglink en reden.
 
 ## Overstappen van MVP naar uitgebreide implementatie
 
@@ -329,13 +394,15 @@ agenttaak vastgelegd.
 ## Invarianten
 
 - Iedere geregistreerde agentrol heeft per product een eigen, permanent geheugen.
-- Een agent leest en wijzigt uitsluitend haar eigen rolgeheugen.
+- Een gewone procesagent leest en wijzigt uitsluitend haar eigen rolgeheugen.
+- Alleen de product-/overlegmodule met geldige `MeetingExecutionContext` kan een productbreed
+  meetingsnapshot lezen of een productbrede notulenbatch schrijven.
 - De procesruntime bepaalt product en rol; agentoutput kan die niet kiezen.
 - Een agent ziet normaal alleen actuele versies.
 - De Stakeholder kan via de UI iedere rol corrigeren.
 - Vervangen en intrekken zijn append-only; oude versies blijven auditbaar.
 - Een peildatum reconstrueert de toen actieve projectie.
-- Iedere processessie legt per `AiTask` de exact gelezen geheugenversie-ID's vast.
+- Iedere processessie en ieder overleg legt per `AiTask` de exact gelezen geheugenversie-ID's vast.
 - Een mislukte agenttaak schrijft geen geheugen.
 - Geheugen overschrijft nooit publieke productwaarheid of harde regels.
 - Geen wijziging wordt stil afgekapt of zonder actor en reden opgeslagen.

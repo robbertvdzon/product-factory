@@ -8,7 +8,10 @@ voeren.
 ## Globale scope
 
 - Implementeer het versieerbare permanente geheugen per product en stabiele agentrol.
-- Bewaak dat een agentrol uitsluitend haar eigen actuele geheugen kan lezen en wijzigen.
+- Bewaak dat een gewone procesagent uitsluitend haar eigen actuele geheugen kan lezen en wijzigen.
+- Implementeer de vertrouwde actieve rolcatalogus met verantwoordelijkheden en grenzen per rol.
+- Implementeer de productbrede meetingsnapshot en atomaire meetingbatch als de enige uitzonderingen:
+  alleen product-/overlegcode met een geldige `MeetingExecutionContext` mag ze gebruiken.
 - Geef de Stakeholder via de UI toegang tot alle rolgeheugens, historie en correctiecommands.
 - Implementeer de algemene AI-instellingen per `AiJobKey`, inclusief provider, model of mockprofiel,
   inschakeling en configuratieversie, als intern `settings`-onderdeel van `ai-execution-impl`.
@@ -37,6 +40,6 @@ uitgebreide agentrollen en hun modelinstellingen worden nog niet geregistreerd.
 
 ## Klaar wanneer
 
-De ene globale Stakeholder kan overleg- en MVP-rolgeheugen en AI-jobinstellingen veilig beheren, iedere wijziging is
-historisch reconstrueerbaar en de rolgrenzen zijn automatisch getest. De versie is op acceptatie en
-productie gedeployed.
+De ene globale Stakeholder kan overleg- en MVP-rolgeheugen en AI-jobinstellingen veilig beheren,
+iedere wijziging is historisch reconstrueerbaar en de gewone rolgrenzen plus beide gecontroleerde
+overleguitzonderingen zijn automatisch getest. De versie is op acceptatie en productie gedeployed.

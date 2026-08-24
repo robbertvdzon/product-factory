@@ -3,20 +3,25 @@
 Status: technisch contract voor de laptopworker en de uitvoering van één `AiTask`.
 
 Dit document werkt de uitvoeringsgrens uit van
-[AI-uitvoering](ai-uitvoering.md). Productontwerp, Productplanning en Kwaliteitsbewaking bepalen wat
-een agent moet doen. AI-uitvoering bewaart en distribueert de opaque taak. De laptopworker voert
-iedere echte `CODEX`- of `CLAUDE`-taak volledig uit in een nieuwe tijdelijke Dockeromgeving.
+[AI-uitvoering](ai-uitvoering.md). Productontwerp, Productplanning, Kwaliteitsbewaking en de
+product-/overlegmodule bepalen wat hun agent moet doen. AI-uitvoering bewaart en distribueert de
+opaque taak. De laptopworker voert iedere echte `CODEX`- of `CLAUDE`-taak volledig uit in een nieuwe
+tijdelijke Dockeromgeving.
 `MOCKED` wordt server-side afgehandeld en komt nooit bij deze worker.
 
 ## Verantwoordelijkheidsgrens
 
-De aanvragende procesmodule:
+De aanvragende domeinmodule:
 
 - bevriest product-ID, publieke Git-URL, exacte commit-SHA, bronversies en doelomgeving;
-- verzamelt de benodigde publieke DTO's en uitsluitend het geheugen van de eigen agentrol;
+- verzamelt de benodigde publieke DTO's en voor gewone procestaken uitsluitend het geheugen van de
+  eigen agentrol;
+- mag voor `MEETING.CONVERSE` en `MEETING.SUMMARIZE` alleen vanuit de product-/overlegmodule met een
+  geldige meetingcontext de rolcatalogus en het productbrede meetingsnapshot toevoegen;
 - kiest via de actuele `AiJobConfiguration` provider en model;
 - levert vaste instructies, een resultaatschema en alleen secretreferenties;
-- valideert na afloop de domeinbetekenis en publiceert eventueel epics, stories of testbewijs.
+- valideert na afloop de domeinbetekenis en publiceert eventueel epics, stories, testbewijs of
+  gecontroleerde overleguitkomsten.
 
 AI-uitvoering bewaart de taak, claims, leases, heartbeats, technische resultaten en artifacts. De
 worker kent geen module-entiteiten of agentrollen en schrijft nooit rechtstreeks in hun database.
@@ -189,8 +194,9 @@ Het concrete gedrag is:
 Een taak blijft daardoor nooit onbeperkt `RUNNING`. Zij hervat dezelfde attempt wanneer dat veilig
 kan, wordt anders als nieuwe attempt opnieuw uitgevoerd en eindigt na uitgeputte technische
 `maxAttempts` zichtbaar als `FAILED`. Een nog niet geclaimde taak blijft veilig `QUEUED` zolang geen
-laptopworker beschikbaar is. De aanvragende processessie blijft ondertussen duurzaam
-`WAITING_FOR_AI` of wordt na een terminale taakfout zichtbaar `BLOCKED`.
+laptopworker beschikbaar is. De aanvragende domeincontext blijft ondertussen duurzaam wachten of
+wordt na een terminale taakfout zichtbaar geblokkeerd; bij een procestaak gebeurt dat via
+`WAITING_FOR_AI` of `BLOCKED` op de `ProcessSession`.
 
 ## Onvertrouwde inhoud en prompt-injection
 

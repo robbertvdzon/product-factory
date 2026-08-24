@@ -49,6 +49,7 @@ werkdocumenten, prompts en agentadministratie horen hier niet bij.
 | `Verification` | Onveranderlijk bewijs en een oordeel over een story, epic of gebruikerssignaal. |
 | `QualitySnapshot` | Een onveranderlijke momentopname van de aantoonbare productkwaliteit na een kwaliteitssessie. |
 | `Meeting` | Een overleg met de Stakeholder, inclusief agenda, gesprek en gecontroleerde uitkomst. |
+| `StakeholderQuestion` | Een tijdelijke vraag van één agentrol aan de Stakeholder, met een zichtbare antwoordstatus en bronoverleg. |
 | `AgentMemoryItem` | Een permanente, versieerbare herinnering van precies één agentrol binnen dit product. |
 
 De **backlog** is geen apart object. Het is de lijst van stories met status `TODO` of
@@ -139,9 +140,10 @@ De Software Factory-dispatcher is het vierde uitvoerende onderdeel, maar geen in
 gebruikt geen agents en neemt geen productbesluiten. Net als ieder gepland onderdeel kan hij ook
 bevoegd via UI of REST worden gestart.
 
-Het Agentgeheugen is een ondersteunende module en geen vijfde proces. Iedere agentrol leest bij een
-taak uitsluitend haar eigen actuele geheugen. De Stakeholder kan alle rolgeheugens via de UI
-bekijken en corrigeren.
+Het Agentgeheugen is een ondersteunende module en geen vijfde proces. Iedere gewone procesagent
+leest bij een taak uitsluitend haar eigen actuele geheugen. De Stakeholder kan alle rolgeheugens via
+de UI bekijken en corrigeren. Alleen de Meeting Agent en notulenagent mogen via een vertrouwde
+overlegcontext het actuele geheugen van alle rollen binnen precies het besproken product gebruiken.
 
 AI-uitvoering is eveneens een ondersteunende module. Zij kent geen agentrollen of productobjecten,
 maar alleen complete taken met een expliciete provider en model. Iedere taak staat eerst duurzaam in
@@ -399,15 +401,31 @@ technische epicafronding niet willekeurig tegen.
 
 ## Overleg en richting
 
-De Stakeholder kan vanuit de UI een overleg starten. Een proces kan om overleg vragen wanneer
-menselijke richting nodig is. Bij afsluiting maakt een notulenagent leesbare notulen en verwerkt hij
-alleen expliciete uitkomsten:
+De Stakeholder kan vanuit de UI een overleg starten. Een procesagent die uitleg nodig heeft, maakt
+via vertrouwde procescode een `StakeholderQuestion`. De vraag staat niet in permanent geheugen,
+blijft zichtbaar als `OPEN`, `ANSWERED` of `WITHDRAWN` en komt automatisch op de agenda van een
+bestaand of volgend overleg voor dat product.
+
+Tijdens het overleg praat de Stakeholder met één Meeting Agent. Deze super-agent kent via de
+rolcatalogus de verantwoordelijkheden en grenzen van alle actieve agentrollen en mag het actuele
+geheugen van al die rollen voor dit product inzien. De Stakeholder kan een bericht aan Product
+Factory als geheel of specifiek aan één rol richten. De Meeting Agent noemt dan expliciet vanuit
+welke rol hij antwoordt; de echte procesagent wordt niet gestart.
+
+Bij afsluiting maakt een notulenagent leesbare notulen en verwerkt hij gecontroleerde uitkomsten:
 
 - feedback, een correctie, wens of kwaliteitszorg wordt `UserSignal`;
 - alleen een grote, blijvende keuze wordt `Decision`;
 - een wijziging van doel of harde grens past `ProductAssignment` aan;
 - een gewone epic-, story-, bug-, annulerings- of prioriteitsactie wordt een direct command op de
-  eigenaarsmodule.
+  eigenaarsmodule;
+- beantwoorde agentvragen krijgen antwoord, meeting en bericht als bron;
+- blijvende, herbruikbare lessen kunnen via een gevalideerde append-only batch in het geheugen van
+  een of meer betrokken agentrollen worden toegevoegd, vervangen of ingetrokken.
+
+Voor deze productbrede geheugenbatch is geen extra menselijke goedkeuring nodig. Iedere wijziging
+is aan het overleg gekoppeld, wordt bij de notulen getoond en kan later door de Stakeholder worden
+gecorrigeerd. Een losse vraag, antwoord of actie wordt niet automatisch permanent geheugen.
 
 Een transcript verandert niet vanzelf het product. Iedere doorwerking gebeurt via een zichtbaar
 command aan de module die het betreffende object bezit.
@@ -424,10 +442,10 @@ betekenisvolle commands. Niemand schrijft rechtstreeks in de tabellen van een an
 
 De frontend maakt dezelfde databasegegevens begrijpelijk voor mensen.
 
-Agentgeheugen staat eveneens in de database, maar is context voor één agentrol en geen alternatieve
-productwaarheid. Iedere processessie legt vast welke exacte geheugenversies haar taken hebben
-gebruikt. De Stakeholder kan actuele items via de UI toevoegen, vervangen en intrekken en kan met een peildatum
-zien wat een rol vroeger onthield.
+Agentgeheugen staat eveneens in de database, maar is context voor agentrollen en geen alternatieve
+productwaarheid. Iedere processessie en ieder overleg legt vast welke exacte geheugenversies haar
+taken hebben gebruikt. De Stakeholder kan actuele items via de UI toevoegen, vervangen en intrekken
+en kan met een peildatum zien wat een rol vroeger onthield.
 
 Ook algemene `AiJobConfiguration`s, `AiTask`s, attempts en resultaten staan in de database. De
 laptopworker leest nooit rechtstreeks uit die database: hij claimt echte taken via de publieke
@@ -494,8 +512,9 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
    technische uitvoerders verwerken uitsluitend bestaande queuetaken en starten nooit zelf een
    proces.
 6. Iedere entiteit heeft één eigenaar en andere modules wijzigen haar alleen via publieke commands.
-7. Iedere agentrol leest uitsluitend haar eigen actuele, versieerbare geheugen; de Stakeholder mag
-   dat geheugen via de UI corrigeren.
+7. Iedere gewone procesagent leest uitsluitend haar eigen actuele, versieerbare geheugen. De
+   Stakeholder mag alle rollen via de UI corrigeren; alleen Meeting Agent en notulenagent hebben
+   binnen een vertrouwd productoverleg gecontroleerde toegang tot alle rolgeheugens van dat product.
 8. AI-uitvoering kent geen rollen of productbetekenis en krijgt altijd een complete taak met
    bevroren provider en model.
 9. Gemiste worker-heartbeats leiden eerst tot een hersteltermijn; retries zijn met leases en fencing

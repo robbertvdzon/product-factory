@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2420" height="2280" viewBox="0 0 2420 2280" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont het capabilitycontract uit de ene gedeelde Maven-module product-factory-api en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering bevat intern settings en task-execution; task-execution kent geen rollen, handelt MOCKED server-side af en distribueert CODEX- en CLAUDE-taken via een databasequeue aan de laptopworker. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont het capabilitycontract uit de ene gedeelde Maven-module product-factory-api en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Gewone procesagents krijgen alleen het geheugen van hun eigen rol; Meeting Agent en notulenagent krijgen via een vertrouwde meetingcontext alle actieve rolgeheugens van precies één product. AI-uitvoering bevat intern settings en task-execution; task-execution kent geen rollen, handelt MOCKED server-side af en distribueert CODEX- en CLAUDE-taken via een databasequeue aan de laptopworker. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -51,15 +51,15 @@
   <text x="80" y="495" class="api">«command» markUserSignalInReview(...)</text>
   <text x="80" y="521" class="api">«command» recordSignalInvestigation(...)</text>
   <text x="80" y="547" class="api">«command» linkSignalToEpic(...)</text>
-  <text x="80" y="573" class="api" style="font-size:12px">«command» start/record/closeMeeting(...)</text>
+  <text x="80" y="573" class="api" style="font-size:10px">«command» meetings(...) · ask/recordAnswer/withdrawStakeholder(...)</text>
   <text x="80" y="605" class="api" style="font-size:12px">«query» get/findProduct(...)</text>
   <text x="80" y="631" class="api" style="font-size:10px">«query» assignment / testproduct / getProcessSchedules(...)</text>
-  <text x="80" y="657" class="api" style="font-size:12px">«query» getUserSignal(...) / findUserSignals(...)</text>
+  <text x="80" y="657" class="api" style="font-size:11px">«query» get/findUserSignal(...) · get/findStakeholderQuestion(...)</text>
   <text x="80" y="683" class="api">«query» getMeeting(...) / findMeetings(...)</text>
   <line x1="80" y1="735" x2="555" y2="735" class="divider" stroke="#cbd5e1"/>
   <text x="80" y="765" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="80" y="798" class="entity">Product · ProductAssignment · Meeting</text>
-  <text x="80" y="829" class="entity">UserSignal · TestableProductConfiguration</text>
+  <text x="80" y="829" class="entity" style="font-size:11px">UserSignal · StakeholderQuestion · TestableProductConfiguration</text>
   <text x="80" y="860" class="entity">ProcessScheduleConfiguration</text>
   <text x="80" y="891" class="note">Broninhoud van UserSignal blijft onveranderlijk.</text>
   <text x="80" y="913" class="note">Alleen status en gecontroleerde koppelingen mogen wijzigen.</text>
@@ -241,9 +241,9 @@
   <text x="80" y="1620" class="module-title">Agentgeheugen — ondersteunende module, geen proces</text>
   <text x="80" y="1672" class="section-title">PUBLIEKE INTERFACE</text>
   <text x="80" y="1702" class="api">«query» getActiveMemory(AgentExecutionContext)</text>
-  <text x="80" y="1728" class="api" style="font-size:12px">«query» getMemoryAt(...) / getMemoryHistory(...)</text>
-  <text x="790" y="1702" class="api" style="font-size:12px">«command» addAgentMemory(...) / replaceAgentMemory(...) / retractAgentMemory(...)</text>
-  <text x="790" y="1728" class="note">Agent: alleen eigen rol · globale Stakeholder: alle rollen van ieder product</text>
+  <text x="80" y="1728" class="api" style="font-size:11px">«query» memory history · role catalog · meeting memory snapshot</text>
+  <text x="790" y="1702" class="api" style="font-size:11px">«command» add/replace/retractAgentMemory(...) · applyMeetingMemoryChanges(...)</text>
+  <text x="790" y="1728" class="note">Procesagent: eigen rol · overlegagents: productbreed · Stakeholder: beheer</text>
   <line x1="80" y1="1760" x2="2340" y2="1760" class="divider" stroke="#99f6e4"/>
   <text x="80" y="1790" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="80" y="1823" class="entity">AgentMemoryItem · AgentMemoryVersion · AgentMemoryRetraction</text>
@@ -253,7 +253,7 @@
 
   <!-- Own-role memory queries and Stakeholder management -->
   <path d="M450 1580 H600 V850 H580" class="query"/>
-  <text x="315" y="1532" class="flow">alleen geheugen van de eigen overlegrol</text>
+  <text x="250" y="1532" class="flow">Meeting Agent/notulen: alle actieve rolgeheugens van dit product</text>
   <path d="M700 1580 H625 V790 H675" class="query"/>
   <text x="405" y="1555" class="flow">alleen geheugen van de eigen ontwerp-rol</text>
   <path d="M955 1580 V1480" class="query"/>

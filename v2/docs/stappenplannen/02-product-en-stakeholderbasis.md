@@ -13,8 +13,11 @@ Deze stap levert de publieke productbasis waarop alle latere modules voortbouwen
   onderdeel.
 - Implementeer het Besluitenregister, inclusief actuele besluiten, historie, intrekken en vervangen.
 - Implementeer overleggen, notulen en de gecontroleerde verwerking van stakeholderuitkomsten.
+- Implementeer `StakeholderQuestion` met status, vragende rol, bronprocessessie, gekoppelde context
+  en antwoordbron. Open vragen komen automatisch op een overlegagenda; in deze stap worden zij met
+  testdata of via de gewone API aangemaakt omdat procesagents pas later volgen.
 - Leg vast dat één globale Stakeholder alle producten en Product Factory-brede instellingen beheert.
-- Voeg de bijbehorende product-, signalen-, schedule-, besluiten- en overlegschermen aan de
+- Voeg de bijbehorende product-, signalen-, vragen-, schedule-, besluiten- en overlegschermen aan de
   frontend toe. Schedulebediening ondersteunt meerdere menselijke dag/tijdregels of één interval,
   een expliciete tijdzone en toont `nextRunAt`; er is geen cronveld.
 - Toon herkomst, status en historie via de publieke module-API's; schrijf nooit vanuit de UI in
@@ -38,8 +41,8 @@ overleguitkomst zonder AI via dezelfde publieke commands worden geregistreerd.
 
 ## Klaar wanneer
 
-De Stakeholder kan in de UI het product beheren, per proces een schedule configureren, signalen
-indienen en volgen, overleggen vastleggen en geldige of historische besluiten bekijken en wijzigen.
+De Stakeholder kan in de UI het product beheren, per proces een schedule configureren, signalen en
+agentvragen volgen, overleggen vastleggen en geldige of historische besluiten bekijken en wijzigen.
 De scheduleconfiguratie is in stap 2 al duurzaam en uitleesbaar; de echte automatische starts worden
 pas in stap 9 geactiveerd. Dit werkt met synthetische data op acceptatie en met duurzame data en
 authenticatie op productie.

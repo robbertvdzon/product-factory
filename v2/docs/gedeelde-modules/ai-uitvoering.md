@@ -53,11 +53,12 @@ De module doet nadrukkelijk niet het volgende:
 | Onderdeel | Verantwoordelijkheid |
 |---|---|
 | aanvragende procesmodule | bepaalt wat de agent moet doen, verzamelt alle input en het eigen rolgeheugen, kiest een `AiJobKey` en valideert later de domeinuitkomst |
+| product-/overlegmodule | stelt voor `MEETING.CONVERSE` en `MEETING.SUMMARIZE` een complete taak samen met vertrouwde rolcatalogus, productbreed meetingsnapshot en Stakeholdervragen; verwerkt antwoorden en notuleneffecten zelf |
 | AI-uitvoering — intern `settings` | vertaalt de opaque `AiJobKey` naar actuele provider en model zonder de rol- of productbetekenis te kennen |
 | AI-uitvoering — intern `task-execution` | bewaart en distribueert de complete taak, bewaakt uitvoering en levert het technische resultaat terug; kiest zelf nooit provider of model |
 | laptopworker | claimt uitsluitend `CODEX`- en `CLAUDE`-taken, start de gevraagde provider in Docker en rapporteert heartbeat, voortgang en resultaat |
 | server-side mockexecutor | handelt `MOCKED` direct binnen AI-uitvoering af met een vooraf ingesteld testresultaat; gebruikt geen worker, laptop, lease of Dockercontainer |
-| Agentgeheugen | levert uitsluitend aan de vertrouwde aanvragende rol haar eigen actuele geheugen; AI-uitvoering kent de rol niet |
+| Agentgeheugen | levert een gewone procesruntime uitsluitend het eigen rolgeheugen en levert alleen de product-/overlegmodule met geldige meetingcontext een productbreed snapshot; AI-uitvoering kent dit verschil niet |
 
 ## Algemene AI-jobinstellingen
 
@@ -124,24 +125,23 @@ void cancelAiTask(CancelAiTaskCommand command);
 ```
 
 `requestAiTask(...)` start geen providerproces. Het valideert en bewaart alleen een `QUEUED` taak en
-retourneert direct. De unieke combinatie van aanvragende module, processessie en
-idempotentiesleutel voorkomt dubbele taken.
+retourneert direct. De unieke combinatie van aanvragende module, `requestContextType`,
+`requestContextId` en idempotentiesleutel voorkomt dubbele taken.
 
-Alle queries controleren dat de aanvrager het product en de processessie mag zien. Een procesmodule
-kan alleen taken lezen die zij zelf heeft aangevraagd; operations en frontend gebruiken een aparte
-bevoegde read-only projectie.
+Alle queries controleren dat de aanvrager het product en de vertrouwde aanvragerscontext mag zien.
+Een domeinmodule kan alleen taken lezen die zij zelf voor die context heeft aangevraagd; operations
+en frontend gebruiken een aparte bevoegde read-only projectie.
 
 `cancelAiTask(...)` annuleert een nog niet geclaimde taak direct. Bij een lopende taak registreert
 het command een annuleringsverzoek. De worker ziet dit bij de volgende heartbeat en stopt het lokale
 providerproces zo snel mogelijk. Een resultaat dat daarna arriveert wordt niet meer als succesvol
 geaccepteerd.
 
-AI-uitvoering bepaalt niet wat de aanvragende processessie daarna doet. De aanvrager bewaart daarom
-een annuleringsreden. Is het domeinwerk zelf geannuleerd, bijvoorbeeld doordat de Stakeholder de
-epic stopte, dan sluit de eigenaar de processessie als `CANCELLED`. Is alleen de technische taak
-gestopt terwijl het domeinwerk nog geldig is, dan wordt de sessie `BLOCKED` en vraagt een latere
-`runProcessSession(productId)` na back-off een nieuwe taak aan met een nieuwe taak-ID. Een
-`CANCELLED` `AiTask` kan zo nooit een wachtende processessie verweesd achterlaten.
+AI-uitvoering bepaalt niet wat de aanvragende domeincontext daarna doet. De aanvrager bewaart daarom
+een annuleringsreden. Een procesmodule werkt haar `ProcessSession` volgens de bestaande regels bij;
+de product-/overlegmodule werkt de betreffende `Meeting` en open actie bij. Alleen de eigenaar
+bepaalt of later een nieuwe taak nodig is. Een `CANCELLED` `AiTask` laat zo nooit een wachtende
+processessie of overlegactie verweesd achter.
 
 ## Complete taakenvelop
 
@@ -149,7 +149,8 @@ gestopt terwijl het domeinwerk nog geldig is, dan wordt de sessie `BLOCKED` en v
 class RequestAiTaskCommand {
     String productId;
     String requestingModule;
-    String processSessionId;
+    RequestContextType requestContextType; // PROCESS_SESSION of MEETING
+    String requestContextId;               // vertrouwd sessie-ID of meeting-ID
     String idempotencyKey;
     String jobKey;                    // alleen voor audit, niet geïnterpreteerd
     int jobConfigurationVersion;
@@ -165,13 +166,15 @@ class RequestAiTaskCommand {
 }
 ```
 
-De aanvrager levert één volledige momentopname. Daarin staan alle productgegevens,
-bronversies, eigen rolgeheugenversies, handoffs en toegestane omgevingsinformatie die de taak nodig
-heeft. De worker hoeft nooit terug te bellen naar Productontwerp, Productplanning,
-Kwaliteitsbewaking of Agentgeheugen.
+De aanvrager levert één volledige momentopname. Bij een gewone procestaak staan daarin alle
+productgegevens, bronversies, eigen rolgeheugenversies, handoffs en toegestane omgevingsinformatie
+die de taak nodig heeft. Bij een overlegtaak mag de product-/overlegmodule in plaats daarvan het
+vertrouwde productbrede meetingsnapshot, de rolcatalogus en Stakeholdervragen opnemen. De worker
+hoeft nooit terug te bellen naar Productontwerp, Productplanning, Kwaliteitsbewaking of
+Agentgeheugen.
 
-`productId`, `requestingModule` en `processSessionId` worden uit de vertrouwde aanroepcontext
-gecontroleerd en kunnen niet door vrije taakinhoud of modeloutput worden vervalst.
+`productId`, `requestingModule`, `requestContextType` en `requestContextId` worden uit de vertrouwde
+aanroepcontext gecontroleerd en kunnen niet door vrije taakinhoud of modeloutput worden vervalst.
 
 AI-uitvoering bewaart `input` en `instructions` als opaque data. Zij mag generieke grootte-, schema-,
 privacy- en malwarecontroles doen, maar trekt geen productconclusies uit de inhoud.
@@ -194,7 +197,8 @@ class AiTask {
     String id;
     String productId;
     String requestingModule;
-    String processSessionId;
+    RequestContextType requestContextType;
+    String requestContextId;
     String idempotencyKey;
     String jobKey;
     int jobConfigurationVersion;
@@ -391,16 +395,18 @@ nieuwe, gerichte hersteltaak aanvraagt.
 ## MOCKED-provider
 
 `MOCKED` wordt vóór iedere laptop- of workergrens server-side binnen `task-execution` afgehandeld.
-Productontwerp, Productplanning en Kwaliteitsbewaking vragen nog steeds via hetzelfde publieke
-`requestAiTask(...)` een duurzame `AiTask` aan en kennen de uitvoeringsvariant niet.
+Productontwerp, Productplanning, Kwaliteitsbewaking en de product-/overlegmodule vragen nog steeds
+via hetzelfde publieke `requestAiTask(...)` een duurzame `AiTask` aan en kennen de
+uitvoeringsvariant niet.
 
 Na het bewaren van een `MOCKED` taak consumeert de interne mockexecutor het eerst passende
 voorbereide antwoord, valideert output en artifacts op dezelfde technische schema's en maakt direct
 het onveranderlijke `AiTaskResult`. De taak gaat daarmee zonder `AiWorkerSession`, lease, heartbeat,
-fencing token of Dockercontainer naar `SUCCEEDED` of `FAILED`. De aanvragende processessie volgt
-desondanks de gewone asynchrone grens: zij bewaart het taak-ID en verwerkt het resultaat pas wanneer
-een volgende `runProcessSession(productId)` haar hervat. `attemptCount` blijft voor zo'n taak nul en
-`maxAttempts` heeft alleen betekenis aan de echte workergrens.
+fencing token of Dockercontainer naar `SUCCEEDED` of `FAILED`. De aanvragende domeincontext volgt
+desondanks haar gewone asynchrone grens: een processessie verwerkt het resultaat pas wanneer een
+volgende `runProcessSession(productId)` haar hervat; de overlegafhandeling verwerkt het bij een
+volgende bericht- of afsluitstap. `attemptCount` blijft voor zo'n taak nul en `maxAttempts` heeft
+alleen betekenis aan de echte workergrens.
 
 Een voorbereid `MockAiResponse` bevat minimaal:
 

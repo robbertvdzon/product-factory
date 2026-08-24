@@ -29,9 +29,11 @@ een externe actor.
 - De eigenaar controleert bevoegdheid, bronversie, huidige status en idempotentie.
 - Modules krijgen nooit elkaars repository of interne JPA-entiteit.
 - De frontend gebruikt dezelfde publieke API's en krijgt geen repositorytoegang.
-- De aanvragende procesruntime geeft iedere agent uitsluitend het actuele geheugen van haar
-  vertrouwde eigen rol.
-  Agentgeheugen is append-only versieerbaar en geen vervanging voor publieke productwaarheid.
+- De aanvragende procesruntime geeft iedere gewone procesagent uitsluitend het actuele geheugen van
+  haar vertrouwde eigen rol. Alleen product-/overlegcode met een geldige meetingcontext mag Meeting
+  Agent en notulenagent een productbreed snapshot geven en notulenwijzigingen voor meerdere rollen
+  laten vastleggen. Agentgeheugen is append-only versieerbaar en geen vervanging voor publieke
+  productwaarheid.
 - AI-uitvoering kent geen rollen of productentiteiten. De aanvrager levert opaque taakdata en een
   reeds gekozen provider en model.
 
@@ -83,10 +85,12 @@ Er is geen verplichte Stakeholdergoedkeuring tussen epic, planning en dispatch.
 | feedback, probleem, kans, risico of kwaliteitszorg | `UserSignal` | ontwerp of kwaliteit onderzoekt dit later; een kwaliteitszorg kan een `QualityWorkItem` opleveren |
 | handmatige hoge prioriteit voor een epic | direct UI-command `requestEpicReprioritization(...)` | Productplanning bewaart gericht planwerk; dit is geen besluit |
 | beschikbare epic intrekken of actieve epic annuleren | direct UI-command op Productontwerp | `withdrawEpic(...)` of `cancelEpic(...)`, met bron en reden |
-| overleg, vragen en antwoorden | `Meeting` | bewaart de bespreking en maakt expliciete doorwerking controleerbaar |
+| antwoord op een agentvraag | `StakeholderQuestion` gekoppeld aan `Meeting` | maakt vraag, antwoord, vragende rol en bronoverleg controleerbaar |
+| algemene of rolgerichte vraag aan Product Factory | doelrol op een meetingbericht | Meeting Agent antwoordt herkenbaar vanuit die rol zonder de procesagent te starten |
 | testomgevingen en toegestane toegang | `TestableProductConfiguration` | maakt gecontroleerd testen mogelijk |
 | automatisch ritme per product en proces | `ProcessScheduleConfiguration` | de technische scheduler start de gewone publieke runfunctie op de ingestelde dag/tijdregels of volgens het interval |
 | geheugen voor een agentrol toevoegen, corrigeren of intrekken | `AgentMemoryItem` via een direct UI-command | append-only wijziging met actor en reden; een volgende agenttaak van die rol leest de nieuwe versie |
+| blijvende lessen uit een afgesloten overleg | `AgentMemoryItem` via gecontroleerde notulenbatch | notulenagent kan meerdere rollen bijwerken; iedere versie verwijst naar het overleg en blijft corrigeerbaar |
 
 De Stakeholder schrijft geen epic, story, bug, verificatie of backlogpositie.
 
@@ -119,7 +123,8 @@ nooit rechtstreeks in de tabel.
 | `TestableProductConfiguration` | productmodule | Stakeholder of beheerder | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en productieomgeving, veilige routes, revisionendpoint, account- en secretreferenties, data- en toegangsgrenzen |
 | `ProcessScheduleConfiguration` | productmodule | globale Stakeholder | technische scheduler, operations en frontend | per product en proces één geversioneerd automatisch schema met aan/uit, meerdere dag/tijdregels of één interval, tijdzone en `nextRunAt`; start alleen de gewone publieke runfunctie |
 | `UserSignal` | productmodule | gebruiker/Stakeholder dient in; ontwerp of kwaliteit registreert een uitkomst via command | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | onveranderlijke melding plus actuele verwerkingsstatus en resultaatlinks |
-| `Meeting` | product-/overlegmodule | Stakeholder of een proces vraagt een overleg aan; de notulenagent sluit het af | Stakeholder, betrokken processen en frontend | agenda, berichten, gekoppelde objecten, status, notulen en expliciete doorwerking |
+| `Meeting` | product-/overlegmodule | Stakeholder of een proces vraagt een overleg aan; de notulenagent sluit het af | Stakeholder, betrokken processen en frontend | agenda met open Stakeholdervragen, berichten met eventuele doel- of vertegenwoordigde rol, gesprek, gekoppelde objecten, gebruikte rol- en geheugenversies, status, notulen en expliciete doorwerking |
+| `StakeholderQuestion` | product-/overlegmodule | vertrouwde code namens precies één procesagentrol stelt of trekt een vraag in; notulenagent registreert een antwoord | vragende procesrol, Meeting Agent, notulenagent, Stakeholder en frontend | tijdelijke vraag met context en bronprocessessie; status `OPEN`, `ANSWERED` of `WITHDRAWN`, bij antwoord gekoppeld aan meeting en bericht; geen permanent geheugen |
 | `Epic` | Productontwerp | Productplanning vraagt planning/statusovergangen; Kwaliteitsbewaking registreert uitkomst; Stakeholder kan intrekken of annuleren | ontwerp, planning, kwaliteit en frontend | metadata `id`, `productId`, `version` en status, opgeslagen `title` en `summary`, plus uitsluitend probleem, oplossing, richtingsrelaties, eventuele UX, acceptatiecriteria en behapbaarheid; status `AVAILABLE`, `IN_PLANNING`, `ACTIVE`, `VERIFYING`, `COMPLETED`, `NOT_SUCCESSFUL`, `CANCELLED`, `SUPERSEDED` of `WITHDRAWN` |
 | `PlanningWorkItem` | Productplanning | Kwaliteitsbewaking, product-/overlegmodule, eigen annuleringsafhandeling of bevoegde bediening | Productplanning, operations en frontend | gerichte planningsqueue; type `PLAN_BUGFIX`, `PLAN_EPIC_GAP`, `REPLAN_CANCELLED_DEPENDENCY`, `REPRIORITIZE_EPIC` of `MANUAL_REPLAN`; status `PENDING`, `IN_PROGRESS`, `DONE`, `BLOCKED` of `FAILED` |
 | `Story` | Productplanning | dispatcher meldt verzending, oplevercommit of externe annulering; Kwaliteitsbewaking meldt een exacte verificatie; Productontwerp vraagt annulering van open stories | planning, dispatcher, kwaliteit en frontend | complete productstory of bugfix met opgeslagen `title` en `summary`, waar nodig zelfstandige UX, afhankelijkheden, productbreed `sequenceNumber`, leveringsstatus `TODO`, `IN_PROGRESS`, `DONE` of `CANCELLED`, eventuele `deliveredCommitSha` en actuele verificatiereferentie; nooit een status **mislukt** |
@@ -129,11 +134,11 @@ nooit rechtstreeks in de tabel.
 | `QualitySnapshot` | Kwaliteitsbewaking | niemand; na publicatie onveranderlijk | Productontwerp, Stakeholder en frontend | aantoonbaar kwaliteitsbeeld van precies één product na diens afgeronde niet-lege kwaliteitssessie; vormt samen met eerdere snapshots de historie |
 | `Decision` | Besluitenregister | notulenagent voor de Stakeholder of bevoegde Factorymodule mag aanmaken, herzien, intrekken of vervangen | alle processen via geldige snapshot; Stakeholder en frontend ook via archief | stabiele identiteit, `origin`, state `ACTIVE`, `WITHDRAWN` of `SUPERSEDED`, historie en eventuele opvolger |
 | `DecisionDetails` | Besluitenregister binnen één `Decision` | uitsluitend via revise-, withdraw- of supersedecommand | via `DecisionDto` of `DecisionHistoryDto` | één versie met ID, `validFrom`, `validUntil` en alleen de besluittekst |
-| `AgentMemoryItem` | Agentgeheugen | uitsluitend de eigen agentrol of de Stakeholder; product en rol worden door vertrouwde code bepaald | alleen de eigen agentrol; Stakeholder en frontend ook voor beheer | stabiele herinneringslijn per product en agentrol; actuele versie of ingetrokken |
-| `AgentMemoryVersion` | Agentgeheugen binnen één `AgentMemoryItem` | via add- of replacecommand; na opslag onveranderlijk | eigen agentrol ziet alleen actueel; Stakeholder en frontend zien ook historie | append-only titel en inhoud met voorganger, actor, reden en geldigheidsperiode |
-| `AgentMemoryRetraction` | Agentgeheugen binnen één `AgentMemoryItem` | eigen agentrol of Stakeholder via retractcommand | Stakeholder, frontend en audit | append-only tombstone die een geheugenlijn vanaf dat moment intrekt |
+| `AgentMemoryItem` | Agentgeheugen | eigen agentrol of Stakeholder; notulenagent via gecontroleerde meetingbatch; product en rol komen uit vertrouwde context | eigen procesrol; Meeting Agent en notulenagent productbreed tijdens overleg; Stakeholder en frontend voor beheer | stabiele herinneringslijn per product en agentrol; actuele versie of ingetrokken |
+| `AgentMemoryVersion` | Agentgeheugen binnen één `AgentMemoryItem` | via add-, replace- of gecontroleerd meetingbatchcommand; na opslag onveranderlijk | eigen procesrol ziet alleen actueel; overlegagents zien productbreed actueel; Stakeholder en frontend zien ook historie | append-only titel en inhoud met voorganger, actor, reden, meetingbron waar van toepassing en geldigheidsperiode |
+| `AgentMemoryRetraction` | Agentgeheugen binnen één `AgentMemoryItem` | eigen agentrol, Stakeholder of notulenagent via gecontroleerde meetingbatch | Stakeholder, frontend en audit; overlegagents zien alleen dat ingetrokken inhoud niet actueel is | append-only tombstone die een geheugenlijn vanaf dat moment intrekt |
 | `AiJobConfiguration` | AI-uitvoering, intern onderdeel `settings` | globale Stakeholder of beheerder | procesmodules en frontend | stabiele jobkey met `enabled`, actuele provider `MOCKED`, `CODEX` of `CLAUDE`, model en configuratieversie; uitgeschakeld werk blokkeert zichtbaar zonder taak |
-| `AiTask` | AI-uitvoering | een intelligente processessie of bevoegde overlegafhandeling vraagt idempotent een taak aan | aanvragende module, operations en frontend | complete opaque AI-opdracht met bevroren provider/model en status `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` of `CANCELLED` |
+| `AiTask` | AI-uitvoering | een intelligente processessie of bevoegde overlegafhandeling vraagt idempotent een taak aan | aanvragende module, operations en frontend | complete opaque AI-opdracht met vertrouwde context `PROCESS_SESSION` of `MEETING`, bevroren provider/model en status `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` of `CANCELLED` |
 | `AiTaskAttempt` | AI-uitvoering | bevoegde laptopworker claimt een `CODEX`- of `CLAUDE`-taak en meldt heartbeat, progress, afronding of fout via commands | AI-uitvoering, operations en frontend | één echte uitvoeringspoging met worker, lease, hersteltermijn en fencing token; server-side `MOCKED` heeft geen attempt |
 | `AiTaskResult` | AI-uitvoering | laptopworker biedt met het actuele fencing token een echt resultaat aan; interne mockexecutor schrijft een voorbereid mockresultaat | alleen aanvragende module, operations en frontend | onveranderlijk technisch gevalideerd resultaat met optionele attemptreferentie; de procesmodule valideert de productbetekenis |
 | `AiResultArtifact` | AI-uitvoering | laptopworker uploadt met fencing token of server-side mockexecutor materialiseert een voorbereid artifact | aanvragende module via resultaatreferentie; frontend binnen autorisatie | begrensd, gehasht en onveranderlijk bewijsbestand; in de MVP als database-BLOB opgeslagen |
@@ -142,9 +147,10 @@ nooit rechtstreeks in de tabel.
 | `DeliveryAttempt` | Software Factory-dispatcher | dispatcher via eigen service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
 Interne analyses, concepten en agentuitvoer steken de modulegrens niet over. Permanent rolgeheugen
-gaat uitsluitend via Agentgeheugen en is alleen leesbaar voor de eigen rol. Alleen een afzonderlijke
-grote, blijvende Factorykeuze binnen de productopdracht en geldige besluiten kan een `Decision`
-worden; gewone conclusies, geheugenlessen en proceskeuzes niet.
+gaat uitsluitend via Agentgeheugen. Gewone procesagents lezen alleen hun eigen rol; uitsluitend
+Meeting Agent en notulenagent krijgen tijdens een vertrouwd productoverleg een exact productbreed
+snapshot. Alleen een afzonderlijke grote, blijvende Factorykeuze binnen de productopdracht en
+geldige besluiten kan een `Decision` worden; gewone conclusies, geheugenlessen en proceskeuzes niet.
 
 ## Read-only en transportcontracten
 
@@ -157,7 +163,8 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `TestableProductDetails` | productmodule | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en eventueel productieomgeving met veilige routes, revisionendpoint en account- of secretreferenties, zonder secrets in het DTO |
 | `ProcessScheduleDetails` | productmodule | technische scheduler, operations en frontend | proces, actief schema in menselijke vorm, tijdzone, laatst gepland tijdstip, `nextRunAt`, versie en eventuele laatste overgeslagen start |
 | `UserSignalDetails` | productmodule | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | bronmelding, status, uitkomst en koppelingen |
-| `MeetingDetails` | product-/overlegmodule | Stakeholder, betrokken processen en frontend | agenda, gesprek, status, gekoppelde objecten, notulen en doorwerking |
+| `MeetingDetails` | product-/overlegmodule | Stakeholder, betrokken processen en frontend | agenda, open en beantwoorde vragen, berichten met doel- en vertegenwoordigde rol, gesprek, status, gekoppelde objecten, gebruikte geheugenversies, notulen en doorwerking |
+| `StakeholderQuestionDetails` | product-/overlegmodule | vragende procesrol, Meeting Agent, notulenagent, Stakeholder en frontend | vraag, vragende rol, context, bronprocessessie, koppelingen, status en eventueel antwoord met meeting- en berichtbron |
 | `EpicDetails` | Productontwerp | Productplanning, Kwaliteitsbewaking en frontend | metadata, titel en samenvatting plus probleem, oplossing, richtingsrelaties, eventuele UX, acceptatiecriteria en behapbaarheid; read-only |
 | `StoryDetails` | Productplanning | dispatcher, Kwaliteitsbewaking en frontend | titel, samenvatting, volledige storyinhoud, eventuele UX, afhankelijkheden, volgorde, leveringsstatus, eventuele dispatchreservering, `deliveredCommitSha` en actuele verificatiereferentie; read-only |
 | backlogquery | Productplanning uit `Story` | dispatcher en frontend | stories met status `TODO` of `IN_PROGRESS`, geordend op `sequenceNumber` |
@@ -169,10 +176,12 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `StoryDispatchReservationDetails` | Productplanning uit de intern gereserveerde story | dispatcher | reserverings-ID en onveranderlijke storymomentopname plus actuele geldigheid; geen duurzame publieke productentiteit |
 | `DecisionDto` | Besluitenregister uit de versie die op `validAt` geldig is | alle processen, Stakeholder en normale frontend | platte actuele of historische momentopname; geen andere versies en geen op dat moment ongeldige besluiten |
 | `DecisionHistoryDto` | Besluitenregister uit `Decision` plus alle `DecisionDetails` | uitsluitend frontend en audit | actieve, ingetrokken en vervangen besluiten, alle versies, reden en opvolgingsrelatie |
-| `AgentMemoryItemDetails` | Agentgeheugen uit de actuele versie | uitsluitend de bijbehorende agentrol; Stakeholder en frontend ook voor beheer | actueel geheugenitem met exacte versie, titel, inhoud, actor en reden |
+| `AgentMemoryItemDetails` | Agentgeheugen uit de actuele versie | bijbehorende procesrol; Meeting Agent en notulenagent productbreed binnen vertrouwd overleg; Stakeholder en frontend voor beheer | actueel geheugenitem met exacte versie, titel, inhoud, actor, reden en eventuele meetingbron |
 | `AgentMemoryVersionDetails` | Agentgeheugen uit de volledige versielijn | uitsluitend Stakeholder, frontend en audit | versie, status `ACTIVE`, `SUPERSEDED` of `RETRACTED`, geldigheid, actor en reden |
+| `AgentRoleDefinitionDetails` | Agentgeheugen uit vertrouwde implementatieregistratie | Meeting Agent, notulenagent, Stakeholder en frontend | actieve stabiele rol, weergavenaam, capability, implementatievariant, verantwoordelijkheid en grenzen |
+| `MeetingMemorySnapshot` | Agentgeheugen voor één geldige `MeetingExecutionContext` | uitsluitend product-/overlegmodule voor `MEETING.CONVERSE` en `MEETING.SUMMARIZE` | rolcatalogus en alle actuele rolgeheugens van precies één product met exacte versie-ID's; geen historie |
 | `AiJobConfigurationDetails` | AI-uitvoering, intern onderdeel `settings` | procesmodules en frontend | `enabled`, actuele provider, model en versie voor één opaque jobkey |
-| `AiTaskDetails` | AI-uitvoering uit `AiTask` en eventuele actuele attempt | aanvragende module, operations en frontend | taakstatus, provider/model-snapshot, optionele workerattempt, lease, veilige voortgang en fout; `MOCKED` heeft geen workerattempt |
+| `AiTaskDetails` | AI-uitvoering uit `AiTask` en eventuele actuele attempt | aanvragende module, operations en frontend | aanvragerscontext, taakstatus, provider/model-snapshot, optionele workerattempt, lease, veilige voortgang en fout; `MOCKED` heeft geen workerattempt |
 | `AiTaskResultDetails` | AI-uitvoering uit `AiTaskResult` | uitsluitend de aanvragende module; operations binnen privacygrenzen | technisch gevalideerde opaque output en artifactreferenties |
 | `ProcessSessionDetails` | betreffende procesmodule of dispatcher | operations en frontend | sessie-ID, module, product, trigger, start/eindtijd, status, leesbare uitkomst, blokkade/fout, implementatie-ID en -versie, gebruikte input- en geheugenversies, AI-taak-ID's en publicaties of technische effecten |
 | `ImplementationManifestDetails` | buildmetadata van `product-factory-app` | operations, frontend en Test Control API | gekozen artifact, variant, versie en broncommit per capability; read-only en geen database-entiteit |
