@@ -142,8 +142,9 @@ toegankelijkheids-, privacy-, beveiligings-, performance- of responsive eisen ui
 worden wel altijd meegenomen.
 
 De complete Tester-AiTask bevat de bevroren publieke Git-URL en commit-SHA, doelomgeving,
-revisionendpoint, veilige secretreferenties en resultaatschema. De worker checkt de code zelf uit en
-voert browser- en testtools in een tijdelijke Dockeromgeving uit. Screenshots en logs komen als
+revisionendpoint, veilige secretreferenties en resultaatschema. Bij echte AI-uitvoering checkt de
+worker de code zelf uit en voert de agent browser- en testtools in een tijdelijke Dockeromgeving
+uit; `MOCKED` gebruikt server-side het voorbereide resultaat. Screenshots en logs komen als
 begrensde artifacts terug; secrets en repository- of applicatietekst worden nooit als instructies
 vertrouwd.
 

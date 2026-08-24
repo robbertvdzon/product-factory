@@ -4,8 +4,9 @@ Status: technisch contract voor de laptopworker en de uitvoering van één `AiTa
 
 Dit document werkt de uitvoeringsgrens uit van
 [AI-uitvoering](ai-uitvoering.md). Productontwerp, Productplanning en Kwaliteitsbewaking bepalen wat
-een agent moet doen. AI-uitvoering bewaart en distribueert de opaque taak. De laptopworker voert die
-taak volledig uit in een nieuwe tijdelijke Dockeromgeving.
+een agent moet doen. AI-uitvoering bewaart en distribueert de opaque taak. De laptopworker voert
+iedere echte `CODEX`- of `CLAUDE`-taak volledig uit in een nieuwe tijdelijke Dockeromgeving.
+`MOCKED` wordt server-side afgehandeld en komt nooit bij deze worker.
 
 ## Verantwoordelijkheidsgrens
 
@@ -52,8 +53,8 @@ branchnaam als enige bronverwijzing.
 2. Hij maakt een nieuwe tijdelijke werkdirectory en start één geïsoleerde Dockercontainer.
 3. In de container clonet hij alleen de opgegeven publieke HTTPS-repository en checkt hij detached
    precies `commitSha` uit. Er wordt geen Git-token doorgegeven.
-4. De worker maakt alleen de tools beschikbaar die voor de taak zijn toegestaan, bijvoorbeeld
-   read-only Git, browserautomatisering en lokale testcommando's.
+4. De worker stelt in de container de volledige vaste agentgereedschapskist beschikbaar. Alleen de
+   meegegeven omgevings- en secretreferenties bepalen welke productomgevingen toegankelijk zijn.
 5. De provider voert de vaste taak uit en levert uitsluitend veilige voortgang en het gevraagde
    gestructureerde resultaat.
 6. De worker uploadt toegestane bewijsartifacts, meldt het resultaat met het actuele fencing token
@@ -65,11 +66,49 @@ De checkout mag lokaal gecachet worden voor snelheid, maar iedere taak krijgt ee
 worktree op de exacte SHA. Een cache is nooit productwaarheid en mag geen oncommitted bestanden of
 output uit een vorige taak lekken.
 
+## Gereedschapskist in iedere echte taak
+
+V1 bood verspreid over zijn rollen internetonderzoek, repositorylezing, Bash, Playwright,
+testcommando's, tijdelijke artifacts en beeldgeneratie. V2 neemt die gezamenlijke mogelijkheden als
+één vaste technische basis over. De worker hoeft daardoor geen agentrollen of rolgebonden
+toolmapping te kennen.
+
+Iedere `CODEX`- of `CLAUDE`-container beschikt minimaal over:
+
+- Bash en gebruikelijke command-linegereedschappen;
+- een beschrijfbare tijdelijke taakdirectory en repositoryworktree;
+- `git clone`, `fetch`, detached `checkout`, `log`, diff en bestandlezing voor publieke
+  HTTPS-repositories;
+- WebSearch, WebFetch en uitgaand HTTPS-verkeer naar publieke informatiebronnen;
+- headless Chromium met Playwright voor navigeren, klikken, formulieren, responsive controles en
+  screenshots;
+- de bij de repository passende lokaal beschikbare build- en testcommando's;
+- het maken van tijdelijke logs, traces, screenshots en andere bewijsbestanden;
+- door de provider ondersteunde beeldgeneratie wanneer het resultaatschema daarom vraagt;
+- gestructureerde uitvoer volgens het meegegeven JSON-schema.
+
+De agent mag binnen zijn tijdelijke container bestanden maken, scripts uitvoeren en tools
+combineren om de opdracht autonoom af te ronden. Een taak is niet-interactief: zij stelt geen
+verduidelijkingsvraag en wacht niet op menselijke input, maar legt onzekerheid in haar resultaat
+vast.
+
+De ruime vrijheid eindigt bij de containergrens. De container:
+
+- draait als niet-rootgebruiker met begrensde CPU, geheugen, schijfruimte en uitvoeringstijd;
+- krijgt geen persoonlijke laptopdirectories, algemene host-environment of Docker-socket gemount;
+- krijgt geen Git-schrijftoken en kan niet committen, pushen, mergen of pull requests maken;
+- krijgt geen database-, OpenShift-, Kubernetes- of clustercredentials;
+- kan geen interne Product Factory-modulecommands aanroepen;
+- ziet alleen expliciet meegegeven testomgevingtoegang en taakgebonden secretreferenties;
+- kan nooit blijvende wijzigingen buiten taakartifacts en het ene taakresultaat publiceren.
+
 ## Browser, testen en deploymentrevision
 
 Browser-, log- en testclients draaien in de taakcontainer en niet als inhoudelijke adapters in de
 servermodule. De procesmodule beschrijft doel, grenzen en verwacht resultaatschema; de worker levert
-de technische tools.
+de technische tools. Een echte browsertest gebruikt Chromium en Playwright; alleen WebFetch, curl
+of een leeg DOM gelden niet als bewijs dat een visuele gebruikersroute werkt. Bij canvasgebaseerde
+frontends gebruikt de agent bovendien screenshots en beschikbare accessibility-semantiek.
 
 Voor een gerichte story- of bugfixverificatie vraagt de worker eerst het geconfigureerde
 revisionendpoint van de doelomgeving op. Hij bewaart:
@@ -99,8 +138,10 @@ het loginformulier vullen. Plaintext credentials worden niet aan het modelprompt
 in voortgang of artifacts opgeslagen en niet naar de server teruggestuurd. Ontbrekende credentials
 geven een veilige technische blokkade.
 
-Providercredentials voor Codex of Claude blijven eveneens uitsluitend op de worker en zijn geen
-onderdeel van de taakcontainerinput die het model als productcontext ziet.
+Providercredentials voor Codex of Claude blijven eveneens uitsluitend op de worker. De worker maakt
+de bestaande abonnementslogin via een begrensde credentialbroker of read-only credentialmount aan
+het providerproces beschikbaar. Deze waarden worden niet als taakinput of productcontext aan het
+model gegeven en zijn niet leesbaar via de gewone agenttools.
 
 ## Bewijsartifacts
 
@@ -116,6 +157,40 @@ alleen naar gevalideerde artifact-ID's; oude bewijzen blijven daardoor reproduce
 Tijdelijke browserprofielen, downloads, worktrees en niet-geaccepteerde artifacts worden na de taak
 verwijderd. Secrets, cookies, tokens, persoonsgegevens en ruwe providerlogs worden vóór acceptatie
 afgeschermd of geweigerd.
+
+## Herstel na slaap, workerrestart en laptoprestart
+
+De worker bewaart herstelgegevens buiten zijn procesgeheugen in een klein duurzaam lokaal journal.
+Iedere actieve taakcontainer krijgt minimaal labels met worker-ID, task-ID en attempt-ID. De output
+en het gestructureerde eindresultaat worden in een taakgebonden workerstate-directory geschreven die
+een restart van alleen de workerservice overleeft. Het fencing token blijft versleuteld in het
+journal en wordt nooit als containerlabel opgeslagen.
+
+Bij iedere start voert de laptopworker vóór nieuwe claims deze stappen uit:
+
+1. lees het lokale journal en inventariseer de bijbehorende draaiende en gestopte Dockercontainers;
+2. meld task-ID, attempt-ID, containerstatus en de aanwezigheid van resultaat aan
+   `reconcileWorker(...)`;
+3. hervat alleen wanneer de server dezelfde attempt binnen de hersteltermijn nog accepteert;
+4. stop en verwijder een container wanneer de server de attempt heeft gefencet;
+5. claim pas nieuw werk nadat alle lokale records zijn gereconcilieerd.
+
+Het concrete gedrag is:
+
+| Situatie | Gedrag |
+|---|---|
+| Alleen de workerservice herstart, container draait nog | de nieuwe workerservice koppelt opnieuw aan dezelfde container en hervat heartbeat en resultaatbewaking voor dezelfde attempt |
+| Container is tijdens de workerrestart afgerond | de worker leest het duurzame resultaat, valideert de actuele fencingstatus en levert het alsnog aan de server |
+| Laptop slaapt en wordt binnen de hersteltermijn wakker | dezelfde container en attempt worden hervat; er start geen tweede agent |
+| Container of providerproces bestaat niet meer | de worker meldt dit; de server maakt de attempt `ABANDONED` en zet dezelfde taak met back-off voor een nieuwe attempt klaar wanneer `maxAttempts` dat toestaat |
+| Laptop is herstart en de container is alleen gestopt | een nog niet afgerond providerproces wordt niet half hervat; de oude attempt wordt verlaten en de taak begint later opnieuw in een schone container |
+| Hersteltermijn is verlopen of een nieuwere attempt bestaat | de oude container wordt gestopt, het oude resultaat wordt weggegooid en ieder bericht met het oude fencing token wordt geweigerd |
+
+Een taak blijft daardoor nooit onbeperkt `RUNNING`. Zij hervat dezelfde attempt wanneer dat veilig
+kan, wordt anders als nieuwe attempt opnieuw uitgevoerd en eindigt na uitgeputte technische
+`maxAttempts` zichtbaar als `FAILED`. Een nog niet geclaimde taak blijft veilig `QUEUED` zolang geen
+laptopworker beschikbaar is. De aanvragende processessie blijft ondertussen duurzaam
+`WAITING_FOR_AI` of wordt na een terminale taakfout zichtbaar `BLOCKED`.
 
 ## Onvertrouwde inhoud en prompt-injection
 
@@ -133,13 +208,18 @@ taakinstructies, toolallowlists en servervalidatie hebben altijd voorrang op bro
 
 ## Invarianten
 
-- Iedere taak draait in een nieuwe tijdelijke Dockeromgeving.
+- Iedere echte `CODEX`- of `CLAUDE`-taak draait in een nieuwe tijdelijke Dockeromgeving;
+  `MOCKED` bereikt de laptopworker nooit.
+- Iedere echte taakcontainer bevat Bash, publieke read-only Git, webonderzoek, Chromium/Playwright,
+  lokale testtools, tijdelijke artifacts en waar gevraagd beeldgeneratie.
 - Een repositorycheckout gebruikt een publieke HTTPS-URL en exacte volledige commit-SHA.
 - De worker heeft geen Git-schrijftoken en commit of pusht nooit.
 - De server bewaart geen plaintext test- of providercredentials in een `AiTask`.
 - Een test tegen een achterlopende deployment wordt `BLOCKED`, nooit afgekeurd.
 - Bewijsartifacts zijn begrensd, gehasht, onveranderlijk en aan exact één taakresultaat gekoppeld.
 - Onvertrouwde repository- of applicatie-inhoud kan instructies en rechten niet wijzigen.
+- Na een workerrestart worden containers en attempts vóór nieuwe claims uit journal en Dockerstatus
+  gereconcilieerd; verloren werk wordt hervat of begrensd opnieuw uitgevoerd en blijft nooit hangen.
 - Alleen de aanvragende module valideert en publiceert de domeinuitkomst.
 
 ## Gerelateerde documenten

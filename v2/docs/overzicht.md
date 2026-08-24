@@ -144,8 +144,9 @@ bekijken en corrigeren.
 
 AI-uitvoering is eveneens een ondersteunende module. Zij kent geen agentrollen of productobjecten,
 maar alleen complete taken met een expliciete provider en model. Iedere taak staat eerst duurzaam in
-een databasequeue. De laptopworker haalt via HTTPS werk op en meldt heartbeat, veilige voortgang en
-het eindresultaat terug.
+een databasequeue. Echte `CODEX`- en `CLAUDE`-taken worden via HTTPS door de laptopworker opgehaald
+en in een tijdelijke Dockercontainer uitgevoerd. Buiten productie handelt een server-side
+mockexecutor `MOCKED`-taken af, zodat tests geen laptop nodig hebben.
 
 Welke provider en welk model een bepaald soort agentjob gebruikt, staat in de globale
 AI-jobconfiguratie van de AI-uitvoeringscapability in de database. De Stakeholder bedient die op
@@ -177,7 +178,7 @@ doet.
 | `UserSignal`s | Read-only query op de productmodule | Feedback, problemen, kansen en kwaliteitszorgen. |
 | Stories en `Verification`s | Read-only queries op planning en kwaliteit | Wat eerder werkelijk is gebouwd en aangetoond. |
 | Huidig kwaliteitsbeeld en historie | Queries op `QualitySnapshot`s | Aantoonbare kwaliteit, risico's en ontwikkeling door de tijd. |
-| Huidige code en documentatie | Read-only checkout van `ProductAssignment.gitUrl` | Hoe het product er nu voorstaat. |
+| Huidige code en documentatie | Read-only checkout in de AI-taakcontainer vanaf `ProductAssignment.gitUrl` | Hoe het product er nu voorstaat. |
 | Acceptatie- en eventueel productieomgeving | Read-only `TestableProductConfiguration` | Hoe het product nu werkelijk werkt en aanvoelt; productie alleen binnen veilige grenzen. |
 | Eigen actueel rolgeheugen | Automatisch via Agentgeheugen en de vertrouwde agentrol | Permanente lessen van precies de uitgevoerde Productontwerp-rol; nooit geheugen van een andere rol. |
 
@@ -218,7 +219,7 @@ die niet bestaat, zoekt hij naar `AVAILABLE` epics en claimt hij gericht werk ui
 | `Bug` en `Verification` | Read-only queries op Kwaliteitsbewaking | Bewijs voor herstelwerk of ontbrekende epicdekking. |
 | `ProductAssignment` en geldige `Decision`s | Read-only queries | Het productdoel, de grenzen en blijvende keuzes. |
 | Bestaande `Story`s | Eigen database | Reeds gepland, verzonden en opgeleverd werk. |
-| Huidige code en documentatie | Read-only checkout van de publieke Git-URL | Context voor een realistische storiesplitsing. |
+| Huidige code en documentatie | Read-only checkout in de AI-taakcontainer vanaf de publieke Git-URL | Context voor een realistische storiesplitsing. |
 | Acceptatie- en eventueel productieomgeving | Read-only `TestableProductConfiguration` | Bestaande gebruikersroutes, schermen en gedrag; productie alleen binnen veilige grenzen. |
 | Eigen actueel rolgeheugen | Automatisch via Agentgeheugen en de vertrouwde agentrol | Permanente planningslessen van precies de uitgevoerde rol. |
 
@@ -258,7 +259,7 @@ items van dat product waarvan `retryAfter` is verstreken weer `PENDING` gemaakt.
 | `Story` | Read-only query op Productplanning | Wat is gebouwd, in welke commit het is opgeleverd en waar de oplevering bij hoort. |
 | Bevroren `Epic` met UX | Read-only query op Productontwerp | De volledige bedoeling die na alle stories moet worden gecontroleerd. |
 | `UserSignal` | Read-only query op de productmodule | De oorspronkelijke zorg of observatie die onderzocht moet worden. |
-| Huidige code en documentatie | Read-only checkout van de publieke Git-URL | Informatie over risico's en relevante tests; geen bewijs van werkend gedrag. |
+| Huidige code en documentatie | Read-only checkout in de AI-taakcontainer vanaf de publieke Git-URL | Informatie over risico's en relevante tests; geen bewijs van werkend gedrag. |
 | Eigen actueel rolgeheugen | Automatisch via Agentgeheugen en de vertrouwde agentrol | Permanente testlessen van precies de uitgevoerde kwaliteitsrol. |
 
 ### Output
@@ -429,9 +430,10 @@ gebruikt. De Stakeholder kan actuele items via de UI toevoegen, vervangen en int
 zien wat een rol vroeger onthield.
 
 Ook algemene `AiJobConfiguration`s, `AiTask`s, attempts en resultaten staan in de database. De
-laptopworker leest nooit rechtstreeks uit die database: hij claimt taken via de publieke worker-API.
-De worker draait niet in een `product-factory-workspace`; iedere taak bevat zelf alle benodigde data
-en gebruikt een tijdelijke werkdirectory.
+laptopworker leest nooit rechtstreeks uit die database: hij claimt echte taken via de publieke
+worker-API. De worker draait niet in een `product-factory-workspace`; iedere taak bevat zelf alle
+benodigde data en gebruikt een tijdelijke werkdirectory. `MOCKED` blijft vóór deze workergrens en
+wordt alleen in integratie en acceptatie server-side uitgevoerd met vooraf ingestelde antwoorden.
 
 Ook iedere `ProcessScheduleConfiguration` staat duurzaam en geversioneerd in de database bij het
 betreffende product. De technische scheduler gebruikt uitsluitend deze publieke configuratie en een
@@ -439,8 +441,9 @@ eigen idempotente claim op het geplande tijdstip; omgevingsconfiguratie kan auto
 zoals op acceptatie, volledig uitschakelen zonder de productinstelling te overschrijven.
 
 De publieke productrepository blijft wel de waarheid over de huidige code, tests en
-productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking mogen de Git-URL uit de
-`ProductAssignment` tijdens een sessie read-only uitchecken. Zij committen of pushen niets.
+productdocumentatie. Productontwerp, Productplanning en Kwaliteitsbewaking bevriezen de Git-URL en
+commit-SHA in hun taakinput. Bij echte AI-uitvoering checkt de agent die commit in zijn tijdelijke
+Dockercontainer read-only uit; de servermodules en de agent committen of pushen niets.
 
 ## Technische moduleopbouw
 
@@ -487,8 +490,9 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 2. Productontwerp maakt complete epics met UX, maar geen stories.
 3. Productplanning maakt en ordent alle stories; de backlog is alleen een query op open stories.
 4. Kwaliteitsbewaking levert bewijs en bugs, maar maakt geen stories en wijzigt geen epics.
-5. Alleen `runProcessSession(productId)` mag voor een intelligent proces AI-taken aanvragen; de laptopworker
-   voert uitsluitend bestaande queuetaken uit.
+5. Alleen `runProcessSession(productId)` mag voor een intelligent proces AI-taken aanvragen; de
+   technische uitvoerders verwerken uitsluitend bestaande queuetaken en starten nooit zelf een
+   proces.
 6. Iedere entiteit heeft één eigenaar en andere modules wijzigen haar alleen via publieke commands.
 7. Iedere agentrol leest uitsluitend haar eigen actuele, versieerbare geheugen; de Stakeholder mag
    dat geheugen via de UI corrigeren.

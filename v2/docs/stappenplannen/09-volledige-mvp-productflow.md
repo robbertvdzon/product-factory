@@ -14,7 +14,12 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 - Controleer alle queues, commands, statussen, idempotentie en eigenaarsgrenzen in de complete route.
 - Maak het productoverzicht en de operationele weergave compleet voor de hele MVP.
 - Voeg vaste end-to-endacceptatiescenario's toe voor de normale route, bugs, ontbrekende epicdekking,
-  signalen, handmatige prioriteit, workeruitval en externe leveringsfouten.
+  signalen, handmatige prioriteit, AI-taakfouten en externe leveringsfouten.
+- Bewijs dat de normale mockscenario's volledig server-side draaien zonder laptopworker en dat een
+  ontbrekend voorbereid mockantwoord zichtbaar en voorspelbaar faalt.
+- Test de echte workergrens apart: na een workerherstart wordt een bestaande taakcontainer hervat,
+  een al afgerond resultaat alsnog ingeleverd of een verdwenen poging veilig opnieuw beschikbaar
+  gemaakt; een oude poging kan daarna niet meer geldig afronden.
 - Bewijs dat een epic in de normale route pas naar `VERIFYING` gaat nadat iedere actuele story- en
   bugfixcontrole is geslaagd, bij `NEEDS_WORK` naar `ACTIVE` terugkeert en bij `BLOCKED` retrybaar
   op `VERIFYING` blijft.

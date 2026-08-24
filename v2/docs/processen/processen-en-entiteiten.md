@@ -134,10 +134,10 @@ nooit rechtstreeks in de tabel.
 | `AgentMemoryRetraction` | Agentgeheugen binnen één `AgentMemoryItem` | eigen agentrol of Stakeholder via retractcommand | Stakeholder, frontend en audit | append-only tombstone die een geheugenlijn vanaf dat moment intrekt |
 | `AiJobConfiguration` | AI-uitvoering, intern onderdeel `settings` | globale Stakeholder of beheerder | procesmodules en frontend | stabiele jobkey met `enabled`, actuele provider `MOCKED`, `CODEX` of `CLAUDE`, model en configuratieversie; uitgeschakeld werk blokkeert zichtbaar zonder taak |
 | `AiTask` | AI-uitvoering | een intelligente processessie of bevoegde overlegafhandeling vraagt idempotent een taak aan | aanvragende module, operations en frontend | complete opaque AI-opdracht met bevroren provider/model en status `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` of `CANCELLED` |
-| `AiTaskAttempt` | AI-uitvoering | bevoegde worker claimt en meldt heartbeat, progress, afronding of fout via commands | AI-uitvoering, operations en frontend | één uitvoeringspoging met worker, lease, hersteltermijn en fencing token |
-| `AiTaskResult` | AI-uitvoering | bevoegde worker mag met het actuele fencing token één resultaat aanbieden | alleen aanvragende module, operations en frontend | onveranderlijk technisch gevalideerd resultaat; de procesmodule valideert de productbetekenis |
-| `AiResultArtifact` | AI-uitvoering | bevoegde worker uploadt met het actuele fencing token | aanvragende module via resultaatreferentie; frontend binnen autorisatie | begrensd, gehasht en onveranderlijk bewijsbestand; in de MVP als database-BLOB opgeslagen |
-| `AiWorkerSession` | AI-uitvoering | worker opent en reconcileert zijn sessie | operations en frontend | worker-ID, bootsessie, provider-capabilities, capaciteit en laatste heartbeat; geen agentrollen |
+| `AiTaskAttempt` | AI-uitvoering | bevoegde laptopworker claimt een `CODEX`- of `CLAUDE`-taak en meldt heartbeat, progress, afronding of fout via commands | AI-uitvoering, operations en frontend | één echte uitvoeringspoging met worker, lease, hersteltermijn en fencing token; server-side `MOCKED` heeft geen attempt |
+| `AiTaskResult` | AI-uitvoering | laptopworker biedt met het actuele fencing token een echt resultaat aan; interne mockexecutor schrijft een voorbereid mockresultaat | alleen aanvragende module, operations en frontend | onveranderlijk technisch gevalideerd resultaat met optionele attemptreferentie; de procesmodule valideert de productbetekenis |
+| `AiResultArtifact` | AI-uitvoering | laptopworker uploadt met fencing token of server-side mockexecutor materialiseert een voorbereid artifact | aanvragende module via resultaatreferentie; frontend binnen autorisatie | begrensd, gehasht en onveranderlijk bewijsbestand; in de MVP als database-BLOB opgeslagen |
+| `AiWorkerSession` | AI-uitvoering | laptopworker opent en reconcileert zijn sessie | operations en frontend | worker-ID, bootsessie, `CODEX`-/`CLAUDE`-capabilities, capaciteit en laatste heartbeat; geen agentrollen en nooit `MOCKED` |
 | `ProcessSession` | betreffende procesmodule of dispatcher | niemand buiten eigenaar | operations en frontend | productgebonden uitvoering, implementatie-ID en -versie, inputversies, eventuele AI-taak-ID's, publicaties of technische effecten, status inclusief `WAITING_FOR_AI`, `BLOCKED` en `CANCELLED` waar van toepassing |
 | `DeliveryAttempt` | Software Factory-dispatcher | dispatcher via eigen service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
@@ -172,7 +172,7 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `AgentMemoryItemDetails` | Agentgeheugen uit de actuele versie | uitsluitend de bijbehorende agentrol; Stakeholder en frontend ook voor beheer | actueel geheugenitem met exacte versie, titel, inhoud, actor en reden |
 | `AgentMemoryVersionDetails` | Agentgeheugen uit de volledige versielijn | uitsluitend Stakeholder, frontend en audit | versie, status `ACTIVE`, `SUPERSEDED` of `RETRACTED`, geldigheid, actor en reden |
 | `AiJobConfigurationDetails` | AI-uitvoering, intern onderdeel `settings` | procesmodules en frontend | `enabled`, actuele provider, model en versie voor één opaque jobkey |
-| `AiTaskDetails` | AI-uitvoering uit `AiTask` en actuele attempt | aanvragende module, operations en frontend | taakstatus, provider/model-snapshot, attempt, lease, veilige voortgang en fout |
+| `AiTaskDetails` | AI-uitvoering uit `AiTask` en eventuele actuele attempt | aanvragende module, operations en frontend | taakstatus, provider/model-snapshot, optionele workerattempt, lease, veilige voortgang en fout; `MOCKED` heeft geen workerattempt |
 | `AiTaskResultDetails` | AI-uitvoering uit `AiTaskResult` | uitsluitend de aanvragende module; operations binnen privacygrenzen | technisch gevalideerde opaque output en artifactreferenties |
 | `ProcessSessionDetails` | betreffende procesmodule of dispatcher | operations en frontend | sessie-ID, module, product, trigger, start/eindtijd, status, leesbare uitkomst, blokkade/fout, implementatie-ID en -versie, gebruikte input- en geheugenversies, AI-taak-ID's en publicaties of technische effecten |
 | `ImplementationManifestDetails` | buildmetadata van `product-factory-app` | operations, frontend en Test Control API | gekozen artifact, variant, versie en broncommit per capability; read-only en geen database-entiteit |
@@ -184,13 +184,15 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 ## Publieke productrepository als leesbron
 
 `ProductAssignment.gitUrl` wijst naar de publiek leesbare GitHub-repository. Productontwerp,
-Productplanning en Kwaliteitsbewaking mogen de repository bij een inhoudelijke sessie uitchecken en
-code, tests en documentatie lezen. Zij committen en pushen niet. De Software Factory-story blijft
-zelfstandig en gebruikt Git nooit als enige drager van product- of UX-keuzes.
+Productplanning en Kwaliteitsbewaking bevriezen URL en commit-SHA in een inhoudelijke `AiTask`. Bij
+echte AI-uitvoering checkt de agent die commit in zijn taakcontainer uit en leest daar code, tests
+en documentatie. De servermodules en de agent committen of pushen niet. De Software Factory-story
+blijft zelfstandig en gebruikt Git nooit als enige drager van product- of UX-keuzes.
 
-Een inhoudelijke `AiTask` bevat de publieke Git-URL en een vooraf bevroren commit-SHA. De worker
-checkt die SHA zelf read-only uit in de tijdelijke Dockeromgeving van de taak. Repositoryinhoud en
-tekst uit een bekeken applicatie zijn onvertrouwde context: zij kunnen nooit systeeminstructies,
+Een inhoudelijke `AiTask` bevat de publieke Git-URL en een vooraf bevroren commit-SHA. Voor
+`CODEX` en `CLAUDE` checkt de laptopworker die SHA zelf read-only uit in de tijdelijke
+Dockeromgeving van de taak. De server-side mockexecutor checkt niets uit. Repositoryinhoud en tekst
+uit een bekeken applicatie zijn onvertrouwde context: zij kunnen nooit systeeminstructies,
 toegangsgrenzen of modulecommands overschrijven.
 
 Dezelfde drie procesmodules mogen via `TestableProductDetails` de acceptatieomgeving en, binnen
@@ -227,16 +229,18 @@ item direct `PENDING` en laat de UI daarna alleen wanneer nodig de normale kwali
 product starten.
 
 Daarnaast bestaat de generieke `AiTask`-queue. Een procesrun zet daar alleen complete technische
-agenttaken in. Een laptop- of mockworker claimt taken via HTTPS, niet via directe databasetoegang.
-Gemiste heartbeats maken een attempt eerst `SUSPECTED`; pas na de hersteltermijn wordt zij verlaten
-en kan de taak met een nieuw fencing token opnieuw worden aangeboden.
+agenttaken in. `CODEX`- en `CLAUDE`-taken worden door een laptopworker via HTTPS geclaimd, nooit via
+directe databasetoegang. `MOCKED` wordt direct server-side met een voorbereid antwoord afgehandeld
+en gebruikt geen worker, lease of Docker. Gemiste heartbeats van echte workerattempts maken een
+attempt eerst `SUSPECTED`; pas na de hersteltermijn wordt zij verlaten en kan de taak met een nieuw
+fencing token opnieuw worden aangeboden.
 
 Product Factory Testbed is geen productmodule en bezit geen productentiteiten. In integratietests en
-acceptatie gedraagt `MockAiWorker` zich via de echte worker-API als externe worker en implementeert
-`MockSoftwareFactory` het echte dispatchercontract. Zij beheren alleen hun eigen tijdelijke
-scenariotoestand en schrijven nooit rechtstreeks in een moduleaggregate. De in-memory
-acceptatiedatabase wordt gevuld door testfixture-contributors binnen de modules die eigenaar van de
-betrokken data zijn.
+acceptatie configureert de Test Control API de server-side AI-mockstore en implementeert
+`MockSoftwareFactory` het echte dispatchercontract. De mockstore en simulator beheren alleen hun
+eigen tijdelijke scenariotoestand en schrijven nooit rechtstreeks in een moduleaggregate. De
+in-memory acceptatiedatabase wordt gevuld door testfixture-contributors binnen de modules die
+eigenaar van de betrokken data zijn.
 
 Dispatchfouten blijven intern bij de dispatcher. Tijdelijke transportfouten krijgen een
 `DeliveryAttempt`, idempotentiecontrole en retry met backoff. Configuratie- of autorisatiefouten

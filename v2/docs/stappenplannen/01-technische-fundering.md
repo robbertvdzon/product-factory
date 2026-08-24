@@ -368,8 +368,9 @@ Volg [Integratie- en acceptatietesten](../platform/integratie-en-acceptatieteste
 2. Schakel automatische schedules standaard uit.
 3. Schakel authenticatie expliciet uit en toon de acceptatiebanner overal.
 4. Maak alleen het Testbed-raamwerk, de Test Control API, fixturecontributorgrens en veilige
-   omgevingsblokkades. Reserveer de al bestaande publieke contracten voor `MockAiWorker` en
-   `MockSoftwareFactory`, maar implementeer hun gedrag pas in respectievelijk stap 4 en stap 8.
+   omgevingsblokkades. Reserveer de al bestaande publieke contracten voor de server-side
+   AI-mockexecutor en `MockSoftwareFactory`, maar implementeer hun gedrag pas in respectievelijk
+   stap 4 en stap 8.
 5. Laat Testbed nooit rechtstreeks in moduletabellen schrijven.
 6. Maak reset en scenariokeuze alleen in acceptatie beschikbaar; productie registreert deze
    endpoints en beans niet.

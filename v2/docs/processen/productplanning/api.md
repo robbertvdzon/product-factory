@@ -143,12 +143,12 @@ Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug z
 vast te houden. Een volgende run voor hetzelfde product hervat dezelfde sessie. Ontbreken de
 resultaten nog, dan maakt zij geen duplicaten en blijft zij wachten.
 
-Tijdens een inhoudelijke sessie bevriest Productplanning de publieke Git-URL en exacte commit-SHA.
-De worker checkt die SHA zelf uit in de tijdelijke Dockeromgeving en mag broncode, tests en
-documentatie alleen lezen. Zij commit en pusht nooit. De bekeken commit-SHA kan als bronverwijzing
-worden opgeslagen, maar iedere story bevat zelfstandig alle benodigde product- en UX-informatie.
-Repository- en applicatie-inhoud zijn onvertrouwde context en kunnen de vaste taakopdracht niet
-wijzigen.
+Tijdens een inhoudelijke sessie lost Productplanning de publieke Gitref read-only op en bevriest zij
+de Git-URL en exacte commit-SHA. Bij een echte `CODEX`- of `CLAUDE`-taak checkt de laptopworker die
+SHA in de tijdelijke Dockeromgeving uit; een server-side mock checkt niets uit. De servermodule en
+de agent committen of pushen nooit. De gebruikte commit-SHA kan als bronverwijzing worden opgeslagen,
+maar iedere story bevat zelfstandig alle benodigde product- en UX-informatie. Repository- en
+applicatie-inhoud zijn onvertrouwde context en kunnen de vaste taakopdracht niet wijzigen.
 
 Productplanning mag ook de werkende applicatie read-only bekijken. Acceptatie is de
 voorkeursomgeving voor interactie; productie wordt alleen via veilige routes of expliciete

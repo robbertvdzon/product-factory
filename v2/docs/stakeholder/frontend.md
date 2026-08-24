@@ -292,7 +292,7 @@ Technische gebruikers kunnen apart zien:
 - geblokkeerde processessies door `AI_JOB_DISABLED`, een terminale taakfout of een geannuleerde
   technische taak, inclusief product, volgende retry en behouden domeinclaim;
 - veilige AI-voortgang, laatste heartbeat, lease, hersteltermijn en retryreden;
-- laptop- en mockworkers met capabilities, capaciteit en laatste aanwezigheid;
+- laptopworkers met capabilities, capaciteit en laatste aanwezigheid;
 
 De MVP toont operationele aandachtspunten alleen in deze UI. E-mail, Telegram of andere externe
 notificaties vallen buiten de MVP en kunnen later als aparte uitgaande adapter worden toegevoegd.
@@ -321,14 +321,17 @@ De tester kan hier:
 - de actieve dataset-, scenario-, Testbed- en implementatieversies zien;
 - de omgeving resetten naar vaste initiële testdata;
 - een beschreven AI- of Software Factory-scenario activeren;
-- expliciete externe stappen uitvoeren, zoals een mockworker laten slapen of hervatten, een externe
-  story afronden of annuleren, of de volgende externe call laten mislukken;
+- server-side AI-mockantwoorden klaarzetten, inzien, verwijderen of resetten, inclusief de gewenste
+  uitkomst en veilige JSON- of artifactinhoud;
+- expliciete externe Software Factory-stappen uitvoeren, zoals een story afronden of annuleren, of
+  de volgende externe call laten mislukken;
 - daarna via links de normale processessie, dispatcher, backlog, kwaliteit en operationele historie
   bekijken;
 - per scenariostap de verwachte zichtbare uitkomst afvinken.
 
-De UI biedt vaste, versieerbare scenario's in plaats van vrije scripts of willekeurige
-mockresponse-JSON. Automatische schedules staan in acceptatie standaard uit. Alle functies die
+De UI biedt vaste, versieerbare scenario's voor normale productflows. Voor gerichte AI-tests mag de
+tester daarnaast via een schema-ondersteund formulier een mockantwoord klaarzetten; vrije scripts
+zijn niet toegestaan. Automatische schedules staan in acceptatie standaard uit. Alle functies die
 normaal gepland draaien, inclusief processen en dispatcher, worden via hun gewone handmatige acties
 gestart, zodat iedere overgang goed te volgen is. Reset
 waarschuwt dat alle tijdelijke acceptatiewijzigingen verdwijnen en is technisch onmogelijk in

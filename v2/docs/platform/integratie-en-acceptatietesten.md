@@ -12,9 +12,9 @@ Factory gebruikt daarbij dezelfde publieke poorten en technische protocollen als
 alleen de adapter aan de andere kant is vervangen.
 
 WireMock mag in een gerichte contracttest worden gebruikt, maar is niet de centrale
-acceptatievoorziening. AI-uitvoering en Software Factory hebben een levenscyclus, idempotentie,
-wachtrijen, vertraging en herstelgedrag. Een stateful simulator maakt die scenario's
-explicieter en beter via de UI bestuurbaar dan een verzameling losse HTTP-stubs.
+acceptatievoorziening. Software Factory heeft een externe levenscyclus en krijgt daarom een
+stateful simulator. AI-resultaten worden vóór de laptopgrens server-side voorbereid en gemockt,
+zodat productscenario's zonder laptop of Docker volledig via de UI bestuurbaar blijven.
 
 ## Omgevingsgrens
 
@@ -22,8 +22,8 @@ explicieter en beter via de UI bestuurbaar dan een verzameling losse HTTP-stubs.
 |---|---|---|---|
 | Product Factory-modules | echte Maven-implementaties met hun interne Modulith-structuur | één echte appbuild met gekozen implementaties | één echte appbuild met gekozen implementaties |
 | database | nieuwe in-memory database per test of testsuite | in-memory database, opnieuw te vullen via reset | duurzame ondersteunde productiedatabase |
-| AI-uitvoering | echte AI-module, queue, leases en worker-API | echte AI-module, queue, leases en worker-API | echte AI-module |
-| AI-provider | `MockAiWorker` uit Testbed | `MockAiWorker` uit Testbed | laptopworker met toegestane echte provider |
+| AI-uitvoering | echte AI-module, duurzame taken en resultaatvalidatie; server-side `MOCKED` | echte AI-module, duurzame taken en resultaatvalidatie; server-side `MOCKED` | echte AI-module, leases en worker-API |
+| AI-provider | in-memory mockexecutor met voorbereide antwoorden | acceptance-only server-side mockexecutor met voorbereide antwoorden | laptopworker met `CODEX` of `CLAUDE` in Docker |
 | Software Factory | `MockSoftwareFactory` uit Testbed | `MockSoftwareFactory` uit Testbed | echte Software Factory |
 | Git | lokale tijdelijke testrepository | publieke repository read-only via HTTPS, zonder token | publieke repository read-only via HTTPS, zonder token |
 | productomgeving | gecontroleerde lokale testsite indien nodig | synthetische testproductomgeving, nooit echte productie | geconfigureerde acceptatie en veilige productie-informatie |
@@ -56,16 +56,12 @@ Acceptatie-UI
      ▼
 acceptance-only Test Control API
      ├───────────────> Testdatacoördinator ──> in-memory database
+     ├───────────────> server-side MockAiResponse-store
      │
      └───────────────> Product Factory Testbed
-                            ├── MockAiWorker
-                            │      │ echte worker-API
-                            │      ▼
 Product Factory-processen ──> AI-uitvoering en duurzame AiTask-queue
      │
      └── dispatcher ────────> MockSoftwareFactory
-
-Publieke Git-repository ── read-only ──> tijdelijke AI-taakcontainer
 ```
 
 De Test Control API is een acceptance-only orchestratiefacade in Product Factory. Zij roept de
@@ -77,9 +73,10 @@ maar registreert geen controllers, seeders of Testbed-adapters.
 
 ## Product Factory Testbed
 
-Het Testbed is één kleine, zelfstandig te starten testapplicatie met twee simulators en één interne
-scenario-interface. De simulators delen geen Product Factory-database en schrijven nooit direct in
-een productmodule. Zij gedragen zich uitsluitend als externe partij.
+Het Testbed is één kleine, zelfstandig te starten testapplicatie met `MockSoftwareFactory` en één
+interne scenario-interface. De server-side AI-mock hoort bij het acceptance-only deel van
+AI-uitvoering en wordt via de Test Control API geconfigureerd. Testbed deelt geen Product
+Factory-database en schrijft nooit direct in een productmodule.
 
 ### Test Control API voor de acceptatie-UI
 
@@ -111,54 +108,64 @@ Integratietests hebben ieder hun eigen geïsoleerde database en Testbed-instanti
 onderlinge blokkade niet.
 
 `advanceScenario(...)` voert precies één vooraf gedefinieerde externe stap uit, bijvoorbeeld een
-Software Factory-story van `RUNNING` naar `DONE` zetten of een slapende mockworker weer laten
-reconciliëren. Het command start niet stilzwijgend een Product Factory-proces; de gebruiker start de
-volgende dispatcher- of processessie apart via de normale UI-actie.
+Software Factory-story van `RUNNING` naar `DONE` zetten. Het command start niet stilzwijgend een
+Product Factory-proces; de gebruiker start de volgende dispatcher- of processessie apart via de
+normale UI-actie.
 
 `injectTestFault(...)` is voor eenmalige, begrensde fouten zoals de eerstvolgende Software
 Factory-call met HTTP 503 beantwoorden. Blijvende vrije scripts of willekeurige code zijn niet
 toegestaan.
 
-## MockAiWorker
+## Server-side Mock AI-uitvoering
 
-`MockAiWorker` gebruikt exact dezelfde worker-API als de laptopworker. Hij:
+Bij provider `MOCKED` maakt de echte AI-uitvoeringsmodule een duurzame `AiTask`, maar handelt haar
+interne mockexecutor de taak vóór de workergrens af. Er wordt geen `AiWorkerSession`, laptopcall,
+lease, heartbeat of Dockercontainer gemaakt. Productprocessen gebruiken exact hetzelfde
+`requestAiTask(...)`-contract en verwerken het resultaat tijdens hun volgende gewone run.
 
-- opent een echte `AiWorkerSession`;
-- claimt alleen `MOCKED`-taken via de echte queue;
-- meldt started, heartbeat en veilige voortgang;
-- levert een schema-valide of bewust ongeldige fixture terug;
-- gebruikt task-ID, attempt-ID en het echte fencing token;
-- kan op commando heartbeat, voltooiing of reconciliatie tijdelijk onderbreken.
+De Test Control API biedt alleen in integratie en acceptatie:
 
-De procesmodule en AI-uitvoering bevatten geen `if (acceptance)`-pad. Het mockprofiel op de
-bevroren `AiTask` en de actieve Testbed-scenario-versie bepalen samen de reactie.
+```text
+GET    /api/test-control/ai/mock-responses
+POST   /api/test-control/ai/mock-responses
+DELETE /api/test-control/ai/mock-responses/{responseId}
+DELETE /api/test-control/ai/mock-responses
+```
 
-Ondersteunde AI-situaties bevatten minimaal:
+De tester kan hiermee vóór een processessie een antwoord klaarzetten en de resterende antwoorden
+bekijken of wissen. Een antwoord matcht op verplichte `jobKey`, optioneel product-ID en optionele
+testcorrelatiesleutel. Exacte matches gaan voor algemene matches en gelijke matches volgen FIFO.
+Het bevat `SUCCEEDED` met syntactisch geldige JSON en optionele artifacts, of `FAILED` met foutcode
+en veilige melding. Bij gebruik valideert AI-uitvoering een succesvol antwoord opnieuw tegen het
+responseschema van de concrete taak. Ontbreekt een match, dan faalt de taak expliciet met
+`NO_MOCK_RESPONSE_CONFIGURED`; er bestaat geen stil succesvolle standaardrespons.
+
+Ondersteunde productgerichte AI-situaties bevatten minimaal:
 
 | Situatie | Te bewijzen gedrag |
 |---|---|
-| normaal succes | taak doorloopt queue, attempt en resultaat; processessie hervat |
-| langzaam succes | veilige voortgang en heartbeat blijven zichtbaar |
+| normaal succes | taak en resultaat worden duurzaam bewaard; processessie hervat |
 | technisch ongeldig resultaat | AI-uitvoering weigert schemafout volgens retrybeleid |
 | inhoudelijk ongeldig resultaat | procesmodule vraagt eventueel gericht herstel in een nieuwe taak |
-| tijdelijke providerfout | attempt faalt en retry gebruikt dezelfde configuratiemomentopname |
-| workercrash | heartbeat stopt, attempt wordt eerst `SUSPECTED` en later herstelbaar of verlaten |
-| laptopslaap | dezelfde attempt reconcileert binnen de hersteltermijn |
-| late oude worker | fencing weigert progress en resultaat van een verouderde attempt |
-| harde time-out | taak eindigt voorspelbaar zonder domeinpublicatie |
-| annulering | worker ziet annulering en een laat resultaat wordt niet geaccepteerd |
+| voorbereide technische fout | taak eindigt zichtbaar `FAILED` zonder domeinpublicatie |
+| geen voorbereid antwoord | taak faalt fail-closed met `NO_MOCK_RESPONSE_CONFIGURED` |
+| annulering | een geannuleerde taak accepteert geen later mockresultaat |
 | job uitgeschakeld | de productsessie wordt `BLOCKED` met `AI_JOB_DISABLED`, maakt geen taak en hervat na inschakelen |
 | taak geannuleerd maar domeinwerk geldig | de productsessie blijft zichtbaar `BLOCKED` en maakt later een vervangende taak |
-
-Daarnaast bewijst een workercontracttest dat de taakcontainer zelf de publieke testrepository op de
-bevroren SHA uitcheckt, geen Git-schrijfrechten heeft, begrensde artifacts uploadt en repository- of
-applicatietekst met schijninstructies als onvertrouwde data behandelt. Een credentialtest gebruikt
-alleen lokale mock-secretreferenties en controleert dat plaintext nooit in taak, progress of artifact
-terechtkomt.
 
 Fixtures zijn gekoppeld aan een stabiele `scenarioKey`, `scenarioVersion`, `jobKey` en optionele
 stap. Zij bevatten geen vrije productieprompt. Iedere fixture wordt in CI gevalideerd tegen het
 response-schema van de bijbehorende job.
+
+### Aparte workercontracttests
+
+De normale acceptatieflow test geen laptopstoringen. Een aparte integratiesuite gebruikt een
+technische fake worker tegen de echte worker-API en bewijst claims, heartbeat, `SUSPECTED`, slaap,
+workerrestart, reconciliatie, `ABANDONED`, retry, fencing en een laat oud resultaat. Een aanvullende
+containercontracttest bewijst dat de echte taakcontainer de lokale testrepository op de bevroren
+SHA uitcheckt, Bash, webtools, Chromium/Playwright, tests en artifacts ondersteunt, geen
+Git-schrijfrechten heeft en schijninstructies uit repository of applicatie als onvertrouwde data
+behandelt. Een credentialtest controleert dat plaintext nooit in taak, progress of artifact staat.
 
 ## MockSoftwareFactory
 
@@ -222,7 +229,8 @@ De basisdataset bevat minimaal:
 - bugs, verificaties en meerdere `QualitySnapshot`s voor een zichtbare tijdlijn;
 - een overleg met notulen en doorwerking;
 - versieerbaar geheugen voor meerdere agentrollen;
-- alle `AiJobConfiguration`s op provider `MOCKED` met geldige mockprofielen;
+- alle `AiJobConfiguration`s op provider `MOCKED` en voorbereide mockantwoorden voor de vaste
+  beginscenario's;
 - voorbeeldhistorie voor `ProcessSession`, `AiTask`, attempts en `DeliveryAttempt`.
 
 Iedere module blijft eigenaar van haar eigen tabellen en levert een testfixture-contributor. Een
@@ -244,9 +252,11 @@ testservice.
 ## Git als echte read-only bron
 
 Publieke productrepositories mogen in acceptatie echt worden gelezen via HTTPS. Daarvoor is geen
-token nodig en er wordt ook geen token geconfigureerd. De inhoudelijke `AiTask` bevat URL en exacte
-SHA; de mock- of laptopworker voert clone, fetch, detached checkout, log en bestandlezing zelf uit in
-de tijdelijke taakcontainer. Commit, push, tag, merge en pull-requestacties zijn niet beschikbaar.
+token nodig en er wordt ook geen token geconfigureerd. De procesmodule mag de bedoelde commit-SHA
+vastzetten en in de `AiTask` bewaren. De server-side mockexecutor checkt de repository niet uit; de
+voorbereide fixture staat voor het modelresultaat. De echte laptopworker voert in productie clone,
+fetch, detached checkout, log en bestandlezing zelf uit in de tijdelijke taakcontainer. Commit,
+push, tag, merge en pull-requestacties zijn niet beschikbaar.
 
 Voor reproduceerbaarheid legt iedere processessie de opgeloste commit-SHA vast. Een branch mag bij
 de start naar de nieuwste commit wijzen, maar alle taken in die sessie gebruiken daarna dezelfde
@@ -271,9 +281,10 @@ Het scherm bevat:
 - knop **Reset naar beginsituatie**;
 - lijst met beschreven vaste scenario's en hun verwachte resultaat;
 - knop om een scenario te activeren;
-- expliciete knoppen voor toegestane vervolgstappen, zoals **AI-worker laten slapen**, **Worker
-  hervatten**, **Software Factory-story afronden**, **Software Factory-story annuleren** en
-  **Volgende externe call laten mislukken**;
+- een formulier en lijst om het volgende AI-mockantwoord per job en eventueel product klaar te
+  zetten, te bekijken en te verwijderen;
+- expliciete knoppen voor toegestane vervolgstappen, zoals **Software Factory-story afronden**,
+  **Software Factory-story annuleren** en **Volgende externe call laten mislukken**;
 - links naar de gewone proces-, backlog-, kwaliteit-, AI-task- en dispatcherweergaven;
 - een tijdlijn van Testbed-interacties met requesttype, status en tijdstip, zonder secrets of
   volledige prompts;
@@ -298,8 +309,10 @@ Vaste kwaliteitsscenario's bewijzen daarnaast dat:
 - een storyverificatie `DEPLOYMENT_PENDING` blijft zolang de synthetische doelomgeving nog een
   revision vóór `deliveredCommitSha` meldt en daarna zonder onterechte afkeuring hervat.
 
-De UI maakt geen vrije mockresponse-JSON de normale route. Vaste, versieerbare scenario's houden
-acceptatietests herhaalbaar. Een technische beheerweergave mag voor diagnose wel de veilige
+Vaste, versieerbare presets blijven de eenvoudige normale route. Voor gericht onderzoek mag de
+tester via een schema-ondersteund formulier ook zelf de JSON-output van het volgende mockantwoord
+invoeren; de backend valideert die vóór opslag en opnieuw tegen het taakresponseschema bij gebruik.
+Vrije scripts zijn nooit toegestaan. Een technische beheerweergave mag voor diagnose de veilige
 request- en response-envelop tonen.
 
 Automatische schedules staan standaard uit. De tester kiest een product en start
@@ -362,24 +375,27 @@ build kan opnieuw de MVP selecteren wanneer die aantoonbaar beter werkt.
 
 ## Wat deze omgeving wel en niet bewijst
 
-De omgeving bewijst onder meer:
+De productgerichte integratie- en acceptatieomgeving bewijst onder meer:
 
 - modulecontracten en databaseovergangen;
-- echte queue-, lease-, heartbeat-, retry- en fencinglogica;
+- duurzame AI-taak- en resultaatverwerking met bestuurbare server-side mockoutput;
 - dispatchercontract, idempotentie en foutafhandeling;
 - end-to-end UI-flows met voorspelbare externe reacties;
 - historie, resetbaarheid en operationele zichtbaarheid.
 
-De omgeving bewijst niet dat Codex of Claude inhoudelijk goede productkeuzes maakt, dat GitHub
-altijd beschikbaar is of dat de echte Software Factory exact dezelfde implementatiefouten heeft.
-Daarvoor kunnen afzonderlijke, bewust gestarte smoke- of contracttests bestaan. Die gebruiken geen
-acceptatiedata en zijn nooit een voorwaarde om de veilige acceptatieomgeving te gebruiken.
+De omgeving bewijst niet dat Codex of Claude inhoudelijk goede productkeuzes maakt, dat de echte
+laptopworker na een echte OS- of Dockerstoring herstelt, dat GitHub altijd beschikbaar is of dat de
+echte Software Factory exact dezelfde implementatiefouten heeft. Workercontracttests bewijzen de
+technische queue-, lease-, heartbeat-, restart-, retry- en fencinglogica. Aanvullende bewust gestarte
+smoke-tests mogen de echte laptopworker gebruiken, maar gebruiken geen acceptatiedata en zijn nooit
+een voorwaarde voor de veilige acceptatieomgeving.
 
 ## Invarianten
 
 - Acceptatie gebruikt uitsluitend synthetische, resetbare data.
 - Acceptatie heeft geen externe schrijfcredentials.
-- AI en Software Factory worden stateful gesimuleerd via hun echte Product Factory-contract.
+- AI wordt vóór de workergrens server-side gemockt via dezelfde taak- en resultaatgrens;
+  Software Factory wordt stateful gesimuleerd via haar echte externe contract.
 - Auth is uit en dit is overal zichtbaar.
 - Git is uitsluitend publiek, HTTPS en read-only; integratietests gebruiken een lokale repository.
 - Automatische schedules staan standaard uit en tijd kan gecontroleerd worden voortgezet.

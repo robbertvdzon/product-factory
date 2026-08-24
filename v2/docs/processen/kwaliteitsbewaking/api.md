@@ -145,9 +145,10 @@ bestaande run doorgaat; het workitem blijft veilig `PENDING` voor een volgende v
 ## Interface met andere modules en services
 
 Kwaliteitsbewaking gebruikt publieke capabilitypackages uit `product-factory-api` en hun read-only
-DTO's. DTO's zijn geen database-entiteiten. De module assembleert en valideert testtaken; de
-daadwerkelijke Git-checkout, browser, log- en testclients draaien als tools in de tijdelijke
-Dockeromgeving van de worker. Spring Modulith structureert alleen de binnenkant van de gekozen
+DTO's. DTO's zijn geen database-entiteiten. De module assembleert en valideert testtaken; bij echte
+AI-uitvoering draaien de daadwerkelijke Git-checkout, browser, log- en testclients als tools in de
+tijdelijke Dockeromgeving van de worker. Een server-side mock gebruikt alleen het voorbereide
+resultaat. Spring Modulith structureert alleen de binnenkant van de gekozen
 Kwaliteitsbewaking-implementatie.
 
 ### Input
@@ -174,12 +175,14 @@ Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug z
 vast te houden. Een volgende run voor hetzelfde product hervat dezelfde sessie. Zolang resultaten
 ontbreken, worden geen nieuwe duplicerende taken aangemaakt.
 
-Kwaliteitsbewaking bevriest de publieke Git-URL en de commit die als codecontext moet worden
-gebruikt. De worker checkt die commit zelf uit in de tijdelijke Dockeromgeving en gebruikt code,
-tests en documentatie read-only voor testselectie, regressierisico en uitleg. Zij commit en pusht
-nooit. Code is context en geen bewijs dat gedrag werkt; de gedeployde applicatie en het verzamelde
-testbewijs blijven leidend. Git-inhoud en tekst uit de geteste applicatie zijn onvertrouwde data en
-kunnen de vaste taakopdracht, veiligheidsgrenzen of resultaatschema's niet wijzigen.
+Kwaliteitsbewaking lost de publieke Gitref read-only op en bevriest de Git-URL en commit die als
+codecontext moet worden gebruikt. Bij een echte `CODEX`- of `CLAUDE`-taak checkt de laptopworker die
+commit in de tijdelijke Dockeromgeving uit en gebruikt de agent code, tests en documentatie
+read-only voor testselectie, regressierisico en uitleg; een server-side mock checkt niets uit. De
+servermodule en de agent committen of pushen nooit. Code is context en geen bewijs dat gedrag werkt;
+de gedeployde applicatie en het verzamelde testbewijs blijven leidend. Git-inhoud en tekst uit de
+geteste applicatie zijn onvertrouwde data en kunnen de vaste taakopdracht, veiligheidsgrenzen of
+resultaatschema's niet wijzigen.
 
 Voor een story- of bugfixcontrole is `StoryDetails.deliveredCommitSha` de vereiste productversie.
 `TestableProductDetails` wijst voor iedere testomgeving naar een revisionendpoint dat de werkelijk

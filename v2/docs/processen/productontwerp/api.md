@@ -43,7 +43,8 @@ zinvol werk eindigt de functie als succesvolle no-op.
 
 Alleen `runProcessSession(productId)` mag voor Productontwerp nieuwe taken bij
 [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
-implementatiedetail. De laptopworker voert ze later asynchroon uit en kent Productontwerp niet.
+implementatiedetail. AI-uitvoering handelt ze later asynchroon af en kent Productontwerp niet; echte
+`CODEX`- en `CLAUDE`-taken gaan daarvoor naar de laptopworker en `MOCKED` blijft server-side.
 
 Daarnaast heeft de module deze deterministische command- en query-interface:
 
@@ -101,15 +102,16 @@ aanroep terug. Een volgende geplande of handmatige `runProcessSession(productId)
 sessie voor dat product. Als
 de resultaten nog ontbreken, blijft zij zonder nieuwe taken aan te maken wachten.
 
-Bij een inhoudelijke sessie mag Productontwerp de publieke Git-URL uit de productopdracht uitchecken
-en broncode, tests en documentatie read-only bekijken. Productontwerp commit en pusht nooit. De
-gelezen commit-SHA kan als bronverwijzing bij de sessie of epic worden vastgelegd; ruwe
-repository-inhoud steekt de modulegrens niet over.
+Bij een inhoudelijke sessie lost Productontwerp de publieke Gitref uit de productopdracht read-only
+op naar een exacte commit-SHA en bevriest die in de taakinput. De servermodule checkt de repository
+niet zelf uit en commit of pusht nooit. De gebruikte commit-SHA kan als bronverwijzing bij de sessie
+of epic worden vastgelegd; ruwe repository-inhoud steekt de modulegrens niet over.
 
-Voor een agenttaak bevriest Productontwerp de publieke Git-URL en exacte commit-SHA. De laptopworker
-checkt die SHA zelf uit in de tijdelijke Dockeromgeving van de taak. Git-code, documentatie en tekst
-uit de bekeken applicatie zijn onvertrouwde contextdata en kunnen nooit de vaste taakopdracht,
-veiligheidsgrenzen of toegestane commands wijzigen.
+Voor een agenttaak bevriest Productontwerp de publieke Git-URL en exacte commit-SHA. Bij een echte
+`CODEX`- of `CLAUDE`-taak checkt de laptopworker die SHA zelf uit in de tijdelijke Dockeromgeving van
+de taak; een server-side mock checkt niets uit. Git-code, documentatie en tekst uit de bekeken
+applicatie zijn onvertrouwde contextdata en kunnen nooit de vaste taakopdracht, veiligheidsgrenzen
+of toegestane commands wijzigen.
 
 Productontwerp mag ook de werkende applicatie via `TestableProductDetails` bekijken. Acceptatie is
 de voorkeursomgeving voor handelingen die data kunnen veranderen. Productie wordt alleen read-only

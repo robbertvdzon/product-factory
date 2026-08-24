@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2420" height="2280" viewBox="0 0 2420 2280" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont het capabilitycontract uit de ene gedeelde Maven-module product-factory-api en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering bevat intern settings en task-execution; task-execution kent geen rollen en distribueert complete taken via een databasequeue aan een laptop- of mockworker. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont het capabilitycontract uit de ene gedeelde Maven-module product-factory-api en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Agentgeheugen levert iedere agent alleen het geheugen van de eigen rol. AI-uitvoering bevat intern settings en task-execution; task-execution kent geen rollen, handelt MOCKED server-side af en distribueert CODEX- en CLAUDE-taken via een databasequeue aan de laptopworker. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -291,19 +291,19 @@
   <line x1="695" y1="2112" x2="1825" y2="2112" class="divider" stroke="#c7d2fe"/>
   <text x="695" y="2142" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
   <text x="695" y="2175" class="entity">AiTask · AiTaskAttempt · AiTaskResult · AiWorkerSession</text>
-  <text x="695" y="2203" class="note">Geen rollen of productbetekenis · leases + hersteltermijn + fencing</text>
+  <text x="695" y="2203" class="note">Server-side MOCKED · echte workers: leases + hersteltermijn + fencing</text>
 
   <!-- Pull workers -->
   <rect x="1895" y="1910" width="470" height="315" rx="18" fill="#ffffff" stroke="#4338ca" stroke-width="2.5"/>
-  <text x="1920" y="1952" class="module-title">Laptop- / mockworker</text>
+  <text x="1920" y="1952" class="module-title">Laptopworker</text>
   <text x="1920" y="1990" class="note">extern uitvoerend proces</text>
   <text x="1920" y="2030" class="section-title">HTTPS PULL</text>
   <text x="1920" y="2060" class="api">claimNextTask(...)</text>
   <text x="1920" y="2086" class="api">heartbeat / progress</text>
   <text x="1920" y="2112" class="api">complete / fail / reconcile</text>
   <line x1="1920" y1="2140" x2="2340" y2="2140" class="divider" stroke="#c7d2fe"/>
-  <text x="1920" y="2170" class="note">CODEX · CLAUDE · MOCKED</text>
-  <text x="1920" y="2198" class="note">Tijdelijke taakmap; geen workspace-repo.</text>
+  <text x="1920" y="2170" class="note">CODEX · CLAUDE · Dockercontainer</text>
+  <text x="1920" y="2198" class="note">Journal + reconcile; geen workspace-repo.</text>
 
   <path d="M1850 2015 H1895" class="query"/>
   <text x="1815" y="1998" class="flow">taak + lease</text>

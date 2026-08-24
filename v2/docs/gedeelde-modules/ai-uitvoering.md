@@ -3,9 +3,9 @@
 Status: eerste ontwerp van de ondersteunende module, queue en laptopworker.
 
 AI-uitvoering is de enige technische route waarlangs Product Factory een AI-taak laat uitvoeren.
-De module bewaart taken en uitvoeringspogingen duurzaam, deelt werk uit aan een worker en accepteert
-voortgang en resultaten. De worker op de laptop onderhoudt geen blijvende WebSocketverbinding meer,
-maar haalt werk via beveiligde HTTPS long polling op.
+De module bewaart taken en uitvoeringspogingen duurzaam, handelt testmocks intern af, deelt echte
+taken uit aan een worker en accepteert voortgang en resultaten. De worker op de laptop onderhoudt
+geen blijvende WebSocketverbinding meer, maar haalt werk via beveiligde HTTPS long polling op.
 
 De capability heeft een publiek contract in `product-factory-api` en één implementatiemodule.
 Andere implementaties gebruiken
@@ -55,7 +55,8 @@ De module doet nadrukkelijk niet het volgende:
 | aanvragende procesmodule | bepaalt wat de agent moet doen, verzamelt alle input en het eigen rolgeheugen, kiest een `AiJobKey` en valideert later de domeinuitkomst |
 | AI-uitvoering — intern `settings` | vertaalt de opaque `AiJobKey` naar actuele provider en model zonder de rol- of productbetekenis te kennen |
 | AI-uitvoering — intern `task-execution` | bewaart en distribueert de complete taak, bewaakt uitvoering en levert het technische resultaat terug; kiest zelf nooit provider of model |
-| laptopworker of mockworker | claimt een taak, start precies de gevraagde provider en rapporteert heartbeat, voortgang en resultaat |
+| laptopworker | claimt uitsluitend `CODEX`- en `CLAUDE`-taken, start de gevraagde provider in Docker en rapporteert heartbeat, voortgang en resultaat |
+| server-side mockexecutor | handelt `MOCKED` direct binnen AI-uitvoering af met een vooraf ingesteld testresultaat; gebruikt geen worker, laptop, lease of Dockercontainer |
 | Agentgeheugen | levert uitsluitend aan de vertrouwde aanvragende rol haar eigen actuele geheugen; AI-uitvoering kent de rol niet |
 
 ## Algemene AI-jobinstellingen
@@ -214,7 +215,8 @@ class AiTask {
 
 De taakstatussen zijn:
 
-- `QUEUED` — beschikbaar of vanaf `availableAt` beschikbaar voor een passende worker;
+- `QUEUED` — beschikbaar of vanaf `availableAt` beschikbaar voor een passende echte worker of de
+  interne mockexecutor;
 - `RUNNING` — er bestaat één actuele geclaimde poging;
 - `SUCCEEDED` — precies één resultaat is geaccepteerd;
 - `FAILED` — geen retry meer toegestaan of een niet-herstelbare fout;
@@ -248,7 +250,8 @@ Een fencing token wordt alleen bij claimen aan de worker getoond; de database be
 updates vereisen task-ID, attempt-ID en het actuele token. Een oude of dubbele worker kan daardoor
 geen nieuwere poging afronden.
 
-De pogingstatussen zijn `CLAIMED`, `RUNNING`, `SUSPECTED`, `COMPLETED`, `FAILED`, `ABANDONED` en
+Een `AiTaskAttempt` bestaat alleen voor een echte `CODEX`- of `CLAUDE`-uitvoering. De
+pogingstatussen zijn `CLAIMED`, `RUNNING`, `SUSPECTED`, `COMPLETED`, `FAILED`, `ABANDONED` en
 `FENCED`.
 
 ### AiTaskResult
@@ -256,7 +259,7 @@ De pogingstatussen zijn `CLAIMED`, `RUNNING`, `SUSPECTED`, `COMPLETED`, `FAILED`
 ```java
 class AiTaskResult {
     String taskId;
-    String attemptId;
+    String attemptId;                 // nullable: leeg bij server-side MOCKED
     JsonNode output;
     List<AiResultArtifact> artifacts;
     Instant completedAt;
@@ -264,8 +267,9 @@ class AiTaskResult {
 ```
 
 Er bestaat maximaal één geaccepteerd resultaat per taak. Het resultaat wordt na technische
-validatie onveranderlijk. De aanvragende procesmodule bepaalt daarna of de inhoud als epic, story,
-bug, verificatie of andere domeinoutput geldig is.
+validatie onveranderlijk. Bij `CODEX` en `CLAUDE` verwijst `attemptId` naar de geaccepteerde
+workerpoging; bij server-side `MOCKED` is het leeg. De aanvragende procesmodule bepaalt daarna of de
+inhoud als epic, story, bug, verificatie of andere domeinoutput geldig is.
 
 ### AiWorkerSession
 
@@ -279,7 +283,7 @@ statusovergangen en retries uit.
 
 ## Pull-interface voor workers
 
-De laptopworker en mockworker gebruiken een afzonderlijke, beveiligde technische API:
+Alleen de laptopworker gebruikt deze afzonderlijke, beveiligde technische API:
 
 ```java
 WorkerSession openWorkerSession(OpenWorkerSessionCommand command);
@@ -386,26 +390,53 @@ nieuwe, gerichte hersteltaak aanvraagt.
 
 ## MOCKED-provider
 
-`MOCKED` volgt exact dezelfde publieke queue en workerprotocollen als `CODEX` en `CLAUDE`. Er staan
-geen `if (acceptance)`-vertakkingen in Productontwerp, Productplanning of Kwaliteitsbewaking.
+`MOCKED` wordt vóór iedere laptop- of workergrens server-side binnen `task-execution` afgehandeld.
+Productontwerp, Productplanning en Kwaliteitsbewaking vragen nog steeds via hetzelfde publieke
+`requestAiTask(...)` een duurzame `AiTask` aan en kennen de uitvoeringsvariant niet.
 
-- **Unit tests van procesmodules** kiezen `provider = MOCKED` en gebruiken een in-memory fake van de
-  publieke AI-uitvoeringsinterface met vooraf ingestelde taakstatussen en resultaten.
-- **Integratietests** starten de echte AI-uitvoeringsmodule en queue plus `MockAiWorker` uit Product
-  Factory Testbed. De worker claimt `MOCKED`-taken via de echte worker-API en stuurt
-  deterministische fixtures terug.
-- **Acceptatie** draait dezelfde stateful `MockAiWorker` als zelfstandig Testbed-onderdeel. De waarde
-  in `model` is daar een stabiel mockprofiel, bijvoorbeeld `quality-success-v1`.
+Na het bewaren van een `MOCKED` taak consumeert de interne mockexecutor het eerst passende
+voorbereide antwoord, valideert output en artifacts op dezelfde technische schema's en maakt direct
+het onveranderlijke `AiTaskResult`. De taak gaat daarmee zonder `AiWorkerSession`, lease, heartbeat,
+fencing token of Dockercontainer naar `SUCCEEDED` of `FAILED`. De aanvragende processessie volgt
+desondanks de gewone asynchrone grens: zij bewaart het taak-ID en verwerkt het resultaat pas wanneer
+een volgende `runProcessSession(productId)` haar hervat. `attemptCount` blijft voor zo'n taak nul en
+`maxAttempts` heeft alleen betekenis aan de echte workergrens.
 
-De mockworker kiest een fixture op basis van het geconfigureerde mockprofiel en optionele
-testcorrelatie in de opaque input. Ook mockresultaten moeten aan het responseschema voldoen en
-doorlopen leases, idempotentie en resultaatacceptatie.
+Een voorbereid `MockAiResponse` bevat minimaal:
 
-De mockworker kan niet alleen succes teruggeven. Vaste scenario's kunnen langzaam werk, schemafout,
-providerfout, time-out, annulering, ontbrekende heartbeat, slaap, crash, reconciliatie en een laat
-resultaat met een oud fencing token simuleren. Daarmee gebruiken automatische integratietests en
-handmatige UI-acceptatie precies dezelfde queuegrens en scenariofixtures. De volledige
-omgevingsopzet staat in [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md).
+- verplichte `jobKey` en volgordenummer;
+- optioneel product-ID en testcorrelatiesleutel om parallelle productruns eenduidig te matchen;
+- eindstatus `SUCCEEDED` of `FAILED`;
+- bij succes de volledige JSON-output en optionele begrensde artifacts;
+- bij fout een stabiele foutcode en veilige foutmelding.
+
+Exact product plus job plus correlatiesleutel wint van een algemener antwoord; binnen dezelfde
+match geldt FIFO. Is geen passend antwoord voorbereid, dan eindigt de taak zichtbaar en
+niet-retrybaar als `FAILED` met `NO_MOCK_RESPONSE_CONFIGURED`. Een vriendelijke standaardrespons is
+bewust niet toegestaan, omdat die een onvolledig ingericht scenario ten onrechte groen kan maken.
+
+Alleen het integratie- en acceptatieprofiel registreert de bestuurbare mockstore en deze Test
+Control-routes:
+
+```text
+GET    /api/test-control/ai/mock-responses
+POST   /api/test-control/ai/mock-responses
+DELETE /api/test-control/ai/mock-responses/{responseId}
+DELETE /api/test-control/ai/mock-responses
+```
+
+De tester kan daarmee antwoorden bekijken, klaarzetten, afzonderlijk verwijderen en volledig
+resetten voordat hij een gewone procesrun start. Scenariofixtures mogen dezelfde interface
+gebruiken. Productie registreert de store, executor en endpoints niet en weigert provider `MOCKED`
+zowel bij configuratie als taakaanvraag.
+
+- **Unit tests van procesmodules** mogen een kleine in-memory fake van de publieke
+  AI-uitvoeringsinterface gebruiken.
+- **Integratietests en acceptatie** gebruiken de echte AI-uitvoeringsmodule, echte `AiTask`-opslag,
+  schema-validatie en de server-side mockexecutor; de laptop hoeft niet aan te staan.
+- **Workercontracttests** gebruiken apart een technische fake laptopworker om queueclaims,
+  heartbeats, leases, slaap, restart, fencing en late resultaten te bewijzen. Die technische fake is
+  geen productmock en verschijnt niet in de gewone acceptatieflow.
 
 Productieconfiguratie bevat een allowlist van providers en weigert `MOCKED` bij het opslaan van
 algemene instellingen en bij het aanvragen van een taak. Zo kan een verkeerde instelling niet
@@ -457,15 +488,16 @@ en kan nooit zelf een proces, agentjob of vervolgstap starten.
 - AI-uitvoering kent geen agentrollen of productentiteiten.
 - Iedere taak bevat een vaste provider, model, configuratieversie en instructieversie.
 - Algemene instellingen bepalen de waarden voor nieuwe taken, niet voor bestaande taken.
-- Een worker leest de queue uitsluitend via de publieke worker-API en nooit rechtstreeks uit de
-  database.
+- Een laptopworker leest `CODEX`- en `CLAUDE`-taken uitsluitend via de publieke worker-API en nooit
+  rechtstreeks uit de database.
 - Per taak bestaat maximaal één actuele attempt en maximaal één geaccepteerd resultaat.
 - Iedere workerupdate vereist het actuele fencing token.
 - Een gemiste heartbeat veroorzaakt eerst `SUSPECTED`, niet onmiddellijk een retry.
 - Reconnect en wakker worden beginnen altijd met reconciliatie.
 - AI-taken hebben geen externe schrijfrechten; domeinpublicatie gebeurt idempotent door de
   aanvragende module.
-- `MOCKED` gebruikt dezelfde queuegrens en is technisch uitgesloten in productie.
+- `MOCKED` bewaart dezelfde duurzame taak en hetzelfde gevalideerde resultaat, maar wordt vóór de
+  workergrens server-side uitgevoerd en is technisch uitgesloten in productie.
 - `enabled = false`, terminale taakfouten en geannuleerde taken laten de aanvragende productgebonden
   processessie altijd zichtbaar en hervatbaar of bewust `CANCELLED` achter.
 
