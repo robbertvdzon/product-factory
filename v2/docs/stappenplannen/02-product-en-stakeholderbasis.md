@@ -15,8 +15,8 @@ Deze stap levert de publieke productbasis waarop alle latere modules voortbouwen
 - Implementeer overleggen, notulen en de gecontroleerde verwerking van stakeholderuitkomsten.
 - Leg vast dat één globale Stakeholder alle producten en Product Factory-brede instellingen beheert.
 - Voeg de bijbehorende product-, signalen-, schedule-, besluiten- en overlegschermen aan de
-  frontend toe. Schedulebediening ondersteunt menselijke weekdagen/tijden of een interval, een
-  expliciete tijdzone en toont `nextRunAt`; er is geen cronveld.
+  frontend toe. Schedulebediening ondersteunt meerdere menselijke dag/tijdregels of één interval,
+  een expliciete tijdzone en toont `nextRunAt`; er is geen cronveld.
 - Toon herkomst, status en historie via de publieke module-API's; schrijf nooit vanuit de UI in
   moduletabellen.
 - Voeg vaste acceptatiescenario's toe en deploy de afgeronde stap naar acceptatie en productie.

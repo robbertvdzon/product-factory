@@ -80,7 +80,8 @@ besluit. Een specifieker document wint alleen wanneer de teksten naast elkaar ku
 - De dispatcher gebruikt geen AI en stuurt maximaal één story per product wanneer Software Factory
   voor dat product geen open story heeft.
 - De Stakeholder beheert per product het automatische schema van ieder uitvoerend onderdeel met
-  gewone weekdagen en tijden of een interval; handmatig starten blijft daarnaast beschikbaar.
+  één of meer regels van gewone weekdagen en tijden, of met een interval; handmatig starten blijft
+  daarnaast beschikbaar.
 - Alleen een geplande of bevoegde handmatige processessie mag AI-taken aanvragen.
 - AI-uitvoering is een generieke queue en begrijpt geen agentrollen of productobjecten.
 - Iedere agentrol leest uitsluitend haar eigen versieerbare geheugen.

@@ -79,14 +79,21 @@ De Stakeholder beheert per product een afzonderlijk schedule voor:
 - `SOFTWARE_FACTORY_DISPATCHER` — roept `runDispatchSession(productId)` aan.
 
 `ProcessScheduleConfiguration` bevat minimaal product-ID, proces, `enabled`, IANA-tijdzone,
-schedulepatroon, berekende `nextRunAt`, wijzigingsmoment en versie. Het patroon ondersteunt:
+schedulepatroon, berekende `nextRunAt`, wijzigingsmoment en versie. Het patroon is precies één van:
 
-- één of meer vaste tijden op gekozen weekdagen, bijvoorbeeld dagelijks om 08:00 en 20:00 of
-  iedere maandag om 07:00;
-- een vast interval in hele minuten, bijvoorbeeld ieder uur voor de dispatcher.
+- een niet-lege lijst `WeeklyScheduleRule`s. Iedere regel bevat één of meer weekdagen en één of meer
+  geldige lokale tijden. Eén regel kan bijvoorbeeld iedere dag om 07:00 en 20:00 betekenen; twee
+  andere regels kunnen maandag om 09:00 en vrijdag om 21:00 betekenen;
+- één vast interval in hele minuten, bijvoorbeeld ieder uur voor de dispatcher.
 
-De normale UI toont menselijke dagen en tijden en geen cronexpressie. De tijdzone is expliciet en
-standaard `Europe/Amsterdam`, zodat zomer- en wintertijd volgens die zone worden berekend.
+Dag/tijdregels en een interval worden niet binnen dezelfde configuratie gemengd. Gelijke
+dag/tijdcombinaties worden bij validatie ontdubbeld. Een lokale tijd moet bestaan en tussen `00:00`
+en `23:59` liggen. `nextRunAt` is steeds het vroegste toekomstige tijdstip uit alle regels, berekend
+door de backend.
+
+De normale UI toont menselijke regels met dagen en tijden en geen cronexpressie. De tijdzone is
+expliciet en standaard `Europe/Amsterdam`, zodat zomer- en wintertijd volgens die zone worden
+berekend.
 `updateProcessSchedule(...)` wijzigt alleen toekomstige starts, annuleert geen lopende sessie en
 verandert niets aan handmatige bediening.
 

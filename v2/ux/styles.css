@@ -2744,6 +2744,59 @@ select:focus-visible {
   gap: 0.8rem;
 }
 
+.schedule-rule-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.schedule-rule {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid #d8e2dd;
+  border-radius: 0.75rem;
+  background: #f8faf8;
+}
+
+.schedule-rule header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.schedule-rule header strong {
+  color: #294942;
+  font-size: 0.78rem;
+}
+
+.schedule-rule header button,
+.add-schedule-rule {
+  min-height: 2.2rem;
+  padding: 0.42rem 0.65rem;
+  border: 1px solid #c6d5ce;
+  border-radius: 0.5rem;
+  color: #526b65;
+  font-size: 0.7rem;
+  font-weight: 750;
+  background: #ffffff;
+}
+
+.schedule-rule header button {
+  color: #9a4e3a;
+  border-color: #e0c6bd;
+}
+
+.add-schedule-rule {
+  justify-self: start;
+  color: #087156;
+  border-color: #9fd0be;
+}
+
+.schedule-rule > label {
+  margin-top: 0;
+}
+
 .schedule-modal fieldset {
   min-width: 0;
   margin: 0;

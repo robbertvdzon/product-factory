@@ -469,28 +469,30 @@ uitlegbaar en herstelbaar zonder dat de Stakeholder een losse story hoeft te bew
 
 ### Beginsituatie
 
-HKH is actief. De Stakeholder wil Productplanning iedere dag om 08:00 en 20:00 laten draaien,
-Productontwerp alleen iedere maandag om 07:00 en de dispatcher ieder uur.
+HKH is actief. De Stakeholder wil Productplanning iedere dag om 07:00 en 20:00 laten draaien,
+Productontwerp op maandag om 09:00 en op vrijdag om 21:00 en de dispatcher ieder uur.
 
 ### Scenario
 
 1. De Stakeholder opent **Beheer → Productinstellingen → Automatisering** voor HKH.
-2. Zij stelt Productplanning in op alle weekdagen met de tijden 08:00 en 20:00 in
-   `Europe/Amsterdam` en Productontwerp op maandag 07:00.
-3. Zij stelt de dispatcher in op een interval van 60 minuten en slaat ieder schema op.
-4. De backend bewaart per product en proces één nieuwe configuratieversie en berekent `nextRunAt`.
-5. Op ieder vervallen tijdstip claimt de scheduler de geplande start hooguit eenmaal en roept hij de
+2. Zij maakt voor Productplanning één regel met alle dagen en de tijden 07:00 en 20:00 in
+   `Europe/Amsterdam`.
+3. Zij maakt voor Productontwerp twee regels: maandag om 09:00 en vrijdag om 21:00.
+4. Zij stelt de dispatcher in op een interval van 60 minuten en slaat ieder schema op.
+5. De backend bewaart per product en proces één nieuwe configuratieversie, ontdubbelt gelijke
+   combinaties en berekent het vroegste toekomstige tijdstip als `nextRunAt`.
+6. Op ieder vervallen tijdstip claimt de scheduler de geplande start hooguit eenmaal en roept hij de
    gewone publieke runfunctie voor HKH aan.
-6. De Stakeholder schakelt later Productontwerp tijdelijk uit en kan het desondanks met
+7. De Stakeholder schakelt later Productontwerp tijdelijk uit en kan het desondanks met
    **Nu starten** handmatig uitvoeren.
-7. Na een periode van downtime haalt de scheduler hooguit één gemiste run per schema in en plant
+8. Na een periode van downtime haalt de scheduler hooguit één gemiste run per schema in en plant
    daarna meteen het eerstvolgende toekomstige tijdstip.
 
 ### Eindresultaat
 
 Ieder product en proces kan een eigen begrijpelijk automatisch ritme hebben, inclusief meerdere
-tijden per dag. Er zijn geen cronexpressies in de UI, geen dubbele geplande starts en uitschakelen
-blokkeert de handmatige bediening niet.
+tijden per dag en meerdere regels met andere dagen en tijden. Er zijn geen cronexpressies in de UI,
+geen dubbele geplande starts en uitschakelen blokkeert de handmatige bediening niet.
 
 ## Brondocumenten
 

@@ -118,10 +118,11 @@ overgeslagen en geregistreerd.
 
 De technische scheduler leest voor ieder actief product de `ProcessScheduleConfiguration` van de
 vier uitvoerende onderdelen en roept alleen vervallen, ingeschakelde schedules aan. De Stakeholder
-stelt via de UI menselijke weekdagen, tijden of een vast interval en een expliciete tijdzone in;
-cronexpressies zijn geen onderdeel van de publieke bediening. De scheduler bevat geen product- of
-agentlogica. Een handmatige UI-/REST-start kiest eveneens expliciet één product en blijft ook bij
-een uitgeschakeld schedule beschikbaar.
+stelt via de UI één of meer menselijke dag/tijdregels of een vast interval en een expliciete
+tijdzone in. Een regel kan meerdere dagen en meerdere tijden delen, terwijl een tweede regel andere
+dagen en tijden kan hebben. Cronexpressies zijn geen onderdeel van de publieke bediening. De
+scheduler bevat geen product- of agentlogica. Een handmatige UI-/REST-start kiest eveneens
+expliciet één product en blijft ook bij een uitgeschakeld schedule beschikbaar.
 
 Iedere geplande combinatie wordt hooguit eenmaal geclaimd. Na downtime wordt maximaal één gemiste
 run ingehaald en daarna het eerstvolgende toekomstige tijdstip berekend; een lange storing speelt

@@ -254,16 +254,18 @@ informatie anders groeperen op mobiel, zolang iedere functie rechtstreeks bereik
 Onder **Productinstellingen → Automatisering** toont de frontend per uitvoerend onderdeel:
 
 - of automatische starts zijn ingeschakeld;
-- het schema in gewone taal, bijvoorbeeld **Dagelijks om 08:00 en 20:00** of
-  **Iedere maandag om 07:00**;
+- het volledige schema in gewone taal, bijvoorbeeld **Dagelijks om 07:00 en 20:00** of
+  **Maandag 09:00 · vrijdag 21:00**;
 - de tijdzone, standaard `Europe/Amsterdam`;
 - de eerstvolgende geplande start;
 - **Bewerken** en de bestaande actie **Nu starten**.
 
-De bewerkweergave gebruikt gekozen weekdagen met één of meer tijden, of een vast interval in hele
-minuten. Zij toont geen cronexpressie. Opslaan roept `updateProcessSchedule(...)` aan met de
-verwachte configuratieversie. Een wijzigingsconflict en ongeldige combinatie worden zichtbaar
-getoond; de frontend rekent `nextRunAt` niet zelf uit.
+De bewerkweergave laat bij dag/tijdplanning meerdere regels toevoegen en verwijderen. Iedere regel
+heeft één of meer gekozen weekdagen en één of meer tijden. De andere modus bevat één vast interval
+in hele minuten; een interval en dag/tijdregels kunnen niet worden gemengd. De UI toont geen
+cronexpressie. Opslaan roept `updateProcessSchedule(...)` aan met de verwachte configuratieversie.
+Een wijzigingsconflict, dubbele combinatie en ongeldige tijd worden zichtbaar getoond; de frontend
+rekent `nextRunAt` niet zelf uit.
 
 Uitschakelen voorkomt alleen toekomstige automatische starts. Handmatig starten blijft mogelijk en
 een bestaande lopende of `WAITING_FOR_AI`-sessie wordt niet geannuleerd. In acceptatie staan

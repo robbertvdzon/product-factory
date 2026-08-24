@@ -250,6 +250,102 @@
     scheduleModal.querySelector(".interval-schedule-fields").hidden = mode !== "interval";
   }
 
+  const scheduleDayNames = [
+    ["1", "Ma", "maandag"],
+    ["2", "Di", "dinsdag"],
+    ["3", "Wo", "woensdag"],
+    ["4", "Do", "donderdag"],
+    ["5", "Vr", "vrijdag"],
+    ["6", "Za", "zaterdag"],
+    ["0", "Zo", "zondag"]
+  ];
+
+  function addScheduleTimeInput(container, value = "12:00") {
+    const input = document.createElement("input");
+    input.type = "time";
+    input.value = value;
+    container.querySelector("button").before(input);
+    return input;
+  }
+
+  function renumberScheduleRules() {
+    scheduleModal.querySelectorAll(".schedule-rule").forEach((rule, index) => {
+      rule.querySelector("header strong").textContent = `Regel ${index + 1}`;
+      rule.querySelector('[data-action="remove-schedule-rule"]').hidden = scheduleModal.querySelectorAll(".schedule-rule").length === 1;
+    });
+  }
+
+  function createScheduleRule(days = ["1"], times = ["09:00"]) {
+    const rule = document.createElement("article");
+    rule.className = "schedule-rule";
+
+    const header = document.createElement("header");
+    header.innerHTML = '<strong>Regel</strong><button type="button" data-action="remove-schedule-rule">Verwijderen</button>';
+    rule.append(header);
+
+    const fieldset = document.createElement("fieldset");
+    const legend = document.createElement("legend");
+    legend.textContent = "Dagen";
+    const picker = document.createElement("div");
+    picker.className = "weekday-picker";
+    scheduleDayNames.forEach(([value, shortName]) => {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = value;
+      input.checked = days.includes(value);
+      const text = document.createElement("span");
+      text.textContent = shortName;
+      label.append(input, text);
+      picker.append(label);
+    });
+    fieldset.append(legend, picker);
+    rule.append(fieldset);
+
+    const timesLabel = document.createElement("label");
+    const timesTitle = document.createElement("span");
+    timesTitle.textContent = "Tijden";
+    const timesContainer = document.createElement("div");
+    timesContainer.className = "schedule-times";
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.dataset.action = "add-schedule-time";
+    addButton.setAttribute("aria-label", "Tijd aan deze regel toevoegen");
+    addButton.textContent = "+";
+    timesContainer.append(addButton);
+    times.forEach((time) => addScheduleTimeInput(timesContainer, time));
+    timesLabel.append(timesTitle, timesContainer);
+    rule.append(timesLabel);
+    return rule;
+  }
+
+  function collectScheduleRules() {
+    return [...scheduleModal.querySelectorAll(".schedule-rule")].map((rule) => ({
+      days: [...rule.querySelectorAll(".weekday-picker input:checked")].map((input) => input.value),
+      times: [...rule.querySelectorAll(".schedule-times input")].map((input) => input.value).filter(Boolean)
+    }));
+  }
+
+  function parseScheduleRules(serializedRules) {
+    return (serializedRules || "1@09:00").split(";").filter(Boolean).map((serializedRule) => {
+      const [days = "", times = ""] = serializedRule.split("@");
+      return { days: days.split(",").filter(Boolean), times: times.split(",").filter(Boolean) };
+    });
+  }
+
+  function serializeScheduleRules(rules) {
+    return rules.map((rule) => `${rule.days.join(",")}@${rule.times.join(",")}`).join(";");
+  }
+
+  function formatScheduleRule(rule) {
+    const fullNames = Object.fromEntries(scheduleDayNames.map(([value, , fullName]) => [value, fullName]));
+    const shortNames = Object.fromEntries(scheduleDayNames.map(([value, shortName]) => [value, shortName.toLowerCase()]));
+    const timeText = rule.times.join(" en ");
+    if (rule.days.length === 7) return `Dagelijks om ${timeText}`;
+    if (rule.days.length === 1) return `${fullNames[rule.days[0]][0].toUpperCase()}${fullNames[rule.days[0]].slice(1)} ${timeText}`;
+    return `${rule.days.map((day) => shortNames[day]).join(", ")} om ${timeText}`;
+  }
+
   function formatScheduleFromModal() {
     const mode = scheduleModal.querySelector(".schedule-mode").value;
     if (mode === "interval") {
@@ -259,16 +355,8 @@
       return `Iedere ${minutes} minuten`;
     }
 
-    const dayNames = { "0": "zo", "1": "ma", "2": "di", "3": "wo", "4": "do", "5": "vr", "6": "za" };
-    const fullDayNames = { "0": "zondag", "1": "maandag", "2": "dinsdag", "3": "woensdag", "4": "donderdag", "5": "vrijdag", "6": "zaterdag" };
-    const days = [...scheduleModal.querySelectorAll(".weekday-picker input:checked")].map((input) => input.value);
-    const times = [...scheduleModal.querySelectorAll(".schedule-times input")].map((input) => input.value).filter(Boolean);
-    let dayText = "Op gekozen dagen";
-    if (days.length === 7) dayText = "Dagelijks";
-    else if (days.length === 1) dayText = `Iedere ${fullDayNames[days[0]]}`;
-    else if (days.length > 1) dayText = days.map((day) => dayNames[day]).join(", ");
-    const timeText = times.length ? ` om ${times.join(" en ")}` : "";
-    return `${dayText}${timeText}`;
+    const rules = collectScheduleRules().filter((rule) => rule.days.length && rule.times.length);
+    return rules.length ? rules.map(formatScheduleRule).join(" · ") : "Maak minimaal één complete regel";
   }
 
   function updateSchedulePreview() {
@@ -283,19 +371,9 @@
     scheduleModal.querySelector("#schedule-modal-title").textContent = `${button.dataset.scheduleProcess} plannen`;
     setScheduleMode(mode);
     scheduleModal.querySelector(".schedule-enabled input").checked = editingScheduleRow.querySelector("[data-schedule-toggle]").checked;
-    const selectedDays = new Set((button.dataset.scheduleDays || "").split(",").filter(Boolean));
-    scheduleModal.querySelectorAll(".weekday-picker input").forEach((input) => {
-      input.checked = selectedDays.has(input.value);
-    });
-    const times = (button.dataset.scheduleTimes || "08:00").split(",");
-    const timesContainer = scheduleModal.querySelector(".schedule-times");
-    timesContainer.querySelectorAll("input").forEach((input) => input.remove());
-    times.forEach((time) => {
-      const input = document.createElement("input");
-      input.type = "time";
-      input.value = time;
-      timesContainer.querySelector("button").before(input);
-    });
+    const ruleList = scheduleModal.querySelector(".schedule-rule-list");
+    ruleList.replaceChildren(...parseScheduleRules(button.dataset.scheduleRules).map((rule) => createScheduleRule(rule.days, rule.times)));
+    renumberScheduleRules();
     scheduleModal.querySelector(".interval-input input").value = button.dataset.scheduleInterval || "60";
     updateSchedulePreview();
   }
@@ -408,33 +486,48 @@
         const editButton = editingScheduleRow.querySelector('[data-action="edit-schedule"]');
         const enabled = scheduleModal.querySelector(".schedule-enabled input").checked;
         const mode = scheduleModal.querySelector(".schedule-mode").value;
-        const times = [...scheduleModal.querySelectorAll(".schedule-times input")].map((input) => input.value).filter(Boolean);
-        const days = [...scheduleModal.querySelectorAll(".weekday-picker input:checked")].map((input) => input.value);
+        const rules = collectScheduleRules();
         const interval = Number(scheduleModal.querySelector(".interval-input input").value);
-        if ((mode === "weekly" && (!days.length || !times.length)) || (mode === "interval" && interval < 5)) {
-          showToast(mode === "weekly" ? "Kies minimaal één dag en één tijd." : "Het interval is minimaal 5 minuten.");
+        if ((mode === "weekly" && (!rules.length || rules.some((rule) => !rule.days.length || !rule.times.length))) || (mode === "interval" && interval < 5)) {
+          showToast(mode === "weekly" ? "Iedere regel heeft minimaal één dag en één tijd nodig." : "Het interval is minimaal 5 minuten.");
+          break;
+        }
+        const moments = rules.flatMap((rule) => rule.days.flatMap((day) => rule.times.map((time) => `${day}@${time}`)));
+        if (mode === "weekly" && new Set(moments).size !== moments.length) {
+          showToast("Dezelfde dag en tijd staat meer dan één keer in het schema.");
           break;
         }
         editButton.dataset.scheduleMode = mode;
-        editButton.dataset.scheduleTimes = times.join(",");
-        editButton.dataset.scheduleDays = days.join(",");
+        editButton.dataset.scheduleRules = serializeScheduleRules(rules);
         editButton.dataset.scheduleInterval = interval;
         editingScheduleRow.querySelector("[data-schedule-toggle]").checked = enabled;
         editingScheduleRow.querySelector(".schedule-description strong").textContent = formatScheduleFromModal();
-        editingScheduleRow.querySelector(".schedule-description small").textContent = `${mode === "interval" ? "Vast interval" : "Vaste dagen en tijden"} · ${scheduleModal.querySelector(".schedule-timezone").value}`;
+        editingScheduleRow.querySelector(".schedule-description small").textContent = `${mode === "interval" ? "Vast interval" : `${rules.length} ${rules.length === 1 ? "regel" : "regels"}`} · ${scheduleModal.querySelector(".schedule-timezone").value}`;
         editingScheduleRow.querySelector("time").textContent = enabled ? "Wordt berekend…" : "Niet gepland";
         closeModal(scheduleModal, scheduleBackdrop);
         showToast("Het schema is als nieuwe versie bewaard; de server berekent nu de volgende run.");
         break;
       }
       case "add-schedule-time": {
-        const input = document.createElement("input");
-        input.type = "time";
-        input.value = "12:00";
-        actionButton.before(input);
+        const input = addScheduleTimeInput(actionButton.closest(".schedule-times"));
+        updateSchedulePreview();
         input.focus();
         break;
       }
+      case "add-schedule-rule": {
+        const ruleList = scheduleModal.querySelector(".schedule-rule-list");
+        const newRule = createScheduleRule();
+        ruleList.append(newRule);
+        renumberScheduleRules();
+        updateSchedulePreview();
+        newRule.querySelector(".weekday-picker input").focus();
+        break;
+      }
+      case "remove-schedule-rule":
+        actionButton.closest(".schedule-rule").remove();
+        renumberScheduleRules();
+        updateSchedulePreview();
+        break;
       case "run-scheduled-process":
         startButton(actionButton, "Gestart", `${actionButton.dataset.processLabel} is handmatig gestart voor HKH.`);
         break;

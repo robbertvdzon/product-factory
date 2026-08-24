@@ -33,8 +33,9 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 - Bewijs dat iedere procesmodule maximaal één sessie per product heeft en twee verschillende
   producten wel gelijktijdig kan verwerken.
 - Bewijs dat alle geplande functies via zowel schedule als bevoegde UI/REST-start werken.
-- Bewijs dat aan/uit, meerdere tijden per dag, een wekelijkse dag, een interval, zomer-/wintertijd,
-  wijziging tijdens een lopende sessie en maximaal één inhaalrun na downtime correct werken.
+- Bewijs dat aan/uit, meerdere tijden per dag, meerdere regels met verschillende dagen en tijden,
+  een interval, zomer-/wintertijd, wijziging tijdens een lopende sessie en maximaal één inhaalrun
+  na downtime correct werken.
 - Verifieer dat productie uitsluitend de drie MVP-procesimplementaties selecteert.
 - Werk runbooks, rooktests en documentatie bij op basis van de werkelijk gebouwde route.
 

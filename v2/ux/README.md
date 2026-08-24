@@ -26,8 +26,9 @@ Open daarna `http://localhost:8080`.
   voorgesteld.
 - Handmatige acties gebruiken precies de publieke commands uit de specificatie, maar tonen in de
   UI gewone mensentaal.
-- Onder **Productinstellingen → Automatisering** kan de Stakeholder per product en proces vaste
-  weekdagen en één of meer tijden, of een vast interval instellen. De UI toont geen cronexpressies;
+- Onder **Productinstellingen → Automatisering** kan de Stakeholder per product en proces meerdere
+  regels met eigen weekdagen en tijden, of één vast interval instellen. Zo passen zowel dagelijks
+  07:00 en 20:00 als maandag 09:00 plus vrijdag 21:00. De UI toont geen cronexpressies;
   uitschakelen laat **Nu starten** beschikbaar.
 - Een dispatchreservering verschijnt tijdelijk als **Wordt verstuurd**, zonder extra storystatus.
 - Kwaliteit groepeert testwerk, bugs, verificaties en historie in rustige deelweergaven. Statistieken
