@@ -1,7 +1,0 @@
-.git
-.idea
-**/target
-dashboard-frontend/.dart_tool
-dashboard-frontend/build
-properties.env
-secrets.env

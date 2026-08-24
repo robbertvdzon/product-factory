@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: product-factory
+
+server:
+  port: ${PF_BACKEND_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

@@ -1,48 +1,26 @@
 # Product Factory
 
-> **Nieuwbouw:** deze README beschrijft de huidige v1-implementatie. Voor het doel, de architectuur
-> en de uitvoeringsvolgorde van de volledige vervanging is
-> [`v2/README.md`](v2/README.md) leidend. Hergebruik de functionele v1-keuzes hieronder niet als
-> specificatie voor de nieuwbouw.
+Dit is de nieuwe technische basis van Product Factory. Release `0.1.0` bevat eerst de veilige
+backend- en frontendfundering; functionele procesimplementaties worden daarna capability voor
+capability toegevoegd.
 
-Product Factory is een zelfstandige Kotlin-applicatie die productonderzoek, productkeuzes,
-UX-ontwikkeling en storyvorming autonoom organiseert, voor elk product dat erin geregistreerd
-staat. Zij bouwt zelf geen productcode, maar biedt stories aan de Software Factory aan, volgt de
-uitvoering en verwerkt de resultaten in een volgende productiteratie. Een nieuw product wordt als
-data toegevoegd, niet als code — zie [docs/product-template.md](docs/product-template.md) voor het
-contract en de regels.
+## Vereisten
 
-Lokale secrets staan steeds in een gitignored `secrets.env` in de repositoryroot, met een
-gecommit `secrets.env.example`; proces-environmentvariabelen blijven de hoogste prioriteit voor CI
-en OpenShift.
+- JDK 21 (geen andere hoofdversie);
+- Maven 3.9;
+- Flutter 3.44.6 met de bijbehorende Dart-SDK;
+- Docker met Compose voor de latere productieachtige lokale omgeving.
 
-Goedgekeurde onderzoeksrapporten, UX-ontwerpen, productbeslissingen, roadmaps en storyvoorstellen
-worden als leesbare bestanden versieerd in de aparte repository `product-factory-workspace`. De
-eigen database van Product Factory bevat de operationele toestand, zoals runs, wachtrijen, kosten,
-fouten en verwijzingen naar workspace-commits. Product Factory commit nooit rechtstreeks in een
-productrepository; alleen Software Factory wijzigt de doelrepository van een product tijdens de
-uitvoering van een story.
+Op macOS selecteert de lokale CLI zelf de geïnstalleerde JDK 21. Maven Enforcer laat iedere build
+vroeg en duidelijk falen wanneer Maven toch met een andere Java-hoofdversie draait.
 
-## Fase-2-runtime
+```bash
+./product-factory verify
+./product-factory backend
+./product-factory frontend
+```
 
-De zelfstandige technische basis bestaat uit een Maven-reactor, Spring Modulith-runtime,
-PostgreSQL/Flyway, agentworker, Google OIDC-dashboard en een begrensde workspace-publisher. Start
-lokaal met `./product-factory up` en controleer alles met `./product-factory verify`.
+De backendroute `GET /api/foundation` bevestigt dat de technische basis actief is. De frontend toont
+bewust nog geen functionele processen.
 
-De agentworker draait bewust als zelfstandig proces op de Mac. Hij maakt zelf een uitgaande,
-geauthenticeerde WebSocket-verbinding met de OpenShift-dashboardbackend en start `codex exec` met
-de bestaande ChatGPT/Codex-login van de macOS-gebruiker. Er worden geen OpenAI API-keys aan het
-agentproces doorgegeven. De backend kan daardoor taken aanbieden zonder een poort op de Mac te
-publiceren; tijdens slaapstand of uitschakelen rapporteert de backend de worker als offline.
-
-- [Architectuurreferentie](docs/architecture/reference-baseline.md)
-- [Overzicht van Product Factory v2](v2/docs/overzicht.md)
-- [Modulegrenzen](docs/architecture/modules.md)
-- [Functioneel overzicht: wat doet een productcyclus precies](docs/architecture/functioneel-overzicht.md)
-- [Productagents in shadow mode](docs/architecture/shadow-mode.md)
-- [dependsOn-datamodel van storykandidaten](docs/architecture/dependson-datamodel.md)
-- [Lokale ontwikkeling](docs/development/local-development.md)
-- [OpenShift-deployment](docs/deployment/openshift.md)
-- [Deployment, secrets en databasetoegang (lokaal en productie)](deploy/README.md)
-- [Workspace-security](docs/security/workspace-credential.md)
-- [Template voor een volgend product](docs/product-template.md)
+De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md).

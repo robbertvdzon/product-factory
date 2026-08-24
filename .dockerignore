@@ -1,7 +1,13 @@
 .git
+.github
 .idea
 **/target
-dashboard-frontend/.dart_tool
-dashboard-frontend/build
+**/.dart_tool
+**/build
+coverage
+docs
 properties.env
 secrets.env
+work
+*.log
+*.dump
