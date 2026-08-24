@@ -447,6 +447,7 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 
 ### Processen
 
+- [Belangrijkste functionele ketenscenario's](ketenscenarios.md)
 - [Processen, publieke interfaces en entiteiten](processen/processen-en-entiteiten.md)
 - [Productontwerp-API](processen/productontwerp/api.md)
 - [Productontwerp — MVP](processen/productontwerp/mvp.md)

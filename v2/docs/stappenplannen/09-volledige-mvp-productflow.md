@@ -27,6 +27,7 @@ voorbereid. Optimalisaties op basis van productie-ervaring komen pas na deze com
 ## Specificaties
 
 - [Overzicht](../overzicht.md)
+- [Belangrijkste functionele ketenscenario's](../ketenscenarios.md)
 - [Processen en entiteiten](../processen/processen-en-entiteiten.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
 - [Deployment en operatie](../platform/deployment-en-operatie.md)
