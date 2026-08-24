@@ -1,5 +1,10 @@
 # Product Factory
 
+> **Nieuwbouw:** deze README beschrijft de huidige v1-implementatie. Voor het doel, de architectuur
+> en de uitvoeringsvolgorde van de volledige vervanging is
+> [`v2/README.md`](v2/README.md) leidend. Hergebruik de functionele v1-keuzes hieronder niet als
+> specificatie voor de nieuwbouw.
+
 Product Factory is een zelfstandige Kotlin-applicatie die productonderzoek, productkeuzes,
 UX-ontwikkeling en storyvorming autonoom organiseert, voor elk product dat erin geregistreerd
 staat. Zij bouwt zelf geen productcode, maar biedt stories aan de Software Factory aan, volgt de
