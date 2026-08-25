@@ -47,7 +47,7 @@ spec:
                   checksum_temporary="$temporary.sha256"
                   trap 'rm -f "$temporary" "$checksum_temporary"' EXIT
                   mkdir -p "$backup_dir"
-                  pg_dump --format=custom --no-owner --no-privileges --file "$temporary" "$PF_DB_URL"
+                  pg_dump --format=custom --no-owner --no-privileges --file "$temporary"
                   pg_restore --list "$temporary" >/dev/null
                   digest="$(sha256sum "$temporary" | awk '{print $1}')"
                   printf '%s  %s\n' "$digest" "$(basename "$final")" > "$checksum_temporary"
@@ -55,11 +55,17 @@ spec:
                   mv "$checksum_temporary" "$final.sha256"
                   find "$backup_dir" -type f -mtime +14 -name 'product-factory-*.dump*' -delete
               env:
-                - name: PF_DB_URL
+                - name: PGHOST
+                  value: product-factory-postgres
+                - name: PGPORT
+                  value: "5432"
+                - name: PGDATABASE
+                  value: productfactory_v2
+                - name: PGUSER
                   valueFrom:
                     configMapKeyRef:
                       name: product-factory-config
-                      key: PF_DB_URL
+                      key: PF_DB_USERNAME
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
