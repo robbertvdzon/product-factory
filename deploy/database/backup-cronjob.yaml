@@ -12,8 +12,12 @@ spec:
       backoffLimit: 2
       template:
         spec:
+          serviceAccountName: product-factory-database-backup
           restartPolicy: Never
           securityContext:
+            fsGroupChangePolicy: OnRootMismatch
+            seLinuxOptions:
+              type: spc_t
             seccompProfile:
               type: RuntimeDefault
           containers:
