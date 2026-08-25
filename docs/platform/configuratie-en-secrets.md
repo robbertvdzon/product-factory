@@ -27,10 +27,19 @@ stoppen startup zonder waarden te loggen.
 | `PF_STAKEHOLDER_EMAILS` | ja | ja | gesloten allowlist van Stakeholder-e-mailadressen |
 | `PF_SESSION_SIGNING_SECRET` | ja | ja | nieuwe sleutel voor Product Factory-sessies |
 | `PF_SOFTWARE_FACTORY_TOKEN` | ja | nee | gereserveerd; pas actief bij de dispatcher |
-| `PF_AGENT_WORKER_TOKEN` | ja | nee | gereserveerd; pas actief bij AI-uitvoering |
+| `PF_AGENT_RUNTIME_URL` | nee | ja vanaf stap 4 | HTTPS-basis-URL van de Agent Runtime voor deze omgeving |
+| `PF_AGENT_RUNTIME_TOKEN` | ja | ja vanaf stap 4 | gescopete Product Factory-consumentcredential; nooit een worker- of admincredential |
+| `PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN` | ja | nee | alleen integratie/acceptatie voor gescopete Runtime-mockfixtures; nooit in productie |
 
 Acceptatie krijgt geen productiesecrets. Productie weigert op te starten bij ontbrekende verplichte
 waarden, uitgeschakelde authenticatie, een te korte sessiesleutel of niet-HTTPS publieke URLs.
+Vanaf stap 4 controleert productie ook een HTTPS Runtime-URL en niet-lege consumentcredential.
+Acceptatie mag uitsluitend de Agent Runtime-acceptatieomgeving met provider `MOCKED` aanspreken.
+
+Projectcredentials die een AI-agent eventueel mag ontvangen staan niet in Product Factory-
+`secrets.env`, database of OpenShift Secret. Zij bestaan uitsluitend als `project-credentials.env`
+bij lokale Agent Runtime-workers. Product Factory leest alleen de door Runtime ontdekte namen en
+bewaart per product en agentrol welke namen mogen worden aangevraagd.
 
 ## Sealed Secrets
 

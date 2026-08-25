@@ -1,232 +1,223 @@
-# Product Factory v2 — AI-worker en taakcontainer
+# Product Factory v2 — Agent Runtime-integratie en taakcontainer
 
-Status: technisch contract voor de laptopworker en de uitvoering van één `AiTask`.
+Status: Product Factory-specificatie van de externe uitvoeringsgrens. De technische worker wordt
+uitsluitend in de repository `/Users/robbertvdzon/git/agent-runtime` gebouwd en beheerd.
 
-Dit document werkt de uitvoeringsgrens uit van
-[AI-uitvoering](ai-uitvoering.md). Productontwerp, Productplanning, Kwaliteitsbewaking en de
-product-/overlegmodule bepalen wat hun agent moet doen. AI-uitvoering bewaart en distribueert de
-opaque taak. De laptopworker voert iedere echte `CODEX`- of `CLAUDE`-taak volledig uit in een nieuwe
-tijdelijke Dockeromgeving.
-`MOCKED` wordt server-side afgehandeld en komt nooit bij deze worker.
+Product Factory heeft geen eigen laptopworker. Iedere echte `CODEX`- of `CLAUDE`-taak wordt als
+`APPLICATION_WORK` naar Agent Runtime gestuurd. De Runtime-server beheert queue, attempts, leases,
+harde deadlines, retries, fencing, resultaten en artifacts. Een lokale Runtime-worker voert de job
+in een nieuwe tijdelijke Dockercontainer uit. `MOCKED` blijft server-side in Agent Runtime.
 
-## Verantwoordelijkheidsgrens
+## Product Factory-verantwoordelijkheid
 
-De aanvragende domeinmodule:
+De aanvragende module:
 
-- bevriest product-ID, publieke Git-URL, exacte commit-SHA, bronversies en doelomgeving;
-- verzamelt de benodigde publieke DTO's en voor gewone procestaken uitsluitend het geheugen van de
-  eigen agentrol;
-- mag voor `MEETING.CONVERSE` en `MEETING.SUMMARIZE` alleen vanuit de product-/overlegmodule met een
-  geldige meetingcontext de rolcatalogus en het productbrede meetingsnapshot toevoegen;
-- kiest via de actuele `AiJobConfiguration` provider en model;
-- levert vaste instructies, een resultaatschema en alleen secretreferenties;
-- valideert na afloop de domeinbetekenis en publiceert eventueel epics, stories, testbewijs of
-  gecontroleerde overleguitkomsten.
+- bevriest de inhoudelijke jobkey, provider, model en prompttemplateversie lokaal;
+- bouwt één complete prompt met alle benodigde productdata en toegestaan rolgeheugen;
+- levert een JSON-responseschema en verplichte harde uitvoeringstime-out;
+- levert optioneel kleine inputattachments en een publieke repositorysnapshot op exacte commit-SHA;
+- geeft de vertrouwde agentrol door aan de AI-façade;
+- laat de façade environmentkeynamen uitsluitend uit product- en rolgrants afleiden;
+- valideert na afloop de domeinbetekenis en publiceert idempotent epics, stories, bugs,
+  verificaties of overleguitkomsten.
 
-AI-uitvoering bewaart de taak, claims, leases, heartbeats, technische resultaten en artifacts. De
-worker kent geen module-entiteiten of agentrollen en schrijft nooit rechtstreeks in hun database.
+Product Factory schrijft nooit rechtstreeks in een Runtime-database en krijgt geen worker-,
+provider- of fencingcredentials.
 
-## Taakinput
+## Complete prompt
 
-Naast de generieke taakenvelop kan een taak deze technische context bevatten:
+De procesmodule maakt zelf één zelfstandige prompt. Die bevat minimaal:
 
-```java
-class RepositorySnapshot {
-    String gitUrl;       // publieke HTTPS-URL
-    String commitSha;    // volledige, vooraf bevroren Git-SHA
-}
+- rol, doel en grenzen;
+- de bevroren product- of meetingcontext;
+- voor gewone procestaken uitsluitend het geheugen van de eigen agentrol;
+- bij meetingtaken alleen vanuit de product-/overlegmodule de geldige productbrede meetingcontext;
+- de betekenis van inputattachments en repositorycontext;
+- het verwachte resultaat en omgang met onzekerheid;
+- de instructie geen secretwaarden in resultaat, voortgang of artifacts op te nemen.
 
-class TestEnvironmentAccess {
-    String environmentId;
-    URI baseUrl;
-    URI revisionEndpoint;
-    List<String> allowedRoutes;
-    List<String> secretRefs;
-    AccessMode accessMode; // TEST_DATA_WRITE of READ_ONLY
+Agent Runtime interpreteert de prompt niet en voegt alleen vaste technische pad- en outputinstructies
+toe. Product Factory bewaart jobkey, configuratieversie, prompttemplateversie en domeincorrelatie
+lokaal; die velden gaan niet naar Runtime.
+
+## Runtime-aanvraag
+
+```json
+{
+  "jobKind": "APPLICATION_WORK",
+  "idempotencyKey": "stabiele-product-factory-sleutel",
+  "provider": "CODEX",
+  "model": "gpt-5.6",
+  "prompt": "volledige opdracht",
+  "responseSchema": {},
+  "executionTimeoutSeconds": 3600,
+  "environmentKeys": [
+    "HKH__ACCEPTANCE_BASE_URL",
+    "HKH__ACCEPTANCE_USERNAME",
+    "HKH__ACCEPTANCE_PASSWORD"
+  ],
+  "attachments": [],
+  "repositorySnapshot": {
+    "url": "https://github.com/example/project.git",
+    "commitSha": "0123456789abcdef0123456789abcdef01234567"
+  }
 }
 ```
 
-De aanvrager bepaalt de commit vóór het queueën. Voor ontwerp en planning is dat normaal de HEAD die
-bij het maken van de inputmomentopname gold. Voor story- en bugfixverificatie is minimaal de
-`deliveredCommitSha` van Software Factory beschikbaar. Een taak gebruikt nooit een beweeglijke
-branchnaam als enige bronverwijzing.
+`environmentKeys` bevat alleen namen. De waarden bestaan uitsluitend lokaal in
+`project-credentials.env` bij geschikte Runtime-workers. Product Factory ontvangt, verstuurt en
+bewaart de waarden nooit.
 
-## Verloop van één taak
+## Credentialcatalogus en roltoegang
 
-1. De worker claimt de taak via de beveiligde worker-API en controleert provider, model, time-out,
-   toegestane netwerkdoelen en grootte.
-2. Hij maakt een nieuwe tijdelijke werkdirectory en start één geïsoleerde Dockercontainer.
-3. In de container clonet hij alleen de opgegeven publieke HTTPS-repository en checkt hij detached
-   precies `commitSha` uit. Er wordt geen Git-token doorgegeven.
-4. De worker stelt in de container de volledige vaste agentgereedschapskist beschikbaar. Alleen de
-   meegegeven omgevings- en secretreferenties bepalen welke productomgevingen toegankelijk zijn.
-5. De provider voert de vaste taak uit en levert uitsluitend veilige voortgang en het gevraagde
-   gestructureerde resultaat.
-6. De worker uploadt toegestane bewijsartifacts, meldt het resultaat met het actuele fencing token
-   en verwijdert daarna container en tijdelijke worktree.
-7. Bij crash of slaap volgt de lease- en reconciliatieroute uit het hoofddocument. Een oude
-   gefencete container mag nooit alsnog resultaat publiceren.
+De lokale worker registreert bij Agent Runtime alleen namen uit `project-credentials.env`. Namen
+gebruiken `<PROJECT>__<NAAM>`, bijvoorbeeld `HKH__ACCEPTANCE_PASSWORD`. Runtime biedt aan de
+Product Factory-identiteit een gefilterde catalogus met bekende namen, actuele beschikbaarheid,
+aantal geschikte online workers en laatste waarneming.
 
-De checkout mag lokaal gecachet worden voor snelheid, maar iedere taak krijgt een afzonderlijke
-worktree op de exacte SHA. Een cache is nooit productwaarheid en mag geen oncommitted bestanden of
-output uit een vorige taak lekken.
+Product Factory toont deze catalogus per product en bewaart twee soorten metadata:
 
-## Gereedschapskist in iedere echte taak
+1. welke ontdekte environmentkeys bij het product horen;
+2. welke Product Factory-agentrollen iedere key mogen ontvangen.
 
-V1 bood verspreid over zijn rollen internetonderzoek, repositorylezing, Bash, Playwright,
-testcommando's, tijdelijke artifacts en beeldgeneratie. V2 neemt die gezamenlijke mogelijkheden als
-één vaste technische basis over. De worker hoeft daardoor geen agentrollen of rolgebonden
-toolmapping te kennen.
+De beheerder kan bijvoorbeeld alleen de Tester toegang geven tot de HKH-acceptatiecredentials. De
+Productontwerper en Planner ontvangen standaard geen environmentkeys. Meetingrollen krijgen alleen
+expliciete grants.
 
-Iedere `CODEX`- of `CLAUDE`-container beschikt minimaal over:
+Bij taakopbouw berekent de backend de doorsnede van actieve productkeys en grants voor de vertrouwde
+agentrol. Vrije prompttekst, frontendinput of modeloutput kan de lijst nooit verruimen. Agent
+Runtime kiest alleen een worker die alle gevraagde namen heeft en de worker controleert dat opnieuw.
 
-- Bash en gebruikelijke command-linegereedschappen;
-- een beschrijfbare tijdelijke taakdirectory en repositoryworktree;
-- `git clone`, `fetch`, detached `checkout`, `log`, diff en bestandlezing voor publieke
-  HTTPS-repositories;
-- WebSearch, WebFetch en uitgaand HTTPS-verkeer naar publieke informatiebronnen;
-- headless Chromium met Playwright voor navigeren, klikken, formulieren, responsive controles en
-  screenshots;
-- de bij de repository passende lokaal beschikbare build- en testcommando's;
-- het maken van tijdelijke logs, traces, screenshots en andere bewijsbestanden;
-- door de provider ondersteunde beeldgeneratie wanneer het resultaatschema daarom vraagt;
-- gestructureerde uitvoer volgens het meegegeven JSON-schema.
+## Lokale credentialbestanden van de Runtime-worker
 
-De agent mag binnen zijn tijdelijke container bestanden maken, scripts uitvoeren en tools
-combineren om de opdracht autonoom af te ronden. Een taak is niet-interactief: zij stelt geen
-verduidelijkingsvraag en wacht niet op menselijke input, maar legt onzekerheid in haar resultaat
-vast.
+De workerrepository gebruikt:
 
-De ruime vrijheid eindigt bij de containergrens. De container:
+```text
+secrets.env
+project-credentials.env
+```
 
-- draait als niet-rootgebruiker met begrensde CPU, geheugen, schijfruimte en uitvoeringstijd;
-- krijgt geen persoonlijke laptopdirectories, algemene host-environment of Docker-socket gemount;
-- krijgt geen Git-schrijftoken en kan niet committen, pushen, mergen of pull requests maken;
-- krijgt geen database-, OpenShift-, Kubernetes- of clustercredentials;
-- kan geen interne Product Factory-modulecommands aanroepen;
-- ziet alleen expliciet meegegeven testomgevingtoegang en taakgebonden secretreferenties;
-- kan nooit blijvende wijzigingen buiten taakartifacts en het ene taakresultaat publiceren.
+`secrets.env` bevat Runtime-server-, worker- en providerconfiguratie en is nooit zichtbaar voor een
+agent. `project-credentials.env` bevat projectgebonden waarden die selecteerbaar zijn. Beide zijn
+gitignored, dockerignored, geen symlink en hebben rechten `0600`.
 
-## Browser, testen en deploymentrevision
+De worker mount nooit het volledige `project-credentials.env`. Hij schrijft per attempt alleen de
+gevraagde subset naar een tijdelijke `secrets.env`. Voor deze persoonlijke projecten is bewust
+geaccepteerd dat de agent deze geselecteerde waarden kan lezen. Runtime-, provider- en
+Git-publicatiecredentials blijven altijd buiten de taakcontainer.
 
-Browser-, log- en testclients draaien in de taakcontainer en niet als inhoudelijke adapters in de
-servermodule. De procesmodule beschrijft doel, grenzen en verwacht resultaatschema; de worker levert
-de technische tools. Een echte browsertest gebruikt Chromium en Playwright; alleen WebFetch, curl
-of een leeg DOM gelden niet als bewijs dat een visuele gebruikersroute werkt. Bij canvasgebaseerde
-frontends gebruikt de agent bovendien screenshots en beschikbare accessibility-semantiek.
+## Taakdirectory
 
-Voor een gerichte story- of bugfixverificatie vraagt de worker eerst het geconfigureerde
-revisionendpoint van de doelomgeving op. Hij bewaart:
+Agent Runtime maakt per attempt:
 
-- de vereiste `deliveredCommitSha`;
-- de werkelijk gedeployde commit of release;
-- het tijdstip en de omgeving waarop dit is vastgesteld.
+```text
+/job/
+├── input/
+│   ├── prompt.md
+│   ├── response-schema.json
+│   └── attachments/
+├── secrets/
+│   └── secrets.env
+├── docs/
+│   └── available-tools.md
+└── output/
+    ├── result.json
+    └── artifacts/
+```
 
-Wanneer Git-commits worden gebruikt, moet de gedeployde commit de oplevercommit bevatten. Is dat
-niet aantoonbaar, dan retourneert de taak geen afkeuring maar een gestructureerde blokkade
-`DEPLOYMENT_PENDING`. Bij een ander release-id-systeem moet de productconfiguratie een even
-betrouwbare vergelijkingsregel leveren. Een ontbrekend of ongeldig revisionantwoord is eveneens een
-testblokkade en nooit een productbug.
+`input`, `secrets` en `docs` zijn read-only; `output` is schrijfbaar. Een optionele
+repositoryworktree staat op `/work`. `available-tools.md` beschrijft Bash, web, browser,
+build/testgereedschap, vaste paden en eventueel credentialgebruik. Het document is uitleg, geen
+beveiligingsgrens.
 
-Acceptatie mag binnen de geconfigureerde synthetische testdata schrijven. Productie is standaard
-`READ_ONLY`; alleen een expliciet begrensd testaccount en toegestane routes kunnen daarvan afwijken.
-De worker pusht nooit Git-wijzigingen en krijgt geen toegang tot Product Factory-modulecommands.
+## Repositorysnapshot
 
-## Credentials
+Een optionele snapshot bevat alleen een publieke HTTPS-Git-URL en volledige commit-SHA. De worker
+clonet en checkt detached precies die SHA uit, verwijdert de remote en geeft geen Git-schrijftoken
+aan de container. Een branchnaam alleen is nooit voldoende. Product Factory stuurt geen
+repositoryboom in JSON.
 
-DTO, database en `AiTask` bevatten uitsluitend stabiele `secretRef`s. Voor de MVP heeft de
-laptopworker een lokale, versleutelde secretstore of OS-keychain met waarden voor die referenties.
-Bij claimen controleert de worker dat alle benodigde referenties lokaal beschikbaar zijn.
+## Inputattachments
 
-Waar mogelijk opent de worker een vooraf geauthenticeerde browsercontext of laat een lokale helper
-het loginformulier vullen. Plaintext credentials worden niet aan het modelprompt toegevoegd, niet
-in voortgang of artifacts opgeslagen en niet naar de server teruggestuurd. Ontbrekende credentials
-geven een veilige technische blokkade.
+Kleine inputbestanden gaan Base64 over de Runtime-API en worden vóór uitvoering echte bestanden:
 
-Providercredentials voor Codex of Claude blijven eveneens uitsluitend op de worker. De worker maakt
-de bestaande abonnementslogin via een begrensde credentialbroker of read-only credentialmount aan
-het providerproces beschikbaar. Deze waarden worden niet als taakinput of productcontext aan het
-model gegeven en zijn niet leesbaar via de gewone agenttools.
+- maximaal 10 attachments;
+- maximaal 2 MB gedecodeerd per bestand;
+- maximaal 10 MB gedecodeerd per job;
+- veilige platte bestandsnaam en toegestaan MIME-type;
+- geen symlinks, padsegmenten, uitvoerbare bestanden of automatisch uitgepakte archieven.
 
-## Bewijsartifacts
+De prompt verwijst expliciet naar relevante bestandsnamen. De bytes worden niet automatisch als
+tekst aan het modelprompt toegevoegd.
 
-Screenshots, logs, traces en andere taakoutput worden niet als Base64 in de taak-JSON opgenomen. De
-worker uploadt ze via de worker-API met MIME-type, grootte en SHA-256-hash. AI-uitvoering controleert
-type, hash en limieten en bewaart ze als onveranderlijke `AiResultArtifact`s.
+## Outputartifacts
 
-Voor de MVP worden begrensde artifacts als BLOB in dezelfde database bewaard. Eerste limieten zijn
-maximaal 5 MB per artifact en 25 MB per taak. Een latere objectstore kan deze opslag vervangen
-zonder het publieke taak- of kwaliteitscontract te wijzigen. Een `Bug` of `Verification` verwijst
-alleen naar gevalideerde artifact-ID's; oude bewijzen blijven daardoor reproduceerbaar.
+De agent schrijft screenshots, traces en andere bewijzen naar `/runtime/output/artifacts`. Na
+providerafronding valideert de worker uitsluitend bestanden binnen die directory, weigert symlinks
+en onveilige namen, controleert MIME-type, grootte en SHA-256 en uploadt met het actuele fencing
+token.
 
-Tijdelijke browserprofielen, downloads, worktrees en niet-geaccepteerde artifacts worden na de taak
-verwijderd. Secrets, cookies, tokens, persoonsgegevens en ruwe providerlogs worden vóór acceptatie
-afgeschermd of geweigerd.
+Eerste grenzen zijn 5 MB per artifact, 25 MB per job en maximaal 25 bestanden. Product Factory
+ontvangt alleen gevalideerde artifactreferenties. Tijdelijke browserprofielen, downloads, worktrees,
+geselecteerde credentials en niet-geaccepteerde output worden na de attempt verwijderd.
 
-## Herstel na slaap, workerrestart en laptoprestart
+## Harde uitvoeringstime-out
 
-De worker bewaart herstelgegevens buiten zijn procesgeheugen in een klein duurzaam lokaal journal.
-Iedere actieve taakcontainer krijgt minimaal labels met worker-ID, task-ID en attempt-ID. De output
-en het gestructureerde eindresultaat worden in een taakgebonden workerstate-directory geschreven die
-een restart van alleen de workerservice overleeft. Het fencing token blijft versleuteld in het
-journal en wordt nooit als containerlabel opgeslagen.
+Bij claimen berekent Agent Runtime:
 
-Bij iedere start voert de laptopworker vóór nieuwe claims deze stappen uit:
+```text
+attemptDeadline = claimedAt + executionTimeoutSeconds
+```
 
-1. lees het lokale journal en inventariseer de bijbehorende draaiende en gestopte Dockercontainers;
-2. meld task-ID, attempt-ID, containerstatus en de aanwezigheid van resultaat aan
-   `reconcileWorker(...)`;
-3. hervat alleen wanneer de server dezelfde attempt binnen de hersteltermijn nog accepteert;
-4. stop en verwijder een container wanneer de server de attempt heeft gefencet;
-5. claim pas nieuw werk nadat alle lokale records zijn gereconcilieerd.
+Server en worker dwingen deze deadline onafhankelijk af. Heartbeat, laptop-slaap en recovery
+verlengen hem niet. Na de deadline:
 
-Het concrete gedrag is:
+- stopt de worker de container beheerst en daarna zo nodig geforceerd;
+- fencet de server de attempt;
+- worden late progress, artifacts en resultaten geweigerd;
+- ontstaat `EXECUTION_TIMEOUT`;
+- beslist alleen de vaste Runtime-retrypolicy of een nieuwe attempt volgt.
 
-| Situatie | Gedrag |
-|---|---|
-| Alleen de workerservice herstart, container draait nog | de nieuwe workerservice koppelt opnieuw aan dezelfde container en hervat heartbeat en resultaatbewaking voor dezelfde attempt |
-| Container is tijdens de workerrestart afgerond | de worker leest het duurzame resultaat, valideert de actuele fencingstatus en levert het alsnog aan de server |
-| Laptop slaapt en wordt binnen de hersteltermijn wakker | dezelfde container en attempt worden hervat; er start geen tweede agent |
-| Container of providerproces bestaat niet meer | de worker meldt dit; de server maakt de attempt `ABANDONED` en zet dezelfde taak met back-off voor een nieuwe attempt klaar wanneer `maxAttempts` dat toestaat |
-| Laptop is herstart en de container is alleen gestopt | een nog niet afgerond providerproces wordt niet half hervat; de oude attempt wordt verlaten en de taak begint later opnieuw in een schone container |
-| Hersteltermijn is verlopen of een nieuwere attempt bestaat | de oude container wordt gestopt, het oude resultaat wordt weggegooid en ieder bericht met het oude fencing token wordt geweigerd |
+Een workerrestart leest de oorspronkelijke deadline uit het lokale journal en hervat nooit een al
+verlopen attempt.
 
-Een taak blijft daardoor nooit onbeperkt `RUNNING`. Zij hervat dezelfde attempt wanneer dat veilig
-kan, wordt anders als nieuwe attempt opnieuw uitgevoerd en eindigt na uitgeputte technische
-`maxAttempts` zichtbaar als `FAILED`. Een nog niet geclaimde taak blijft veilig `QUEUED` zolang geen
-laptopworker beschikbaar is. De aanvragende domeincontext blijft ondertussen duurzaam wachten of
-wordt na een terminale taakfout zichtbaar geblokkeerd; bij een procestaak gebeurt dat via
-`WAITING_FOR_AI` of `BLOCKED` op de `ProcessSession`.
+## Herstel en fencing
 
-## Onvertrouwde inhoud en prompt-injection
+De worker journaliseert Runtime-job-ID, attempt-ID, fencing token, deadline en containerstatus. Bij
+startup reconcileert hij eerst bestaande containers en claims en claimt pas daarna nieuw werk. Een
+oude of gefencete container wordt gestopt en haar resultaat verwijderd. Product Factory volgt
+alleen de stabiele Runtime-jobstatus en beheert deze technische details niet zelf.
 
-Alle vrije inhoud is onvertrouwde data, waaronder:
+## Browser en testen
 
-- code, README's, tests, issues en comments uit Git;
-- epic-, story-, signalen- en meetingtekst;
-- zichtbare en verborgen tekst, HTML, accessibility labels en API-responses van de geteste app;
-- gedownloade bestanden, logs en foutmeldingen.
+Browser-, log- en testclients draaien in de taakcontainer. Een echte browsertest gebruikt Chromium
+en Playwright en kan screenshots als outputartifact opslaan. Voor kwaliteitswerk vergelijkt de
+prompt de vereiste oplevercommit met het revisionendpoint van de doelomgeving. Een achterlopende of
+onleesbare deployment levert `DEPLOYMENT_PENDING`, geen productafkeuring.
 
-Tekst daarin die zich voordoet als instructie wordt nooit uitgevoerd als systeem- of
-ontwikkelaarsinstructie. Zij kan geen extra netwerkdoel toestaan, credentials opvragen,
-resultaatschema wijzigen, Git schrijven of een Product Factory-command uitvoeren. Vaste
-taakinstructies, toolallowlists en servervalidatie hebben altijd voorrang op broninhoud.
+Toegang tot acceptatie- of productieomgevingen volgt uitsluitend uit de Product Factory-grants en
+de geselecteerde lokale projectcredentials. Productie is standaard read-only tenzij de
+productconfiguratie en prompt een expliciet begrensde testhandeling voorschrijven.
+
+## Onvertrouwde inhoud
+
+Repositorycode, issues, producttekst, meetingtekst, webpagina's, accessibilitylabels, logs en
+downloads zijn onvertrouwde data. Tekst daarin kan productgrenzen, responseschema,
+environmentkeyselectie, Gitrechten of Runtimecommands niet wijzigen. De agent kan binnen de bewust
+geselecteerde credentialset wel waarden lezen; daarom mogen alleen voor de rol aanvaardbare keys
+worden toegekend.
 
 ## Invarianten
 
-- Iedere echte `CODEX`- of `CLAUDE`-taak draait in een nieuwe tijdelijke Dockeromgeving;
-  `MOCKED` bereikt de laptopworker nooit.
-- Iedere echte taakcontainer bevat Bash, publieke read-only Git, webonderzoek, Chromium/Playwright,
-  lokale testtools, tijdelijke artifacts en waar gevraagd beeldgeneratie.
-- Een repositorycheckout gebruikt een publieke HTTPS-URL en exacte volledige commit-SHA.
-- De worker heeft geen Git-schrijftoken en commit of pusht nooit.
-- De server bewaart geen plaintext test- of providercredentials in een `AiTask`.
-- Een test tegen een achterlopende deployment wordt `BLOCKED`, nooit afgekeurd.
-- Bewijsartifacts zijn begrensd, gehasht, onveranderlijk en aan exact één taakresultaat gekoppeld.
-- Onvertrouwde repository- of applicatie-inhoud kan instructies en rechten niet wijzigen.
-- Na een workerrestart worden containers en attempts vóór nieuwe claims uit journal en Dockerstatus
-  gereconcilieerd; verloren werk wordt hervat of begrensd opnieuw uitgevoerd en blijft nooit hangen.
-- Alleen de aanvragende module valideert en publiceert de domeinuitkomst.
+- Product Factory heeft geen eigen laptopworker.
+- Iedere echte taak loopt als `APPLICATION_WORK` via Agent Runtime.
+- Alleen namen, nooit projectcredentialwaarden, staan in Product Factory of Runtime-databases.
+- Alleen de backend leidt environmentkeys af uit product- en rolgrants.
+- De container ziet alleen de geselecteerde credentialsubset.
+- De harde attemptdeadline wordt nooit door herstel verlengd.
+- Inputattachments en outputartifacts gebruiken gescheiden directories en limieten.
+- Repositorygebruik is bij `APPLICATION_WORK` publiek, exact en zonder Git-schrijfrechten.
+- Alleen de Product Factory-domeinmodule publiceert de inhoudelijke uitkomst.
 
 ## Gerelateerde documenten
 
@@ -235,3 +226,4 @@ taakinstructies, toolallowlists en servervalidatie hebben altijd voorrang op bro
 - [Productontwerp-API](../processen/productontwerp/api.md)
 - [Productplanning-API](../processen/productplanning/api.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
+- [Agent Runtime APPLICATION_WORK v2](https://github.com/robbertvdzon/agent-runtime/blob/main/docs/application-work-v2.md)

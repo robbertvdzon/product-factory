@@ -15,7 +15,8 @@ de Stakeholder tot gebouwde, gecontroleerde en zo nodig herstelde gebruikersverb
 - Maak het productoverzicht en de operationele weergave compleet voor de hele MVP.
 - Voeg vaste end-to-endacceptatiescenario's toe voor de normale route, bugs, ontbrekende epicdekking,
   signalen, handmatige prioriteit, AI-taakfouten en externe leveringsfouten.
-- Bewijs dat de normale mockscenario's volledig server-side draaien zonder laptopworker en dat een
+- Bewijs dat de normale mockscenario's volledig in Agent Runtime server-side draaien zonder lokale
+  worker en dat een
   ontbrekend voorbereid mockantwoord zichtbaar en voorspelbaar faalt.
 - Test de echte workergrens apart: na een workerherstart wordt een bestaande taakcontainer hervat,
   een al afgerond resultaat alsnog ingeleverd of een verdwenen poging veilig opnieuw beschikbaar

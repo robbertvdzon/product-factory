@@ -33,7 +33,7 @@ modus mag in productie niet kunnen starten.
 - Client-ID, allowlist en sessiesleutel worden als secrets/configuratie beheerd en nooit gelogd.
 - Tests gebruiken een injecteerbare tokenverifier of lokale test-keyset en hebben geen Google-call
   nodig.
-- Machinekoppelingen, waaronder Software Factory en AI-workers, gebruiken eigen gescopeerde
+- Machinekoppelingen, waaronder Software Factory en Agent Runtime, gebruiken eigen gescopeerde
   credentials en nooit een Stakeholdersessie.
 
 ## Gerelateerde documenten

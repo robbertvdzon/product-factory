@@ -13,8 +13,9 @@ alleen de adapter aan de andere kant is vervangen.
 
 WireMock mag in een gerichte contracttest worden gebruikt, maar is niet de centrale
 acceptatievoorziening. Software Factory heeft een externe levenscyclus en krijgt daarom een
-stateful simulator. AI-resultaten worden vóór de laptopgrens server-side voorbereid en gemockt,
-zodat productscenario's zonder laptop of Docker volledig via de UI bestuurbaar blijven.
+stateful simulator. AI-resultaten worden door de echte Agent Runtime-acceptatieserver server-side
+voorbereid en gemockt, zodat productscenario's zonder laptop of Docker volledig via de UI
+bestuurbaar blijven.
 
 ## Omgevingsgrens
 
@@ -22,21 +23,25 @@ zodat productscenario's zonder laptop of Docker volledig via de UI bestuurbaar b
 |---|---|---|---|
 | Product Factory-modules | echte Maven-implementaties met hun interne Modulith-structuur | één echte appbuild met gekozen implementaties | één echte appbuild met gekozen implementaties |
 | database | nieuwe in-memory database per test of testsuite | in-memory database, opnieuw te vullen via reset | duurzame ondersteunde productiedatabase |
-| AI-uitvoering | echte AI-module, duurzame taken en resultaatvalidatie; server-side `MOCKED` | echte AI-module, duurzame taken en resultaatvalidatie; server-side `MOCKED` | echte AI-module, leases en worker-API |
-| AI-provider | in-memory mockexecutor met voorbereide antwoorden | acceptance-only server-side mockexecutor met voorbereide antwoorden | laptopworker met `CODEX` of `CLAUDE` in Docker |
+| AI-uitvoering | echte Product Factory-façade/outbox tegen een Runtime v2-stub of testserver | echte façade tegen Agent Runtime-acceptatie | echte façade tegen Agent Runtime-productie |
+| AI-provider | Runtime `MOCKED` met voorbereide antwoorden | Runtime `MOCKED` met voorbereide antwoorden | gedeelde Runtime-worker met `CODEX` of `CLAUDE` in Docker |
 | Software Factory | `MockSoftwareFactory` uit Testbed | `MockSoftwareFactory` uit Testbed | echte Software Factory |
 | Git | lokale tijdelijke testrepository | publieke repository read-only via HTTPS, zonder token | publieke repository read-only via HTTPS, zonder token |
 | productomgeving | gecontroleerde lokale testsite indien nodig | synthetische testproductomgeving, nooit echte productie | geconfigureerde acceptatie en veilige productie-informatie |
 | authenticatie | uitgeschakeld | uitgeschakeld | ingeschakeld |
 | klok en schedules | bestuurbare testklok; geen achtergrondruns | automatische schedules standaard uit; handmatig via UI | echte klok en schedules |
 
-De acceptatieomgeving krijgt geen AI-, Software Factory- of Git-schrijftokens. Egress is standaard
-gesloten. Alleen expliciet toegestane publieke Git-hosts zijn read-only bereikbaar. Interne calls
-naar Testbed en de eigen Product Factory-services blijven toegestaan.
+De acceptatieomgeving krijgt geen Runtime-worker-, Runtime-admin-, productie-, Software Factory- of
+Git-schrijftokens. Zij krijgt alleen een acceptatiegebonden Product Factory-consumentcredential en,
+waar fixturebeheer dat vereist, een afzonderlijk gescopete Runtime-mockcredential. Egress is
+standaard gesloten behalve HTTPS naar Agent Runtime-acceptatie en expliciet toegestane publieke
+Git-hosts. Interne calls naar Testbed en de eigen Product Factory-services blijven toegestaan.
 
 Bij het opstarten geldt een fail-closed controle. Met `environment = ACCEPTANCE`:
 
 - moeten alle `AiJobConfiguration`s provider `MOCKED` gebruiken;
+- moet `PF_AGENT_RUNTIME_URL` exact naar Agent Runtime-acceptatie wijzen;
+- mag de Runtime-credential geen worker-, admin- of productiecredential zijn;
 - moet het Software Factory-endpoint naar `MockSoftwareFactory` wijzen;
 - moet authenticatie uitstaan;
 - mogen geen externe schrijfcredentials aanwezig zijn;
@@ -56,10 +61,10 @@ Acceptatie-UI
      ▼
 acceptance-only Test Control API
      ├───────────────> Testdatacoördinator ──> in-memory database
-     ├───────────────> server-side MockAiResponse-store
+     ├───────────────> Agent Runtime Test Control ──> Runtime mockstore
      │
      └───────────────> Product Factory Testbed
-Product Factory-processen ──> AI-uitvoering en duurzame AiTask-queue
+Product Factory-processen ──> AI-façade/outbox ──> Agent Runtime-acceptatie
      │
      └── dispatcher ────────> MockSoftwareFactory
 ```
@@ -74,9 +79,10 @@ maar registreert geen controllers, seeders of Testbed-adapters.
 ## Product Factory Testbed
 
 Het Testbed is één kleine, zelfstandig te starten testapplicatie met `MockSoftwareFactory` en één
-interne scenario-interface. De server-side AI-mock hoort bij het acceptance-only deel van
-AI-uitvoering en wordt via de Test Control API geconfigureerd. Testbed deelt geen Product
-Factory-database en schrijft nooit direct in een productmodule.
+interne scenario-interface. De AI-mockstore hoort bij Agent Runtime-acceptatie en wordt door de
+Product Factory Test Control-orchestratie via een afzonderlijk gescopete externe route
+geconfigureerd. Testbed deelt geen Product Factory- of Runtime-database en schrijft nooit direct in
+een productmodule.
 
 ### Test Control API voor de acceptatie-UI
 
@@ -116,14 +122,16 @@ normale UI-actie.
 Factory-call met HTTP 503 beantwoorden. Blijvende vrije scripts of willekeurige code zijn niet
 toegestaan.
 
-## Server-side Mock AI-uitvoering
+## Server-side Mock AI-uitvoering in Agent Runtime
 
-Bij provider `MOCKED` maakt de echte AI-uitvoeringsmodule een duurzame `AiTask`, maar handelt haar
-interne mockexecutor de taak vóór de workergrens af. Er wordt geen `AiWorkerSession`, laptopcall,
-lease, heartbeat of Dockercontainer gemaakt. Productprocessen gebruiken exact hetzelfde
-`requestAiTask(...)`-contract en verwerken het resultaat tijdens hun volgende gewone run.
+Bij provider `MOCKED` maakt de Product Factory-façade een lokale correlatie/outbox en exact één
+externe Runtime-job. De Agent Runtime-server handelt die job vóór de workergrens af. Product Factory
+maakt geen eigen queueattempt, `AiWorkerSession`, lease, heartbeat of Dockercontainer.
+Productprocessen gebruiken exact hetzelfde `requestAiTask(...)`-contract en verwerken het resultaat
+tijdens hun volgende gewone run.
 
-De Test Control API biedt alleen in integratie en acceptatie:
+De Product Factory Test Control API biedt alleen in integratie en acceptatie een orchestratiefaçade
+naar de gescopete Runtime test-controlroutes:
 
 ```text
 GET    /api/test-control/ai/mock-responses
@@ -133,8 +141,9 @@ DELETE /api/test-control/ai/mock-responses
 ```
 
 De tester kan hiermee vóór een processessie een antwoord klaarzetten en de resterende antwoorden
-bekijken of wissen. Een antwoord matcht op verplichte `jobKey`, optioneel product-ID en optionele
-testcorrelatiesleutel. Exacte matches gaan voor algemene matches en gelijke matches volgen FIFO.
+bekijken of wissen. Product Factory vertaalt lokale `jobKey`, product-ID, scenario en stap naar een
+opaque Runtime-testcorrelatie; deze domeinvelden horen niet in het productiejobcontract. Exacte
+matches gaan voor algemene matches en gelijke matches volgen FIFO.
 Het bevat `SUCCEEDED` met syntactisch geldige JSON en optionele artifacts, of `FAILED` met foutcode
 en veilige melding. Bij gebruik valideert AI-uitvoering een succesvol antwoord opnieuw tegen het
 responseschema van de concrete taak. Ontbreekt een match, dan faalt de taak expliciet met
@@ -157,15 +166,15 @@ Fixtures zijn gekoppeld aan een stabiele `scenarioKey`, `scenarioVersion`, `jobK
 stap. Zij bevatten geen vrije productieprompt. Iedere fixture wordt in CI gevalideerd tegen het
 response-schema van de bijbehorende job.
 
-### Aparte workercontracttests
+### Aparte Agent Runtime-contracttests
 
-De normale acceptatieflow test geen laptopstoringen. Een aparte integratiesuite gebruikt een
-technische fake worker tegen de echte worker-API en bewijst claims, heartbeat, `SUSPECTED`, slaap,
-workerrestart, reconciliatie, `ABANDONED`, retry, fencing en een laat oud resultaat. Een aanvullende
-containercontracttest bewijst dat de echte taakcontainer de lokale testrepository op de bevroren
-SHA uitcheckt, Bash, webtools, Chromium/Playwright, tests en artifacts ondersteunt, geen
-Git-schrijfrechten heeft en schijninstructies uit repository of applicatie als onvertrouwde data
-behandelt. Een credentialtest controleert dat plaintext nooit in taak, progress of artifact staat.
+De normale Product Factory-acceptatieflow test geen laptopstoringen. Agent Runtime test in zijn
+eigen repository claims, heartbeat, slaap, workerrestart, reconciliatie, retry, fencing, harde
+attemptdeadline, inputattachments, outputartifactcollectie en een laat oud resultaat. Product
+Factory test alleen zijn v2-clientcontract, outbox/idempotentie, statusvertaling en domeinhervatting.
+Een credentialcontracttest bewijst gezamenlijk dat alleen toegestane environmentkeynamen in de job
+staan en dat Product Factory of Runtime nooit waarden bewaart; de bewust geselecteerde waarden zijn
+alleen in de tijdelijke agentcontainer leesbaar.
 
 ## MockSoftwareFactory
 
@@ -255,8 +264,8 @@ testservice.
 
 Publieke productrepositories mogen in acceptatie echt worden gelezen via HTTPS. Daarvoor is geen
 token nodig en er wordt ook geen token geconfigureerd. De procesmodule mag de bedoelde commit-SHA
-vastzetten en in de `AiTask` bewaren. De server-side mockexecutor checkt de repository niet uit; de
-voorbereide fixture staat voor het modelresultaat. De echte laptopworker voert in productie clone,
+vastzetten en in de `AiTask` bewaren. Runtime `MOCKED` checkt de repository niet uit; de
+voorbereide fixture staat voor het modelresultaat. De echte Runtime-worker voert in productie clone,
 fetch, detached checkout, log en bestandlezing zelf uit in de tijdelijke taakcontainer. Commit,
 push, tag, merge en pull-requestacties zijn niet beschikbaar.
 
@@ -380,7 +389,7 @@ build kan opnieuw de MVP selecteren wanneer die aantoonbaar beter werkt.
 De productgerichte integratie- en acceptatieomgeving bewijst onder meer:
 
 - modulecontracten en databaseovergangen;
-- duurzame AI-taak- en resultaatverwerking met bestuurbare server-side mockoutput;
+- duurzame lokale AI-correlatie/outbox en resultaatverwerking met bestuurbare Runtime-mockoutput;
 - dispatchercontract, idempotentie en foutafhandeling;
 - agentvraag, automatische overlegagenda, rolgericht antwoord, beantwoording en atomaire
   geheugenwijzigingen voor meerdere rollen zonder dat gewone procesagents elkaars geheugen zien;
@@ -388,17 +397,18 @@ De productgerichte integratie- en acceptatieomgeving bewijst onder meer:
 - historie, resetbaarheid en operationele zichtbaarheid.
 
 De omgeving bewijst niet dat Codex of Claude inhoudelijk goede productkeuzes maakt, dat de echte
-laptopworker na een echte OS- of Dockerstoring herstelt, dat GitHub altijd beschikbaar is of dat de
-echte Software Factory exact dezelfde implementatiefouten heeft. Workercontracttests bewijzen de
-technische queue-, lease-, heartbeat-, restart-, retry- en fencinglogica. Aanvullende bewust gestarte
-smoke-tests mogen de echte laptopworker gebruiken, maar gebruiken geen acceptatiedata en zijn nooit
+Runtime-worker na een echte OS- of Dockerstoring herstelt, dat GitHub altijd beschikbaar is of dat de
+echte Software Factory exact dezelfde implementatiefouten heeft. Agent Runtime-contracttests bewijzen de
+technische queue-, lease-, heartbeat-, harde deadline-, restart-, retry- en fencinglogica. Aanvullende bewust gestarte
+smoke-tests mogen de echte Runtime-worker gebruiken, maar gebruiken geen acceptatiedata en zijn nooit
 een voorwaarde voor de veilige acceptatieomgeving.
 
 ## Invarianten
 
 - Acceptatie gebruikt uitsluitend synthetische, resetbare data.
 - Acceptatie heeft geen externe schrijfcredentials.
-- AI wordt vóór de workergrens server-side gemockt via dezelfde taak- en resultaatgrens;
+- AI wordt vóór de workergrens in Agent Runtime server-side gemockt via dezelfde externe job- en
+  resultaatgrens;
   Software Factory wordt stateful gesimuleerd via haar echte externe contract.
 - Auth is uit en dit is overal zichtbaar.
 - Git is uitsluitend publiek, HTTPS en read-only; integratietests gebruiken een lokale repository.

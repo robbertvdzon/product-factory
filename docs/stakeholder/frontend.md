@@ -143,6 +143,23 @@ AI-taken. Een gequeue'de of lopende taak blijft zichtbaar met de provider, het m
 configuratieversie waarmee zij is aangemaakt. Productie weigert `MOCKED` zowel bij opslaan als bij
 taakaanvraag.
 
+## Projectvariabelen en agenttoegang
+
+Per product toont **Instellingen → Agenttoegang** de door Agent Runtime ontdekte
+environmentkeynamen, gegroepeerd op projectprefix. De UI toont nooit waarden. Per naam zijn
+beschrijving, doelomgeving, bekendheid, actuele online beschikbaarheid en het aantal geschikte
+workers zichtbaar.
+
+De Stakeholder of beheerder selecteert welke keys bij het product horen en koppelt iedere actieve
+key aan nul of meer stabiele Product Factory-agentrollen. Standaard heeft geen rol toegang. De UI
+kan bijvoorbeeld acceptatiecredentials uitsluitend aan de Tester geven. Opslaan gebruikt één
+geversioneerd command; de frontend kan geen vrije keynaam toevoegen die niet in de gefilterde
+Runtime-catalogus voorkomt.
+
+Een bekende maar offline key krijgt **Niet beschikbaar op online worker**. De UI toont geen knop om
+waarden in Product Factory te vullen: waarden worden lokaal in `project-credentials.env` bij de
+Runtime-worker beheerd.
+
 ## Signalen
 
 Het scherm **Signalen** toont `UserSignal`s en gebruikt geen afzonderlijke inboxentiteit. Open,
@@ -320,11 +337,14 @@ Technische gebruikers kunnen apart zien:
 - het ingestelde schema en `nextRunAt` van ieder uitvoerend onderdeel;
 - `PlanningWorkItem`s en `QualityWorkItem`s met status, fout, blokkadereden, `attemptCount` en
   `retryAfter`;
-- `AiTask`s met aanvrager, provider, model, configuratieversie, status en attemptnummer;
+- `AiTask`s met aanvrager, agentrol, jobkey, provider, model, configuratieversie, Runtime-job-ID,
+  hoofdstatus, Runtime-fase en attemptnummer;
 - geblokkeerde processessies door `AI_JOB_DISABLED`, een terminale taakfout of een geannuleerde
   technische taak, inclusief product, volgende retry en behouden domeinclaim;
-- veilige AI-voortgang, laatste heartbeat, lease, hersteltermijn en retryreden;
-- laptopworkers met capabilities, capaciteit en laatste aanwezigheid;
+- veilige AI-voortgang en Runtime-retryreden; leases, fencing en hersteltermijnen blijven in de
+  afzonderlijke Runtime-monitor;
+- per product de bekende environmentkeys, rolgrants en actuele Runtime-workerbeschikbaarheid,
+  zonder waarden;
 
 De MVP toont operationele aandachtspunten alleen in deze UI. E-mail, Telegram of andere externe
 notificaties vallen buiten de MVP en kunnen later als aparte uitgaande adapter worden toegevoegd.
@@ -353,8 +373,8 @@ De tester kan hier:
 - de actieve dataset-, scenario-, Testbed- en implementatieversies zien;
 - de omgeving resetten naar vaste initiële testdata;
 - een beschreven AI- of Software Factory-scenario activeren;
-- server-side AI-mockantwoorden klaarzetten, inzien, verwijderen of resetten, inclusief de gewenste
-  uitkomst en veilige JSON- of artifactinhoud;
+- Agent Runtime-mockantwoorden via de Product Factory Test Control-façade klaarzetten, inzien,
+  verwijderen of resetten, inclusief de gewenste uitkomst en veilige JSON- of artifactinhoud;
 - expliciete externe Software Factory-stappen uitvoeren, zoals een story afronden of annuleren, of
   de volgende externe call laten mislukken;
 - daarna via links de normale processessie, dispatcher, backlog, kwaliteit en operationele historie

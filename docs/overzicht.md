@@ -145,17 +145,19 @@ leest bij een taak uitsluitend haar eigen actuele geheugen. De Stakeholder kan a
 de UI bekijken en corrigeren. Alleen de Meeting Agent en notulenagent mogen via een vertrouwde
 overlegcontext het actuele geheugen van alle rollen binnen precies het besproken product gebruiken.
 
-AI-uitvoering is eveneens een ondersteunende module. Zij kent geen agentrollen of productobjecten,
-maar alleen complete taken met een expliciete provider en model. Iedere taak staat eerst duurzaam in
-een databasequeue. Echte `CODEX`- en `CLAUDE`-taken worden via HTTPS door de laptopworker opgehaald
-en in een tijdelijke Dockercontainer uitgevoerd. Buiten productie handelt een server-side
-mockexecutor `MOCKED`-taken af, zodat tests geen laptop nodig hebben.
+AI-uitvoering is eveneens een ondersteunende module. Zij kent lokaal jobkeys, instellingen,
+domeincorrelatie en agentrollen voor credentialgrants, maar de externe Agent Runtime kent alleen
+complete `APPLICATION_WORK`-jobs met provider, model en één prompt. Product Factory bewaart een
+lokale outbox en Runtime-job-ID; de gedeelde Runtime beheert de technische queue. Echte `CODEX`- en
+`CLAUDE`-taken worden door een lokale Runtime-worker in een tijdelijke Dockercontainer uitgevoerd.
+Buiten productie handelt Agent Runtime `MOCKED` server-side af, zodat tests geen laptop nodig
+hebben.
 
 Welke provider en welk model een bepaald soort agentjob gebruikt, staat in de globale
 AI-jobconfiguratie van de AI-uitvoeringscapability in de database. De Stakeholder bedient die op
 dezelfde frontendpagina onder **Instellingen → AI-modellen**, duidelijk gemarkeerd als geldig voor
 alle producten. Technisch blijft dit een afzonderlijk intern Spring Modulith-onderdeel van
-AI-uitvoering; de generieke taakqueue kiest of interpreteert het model niet. Een proces leest de
+AI-uitvoering; de Runtime-façade kiest of interpreteert het model niet. Een proces leest de
 configuratie vóór het queueën. De gekozen waarden en configuratieversie worden op de taak bevroren,
 zodat een latere instellingenwijziging geen lopende taak verandert.
 
@@ -199,8 +201,8 @@ werkwijze de module gebruikt, is niet zichtbaar voor de andere modules.
 Wanneer Productontwerp AI nodig heeft, verzamelt het zelf de complete taakinput en alleen het
 geheugen van de uit te voeren eigen rol. Het interne `settings`-onderdeel van AI-uitvoering levert
 provider en model.
-AI-uitvoering bewaart en distribueert die opaque taak; het begrijpt niet dat de taak over een epic
-gaat.
+AI-uitvoering bewaart lokale correlatie/outbox en dient één complete opaque prompt bij Agent Runtime
+in; de Runtime begrijpt niet dat de taak over een epic gaat.
 
 ## Productplanning als black box
 
@@ -237,9 +239,9 @@ die niet bestaat, zoekt hij naar `AVAILABLE` epics en claimt hij gericht werk ui
 Alleen Productplanning schrijft stories, story-inhoud, status en volgorde. De dispatcher meldt
 leveringsgebeurtenissen via publieke planningcommands en verandert de story niet rechtstreeks.
 
-Eventuele Planner-taken volgen dezelfde generieke AI-queue. AI-uitvoering kent geen Planner of
-story, en Productplanning hervat haar wachtende processessie pas nadat het taakresultaat beschikbaar
-is.
+Eventuele Planner-taken volgen dezelfde generieke Runtime-façade. De externe Runtime kent geen
+Planner of story, en Productplanning hervat haar wachtende processessie pas nadat het taakresultaat
+beschikbaar is.
 
 ## Kwaliteitsbewaking als black box
 
@@ -283,9 +285,9 @@ loopt. Een bestaande run wordt nooit verdubbeld.
 Kwaliteitsbewaking maakt geen stories en wijzigt geen epic. Zij publiceert bewijs en vraagt de
 eigenaar via een betekenisvol command om de geldige vervolgactie.
 
-De Tester zet iedere benodigde agenttaak als complete `AiTask` in de generieke AI-queue. Dat is een
-andere queue dan `QualityWorkItem`: een qualityworkitem zegt wat Kwaliteitsbewaking moet onderzoeken;
-een AI-taak is alleen de technische uitvoering van één stap binnen die processessie.
+De Tester zet iedere benodigde agenttaak als lokale `AiTask` in de generieke Runtime-outbox. Dat is
+een andere queue dan `QualityWorkItem`: een qualityworkitem zegt wat Kwaliteitsbewaking moet
+onderzoeken; een AI-taak correleert één technische Runtime-job binnen die processessie.
 
 ## Software Factory-dispatcher als black box
 
@@ -447,11 +449,12 @@ productwaarheid. Iedere processessie en ieder overleg legt vast welke exacte geh
 taken hebben gebruikt. De Stakeholder kan actuele items via de UI toevoegen, vervangen en intrekken
 en kan met een peildatum zien wat een rol vroeger onthield.
 
-Ook algemene `AiJobConfiguration`s, `AiTask`s, attempts en resultaten staan in de database. De
-laptopworker leest nooit rechtstreeks uit die database: hij claimt echte taken via de publieke
-worker-API. De worker draait niet in een `product-factory-workspace`; iedere taak bevat zelf alle
-benodigde data en gebruikt een tijdelijke werkdirectory. `MOCKED` blijft vóór deze workergrens en
-wordt alleen in integratie en acceptatie server-side uitgevoerd met vooraf ingestelde antwoorden.
+Ook algemene `AiJobConfiguration`s en lokale `AiTask`-correlaties staan in de Product Factory-
+database. Attempts, leases, fencing, technische resultaten en artifactbytes staan uitsluitend bij
+Agent Runtime. Product Factory dient via HTTPS in en leest status/resultaat; de lokale worker heeft
+nooit toegang tot de Product Factory-database. Iedere job bevat één complete prompt en gebruikt een
+tijdelijke Runtime-werkdirectory. `MOCKED` blijft vóór de workergrens en wordt alleen in integratie
+en acceptatie door Agent Runtime uitgevoerd met vooraf ingestelde antwoorden.
 
 Ook iedere `ProcessScheduleConfiguration` staat duurzaam en geversioneerd in de database bij het
 betreffende product. De technische scheduler gebruikt uitsluitend deze publieke configuratie en een
@@ -515,10 +518,11 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 7. Iedere gewone procesagent leest uitsluitend haar eigen actuele, versieerbare geheugen. De
    Stakeholder mag alle rollen via de UI corrigeren; alleen Meeting Agent en notulenagent hebben
    binnen een vertrouwd productoverleg gecontroleerde toegang tot alle rolgeheugens van dat product.
-8. AI-uitvoering kent geen rollen of productbetekenis en krijgt altijd een complete taak met
-   bevroren provider en model.
-9. Gemiste worker-heartbeats leiden eerst tot een hersteltermijn; retries zijn met leases en fencing
-   beschermd tegen oude workers.
+8. De externe Agent Runtime kent geen rollen of productbetekenis en krijgt altijd één complete
+   prompt met bevroren provider en model; Product Factory gebruikt agentrollen alleen om lokaal
+   geheugen en environmentkeygrants te begrenzen.
+9. Agent Runtime beheert worker-heartbeats, harde deadlines, herstel, retries, leases en fencing;
+   Product Factory projecteert alleen de stabiele jobstatus.
 10. Maven bewaakt de harde grens tussen de ene gedeelde API-module en alle implementaties; alle
     publieke capabilitycontracten bestaan vanaf het begin en de ene main-build kiest exact één
     implementatie per geactiveerde capability. Spring Modulith blijft binnen die implementatie.
@@ -542,7 +546,7 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 - [Besluitenregister](gedeelde-modules/besluitenregister.md)
 - [Agentgeheugen](gedeelde-modules/agentgeheugen.md)
 - [AI-uitvoering](gedeelde-modules/ai-uitvoering.md)
-- [AI-worker en taakcontainer](gedeelde-modules/ai-worker.md)
+- [Agent Runtime-integratie en taakcontainer](gedeelde-modules/ai-worker.md)
 
 ### Stakeholderbediening
 

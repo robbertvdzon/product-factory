@@ -85,4 +85,4 @@ de werkende applicatie en slaat de controle niet over.
 
 - [Software Factory-dispatcher](../processen/software-factory-dispatcher.md)
 - [Kwaliteitsbewaking-API](../processen/kwaliteitsbewaking/api.md)
-- [AI-worker en taakcontainer](../gedeelde-modules/ai-worker.md)
+- [Agent Runtime-integratie en taakcontainer](../gedeelde-modules/ai-worker.md)

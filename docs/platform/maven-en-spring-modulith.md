@@ -38,7 +38,7 @@ product-factory-parent
 ├── agent-memory-impl
 ├── ai-execution-impl
 │   ├── intern Modulith-onderdeel: settings
-│   └── intern Modulith-onderdeel: task-execution
+│   └── intern Modulith-onderdeel: runtime-integration
 ├── decisions-impl
 ├── product-impl
 ├── software-factory-dispatcher-impl
@@ -149,9 +149,12 @@ Deze interne application modules mogen eigen interne interfaces en events hebben
 nieuwe hoofdprocessen en hun typen verschijnen niet in het publieke `design`-package.
 
 `ai-execution-impl` gebruikt dezelfde aanpak voor de interne onderdelen `settings` en
-`task-execution`. `settings` bezit `AiJobConfiguration`; `task-execution` verwerkt alleen al
-samengestelde taken met een bevroren provider en model en kiest die waarden nooit zelf. Beide horen
-bij dezelfde Maven-capability en delen uitsluitend expliciete interne interfaces.
+`runtime-integration`. `settings` bezit `AiJobConfiguration`; `runtime-integration` bewaart lokale
+correlatie/outbox, environmentkeygrants en de geïnjecteerde Agent Runtime-client. Het onderdeel
+verwerkt alleen al samengestelde prompts met een bevroren provider en model en kiest die waarden
+nooit zelf. Attempts, leases, fencing en technische resultaten worden niet als tweede queue in deze
+module geïmplementeerd. Beide onderdelen horen bij dezelfde Maven-capability en delen uitsluitend
+expliciete interne interfaces.
 
 Iedere implementatiemodule krijgt haar eigen Modulith-verificatietest. Die controleert:
 

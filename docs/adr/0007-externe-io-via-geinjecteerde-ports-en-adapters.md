@@ -15,7 +15,7 @@ Software Factory controleert daarnaast met `tools/check-composition-roots` dat d
 paden met een benoemde eigenaar en reden. Daardoor kan technische I/O niet ongemerkt midden in
 businesslogica ontstaan.
 
-Product Factory v2 praat met AI-workers, Software Factory, Git, databases, de klok, het
+Product Factory v2 praat met de gedeelde Agent Runtime, Software Factory, Git, databases, de klok, het
 bestandssysteem en mogelijk lokale processen. Zonder vaste grens worden deze afhankelijkheden
 moeilijk te testen en verspreiden time-outs, credentials en protocolkeuzes zich door de code.
 
