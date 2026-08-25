@@ -1,70 +1,43 @@
-# Product Factory v2 — AI-uitvoering
+# Product Factory v2 — AI-uitvoering via Agent Runtime
 
-Status: eerste ontwerp van de ondersteunende module, queue en laptopworker.
+Status: doelontwerp voor stap 4; de bestaande Kotlin-API bevat nog het oude contract en moet tijdens
+de implementatie van deze stap worden aangepast.
 
-AI-uitvoering is de enige technische route waarlangs Product Factory een AI-taak laat uitvoeren.
-De module bewaart taken en uitvoeringspogingen duurzaam, handelt testmocks intern af, deelt echte
-taken uit aan een worker en accepteert voortgang en resultaten. De worker op de laptop onderhoudt
-geen blijvende WebSocketverbinding meer, maar haalt werk via beveiligde HTTPS long polling op.
+AI-uitvoering is de Product Factory-façade naar de gedeelde Agent Runtime in
+`/Users/robbertvdzon/git/agent-runtime`. Product Factory bouwt geen eigen technische AI-queue,
+laptopworker, attemptadministratie, leasebewaking, fencing, providercontainer of artifactopslag.
+Agent Runtime is de enige eigenaar van die technische uitvoering.
 
-De capability heeft een publiek contract in `product-factory-api` en één implementatiemodule.
-Andere implementaties gebruiken
-uitsluitend de API; alleen de main-module neemt `ai-execution-impl` op. De implementatie bevat ten
-minste de gescheiden interne Spring Modulith-onderdelen `settings` en `task-execution`. Er zijn geen
-aparte Maven-modules nodig voor algemene instellingen.
+Product Factory blijft eigenaar van:
 
-De module is volledig generiek. Zij kent geen Productontwerper, Planner, Tester, overlegrol, epic,
-story of andere productbetekenis. De aanroeper levert een complete, onveranderlijke taak met alle
-benodigde data, de gekozen provider, het gekozen model en het verwachte uitvoercontract.
+- globale provider- en modelinstellingen per stabiele `AiJobKey`;
+- prompttemplates en de complete, bevroren prompt per domeintaak;
+- de koppeling tussen product, processessie of meeting en het externe Runtime-job-ID;
+- idempotente indiening via een lokale outbox;
+- de toekenning van ontdekte project-environmentvariabelen aan Product Factory-agentrollen;
+- domeinvalidatie en verwerking van het technische resultaat;
+- zichtbare blokkering en hervatting van processessies en meetings.
 
-## Verantwoordelijkheid
-
-AI-uitvoering is eigenaar en enige schrijver van:
-
-- `AiJobConfiguration` — de globale provider- en modelkeuze per opaque `AiJobKey`;
-- `AiTask` — de duurzame queueopdracht en actuele taakstatus;
-- `AiTaskAttempt` — één geclaimde uitvoeringspoging met lease en fencing token;
-- `AiTaskResult` — het ene geaccepteerde, onveranderlijke eindresultaat;
-- `AiWorkerSession` — de operationele registratie van een workerproces en zijn capabilities.
-
-De module:
-
-- valideert de technische taakenvelop;
-- bewaart iedere aanvraag idempotent in de database;
-- deelt alleen passende taken uit aan bevoegde workers;
-- bewaakt claims, heartbeats, hersteltermijnen en harde time-outs;
-- accepteert alleen updates met het actuele attempt-ID en fencing token;
-- valideert een resultaat tegen het opgegeven JSON-schema wanneer dat aanwezig is;
-- bewaart veilige operationele voortgang zonder chain-of-thought;
-- maakt status en resultaten read-only beschikbaar aan de aanvrager en operations.
-
-De module doet nadrukkelijk niet het volgende:
-
-- een agentrol kiezen of herkennen;
-- rolgeheugen ophalen of toegangsrechten tussen rollen bepalen;
-- beslissen welk AI-model geschikt is voor een producttaak;
-- productcontext, epics, stories, bugs of verificaties ophalen;
-- een domeinresultaat inhoudelijk goedkeuren of publiceren;
-- zelf nieuwe AI-taken verzinnen;
-- rechtstreeks in een procesmodule schrijven.
+Agent Runtime kent geen Productontwerper, Planner, Tester, overlegrol, product, epic, story of bug.
+Product Factory stuurt een complete `APPLICATION_WORK`-job en verwerkt later het opaque technische
+resultaat. Het vereenvoudigde externe contract staat in
+[`agent-runtime/docs/application-work-v2.md`](https://github.com/robbertvdzon/agent-runtime/blob/main/docs/application-work-v2.md).
 
 ## Verdeling van verantwoordelijkheden
 
 | Onderdeel | Verantwoordelijkheid |
 |---|---|
-| aanvragende procesmodule | bepaalt wat de agent moet doen, verzamelt alle input en het eigen rolgeheugen, kiest een `AiJobKey` en valideert later de domeinuitkomst |
-| product-/overlegmodule | stelt voor `MEETING.CONVERSE` en `MEETING.SUMMARIZE` een complete taak samen met vertrouwde rolcatalogus, productbreed meetingsnapshot en Stakeholdervragen; verwerkt antwoorden en notuleneffecten zelf |
-| AI-uitvoering — intern `settings` | vertaalt de opaque `AiJobKey` naar actuele provider en model zonder de rol- of productbetekenis te kennen |
-| AI-uitvoering — intern `task-execution` | bewaart en distribueert de complete taak, bewaakt uitvoering en levert het technische resultaat terug; kiest zelf nooit provider of model |
-| laptopworker | claimt uitsluitend `CODEX`- en `CLAUDE`-taken, start de gevraagde provider in Docker en rapporteert heartbeat, voortgang en resultaat |
-| server-side mockexecutor | handelt `MOCKED` direct binnen AI-uitvoering af met een vooraf ingesteld testresultaat; gebruikt geen worker, laptop, lease of Dockercontainer |
-| Agentgeheugen | levert een gewone procesruntime uitsluitend het eigen rolgeheugen en levert alleen de product-/overlegmodule met geldige meetingcontext een productbreed snapshot; AI-uitvoering kent dit verschil niet |
+| aanvragende procesmodule | bepaalt agentrol en jobkey, verzamelt toegestane domeininput en geheugen, bouwt de inhoudelijke prompt en valideert het resultaat |
+| product-/overlegmodule | bouwt meetingprompts met de geldige rolcatalogus, meetingsnapshot en Stakeholdervragen en verwerkt antwoorden/notulen |
+| AI-uitvoering — instellingen | bewaart `AiJobConfiguration` en bevriest provider, model en configuratieversie voor een nieuwe lokale taak |
+| AI-uitvoering — Runtime-façade | bewaart lokale correlatie/outbox, leidt toegestane environmentkeynamen af, maakt exact één Runtime-job en vertaalt status/resultaat |
+| Agent Runtime-server | beheert technische queue, mocks, attempts, leases, harde deadlines, retries, fencing, resultaten en artifacts |
+| lokale Agent Runtime-worker | ontdekt projectcredentialnamen, selecteert per job alleen gevraagde waarden en voert Codex of Claude in Docker uit |
+| aanvragende domeinmodule | keurt de technische JSON-uitkomst inhoudelijk goed en publiceert idempotent domeinoutput |
 
 ## Algemene AI-jobinstellingen
 
-De algemene instellingen zijn een intern onderdeel van de AI-uitvoeringscapability. Zij staan
-duurzaam in de database en zijn niet productspecifiek. Iedere inhoudelijke agentjob heeft een
-stabiele `AiJobKey`, bijvoorbeeld:
+Iedere inhoudelijke Product Factory-job houdt een stabiele `AiJobKey`, bijvoorbeeld:
 
 - `PRODUCT_DESIGN.CREATE_EPIC`;
 - `PLANNING.SLICE_EPIC`;
@@ -72,13 +45,14 @@ stabiele `AiJobKey`, bijvoorbeeld:
 - `MEETING.CONVERSE`;
 - `MEETING.SUMMARIZE`.
 
-Een jobkey benoemt een soort opdracht en is geen agentrol. Eén rol kan meerdere jobkeys gebruiken en
-dezelfde technische AI-uitvoering hoeft de betekenis van de key niet te begrijpen.
+Een jobkey benoemt een Product Factory-opdracht en wordt niet naar Agent Runtime gestuurd. Product
+Factory gebruikt hem om provider/model te kiezen, een prompttemplate te selecteren, mocks te
+correleren en operationele historie te groeperen.
 
 ```java
 class AiJobConfiguration {
     String jobKey;
-    AiProvider provider;       // MOCKED, CODEX of CLAUDE
+    AiProvider provider;
     String model;
     int version;
     boolean enabled;
@@ -87,435 +61,300 @@ class AiJobConfiguration {
 }
 ```
 
-De publieke instellingeninterface is:
+De globale Stakeholder of beheerder wijzigt deze instellingen onder **Instellingen → AI-modellen**.
+Een nieuwe lokale taak bewaart jobkey, provider, model, configuratieversie en prompttemplateversie
+als Product Factory-auditgegevens. Alleen provider en model gaan naar Agent Runtime; de versies
+blijven lokaal.
 
-```java
-AiJobConfigurationDetails getAiJobConfiguration(AiJobKey jobKey);
-List<AiJobConfigurationDetails> getAiJobConfigurations();
-void updateAiJobConfiguration(UpdateAiJobConfigurationCommand command);
-```
+Een instellingenwijziging verandert geen bestaande taak of Runtime-job. Bij `enabled = false`
+vraagt een proces geen nieuwe taak aan en wordt de domeinsessie zichtbaar `BLOCKED` met
+`AI_JOB_DISABLED`. Uitschakelen annuleert bestaande Runtime-jobs niet stilzwijgend.
 
-De ene globale Stakeholder of een bevoegde beheerder kan provider en model in de frontend onder
-**Instellingen → AI-modellen** wijzigen. De frontend vermeldt daarbij dat deze configuratie voor
-alle producten geldt. Een proces leest de configuratie vlak voordat het een taak aanvraagt en zet
-`provider`, `model`, `jobKey` en `configurationVersion` als vaste waarden op de `AiTask`.
+## Publieke Product Factory-interface
 
-Een al gequeue'de of lopende taak verandert dus nooit mee met een instellingenwijziging. Alleen een
-nieuwe taak gebruikt de nieuwe provider of het nieuwe model. Een retry van dezelfde technische taak
-behoudt eveneens de oorspronkelijke momentopname; bewust opnieuw uitvoeren met andere instellingen
-vereist een nieuwe taak-ID en idempotentiesleutel.
-
-Bij `enabled = false` vraagt een proces geen nieuwe taak aan. Een sessie die de job nodig heeft
-wordt zichtbaar `BLOCKED` met reden `AI_JOB_DISABLED` en behoudt haar productclaim en
-inputmomentopname. De volgende geplande of handmatige productrun controleert de instelling opnieuw;
-na inschakelen gaat dezelfde domeinsessie verder. Uitschakelen annuleert bestaande gequeue'de of
-lopende taken niet stilzwijgend.
-
-Het interne `task-execution` controleert alleen dat de aangeleverde provider en het model technisch
-geldig en toegestaan zijn. Het vraagt de configuratie niet zelf op en interpreteert de jobkey niet.
-
-## Publieke module-interface voor aanvragers
+Procesmodules gebruiken uitsluitend de Product Factory-API en kennen het HTTP-contract van Agent
+Runtime niet:
 
 ```java
 AiTaskId requestAiTask(RequestAiTaskCommand command);
+void cancelAiTask(AiTaskId taskId, String reason);
 AiTaskDetails getAiTask(AiTaskId taskId);
 AiTaskResultDetails getAiTaskResult(AiTaskId taskId);
 List<AiTaskDetails> findAiTasks(AiTaskFilter filter);
-void cancelAiTask(CancelAiTaskCommand command);
 ```
 
-`requestAiTask(...)` start geen providerproces. Het valideert en bewaart alleen een `QUEUED` taak en
-retourneert direct. De unieke combinatie van aanvragende module, `requestContextType`,
-`requestContextId` en idempotentiesleutel voorkomt dubbele taken.
+`requestAiTask(...)` maakt atomair een lokale correlatie plus outboxrecord en retourneert direct.
+Een dispatcher biedt de job daarna via HTTPS idempotent aan Agent Runtime aan. Zo hoeft geen
+database-transactie over twee applicaties te bestaan. Bij een verloren response gebruikt iedere
+retry exact dezelfde Runtime-idempotentiesleutel en krijgt dezelfde externe job terug.
 
-Alle queries controleren dat de aanvrager het product en de vertrouwde aanvragerscontext mag zien.
-Een domeinmodule kan alleen taken lezen die zij zelf voor die context heeft aangevraagd; operations
-en frontend gebruiken een aparte bevoegde read-only projectie.
+Een reconciler leest statussen en resultaten via de Runtime-API. Een processessie houdt nooit een
+serverthread open terwijl AI draait. Zij bewaart `AiTaskId`, gaat naar `WAITING_FOR_AI` en verwerkt
+een terminale uitkomst tijdens een volgende gewone procesrun.
 
-`cancelAiTask(...)` annuleert een nog niet geclaimde taak direct. Bij een lopende taak registreert
-het command een annuleringsverzoek. De worker ziet dit bij de volgende heartbeat en stopt het lokale
-providerproces zo snel mogelijk. Een resultaat dat daarna arriveert wordt niet meer als succesvol
-geaccepteerd.
+## Vereiste wijziging van het bestaande Kotlin-contract
 
-AI-uitvoering bepaalt niet wat de aanvragende domeincontext daarna doet. De aanvrager bewaart daarom
-een annuleringsreden. Een procesmodule werkt haar `ProcessSession` volgens de bestaande regels bij;
-de product-/overlegmodule werkt de betreffende `Meeting` en open actie bij. Alleen de eigenaar
-bepaalt of later een nieuwe taak nodig is. Een `CANCELLED` `AiTask` laat zo nooit een wachtende
-processessie of overlegactie verweesd achter.
+`product-factory-api/.../api/ai/AiContract.kt` bestaat al, maar beschrijft nog de oude eigen
+workergrens. Stap 4 moet contract, tests en documentatie samen aanpassen.
 
-## Complete taakenvelop
+Doelvorm van `RequestAiTaskCommand`:
 
 ```java
 class RequestAiTaskCommand {
-    String productId;
-    String requestingModule;
-    RequestContextType requestContextType; // PROCESS_SESSION of MEETING
-    String requestContextId;               // vertrouwd sessie-ID of meeting-ID
-    String idempotencyKey;
-    String jobKey;                    // alleen voor audit, niet geïnterpreteerd
-    int jobConfigurationVersion;
-    AiProvider provider;              // MOCKED, CODEX of CLAUDE
+    AiJobKey jobKey;
+    ProductId productId;
+    String requesterCapability;
+    ProcessSessionId requesterSessionId;
+    String agentRole;
+    AiProvider provider;
     String model;
-    String instructionVersion;
-    String instructions;
-    JsonNode input;
-    String responseSchema;            // optioneel JSON Schema
-    List<AiTaskAttachment> attachments;
+    long configurationVersion;
+    String promptTemplateVersion;
+    String prompt;
+    String responseSchema;
+    RepositorySnapshot repository;
+    List<AiInputAttachment> attachments;
     Duration executionTimeout;
-    int maxAttempts;
+    String idempotencyKey;
 }
 ```
 
-De aanvrager levert één volledige momentopname. Bij een gewone procestaak staan daarin alle
-productgegevens, bronversies, eigen rolgeheugenversies, handoffs en toegestane omgevingsinformatie
-die de taak nodig heeft. Bij een overlegtaak mag de product-/overlegmodule in plaats daarvan het
-vertrouwde productbrede meetingsnapshot, de rolcatalogus en Stakeholdervragen opnemen. De worker
-hoeft nooit terug te bellen naar Productontwerp, Productplanning, Kwaliteitsbewaking of
-Agentgeheugen.
+`productId`, `requesterSessionId` en `repository` mogen leeg zijn voor taaktypen waarvoor zij niet
+gelden. Wijzigingen ten opzichte van de huidige interface:
 
-`productId`, `requestingModule`, `requestContextType` en `requestContextId` worden uit de vertrouwde
-aanroepcontext gecontroleerd en kunnen niet door vrije taakinhoud of modeloutput worden vervalst.
+- `instruction` en `inputJson` worden één complete `prompt`;
+- `agentRole` wordt verplicht zodat de façade zelf de credentialgrants kan bepalen;
+- `promptTemplateVersion`, `attachments` en `executionTimeout` worden toegevoegd;
+- `TestEnvironmentAccess` en vrije `credentialReferences` verdwijnen uit de aanvraag;
+- een procesmodule mag nooit zelf `environmentKeys` aanleveren;
+- `jobKey` en `configurationVersion` blijven lokale auditgegevens maar gaan niet naar Runtime;
+- Runtime-velden zoals `jobProfile`, `resourceRequests` en `consumerContext` komen niet in de
+  Product Factory-API.
 
-AI-uitvoering bewaart `input` en `instructions` als opaque data. Zij mag generieke grootte-, schema-,
-privacy- en malwarecontroles doen, maar trekt geen productconclusies uit de inhoud.
+`AiInputAttachment` bevat bestandsnaam, MIME-type en bytes of een begrensde Product Factory-
+artifactreferentie. De Runtime-adapter encodeert kleine inputbestanden pas aan de externe grens als
+Base64. Outputartifacts blijven `ArtifactReference`s in `AiTaskResultDetails`.
 
-Attachments bevatten metadata, hash en een begrensde objectreferentie. Grote binaire gegevens staan
-niet als Base64 in de taaktabel. Secrets en toegangstokens staan niet in `instructions` of `input`;
-waar nodig gebruikt de worker een kortlevende, taakgebonden secretreferentie.
+De lokale taakstatussen worden:
 
-Wanneer een taak repositorycontext nodig heeft, bevat de envelop alleen een publieke HTTPS-Git-URL
-en een vooraf door de aanvragende module bevroren commit-SHA. De worker checkt die SHA zelf uit; de
-server verstuurt geen repositoryboom in JSON. De volledige container-, credential- en
-artifactgrens staat in [AI-worker en taakcontainer](ai-worker.md).
+```text
+PENDING_SUBMISSION
+QUEUED
+WAITING_FOR_WORKER
+RUNNING
+SUCCEEDED
+FAILED
+CANCELLED
+```
 
-## Datamodel
+`CLAIMED`, `SUSPECTED`, `ABANDONED`, leases en attempts zijn Runtime-details en geen Product
+Factory-domeinstatus meer. Hun veilige fase en historie mogen read-only in een operationele
+projectie zichtbaar zijn.
 
-### AiTask
+`AiTaskDetails` krijgt minimaal `runtimeJobId`, `runtimePhase`, `attemptCount`, veilige voortgang en
+de lokale correlatievelden. `AiTaskResultDetails` blijft technisch gevalideerde JSON plus
+artifactreferenties en terminale foutinformatie tonen.
+
+## Extern Runtime-request
+
+De adapter vertaalt een lokale taak naar het minimale v2-request:
+
+```json
+{
+  "jobKind": "APPLICATION_WORK",
+  "idempotencyKey": "stabiele-product-factory-sleutel",
+  "provider": "CODEX",
+  "model": "gpt-5.6",
+  "prompt": "complete prompt",
+  "responseSchema": {},
+  "executionTimeoutSeconds": 3600,
+  "environmentKeys": ["HKH__ACCEPTANCE_USERNAME"],
+  "attachments": [],
+  "repositorySnapshot": null
+}
+```
+
+Product Factory stuurt niet: jobkey, product-ID, processessie-ID, configuratieversie,
+prompttemplateversie, agentrol of andere domeincorrelatie. Die gegevens blijven bij het lokale
+`AiTask` en de aanvragende domeinsessie.
+
+Retries en prioriteit zijn Runtime-policy en geen vrije aanvraagvelden. Een bewuste nieuwe
+inhoudelijke poging na een terminale job krijgt een nieuwe lokale taak en idempotentiesleutel.
+
+## Lokale correlatie en outbox
+
+Product Factory bewaart geen tweede technische queue, maar wel duurzame integratiestatus:
 
 ```java
 class AiTask {
     String id;
     String productId;
     String requestingModule;
-    RequestContextType requestContextType;
     String requestContextId;
-    String idempotencyKey;
+    String agentRole;
     String jobKey;
     int jobConfigurationVersion;
+    String promptTemplateVersion;
     AiProvider provider;
     String model;
-    String instructionVersion;
-    JsonNode executionEnvelope;
-    String responseSchema;
+    String promptHash;
+    String runtimeIdempotencyKey;
+    String runtimeJobId;
     AiTaskStatus status;
-    int attemptCount;
-    int maxAttempts;
-    Duration executionTimeout;
+    String runtimePhase;
     Instant createdAt;
-    Instant availableAt;
+    Instant submittedAt;
     Instant completedAt;
 }
 ```
 
-De taakstatussen zijn:
+De exacte prompt en benodigde input moeten herleidbaar blijven voor een netwerkretry. Privacybeleid
+bepaalt of de prompt zelf of een versleutelde/duurzame payload bij de outbox staat; een hash alleen
+is niet genoeg zolang indiening nog niet is gelukt. Na succesvolle indiening blijft de bevroren
+momentopname beschikbaar zolang productaudit dat vereist.
 
-- `QUEUED` — beschikbaar of vanaf `availableAt` beschikbaar voor een passende echte worker of de
-  interne mockexecutor;
-- `RUNNING` — er bestaat één actuele geclaimde poging;
-- `SUCCEEDED` — precies één resultaat is geaccepteerd;
-- `FAILED` — geen retry meer toegestaan of een niet-herstelbare fout;
-- `CANCELLED` — bewust gestopt en niet meer uitvoerbaar.
+Product Factory maakt geen `AiTaskAttempt`, `AiWorkerSession`, fencing token, lease of technische
+retryrecord. Het Runtime-job-ID en de Runtime-events zijn daarvoor de bron.
 
-### AiTaskAttempt
+## Project-environmentvariabelen en agentrollen
+
+Secretwaarden bestaan alleen in `project-credentials.env` op lokale Runtime-workers. De worker
+registreert via Agent Runtime uitsluitend namen zoals:
+
+```text
+HKH__ACCEPTANCE_BASE_URL
+HKH__ACCEPTANCE_USERNAME
+HKH__ACCEPTANCE_PASSWORD
+```
+
+Product Factory leest via de beveiligde Runtime-catalogus welke namen bekend en op online workers
+beschikbaar zijn. Product Factory bewaart zelf de functionele toekenning:
 
 ```java
-class AiTaskAttempt {
+class ProductEnvironmentVariable {
     String id;
-    String taskId;
-    int attemptNumber;
-    String workerSessionId;
-    String fencingTokenHash;
-    AiTaskAttemptStatus status;
-    Instant claimedAt;
-    Instant startedAt;
-    Instant lastHeartbeatAt;
-    Instant leaseUntil;
-    Instant recoveryUntil;
-    String progressPhase;
-    Integer progressPercentage;
-    String safeProgressMessage;
-    Instant finishedAt;
-    String failureCode;
-    String safeFailureMessage;
+    String productId;
+    String key;
+    String description;
+    TargetEnvironment environment;
+    boolean active;
+}
+
+class AgentEnvironmentVariableGrant {
+    String productEnvironmentVariableId;
+    String agentRole;
 }
 ```
 
-Een fencing token wordt alleen bij claimen aan de worker getoond; de database bewaart de hash. Alle
-updates vereisen task-ID, attempt-ID en het actuele token. Een oude of dubbele worker kan daardoor
-geen nieuwere poging afronden.
+Deze records bevatten nooit waarden. Een product kan bekende keys uit één of meer projectprefixes
+selecteren. De frontend toont per key of minstens één passende online worker hem momenteel heeft.
 
-Een `AiTaskAttempt` bestaat alleen voor een echte `CODEX`- of `CLAUDE`-uitvoering. De
-pogingstatussen zijn `CLAIMED`, `RUNNING`, `SUSPECTED`, `COMPLETED`, `FAILED`, `ABANDONED` en
-`FENCED`.
-
-### AiTaskResult
+Benodigde publieke beheerinterface, toe te voegen tijdens stap 4:
 
 ```java
-class AiTaskResult {
-    String taskId;
-    String attemptId;                 // nullable: leeg bij server-side MOCKED
-    JsonNode output;
-    List<AiResultArtifact> artifacts;
-    Instant completedAt;
-}
+List<AvailableEnvironmentKeyDetails> findAvailableEnvironmentKeys(String projectPrefix);
+List<ProductEnvironmentVariableDetails> getProductEnvironmentVariables(ProductId productId);
+void configureProductEnvironmentVariables(ConfigureProductEnvironmentVariablesCommand command);
+List<AgentEnvironmentVariableGrantDetails> getAgentEnvironmentVariableGrants(ProductId productId);
+void updateAgentEnvironmentVariableGrants(UpdateAgentEnvironmentVariableGrantsCommand command);
 ```
 
-Er bestaat maximaal één geaccepteerd resultaat per taak. Het resultaat wordt na technische
-validatie onveranderlijk. Bij `CODEX` en `CLAUDE` verwijst `attemptId` naar de geaccepteerde
-workerpoging; bij server-side `MOCKED` is het leeg. De aanvragende procesmodule bepaalt daarna of de
-inhoud als epic, story, bug, verificatie of andere domeinoutput geldig is.
+Een backend-aanroep leidt `environmentKeys` uitsluitend af uit `productId`, de vertrouwde
+`agentRole`, actieve productvariabelen en actieve grants. Een frontend, vrije prompt of modeloutput
+kan de selectie niet wijzigen. Ontbrekende keys blokkeren de lokale taak zichtbaar met
+`REQUIRED_ENVIRONMENT_KEY_UNKNOWN`; er wordt geen alternatief secret gekozen. Een bekende key die
+alleen tijdelijk niet op een online worker beschikbaar is, mag wel worden ingediend en blijft bij
+Runtime `WAITING_FOR_WORKER` totdat een passende worker verschijnt. Een `MOCKED`-job heeft geen
+credentials nodig en gebruikt in acceptatiescenario's standaard geen environmentkeys.
 
-### AiWorkerSession
+Meetingagents krijgen alleen grants voor hun expliciete meetingrol. Een productbreed
+meetingsnapshot geeft niet automatisch credentialtoegang tot andere rollen.
 
-`AiWorkerSession` bevat alleen worker-ID, unieke bootsessie-ID, capabilities, starttijd,
-`lastSeenAt`, status en eventuele eindtijd. Capabilities noemen ondersteunde providers en eventueel
-modelgrenzen, maar nooit agentrollen.
+## Attachments en artifacts
 
-Een kleine interne onderhoudstaak van AI-uitvoering controleert periodiek verlopen leases,
-hersteltermijnen en `availableAt`. Zij start geen AI, maar voert uitsluitend de hierboven beschreven
-statusovergangen en retries uit.
+Kleine inputattachments worden aan de Runtime-grens Base64 gecodeerd, maximaal 10 bestanden,
+2 MB gedecodeerd per bestand en 10 MB per job. Product Factory valideert naam, MIME-type en grootte
+vóór indiening; Agent Runtime valideert opnieuw.
 
-## Pull-interface voor workers
+Outputartifacts worden door de agent als bestanden gemaakt. De Runtime-worker verzamelt en uploadt
+ze en het Runtime-resultaat bevat alleen metadata en artifact-ID's. Product Factory downloadt of
+proxy't een artifact uitsluitend binnen de autorisatie van de bijbehorende lokale taak. De eerste
+limieten zijn 5 MB per artifact, 25 MB per job en 25 outputbestanden.
 
-Alleen de laptopworker gebruikt deze afzonderlijke, beveiligde technische API:
+## Harde time-out, herstel en annulering
 
-```java
-WorkerSession openWorkerSession(OpenWorkerSessionCommand command);
-ReconcileResult reconcileWorker(ReconcileWorkerCommand command);
-ClaimedAiTask claimNextTask(ClaimNextAiTaskCommand command);
-void markAiTaskStarted(MarkAiTaskStartedCommand command);
-void heartbeatAiTask(HeartbeatAiTaskCommand command);
-void reportAiTaskProgress(ReportAiTaskProgressCommand command);
-void completeAiTask(CompleteAiTaskCommand command);
-void failAiTaskAttempt(FailAiTaskAttemptCommand command);
-```
+`executionTimeout` is verplicht per lokale taak en gaat als seconden naar Runtime. Runtime berekent
+per echte attempt een harde deadline vanaf claimen. Server en worker dwingen die onafhankelijk af;
+heartbeat, slaap en recovery verlengen de deadline niet. Een verlopen attempt accepteert geen late
+progress, artifacts of resultaat en eindigt technisch met `EXECUTION_TIMEOUT` of een door Runtime
+geplande retry.
 
-De worker leest nooit rechtstreeks uit de database. `claimNextTask(...)` is een HTTPS-long-poll die
-bijvoorbeeld maximaal twintig seconden wacht. De worker roept hem alleen aan wanneer hij lokale
-capaciteit heeft. De server claimt atomair de oudste passende `QUEUED` taak op basis van provider,
-capabilities en `availableAt`.
+Product Factory implementeert geen eigen technische retry zolang dezelfde Runtime-job actief of
+herstelbaar is. Na terminale Runtime-fout bepaalt de domeinmodule of dezelfde processessie zichtbaar
+blokkeert of bewust een nieuwe logische taak nodig heeft.
 
-Een worker mag meerdere taken parallel uitvoeren, maar het door hem gemelde en servermatig begrensde
-maximum bepaalt hoeveel actieve claims hij krijgt. De server pusht geen taak en houdt geen socket
-als permanent pushkanaal open.
+`cancelAiTask(...)` bewaart lokaal eerst de reden en roept daarna idempotent de Runtime-cancelroute
+aan. Product Factory blijft reconciliëren totdat Runtime terminale `CANCELLED` meldt. Alleen de
+eigenaar van de processessie of meeting bepaalt de domeinvervolgstap; geen wachtende context raakt
+verweesd.
 
-## Heartbeat en veilige voortgang
+## `MOCKED` en acceptatie
 
-Heartbeat en inhoudelijke voortgang zijn bewust gescheiden:
+`MOCKED` wordt door de Agent Runtime-server in integratie of acceptatie uitgevoerd en bereikt geen
+worker. Product Factory gebruikt dezelfde lokale outbox, externe jobroute, statusvertaling,
+responseschemavalidatie en domeinverwerking als bij echte AI.
 
-- `heartbeatAiTask(...)` bewijst alleen dat de worker en het lokale providerproces nog leven en
-  verlengt de lease;
-- `reportAiTaskProgress(...)` bewaart optioneel fase, percentage en een korte veilige melding en
-  verlengt eveneens de lease.
-
-Een worker stuurt standaard iedere dertig seconden een heartbeat, ook wanneer Codex of Claude geen
-nieuwe tekst produceert. Voortgang bevat nooit prompts, ruwe providerlogs, tokens, persoonsgegevens
-of chain-of-thought. De frontend toont hooguit bijvoorbeeld **model gestart**, **input verwerken**,
-**resultaat valideren** of **tijdelijk geen heartbeat**.
-
-## Slapen, crashen en leases
-
-Een server kan niet betrouwbaar onderscheiden of een laptop slaapt, het workerproces is gecrasht of
-het netwerk tijdelijk weg is. Daarom leidt een gemiste heartbeat niet direct tot een nieuwe
-AI-uitvoering.
-
-De standaardtijden zijn configureerbaar, met als eerste veilige waarden:
-
-- heartbeat iedere 30 seconden;
-- lease verloopt na 2 minuten zonder heartbeat;
-- daarna 30 minuten hersteltermijn;
-- pas na de hersteltermijn mag een poging `ABANDONED` worden;
-- de harde taak-time-out blijft afzonderlijk gelden.
-
-De overgang is:
-
-```text
-RUNNING
-   │ lease verlopen
-   ▼
-SUSPECTED ──worker herstelt binnen termijn──> RUNNING met dezelfde attempt
-   │ hersteltermijn verlopen
-   ▼
-ABANDONED ──attempts beschikbaar──> AiTask opnieuw QUEUED
-           └─geen attempts meer──> AiTask FAILED
-```
-
-De laptopworker bewaart lokaal een klein duurzaam journal met task-ID, attempt-ID, fencing token en
-status van het providerproces. Na start, reconnect of wakker worden voert hij altijd eerst
-`reconcileWorker(...)` uit en claimt hij pas daarna nieuw werk.
-
-Tijdens reconciliatie geldt:
-
-1. leeft het oude providerproces nog, is de attempt nog `SUSPECTED`, valt zij binnen de
-   hersteltermijn en is geen nieuwe poging geclaimd, dan kan de server dezelfde attempt en lease
-   herstellen;
-2. is de hersteltermijn verstreken, de attempt al `ABANDONED` of inmiddels een nieuwere poging
-   geclaimd, dan wordt de oude attempt `FENCED` en moet de worker het oude proces stoppen en de
-   output weggooien;
-3. bestaat het lokale proces niet meer, dan geeft de worker dit door en kan de server de poging
-   eerder `ABANDONED` maken;
-4. een resultaat met een verlopen of oud fencing token wordt altijd geweigerd.
-
-Hiermee is de uitvoering **at-least-once**, niet mathematisch exactly-once. Bij een crash op precies
-het verkeerde moment kan een model tweemaal gestart zijn. Daarom mogen AI-taken zelf geen externe
-productwijzigingen doen. Alleen de procesmodule publiceert na één geaccepteerd taakresultaat
-idempotent domeinoutput.
-
-Als er geen andere geschikte worker online is, heeft onmiddellijk heropenen geen voordeel. De taak
-blijft dan zichtbaar `SUSPECTED` tot de hersteltermijn verloopt of dezelfde worker terugkomt. Dit
-maakt normaal slapen minder duur zonder herstel na een echte crash onmogelijk te maken.
-
-## Retrybeleid
-
-Een poging kan eindigen door:
-
-- herstelbare worker-, netwerk- of providerfout;
-- leaseverlies of crash;
-- harde time-out;
-- ongeldig technisch resultaat;
-- niet-herstelbare configuratie- of authenticatiefout;
-- bewuste annulering.
-
-Alleen herstelbare fouten en verlaten attempts mogen binnen `maxAttempts` opnieuw naar `QUEUED`, met
-begrensde backoff. Een domeininvalide maar technisch geldige AI-uitkomst is geen automatische retry
-van AI-uitvoering: de procesmodule beslist of zij tijdens een volgende
-`runProcessSession(productId)` een
-nieuwe, gerichte hersteltaak aanvraagt.
-
-## MOCKED-provider
-
-`MOCKED` wordt vóór iedere laptop- of workergrens server-side binnen `task-execution` afgehandeld.
-Productontwerp, Productplanning, Kwaliteitsbewaking en de product-/overlegmodule vragen nog steeds
-via hetzelfde publieke `requestAiTask(...)` een duurzame `AiTask` aan en kennen de
-uitvoeringsvariant niet.
-
-Na het bewaren van een `MOCKED` taak consumeert de interne mockexecutor het eerst passende
-voorbereide antwoord, valideert output en artifacts op dezelfde technische schema's en maakt direct
-het onveranderlijke `AiTaskResult`. De taak gaat daarmee zonder `AiWorkerSession`, lease, heartbeat,
-fencing token of Dockercontainer naar `SUCCEEDED` of `FAILED`. De aanvragende domeincontext volgt
-desondanks haar gewone asynchrone grens: een processessie verwerkt het resultaat pas wanneer een
-volgende `runProcessSession(productId)` haar hervat; de overlegafhandeling verwerkt het bij een
-volgende bericht- of afsluitstap. `attemptCount` blijft voor zo'n taak nul en `maxAttempts` heeft
-alleen betekenis aan de echte workergrens.
-
-Een voorbereid `MockAiResponse` bevat minimaal:
-
-- verplichte `jobKey` en volgordenummer;
-- optioneel product-ID en testcorrelatiesleutel om parallelle productruns eenduidig te matchen;
-- eindstatus `SUCCEEDED` of `FAILED`;
-- bij succes de volledige JSON-output en optionele begrensde artifacts;
-- bij fout een stabiele foutcode en veilige foutmelding.
-
-Exact product plus job plus correlatiesleutel wint van een algemener antwoord; binnen dezelfde
-match geldt FIFO. Is geen passend antwoord voorbereid, dan eindigt de taak zichtbaar en
-niet-retrybaar als `FAILED` met `NO_MOCK_RESPONSE_CONFIGURED`. Een vriendelijke standaardrespons is
-bewust niet toegestaan, omdat die een onvolledig ingericht scenario ten onrechte groen kan maken.
-
-Alleen het integratie- en acceptatieprofiel registreert de bestuurbare mockstore en deze Test
-Control-routes:
-
-```text
-GET    /api/test-control/ai/mock-responses
-POST   /api/test-control/ai/mock-responses
-DELETE /api/test-control/ai/mock-responses/{responseId}
-DELETE /api/test-control/ai/mock-responses
-```
-
-De tester kan daarmee antwoorden bekijken, klaarzetten, afzonderlijk verwijderen en volledig
-resetten voordat hij een gewone procesrun start. Scenariofixtures mogen dezelfde interface
-gebruiken. Productie registreert de store, executor en endpoints niet en weigert provider `MOCKED`
-zowel bij configuratie als taakaanvraag.
-
-- **Unit tests van procesmodules** mogen een kleine in-memory fake van de publieke
-  AI-uitvoeringsinterface gebruiken.
-- **Integratietests en acceptatie** gebruiken de echte AI-uitvoeringsmodule, echte `AiTask`-opslag,
-  schema-validatie en de server-side mockexecutor; de laptop hoeft niet aan te staan.
-- **Workercontracttests** gebruiken apart een technische fake laptopworker om queueclaims,
-  heartbeats, leases, slaap, restart, fencing en late resultaten te bewijzen. Die technische fake is
-  geen productmock en verschijnt niet in de gewone acceptatieflow.
-
-Productieconfiguratie bevat een allowlist van providers en weigert `MOCKED` bij het opslaan van
-algemene instellingen en bij het aanvragen van een taak. Zo kan een verkeerde instelling niet
-stilletjes een productieproces met fictieve output laten doorgaan.
+Product Factory bevat geen eigen mockexecutor of `AiWorkerSession`. Vaste Product Factory-fixtures
+blijven gekoppeld aan lokale `scenarioKey`, `scenarioVersion`, `jobKey`, product en stap. Het
+acceptatie-Testbed bereidt via een afzonderlijk gescopete Runtime test-control-integratie het juiste
+externe mockantwoord voor. Productie weigert `MOCKED`; acceptatie krijgt nooit het Runtime-admin- of
+workertoken.
 
 ## Processessies wachten zonder thread
 
-Een proces houdt geen serverthread, databaseclaim of HTTP-call open terwijl een AI-taak draait.
-Wanneer een `runProcessSession(productId)` één of meer taken heeft aangevraagd:
+Wanneer een proces een taak heeft aangevraagd:
 
-1. bewaart de procesmodule de taak-ID's op haar `ProcessSession`;
+1. bewaart de procesmodule het lokale `AiTaskId`;
 2. zet zij de sessie op `WAITING_FOR_AI`;
-3. geeft de functie normaal terug;
-4. een volgende geplande of handmatige aanroep hervat dezelfde sessie;
-5. zolang resultaten ontbreken, blijft de sessie wachtend en eindigt die aanroep als no-op;
-6. bij beschikbare resultaten valideert de procesmodule de inhoud en vervolgt zij haar eigen flow.
+3. geeft de servercall normaal terug;
+4. outbox en reconciler dienen in en volgen de Runtime-job;
+5. een volgende geplande of handmatige procesrun ziet of het resultaat beschikbaar is;
+6. alleen de procesmodule valideert en publiceert de domeinuitkomst.
 
-Er bestaat maximaal één onafgeronde logische sessie per combinatie van procesmodule en product,
-ook wanneer die `WAITING_FOR_AI` of `BLOCKED` is. Verschillende producten mogen tegelijk door
-dezelfde module lopen. Een wachtende logische sessie houdt geen technische lock vast. Een
-handmatige aanroep tijdens een werkelijk actieve uitvoering voor hetzelfde product krijgt HTTP
-409; een handmatige aanroep bij `WAITING_FOR_AI` of `BLOCKED` probeert veilig dezelfde
-productsessie te hervatten.
+Er bestaat maximaal één onafgeronde logische processessie per procesmodule en product. Een
+wachtende sessie houdt geen lock of HTTP-call open. De Runtime-worker kan nooit zelf een Product
+Factory-proces of vervolgtaak starten.
 
-Alleen `runProcessSession(productId)` mag voor Productontwerp, Productplanning of
-Kwaliteitsbewaking nieuwe AI-taken aanvragen. De laptopworker voert uitsluitend bestaande taken uit
-en kan nooit zelf een proces, agentjob of vervolgstap starten.
+## Beveiliging en geaccepteerde risicoafweging
 
-## Beveiliging
-
-- Iedere worker heeft een eigen intrekbare credential; er is geen gedeeld algemeen bridgetoken.
-- De API autoriseert worker, provider, capabilities en maximaal parallelisme.
-- De worker draait iedere taak in een nieuwe tijdelijke werkdirectory en niet in
-  `product-factory-workspace`.
-- Een taakcontainer checkt alleen de expliciete publieke Git-URL op de expliciete commit-SHA uit en
-  krijgt geen Git-schrijftoken.
-- Providercredentials blijven uitsluitend op de worker en staan nooit in de database of taak.
-- De worker geeft alleen expliciet toegestane environmentvariabelen door aan Codex of Claude.
-- Een worker kan geen taak voor een niet-ondersteunde provider claimen.
-- Resultaat- en attachmentgroottes zijn begrensd en hashes worden gecontroleerd.
-- Ruwe providerlogs en chain-of-thought worden niet als voortgang of resultaat opgeslagen.
-- Git-inhoud, issue- of storytekst en tekst uit een bekeken applicatie gelden als onvertrouwde data;
-  ingebedde instructies kunnen de vaste systeemtaak, toolrechten of outputvalidatie niet wijzigen.
-- Iedere statuswijziging is herleidbaar tot taak, attempt, worker en tijdstip.
+- Product Factory bewaart nooit projectcredentialwaarden, alleen namen en grants.
+- Het Runtime-consumenttoken staat als Product Factory-secret op OpenShift en geeft alleen toegang
+  tot de eigen `APPLICATION_WORK`-jobs en gefilterde environmentcatalogus.
+- Runtime-, worker-, provider- en Git-publicatiecredentials zijn nooit selecteerbaar.
+- Een echte agent krijgt wel de expliciet voor zijn product en rol geselecteerde waarden in een
+  tijdelijke `secrets.env`. Voor deze persoonlijke projecten is bewust geaccepteerd dat de agent
+  die waarden technisch kan lezen; een promptwaarschuwing is geen harde isolatie.
+- Product Factory neemt secretwaarden nooit op in prompt, lokale taak, event, progress, resultaat of
+  artifact.
+- Gitcontext is publiek, HTTPS, read-only en vastgezet op een volledige commit-SHA.
+- Ruwe providerlogs en chain-of-thought worden niet opgeslagen.
 
 ## Invarianten
 
-- Alle echte AI-uitvoering loopt via een duurzame `AiTask`.
-- AI-uitvoering kent geen agentrollen of productentiteiten.
-- Iedere taak bevat een vaste provider, model, configuratieversie en instructieversie.
-- Algemene instellingen bepalen de waarden voor nieuwe taken, niet voor bestaande taken.
-- Een laptopworker leest `CODEX`- en `CLAUDE`-taken uitsluitend via de publieke worker-API en nooit
-  rechtstreeks uit de database.
-- Per taak bestaat maximaal één actuele attempt en maximaal één geaccepteerd resultaat.
-- Iedere workerupdate vereist het actuele fencing token.
-- Een gemiste heartbeat veroorzaakt eerst `SUSPECTED`, niet onmiddellijk een retry.
-- Reconnect en wakker worden beginnen altijd met reconciliatie.
-- AI-taken hebben geen externe schrijfrechten; domeinpublicatie gebeurt idempotent door de
-  aanvragende module.
-- `MOCKED` bewaart dezelfde duurzame taak en hetzelfde gevalideerde resultaat, maar wordt vóór de
-  workergrens server-side uitgevoerd en is technisch uitgesloten in productie.
-- `enabled = false`, terminale taakfouten en geannuleerde taken laten de aanvragende productgebonden
-  processessie altijd zichtbaar en hervatbaar of bewust `CANCELLED` achter.
+- Product Factory bouwt geen eigen laptopworker of tweede technische AI-queue.
+- Agent Runtime is de enige eigenaar van attempts, leases, deadlines, fencing, retries en artifacts.
+- `AiJobKey`, configuratieversie, prompttemplateversie en domeincorrelatie blijven lokaal.
+- Agent Runtime ontvangt één complete prompt en interpreteert geen Product Factory-domein.
+- Environmentkeywaarden blijven op lokale workers; databases bevatten alleen namen.
+- Alleen de vertrouwde Product Factory-backend bepaalt keys uit product- en rolgrants.
+- Per lokale taak bestaat maximaal één extern Runtime-job-ID.
+- Een technisch geldig resultaat wordt pas domeinwaarheid na validatie door de aanvragende module.
+- Productie weigert `MOCKED`.
 
 ## Gerelateerde documenten
 
-- [Overzicht](../overzicht.md)
-- [Processen en entiteiten](../processen/processen-en-entiteiten.md)
-- [Frontend](../stakeholder/frontend.md)
+- [Agent Runtime-integratie en taakcontainer](ai-worker.md)
 - [Agentgeheugen](agentgeheugen.md)
-- [AI-worker en taakcontainer](ai-worker.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
-- [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)
-- [Productontwerp-API](../processen/productontwerp/api.md)
-- [Productplanning-API](../processen/productplanning/api.md)
-- [Kwaliteitsbewaking-API](../processen/kwaliteitsbewaking/api.md)
+- [Frontend](../stakeholder/frontend.md)
+- [Agent Runtime APPLICATION_WORK v2](https://github.com/robbertvdzon/agent-runtime/blob/main/docs/application-work-v2.md)

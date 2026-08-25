@@ -44,7 +44,8 @@ zinvol werk eindigt de functie als succesvolle no-op.
 Alleen `runProcessSession(productId)` mag voor Productontwerp nieuwe taken bij
 [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md) aanvragen. Welke en hoeveel taken een sessie gebruikt, is een
 implementatiedetail. AI-uitvoering handelt ze later asynchroon af en kent Productontwerp niet; echte
-`CODEX`- en `CLAUDE`-taken gaan daarvoor naar de laptopworker en `MOCKED` blijft server-side.
+`CODEX`- en `CLAUDE`-taken gaan daarvoor als `APPLICATION_WORK` naar Agent Runtime en `MOCKED`
+blijft server-side in Runtime.
 
 Daarnaast heeft de module deze deterministische command- en query-interface:
 
@@ -114,7 +115,7 @@ niet zelf uit en commit of pusht nooit. De gebruikte commit-SHA wordt bij de pro
 vastgelegd; ruwe repository-inhoud steekt de modulegrens niet over.
 
 Voor een agenttaak bevriest Productontwerp de publieke Git-URL en exacte commit-SHA. Bij een echte
-`CODEX`- of `CLAUDE`-taak checkt de laptopworker die SHA zelf uit in de tijdelijke Dockeromgeving van
+`CODEX`- of `CLAUDE`-taak checkt de Runtime-worker die SHA zelf uit in de tijdelijke Dockeromgeving van
 de taak; een server-side mock checkt niets uit. Git-code, documentatie en tekst uit de bekeken
 applicatie zijn onvertrouwde contextdata en kunnen nooit de vaste taakopdracht, veiligheidsgrenzen
 of toegestane commands wijzigen.

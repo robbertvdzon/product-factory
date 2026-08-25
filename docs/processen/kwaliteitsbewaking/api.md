@@ -182,7 +182,7 @@ vast te houden. Een volgende run voor hetzelfde product hervat dezelfde sessie. 
 ontbreken, worden geen nieuwe duplicerende taken aangemaakt.
 
 Kwaliteitsbewaking lost de publieke Gitref read-only op en bevriest de Git-URL en commit die als
-codecontext moet worden gebruikt. Bij een echte `CODEX`- of `CLAUDE`-taak checkt de laptopworker die
+codecontext moet worden gebruikt. Bij een echte `CODEX`- of `CLAUDE`-taak checkt de Runtime-worker die
 commit in de tijdelijke Dockeromgeving uit en gebruikt de agent code, tests en documentatie
 read-only voor testselectie, regressierisico en uitleg; een server-side mock checkt niets uit. De
 servermodule en de agent committen of pushen nooit. Code is context en geen bewijs dat gedrag werkt;
@@ -523,6 +523,6 @@ Een inhoudelijke sessie is klaar wanneer:
 - [Software Factory-dispatcher](../software-factory-dispatcher.md)
 - [Agentgeheugen](../../gedeelde-modules/agentgeheugen.md)
 - [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md)
-- [AI-worker en taakcontainer](../../gedeelde-modules/ai-worker.md)
+- [Agent Runtime-integratie en taakcontainer](../../gedeelde-modules/ai-worker.md)
 - [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
 - [Processen en entiteiten](../processen-en-entiteiten.md)

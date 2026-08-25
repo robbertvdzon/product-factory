@@ -73,8 +73,9 @@ De procesruntime leest voor `PRODUCT_DESIGN.CREATE_EPIC` provider en model uit h
 `settings`-onderdeel van AI-uitvoering en vraagt daarna een complete taak aan bij
 [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). De processessie bewaart
 het taak-ID, wordt `WAITING_FOR_AI` en keert terug. Een volgende run verwerkt het resultaat; de
-technische uitvoerder kent de Productontwerper-rol niet. Echte taken gaan naar de laptopworker;
-`MOCKED` wordt buiten productie server-side afgehandeld.
+technische uitvoerder kent de Productontwerper-rol niet. Echte taken gaan als `APPLICATION_WORK`
+naar de gedeelde Agent Runtime-worker; `MOCKED` wordt buiten productie door de Runtime-server
+afgehandeld.
 
 ## Verloop van één processessie
 

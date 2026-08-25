@@ -150,7 +150,7 @@ vast te houden. Een volgende run voor hetzelfde product hervat dezelfde sessie. 
 resultaten nog, dan maakt zij geen duplicaten en blijft zij wachten.
 
 Tijdens een inhoudelijke sessie lost Productplanning de publieke Gitref read-only op en bevriest zij
-de Git-URL en exacte commit-SHA. Bij een echte `CODEX`- of `CLAUDE`-taak checkt de laptopworker die
+de Git-URL en exacte commit-SHA. Bij een echte `CODEX`- of `CLAUDE`-taak checkt de Runtime-worker die
 SHA in de tijdelijke Dockeromgeving uit; een server-side mock checkt niets uit. De servermodule en
 de agent committen of pushen nooit. De gebruikte commit-SHA kan als bronverwijzing worden opgeslagen,
 maar iedere story bevat zelfstandig alle benodigde product- en UX-informatie. Repository- en

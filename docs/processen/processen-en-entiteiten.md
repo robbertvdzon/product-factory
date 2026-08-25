@@ -34,8 +34,9 @@ een externe actor.
   Agent en notulenagent een productbreed snapshot geven en notulenwijzigingen voor meerdere rollen
   laten vastleggen. Agentgeheugen is append-only versieerbaar en geen vervanging voor publieke
   productwaarheid.
-- AI-uitvoering kent geen rollen of productentiteiten. De aanvrager levert opaque taakdata en een
-  reeds gekozen provider en model.
+- De externe Agent Runtime kent geen rollen of productentiteiten. Product Factory AI-uitvoering
+  gebruikt de vertrouwde agentrol alleen voor lokale credentialgrants en levert Runtime één complete
+  prompt met reeds gekozen provider en model.
 
 ## De vier uitvoerende onderdelen
 
@@ -58,7 +59,7 @@ De dispatcher gebruikt geen agents. Een lege backlog of lege processqueue is een
 | Kwaliteitsbewaking | `requestStoryVerification`, `requestEpicVerification`, `requestBugfixRetest`, `requestSignalInvestigation`, `retryQualityWorkItem`, `linkBugfixStory(bugId, storyId)` | `getBug`, `findBugs`, `findVerifications`, `getCurrentQuality`, `getQualityHistory`, `findQualityWorkItems`, `findRetryableQualityWorkItems`, `getProcessSession`, `findProcessSessions` |
 | Besluitenregister | `createDecision`, `reviseDecision`, `withdrawDecision`, `supersedeDecisions` | `getDecisions(productId, validAt?)`, `getDecisionArchive(productId)` |
 | Agentgeheugen | `addAgentMemory`, `replaceAgentMemory`, `retractAgentMemory` | `getActiveMemory(context)`, `getMemoryAt(productId, role, validAt)`, `getMemoryHistory(productId, role, itemId)` |
-| AI-uitvoering | `updateAiJobConfiguration`, `requestAiTask`, `cancelAiTask`; aparte workercommands voor claim, heartbeat, progress, complete en fail | `getAiJobConfiguration`, `getAiJobConfigurations`, `getAiTask`, `getAiTaskResult`, `findAiTasks` |
+| AI-uitvoering | `updateAiJobConfiguration`, `requestAiTask`, `cancelAiTask`, `configureProductEnvironmentVariables`, `updateAgentEnvironmentVariableGrants`; geen workercommands | `getAiJobConfiguration`, `getAiJobConfigurations`, `getAiTask`, `getAiTaskResult`, `findAiTasks`, `findAvailableEnvironmentKeys`, `getProductEnvironmentVariables`, `getAgentEnvironmentVariableGrants` |
 | Software Factory-dispatcher | `runDispatchSession(productId)` via scheduler, UI of REST | `getDispatchStatus`, `findDeliveryAttempts`, `getDispatchSession`, `findDispatchSessions` |
 
 Een command mag ID's, verwachte versies, bron, actor en idempotentiesleutel aannemen, maar geen
@@ -120,7 +121,7 @@ nooit rechtstreeks in de tabel.
 |---|---|---|---|---|
 | `Product` | productmodule | globale Stakeholder of productbediening | alle processen en frontend | productidentiteit, status `ACTIVE` of `INACTIVE` en expliciete dispatchinginstelling |
 | `ProductAssignment` | productmodule | Stakeholder | alle processen en frontend | doelgroep, doel, grenzen en publieke Git-URL |
-| `TestableProductConfiguration` | productmodule | Stakeholder of beheerder | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en productieomgeving, veilige routes, revisionendpoint, account- en secretreferenties, data- en toegangsgrenzen |
+| `TestableProductConfiguration` | productmodule | Stakeholder of beheerder | Productontwerp, Productplanning en Kwaliteitsbewaking | acceptatie- en productieomgeving, veilige routes, revisionendpoint en data-/toegangsgrenzen; geen credentialwaarden of vrije credentialreferences |
 | `ProcessScheduleConfiguration` | productmodule | globale Stakeholder | technische scheduler, operations en frontend | per product en proces één geversioneerd automatisch schema met aan/uit, meerdere dag/tijdregels of één interval, tijdzone en `nextRunAt`; start alleen de gewone publieke runfunctie |
 | `UserSignal` | productmodule | gebruiker/Stakeholder dient in; ontwerp of kwaliteit registreert een uitkomst via command | Productontwerp, Kwaliteitsbewaking, Stakeholder en frontend | onveranderlijke melding plus actuele verwerkingsstatus en resultaatlinks |
 | `Meeting` | product-/overlegmodule | Stakeholder of een proces vraagt een overleg aan; de notulenagent sluit het af | Stakeholder, betrokken processen en frontend | agenda met open Stakeholdervragen, berichten met eventuele doel- of vertegenwoordigde rol, gesprek, gekoppelde objecten, gebruikte rol- en geheugenversies, status, notulen en expliciete doorwerking |
@@ -138,11 +139,10 @@ nooit rechtstreeks in de tabel.
 | `AgentMemoryVersion` | Agentgeheugen binnen één `AgentMemoryItem` | via add-, replace- of gecontroleerd meetingbatchcommand; na opslag onveranderlijk | eigen procesrol ziet alleen actueel; overlegagents zien productbreed actueel; Stakeholder en frontend zien ook historie | append-only titel en inhoud met voorganger, actor, reden, meetingbron waar van toepassing en geldigheidsperiode |
 | `AgentMemoryRetraction` | Agentgeheugen binnen één `AgentMemoryItem` | eigen agentrol, Stakeholder of notulenagent via gecontroleerde meetingbatch | Stakeholder, frontend en audit; overlegagents zien alleen dat ingetrokken inhoud niet actueel is | append-only tombstone die een geheugenlijn vanaf dat moment intrekt |
 | `AiJobConfiguration` | AI-uitvoering, intern onderdeel `settings` | globale Stakeholder of beheerder | procesmodules en frontend | stabiele jobkey met `enabled`, actuele provider `MOCKED`, `CODEX` of `CLAUDE`, model en configuratieversie; uitgeschakeld werk blokkeert zichtbaar zonder taak |
-| `AiTask` | AI-uitvoering | een intelligente processessie of bevoegde overlegafhandeling vraagt idempotent een taak aan | aanvragende module, operations en frontend | complete opaque AI-opdracht met vertrouwde context `PROCESS_SESSION` of `MEETING`, bevroren provider/model en status `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` of `CANCELLED` |
-| `AiTaskAttempt` | AI-uitvoering | bevoegde laptopworker claimt een `CODEX`- of `CLAUDE`-taak en meldt heartbeat, progress, afronding of fout via commands | AI-uitvoering, operations en frontend | één echte uitvoeringspoging met worker, lease, hersteltermijn en fencing token; server-side `MOCKED` heeft geen attempt |
-| `AiTaskResult` | AI-uitvoering | laptopworker biedt met het actuele fencing token een echt resultaat aan; interne mockexecutor schrijft een voorbereid mockresultaat | alleen aanvragende module, operations en frontend | onveranderlijk technisch gevalideerd resultaat met optionele attemptreferentie; de procesmodule valideert de productbetekenis |
-| `AiResultArtifact` | AI-uitvoering | laptopworker uploadt met fencing token of server-side mockexecutor materialiseert een voorbereid artifact | aanvragende module via resultaatreferentie; frontend binnen autorisatie | begrensd, gehasht en onveranderlijk bewijsbestand; in de MVP als database-BLOB opgeslagen |
-| `AiWorkerSession` | AI-uitvoering | laptopworker opent en reconcileert zijn sessie | operations en frontend | worker-ID, bootsessie, `CODEX`-/`CLAUDE`-capabilities, capaciteit en laatste heartbeat; geen agentrollen en nooit `MOCKED` |
+| `AiTask` | AI-uitvoering | een intelligente processessie of bevoegde overlegafhandeling vraagt idempotent een taak aan | aanvragende module, operations en frontend | lokale correlatie/outbox met product, sessie/meeting, agentrol, jobkey/configuratie-audit, Runtime-idempotentiesleutel, extern job-ID en status `PENDING_SUBMISSION`, `QUEUED`, `WAITING_FOR_WORKER`, `RUNNING`, `SUCCEEDED`, `FAILED` of `CANCELLED` |
+| `AiTaskResult` | AI-uitvoering | Runtime-reconciler neemt maximaal één terminale Runtime-uitkomst over | alleen aanvragende module, operations en frontend | lokale technisch gevalideerde JSON-momentopname of referentie met Runtime-artifactreferenties; de procesmodule valideert de productbetekenis |
+| `ProductEnvironmentVariable` | AI-uitvoering | Stakeholder of beheerder selecteert een door Agent Runtime ontdekte naam voor één product | AI-uitvoering en frontend; procesmodule alleen indirect via grants | naam en metadata van een projectvariabele, nooit de waarde; actuele workerbeschikbaarheid komt live uit Runtime |
+| `AgentEnvironmentVariableGrant` | AI-uitvoering | Stakeholder of beheerder koppelt een actieve productvariabele aan een stabiele agentrol | AI-uitvoering en frontend | expliciete allowlist waarmee alleen vertrouwde backendcode environmentkeynamen voor een job afleidt |
 | `ProcessSession` | betreffende procesmodule of dispatcher | niemand buiten eigenaar | operations en frontend | productgebonden uitvoering, implementatie-ID en -versie, inputversies, eventuele AI-taak-ID's, publicaties of technische effecten, status inclusief `WAITING_FOR_AI`, `BLOCKED` en `CANCELLED` waar van toepassing |
 | `DeliveryAttempt` | Software Factory-dispatcher | dispatcher via eigen service | planning, operations en frontend | onveranderlijke externe poging, response, fout en retryhistorie |
 
@@ -181,8 +181,9 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `AgentRoleDefinitionDetails` | Agentgeheugen uit vertrouwde implementatieregistratie | Meeting Agent, notulenagent, Stakeholder en frontend | actieve stabiele rol, weergavenaam, capability, implementatievariant, verantwoordelijkheid en grenzen |
 | `MeetingMemorySnapshot` | Agentgeheugen voor één geldige `MeetingExecutionContext` | uitsluitend product-/overlegmodule voor `MEETING.CONVERSE` en `MEETING.SUMMARIZE` | rolcatalogus en alle actuele rolgeheugens van precies één product met exacte versie-ID's; geen historie |
 | `AiJobConfigurationDetails` | AI-uitvoering, intern onderdeel `settings` | procesmodules en frontend | `enabled`, actuele provider, model en versie voor één opaque jobkey |
-| `AiTaskDetails` | AI-uitvoering uit `AiTask` en eventuele actuele attempt | aanvragende module, operations en frontend | aanvragerscontext, taakstatus, provider/model-snapshot, optionele workerattempt, lease, veilige voortgang en fout; `MOCKED` heeft geen workerattempt |
-| `AiTaskResultDetails` | AI-uitvoering uit `AiTaskResult` | uitsluitend de aanvragende module; operations binnen privacygrenzen | technisch gevalideerde opaque output en artifactreferenties |
+| `AiTaskDetails` | AI-uitvoering uit lokale `AiTask` plus Runtime-statusprojectie | aanvragende module, operations en frontend | aanvragerscontext, agentrol, jobkey/configuratie-audit, Runtime-job-ID, provider/model, hoofdstatus, Runtime-fase, pogingnummer, veilige voortgang en fout; geen lease of fencing token |
+| `AiTaskResultDetails` | AI-uitvoering uit `AiTaskResult` en Runtime-artifactmetadata | uitsluitend de aanvragende module; operations binnen privacygrenzen | technisch gevalideerde opaque output en geautoriseerde Runtime-artifactreferenties |
+| `AvailableEnvironmentKeyDetails` | live Agent Runtime-catalogus | AI-uitvoering en beheerfrontend | naam, projectprefix, bekende/online beschikbaarheid, aantal geschikte workers en laatste waarneming; nooit een waarde |
 | `ProcessSessionDetails` | betreffende procesmodule of dispatcher | operations en frontend | sessie-ID, module, product, trigger, start/eindtijd, status, leesbare uitkomst, blokkade/fout, implementatie-ID en -versie, gebruikte input- en geheugenversies, AI-taak-ID's en publicaties of technische effecten |
 | `ImplementationManifestDetails` | buildmetadata van `product-factory-app` | operations, frontend en Test Control API | gekozen artifact, variant, versie en broncommit per capability; read-only en geen database-entiteit |
 | `DispatcherProductStatusDetails` | dispatcher uit externe status en eigen pogingen | operations en frontend | open extern werk, eventuele technische blokkade en laatste poging voor één product |
@@ -198,9 +199,9 @@ echte AI-uitvoering checkt de agent die commit in zijn taakcontainer uit en lees
 en documentatie. De servermodules en de agent committen of pushen niet. De Software Factory-story
 blijft zelfstandig en gebruikt Git nooit als enige drager van product- of UX-keuzes.
 
-Een inhoudelijke `AiTask` bevat de publieke Git-URL en een vooraf bevroren commit-SHA. Voor
-`CODEX` en `CLAUDE` checkt de laptopworker die SHA zelf read-only uit in de tijdelijke
-Dockeromgeving van de taak. De server-side mockexecutor checkt niets uit. Repositoryinhoud en tekst
+Een inhoudelijke `AiTask` bevat lokaal de publieke Git-URL en een vooraf bevroren commit-SHA; de
+Runtime-aanvraag bevat alleen deze `repositorySnapshot`. Voor `CODEX` en `CLAUDE` checkt de gedeelde
+Runtime-worker die SHA read-only uit in de tijdelijke Dockeromgeving. Runtime `MOCKED` checkt niets uit. Repositoryinhoud en tekst
 uit een bekeken applicatie zijn onvertrouwde context: zij kunnen nooit systeeminstructies,
 toegangsgrenzen of modulecommands overschrijven.
 
@@ -237,16 +238,15 @@ minuten, 1 uur, 4 uur en daarna 24 uur zonder maximaal aantal domeinretries. **R
 item direct `PENDING` en laat de UI daarna alleen wanneer nodig de normale kwaliteitsrun voor dat
 product starten.
 
-Daarnaast bestaat de generieke `AiTask`-queue. Een procesrun zet daar alleen complete technische
-agenttaken in. `CODEX`- en `CLAUDE`-taken worden door een laptopworker via HTTPS geclaimd, nooit via
-directe databasetoegang. `MOCKED` wordt direct server-side met een voorbereid antwoord afgehandeld
-en gebruikt geen worker, lease of Docker. Gemiste heartbeats van echte workerattempts maken een
-attempt eerst `SUSPECTED`; pas na de hersteltermijn wordt zij verlaten en kan de taak met een nieuw
-fencing token opnieuw worden aangeboden.
+Daarnaast bestaat de lokale `AiTask`-outbox. Een procesrun zet daar alleen complete technische
+agenttaken in. De façade dient exact één `APPLICATION_WORK`-job in bij Agent Runtime en bewaart het
+externe job-ID. Runtime beheert de echte queue, workerattempts, heartbeats, harde deadlines, retries
+en fencing; Product Factory projecteert alleen de stabiele status. `MOCKED` wordt direct door de
+Runtime-server afgehandeld en gebruikt geen worker, lease of Docker.
 
 Product Factory Testbed is geen productmodule en bezit geen productentiteiten. In integratietests en
-acceptatie configureert de Test Control API de server-side AI-mockstore en implementeert
-`MockSoftwareFactory` het echte dispatchercontract. De mockstore en simulator beheren alleen hun
+acceptatie configureert de Test Control API de externe Agent Runtime-mockstore en implementeert
+`MockSoftwareFactory` het echte dispatchercontract. De Runtime-mockstore en simulator beheren alleen hun
 eigen tijdelijke scenariotoestand en schrijven nooit rechtstreeks in een moduleaggregate. De
 in-memory acceptatiedatabase wordt gevuld door testfixture-contributors binnen de modules die
 eigenaar van de betrokken data zijn.
@@ -329,7 +329,8 @@ UI-/REST-starts geven daarom altijd het product-ID mee.
   productsessies en laat verschillende producten parallel lopen.
 - Een wachtende processessie houdt geen thread of lock vast; een volgende run hervat dezelfde sessie
   via haar `AiTask`-resultaten.
-- AI-uitvoering bewaakt leases, fencing en maximaal één geaccepteerd resultaat per taak.
+- AI-uitvoering bewaakt maximaal één Runtime-job-ID en geaccepteerd resultaat per lokale taak;
+  Agent Runtime bewaakt attempts, harde deadlines, leases en fencing.
 - Tekst, Markdown, JSON en SVG blijven tekst in `StoryDeliveryPackage`; binaire assets krijgen
   begrensde attachments met MIME-type, grootte en hash en mogen alleen voor transport Base64 zijn.
 
@@ -342,7 +343,7 @@ UI-/REST-starts geven daarom altijd het product-ID mee.
 - [Frontend](../stakeholder/frontend.md)
 - [Agentgeheugen](../gedeelde-modules/agentgeheugen.md)
 - [AI-uitvoering](../gedeelde-modules/ai-uitvoering.md)
-- [AI-worker en taakcontainer](../gedeelde-modules/ai-worker.md)
+- [Agent Runtime-integratie en taakcontainer](../gedeelde-modules/ai-worker.md)
 - [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
 - [Productontwerp-API](productontwerp/api.md)

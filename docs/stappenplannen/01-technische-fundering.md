@@ -235,7 +235,7 @@ Begin minimaal met:
 - sessieondertekeningssleutel;
 - omgeving en publieke URLs.
 
-AI-worker- en Software Factory-secrets worden pas actief wanneer die modules worden gebouwd, maar
+Agent Runtime- en Software Factory-secrets worden pas actief wanneer die modules worden gebouwd, maar
 mogen alvast als lege, niet-verplichte placeholders gedocumenteerd worden.
 
 Migreer bestaande v1-instellingen doelbewust volgens deze tabel. Een bestaand veld behouden betekent
@@ -248,7 +248,7 @@ niet dat zijn waarde in logs, documentatie, een patch of Git mag verschijnen.
 | `PF_DASHBOARD_REMEMBER_SECRET` | Niet hergebruiken; genereer een nieuwe sterke `PF_SESSION_SIGNING_SECRET` | Alle v1-sessies moeten bij de vervanging ongeldig worden |
 | `PF_DB_PASSWORD` | Niet hergebruiken; genereer een nieuw wachtwoord voor gebruiker en database `productfactory_v2` | De nieuwe productiedatabase blijft technisch geïsoleerd van v1 |
 | `PF_SOFTWARE_FACTORY_TOKEN` | In `secrets.env` behouden maar nog niet activeren | Deze technische fundering bevat nog geen dispatcher |
-| `PF_AGENT_WORKER_TOKEN` | In `secrets.env` behouden maar nog niet activeren | Deze technische fundering bevat nog geen AI-uitvoering |
+| `PF_AGENT_RUNTIME_TOKEN` | In `secrets.env` reserveren maar nog niet activeren | Stap 4 gebruikt een gescopete consumentcredential; Product Factory krijgt geen workercredential |
 | `PF_WORKSPACE_GITHUB_TOKEN` | Na een repositorybrede gebruikscontrole uit het actuele secretcontract en `secrets.env` verwijderen | v2 heeft geen workspace en leest alleen publieke Git-repositories |
 
 Google ID-tokens zijn kortlevende loginbewijzen en worden bij iedere login opnieuw verkregen. Neem

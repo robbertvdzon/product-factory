@@ -66,11 +66,15 @@ nogmaals dat exact dat ene product actief is en dispatching aanstaat.
 
 `ProductAssignment` bevat minimaal doelgroep, productdoel, harde grenzen en de publieke Git-URL.
 `TestableProductConfiguration` bevat de acceptatieomgeving en eventueel veilige
-productie-informatie, toegestane routes, testaccount- of secretreferenties en data- en
-toegangsgrenzen. Iedere testbare omgeving heeft daarnaast een revisionendpoint en een vaste regel
+productie-informatie, toegestane routes en data- en toegangsgrenzen. Iedere testbare omgeving heeft
+daarnaast een revisionendpoint en een vaste regel
 om daaruit de werkelijk gedeployde Git-commit of release te lezen. Story- en bugfixverificatie kan
-daardoor aantonen of de `deliveredCommitSha` al op de doelomgeving staat. DTO's bevatten nooit
-secretwaarden, alleen referenties die de worker lokaal veilig kan oplossen.
+daardoor aantonen of de `deliveredCommitSha` al op de doelomgeving staat.
+
+De bestaande Kotlin-DTO `TestEnvironmentConfiguration` bevat nog `credentialReferences`; stap 4
+verwijdert dit veld. Projectcredentialnamen worden dynamisch via Agent Runtime ontdekt en door de
+AI-uitvoeringscapability afzonderlijk per product en agentrol beheerd. De productmodule bewaart geen
+credentialnamen of -waarden in de testomgevingconfiguratie.
 
 De globale Stakeholder mag ieder product en de bijbehorende opdracht en testconfiguratie beheren.
 Een proces leest steeds een exacte versie en legt die bronversie op zijn processessie vast.

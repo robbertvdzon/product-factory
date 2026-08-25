@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2420" height="2280" viewBox="0 0 2420 2280" role="img" aria-labelledby="title desc">
   <title id="title">Product Factory v2 modulecontracten</title>
-  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont het capabilitycontract uit de ene gedeelde Maven-module product-factory-api en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Gewone procesagents krijgen alleen het geheugen van hun eigen rol; Meeting Agent en notulenagent krijgen via een vertrouwde meetingcontext alle actieve rolgeheugens van precies één product. AI-uitvoering bevat intern settings en task-execution; task-execution kent geen rollen, handelt MOCKED server-side af en distribueert CODEX- en CLAUDE-taken via een databasequeue aan de laptopworker. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
+  <desc id="desc">UML-achtig modulecontractdiagram. Ieder moduleblok toont het capabilitycontract uit de ene gedeelde Maven-module product-factory-api en de publieke entiteiten van de tijdens de build gekozen implementatie. Doorgetrokken pijlen zijn commands, gestippelde pijlen zijn read-only queries. Queuecommands starten geen agents. Gewone procesagents krijgen alleen het geheugen van hun eigen rol; Meeting Agent en notulenagent krijgen via een vertrouwde meetingcontext alle actieve rolgeheugens van precies één product. AI-uitvoering bevat instellingen en een Agent Runtime-clientfaçade; zij bewaart lokale correlatie en rolgrants, terwijl Agent Runtime MOCKED, de technische queue en CODEX-/CLAUDE-workeruitvoering beheert. Er is één globale Stakeholder als actor. Scheduler en frontend zijn niet afgebeeld.</desc>
   <defs>
     <marker id="commandArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 L10 5 L0 10 Z" fill="#0f172a"/>
@@ -290,7 +290,7 @@
   <text x="695" y="2084" class="api" style="font-size:12px">«worker» open/reconcile · claim · heartbeat/progress · complete/fail</text>
   <line x1="695" y1="2112" x2="1825" y2="2112" class="divider" stroke="#c7d2fe"/>
   <text x="695" y="2142" class="section-title">EIGEN PUBLIEKE ENTITEITEN</text>
-  <text x="695" y="2175" class="entity">AiTask · AiTaskAttempt · AiTaskResult · AiWorkerSession</text>
+  <text x="695" y="2175" class="entity">AiTask · AiTaskResult · ProductEnvironmentVariable · AgentEnvironmentVariableGrant</text>
   <text x="695" y="2203" class="note">Server-side MOCKED · echte workers: leases + hersteltermijn + fencing</text>
 
   <!-- Pull workers -->

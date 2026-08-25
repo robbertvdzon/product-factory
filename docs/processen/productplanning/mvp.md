@@ -144,7 +144,7 @@ stories bestaan. Een `IN_PROGRESS` story wordt niet herschikt of onderbroken.
 
 Iedere inhoudelijke Planner-stap wordt als complete opaque taak gequeue'd. Sequentiële stappen
 worden over meerdere korte hervattingen van dezelfde processessie uitgevoerd; er blijft nooit een
-serverthread wachten op een laptopworker of server-side mockresultaat.
+serverthread wachten op een externe Runtime-job of server-side Runtime-mockresultaat.
 
 ### Stap 4 — deterministisch valideren
 
