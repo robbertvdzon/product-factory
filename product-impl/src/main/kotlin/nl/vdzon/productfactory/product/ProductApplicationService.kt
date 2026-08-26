@@ -667,7 +667,9 @@ class ProductApplicationService(
     }
 
     private fun validateProductId(productId: ProductId) {
-        if (!PRODUCT_ID.matches(productId.value)) throw InvalidCommand("Product-ID is ongeldig.")
+        if (!PRODUCT_ID.matches(productId.value)) {
+            throw InvalidCommand("Product-ID moet 3–100 tekens bevatten, alleen kleine letters, cijfers en koppeltekens gebruiken en mag niet met een koppelteken beginnen of eindigen.")
+        }
     }
 
     private fun validateActor(actor: ActorReference) {

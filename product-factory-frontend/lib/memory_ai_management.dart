@@ -312,6 +312,8 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
   Map<String, Object?>? _budget;
   String? _productId;
   String? _role;
+  String _projectPrefix = 'HKH';
+  String? _projectPrefixError;
   DateTime? _date;
   String? _error;
   bool _busy = true;
@@ -344,7 +346,9 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       final runtimeValues =
           widget.gateway is AgentRuntimeGateway && selected != null
           ? await Future.wait([
-              (widget.gateway as AgentRuntimeGateway).environmentCatalog('HKH'),
+              (widget.gateway as AgentRuntimeGateway).environmentCatalog(
+                _projectPrefix,
+              ),
               (widget.gateway as AgentRuntimeGateway).productEnvironmentKeys(
                 selected,
               ),
@@ -465,6 +469,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           SizedBox(
             width: 360,
             child: DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _productId,
               decoration: const InputDecoration(
                 labelText: 'Product',
@@ -484,6 +489,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           SizedBox(
             width: 360,
             child: DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _role,
               decoration: const InputDecoration(
                 labelText: 'Capability · agentrol',
@@ -587,12 +593,33 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       ..._ai.map(_aiCard),
       if (widget.gateway is AgentRuntimeGateway) ...[
         const Divider(height: 48),
-        Row(
+        Text(
+          'Agenttoegang · $_projectPrefix',
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Expanded(
-              child: Text(
-                'Agenttoegang · HKH',
-                style: Theme.of(context).textTheme.headlineMedium,
+            SizedBox(
+              width: 320,
+              child: TextFormField(
+                initialValue: _projectPrefix,
+                enabled: !_busy,
+                decoration: InputDecoration(
+                  labelText: 'Runtime-projectprefix',
+                  helperText: 'Bijvoorbeeld HKH of HKH_AUTOPILOT',
+                  errorText: _projectPrefixError,
+                  border: const OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (value) => setState(() {
+                  _projectPrefix = value;
+                  _projectPrefixError = null;
+                }),
+                onFieldSubmitted: (_) => _refreshCatalog(),
               ),
             ),
             OutlinedButton.icon(
@@ -816,11 +843,25 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
     );
   }
 
-  Future<void> _refreshCatalog() => _mutate(
-    () => (widget.gateway as AgentRuntimeGateway).refreshEnvironmentCatalog(
-      'HKH',
-    ),
-  );
+  Future<void> _refreshCatalog() async {
+    final prefix = _projectPrefix.trim();
+    if (!RegExp(r'^[A-Z][A-Z0-9_]*$').hasMatch(prefix)) {
+      setState(
+        () => _projectPrefixError =
+            'Gebruik alleen hoofdletters, cijfers en underscores.',
+      );
+      return;
+    }
+    setState(() {
+      _projectPrefix = prefix;
+      _projectPrefixError = null;
+    });
+    await _mutate(
+      () => (widget.gateway as AgentRuntimeGateway).refreshEnvironmentCatalog(
+        prefix,
+      ),
+    );
+  }
 
   Future<void> _setProductKey(String name, bool active, int expectedVersion) =>
       _mutate(

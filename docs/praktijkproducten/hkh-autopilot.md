@@ -18,6 +18,7 @@ uitgeschakeld totdat de betreffende implementatiestap ze bewust activeert.
 |---|---|
 | Stabiel product-ID | `hkh-autopilot` |
 | Weergavenaam | `Historisch Heemskerk Autopilot` |
+| Agent Runtime-projectprefix | `HKH_AUTOPILOT` |
 | Publieke Git-repository | `https://github.com/robbertvdzon/hkh-autopilot.git` |
 | Doelbranch | `main` |
 | Eerste schone basis voor de nieuwe Product Factory | `af902c33728cb2363be9e47707c80ee3365b2c42` |
@@ -55,8 +56,10 @@ losse interne backendroute.
   geen mutatie uit en omzeilt de login nooit. Een ruimere productiehandeling vereist vooraf een
   expliciet begrensde Stakeholderopdracht.
 - Secrets, tokens, sessies en credentialwaarden worden niet in deze configuratie, Product Factory,
-  prompts, resultaten of artifacts opgeslagen. Agent Runtime levert alleen expliciet verleende
-  `HKH__*`-projectcredentials aan een geschikte worker.
+  prompts, resultaten of artifacts opgeslagen. Product Factory koppelt het product-ID niet op
+  naamconventie aan credentials: de Stakeholder kiest in Agenttoegang expliciet de Runtime-prefix
+  `HKH_AUTOPILOT` en verleent alleen de benodigde `HKH_AUTOPILOT__*`-keynamen aan een agentrol.
+  Agent Runtime levert de bijbehorende waarden uitsluitend aan een geschikte worker.
 - Privacy- en publicatiegrenzen uit de HKH-specificaties blijven fail-closed. Synthetische
   acceptatiedata mag niet als productie- of persoonsgegevens worden behandeld.
 

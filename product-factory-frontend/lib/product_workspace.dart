@@ -12,6 +12,81 @@ String _value(Object? value) {
   return value?.toString() ?? '';
 }
 
+final RegExp _productIdPattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,98}[a-z0-9]$');
+
+String? _productIdError(String value) {
+  final productId = value.trim();
+  if (productId.isEmpty || _productIdPattern.hasMatch(productId)) return null;
+  return 'Gebruik 3–100 kleine letters, cijfers of koppeltekens; begin en eindig zonder koppelteken.';
+}
+
+class _CreateProductDialog extends StatefulWidget {
+  const _CreateProductDialog();
+
+  @override
+  State<_CreateProductDialog> createState() => _CreateProductDialogState();
+}
+
+class _CreateProductDialogState extends State<_CreateProductDialog> {
+  final TextEditingController _name = TextEditingController();
+  final TextEditingController _id = TextEditingController();
+  String? _nameError;
+  String? _idError;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _id.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Product aanmaken'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _name,
+          onChanged: (_) => setState(() => _nameError = null),
+          decoration: InputDecoration(labelText: 'Naam', errorText: _nameError),
+        ),
+        TextField(
+          controller: _id,
+          onChanged: (_) => setState(() => _idError = null),
+          decoration: InputDecoration(
+            labelText: 'Stabiel ID (optioneel)',
+            helperText: 'Bijvoorbeeld: hkh-autopilot',
+            errorText: _idError,
+          ),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuleren'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Aanmaken')),
+    ],
+  );
+
+  void _submit() {
+    final name = _name.text.trim();
+    final id = _id.text.trim();
+    final nameError = name.isEmpty ? 'Vul een productnaam in.' : null;
+    final idError = _productIdError(id);
+    if (nameError != null || idError != null) {
+      setState(() {
+        _nameError = nameError;
+        _idError = idError;
+      });
+      return;
+    }
+    Navigator.pop(context, (name, id));
+  }
+}
+
 class ProductSummary {
   const ProductSummary({
     required this.id,
@@ -463,15 +538,14 @@ class HttpProductGateway implements ProductGateway {
   );
 
   @override
-  Future<void> runScheduledProcess(String productId, String process) => switch (
-    process
-  ) {
-    'PRODUCT_DESIGN' => runProductDesign(productId),
-    'PRODUCT_PLANNING' => runProductPlanning(productId),
-    'QUALITY_ASSURANCE' => runQuality(productId),
-    'SOFTWARE_FACTORY_DISPATCHER' => runDispatcher(productId),
-    _ => throw const ProductFailure(400, 'Onbekend uitvoerend proces.'),
-  };
+  Future<void> runScheduledProcess(String productId, String process) =>
+      switch (process) {
+        'PRODUCT_DESIGN' => runProductDesign(productId),
+        'PRODUCT_PLANNING' => runProductPlanning(productId),
+        'QUALITY_ASSURANCE' => runQuality(productId),
+        'SOFTWARE_FACTORY_DISPATCHER' => runDispatcher(productId),
+        _ => throw const ProductFailure(400, 'Onbekend uitvoerend proces.'),
+      };
 
   String _key(String prefix) =>
       'ui-$prefix-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
@@ -1642,7 +1716,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
       ),
     ),
     const Divider(height: 28),
-    Text('Recente automatische starts', style: Theme.of(context).textTheme.titleMedium),
+    Text(
+      'Recente automatische starts',
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
     if (data.scheduleRuns.isEmpty)
       const Text('Nog geen automatische start geclaimd.')
     else
@@ -1667,13 +1744,16 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
     if (pattern == null) return 'Geen ritme ingesteld';
     final interval = pattern['intervalMinutes'];
     if (interval != null) return 'Elke $interval minuten';
-    final rules = (pattern['weeklyRules'] as List? ?? const []).whereType<Map>();
+    final rules = (pattern['weeklyRules'] as List? ?? const [])
+        .whereType<Map>();
     if (rules.isEmpty) return 'Geen ritme ingesteld';
-    return rules.map((rule) {
-      final days = (rule['days'] as List? ?? const []).join(', ');
-      final times = (rule['times'] as List? ?? const []).join(', ');
-      return '$days om $times';
-    }).join(' · ');
+    return rules
+        .map((rule) {
+          final days = (rule['days'] as List? ?? const []).join(', ');
+          final times = (rule['times'] as List? ?? const []).join(', ');
+          return '$days om $times';
+        })
+        .join(' · ');
   }
 
   Widget _section(
@@ -1731,43 +1811,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
   }
 
   Future<void> _createProduct() async {
-    final name = TextEditingController();
-    final id = TextEditingController();
-    final ok = await showDialog<bool>(
+    final product = await showDialog<(String, String)>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Product aanmaken'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'Naam'),
-            ),
-            TextField(
-              controller: id,
-              decoration: const InputDecoration(
-                labelText: 'Stabiel ID (optioneel)',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuleren'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Aanmaken'),
-          ),
-        ],
-      ),
+      builder: (_) => const _CreateProductDialog(),
     );
-    if (ok == true && name.text.trim().isNotEmpty) {
-      await _mutate(
-        () => widget.gateway.createProduct(name.text.trim(), id.text),
-      );
+    if (product != null) {
+      await _mutate(() => widget.gateway.createProduct(product.$1, product.$2));
     }
   }
 

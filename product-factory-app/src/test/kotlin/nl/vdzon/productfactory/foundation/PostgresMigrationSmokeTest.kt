@@ -6,10 +6,41 @@ import org.junit.jupiter.api.Test
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.springframework.jdbc.datasource.DriverManagerDataSource
 import java.sql.DriverManager
+import java.time.Instant
 
 @Testcontainers(disabledWithoutDocker = true)
 class PostgresMigrationSmokeTest {
+    @Test
+    fun `JdbcTemplate bindt Instant als PostgreSQL timestamp`() {
+        val database = "productfactory_instant_binding"
+        createDatabase(database)
+        val url = databaseUrl(database)
+        Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
+        val jdbc = InstantAwareJdbcTemplate(
+            DriverManagerDataSource(url, postgres.username, postgres.password),
+        )
+        val now = Instant.parse("2026-08-26T16:30:00Z")
+
+        assertThat(
+            jdbc.update(
+                "INSERT INTO environment_metadata(metadata_key,metadata_value,updated_at) VALUES (?,?,?)",
+                "instant.binding",
+                "works",
+                now,
+            ),
+        ).isEqualTo(1)
+        assertThat(
+            jdbc.queryForObject(
+                "SELECT metadata_value FROM environment_metadata WHERE metadata_key=? AND updated_at<=?",
+                String::class.java,
+                "instant.binding",
+                now,
+            ),
+        ).isEqualTo("works")
+    }
+
     @Test
     fun `lege PostgreSQL database migreert vanaf nul`() {
         val result = Flyway.configure()

@@ -72,6 +72,8 @@ overleggen en besluiten; productie krijgt geen demodata.
 Maak `hkh-autopilot` in de ontwikkelroute via hetzelfde publieke productcommand aan waarmee een
 Stakeholder ieder ander echt product aanmaakt. Gebruik daarvoor de vastgelegde praktijkconfiguratie;
 voeg geen speciale HKH-code, automatische productieseed of afwijkende validatieregels toe.
+Een stabiel product-ID bevat 3–100 kleine letters, cijfers en koppeltekens en begint en eindigt met
+een letter of cijfer. Het is nadrukkelijk niet hetzelfde als een Runtime-projectprefix.
 
 ### Product-, signaal- en schedulelogica
 

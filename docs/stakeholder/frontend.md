@@ -144,16 +144,20 @@ taakaanvraag.
 
 ## Projectvariabelen en agenttoegang
 
-Per product toont **Instellingen → Agenttoegang** de door Agent Runtime ontdekte
-environmentkeynamen, gegroepeerd op projectprefix. De UI toont nooit waarden. Per naam zijn
-beschrijving, doelomgeving, bekendheid, actuele online beschikbaarheid en het aantal geschikte
-workers zichtbaar.
+Per product toont **Beheer → Agenttoegang** de door Agent Runtime ontdekte environmentkeynamen voor
+de gekozen projectprefix. De Stakeholder kan de prefix wisselen, bijvoorbeeld van `HKH` naar
+`HKH_AUTOPILOT`, en de catalogus opnieuw verversen. De UI toont nooit waarden. Per naam zijn
+bekendheid, actuele online beschikbaarheid en het aantal geschikte workers zichtbaar.
 
 De Stakeholder of beheerder selecteert welke keys bij het product horen en koppelt iedere actieve
 key aan nul of meer stabiele Product Factory-agentrollen. Standaard heeft geen rol toegang. De UI
 kan bijvoorbeeld acceptatiecredentials uitsluitend aan de Tester geven. Opslaan gebruikt één
 geversioneerd command; de frontend kan geen vrije keynaam toevoegen die niet in de gefilterde
 Runtime-catalogus voorkomt.
+
+Product-ID en Runtime-projectprefix zijn onafhankelijke identifiers. De koppeling bestaat uit de
+expliciet geactiveerde keynaam plus de expliciete rolgrant; Product Factory leidt een prefix nooit
+automatisch af uit een product-ID.
 
 Een bekende maar offline key krijgt **Niet beschikbaar op online worker**. De UI toont geen knop om
 waarden in Product Factory te vullen: waarden worden lokaal in `project-credentials.env` bij de

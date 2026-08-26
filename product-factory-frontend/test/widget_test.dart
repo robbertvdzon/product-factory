@@ -229,6 +229,67 @@ void main() {
 
     expect(find.text('Acceptatietesten'), findsNothing);
   });
+
+  testWidgets('product aanmaken valideert het stabiele ID voor verzending', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = RecordingProductGateway();
+    await tester.pumpWidget(
+      MaterialApp(home: FoundationPage(productGateway: gateway)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Product aanmaken'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'HKH Autopilot');
+    await tester.enterText(find.byType(TextField).at(1), 'HKH_AUTOPILOT');
+    await tester.tap(find.text('Aanmaken'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Gebruik 3–100 kleine letters, cijfers of koppeltekens; begin en eindig zonder koppelteken.',
+      ),
+      findsOneWidget,
+    );
+    expect(gateway.createdId, isNull);
+
+    await tester.enterText(find.byType(TextField).at(1), 'hkh-autopilot');
+    await tester.tap(find.text('Aanmaken'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.createdName, 'HKH Autopilot');
+    expect(gateway.createdId, 'hkh-autopilot');
+  });
+
+  testWidgets('Runtime-catalogus gebruikt de gekozen projectprefix', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = FakeAgentRuntimeManagementGateway();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: MemoryAiManagementPanel(gateway: gateway),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(gateway.catalogPrefixes, contains('HKH'));
+
+    await tester.enterText(find.byType(TextFormField).last, 'HKH_AUTOPILOT');
+    await tester.tap(find.text('Runtime-catalogus verversen'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.refreshedPrefix, 'HKH_AUTOPILOT');
+    expect(gateway.catalogPrefixes.last, 'HKH_AUTOPILOT');
+    expect(find.text('Agenttoegang · HKH_AUTOPILOT'), findsOneWidget);
+  });
 }
 
 class FakeVersionGateway implements VersionGateway {
@@ -489,4 +550,66 @@ class FakeProductGateway implements ProductGateway {
   Future<void> runDispatcher(String productId) async {}
   @override
   Future<void> runScheduledProcess(String productId, String process) async {}
+}
+
+class RecordingProductGateway extends FakeProductGateway {
+  String? createdName;
+  String? createdId;
+
+  @override
+  Future<void> createProduct(String name, String? requestedId) async {
+    createdName = name;
+    createdId = requestedId;
+  }
+}
+
+class FakeAgentRuntimeManagementGateway extends FakeMemoryAiGateway
+    implements AgentRuntimeGateway {
+  final List<String> catalogPrefixes = [];
+  String? refreshedPrefix;
+
+  @override
+  Future<List<Map<String, Object?>>> products() async => const [
+    {'id': 'hkh-autopilot', 'name': 'HKH Autopilot'},
+  ];
+
+  @override
+  Future<List<Map<String, Object?>>> aiTasks() async => const [];
+
+  @override
+  Future<List<Map<String, Object?>>> environmentCatalog(
+    String projectPrefix,
+  ) async {
+    catalogPrefixes.add(projectPrefix);
+    return const [];
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> productEnvironmentKeys(
+    String productId,
+  ) async => const [];
+
+  @override
+  Future<void> refreshEnvironmentCatalog(String projectPrefix) async {
+    refreshedPrefix = projectPrefix;
+  }
+
+  @override
+  Future<void> setProductEnvironmentKey(
+    String productId,
+    String name,
+    bool active,
+    int expectedVersion,
+  ) async {}
+
+  @override
+  Future<void> setAgentEnvironmentGrant(
+    String productId,
+    String name,
+    String role,
+    bool granted,
+  ) async {}
+
+  @override
+  Future<void> cancelAiTask(String taskId, String reason) async {}
 }
