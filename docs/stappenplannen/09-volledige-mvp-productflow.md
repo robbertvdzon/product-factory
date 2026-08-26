@@ -33,6 +33,8 @@ ketenbronnen zijn:
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
 - [Deployment en operatie](../platform/deployment-en-operatie.md)
 - [Frontend](../stakeholder/frontend.md)
+- [Eerste praktijkproduct — HKH Autopilot](../praktijkproducten/hkh-autopilot.md), voor de
+  gecontroleerde echte afsluitende keten
 - alle API- en MVP-documenten waarnaar stappen 2 tot en met 8 verwijzen;
 - alle geldende ADR's.
 
@@ -219,6 +221,11 @@ bron uitgesloten situatie. Een ontbrekende implementatie is nooit `NOT_APPLICABL
 9. Laat de volledige build en regressiesuite groen worden en push de release naar `main`.
 10. Controleer de automatische acceptatie- en productiepromotie, identieke digests, health en
     revisionweergave; voeg het definitieve bewijsrecord toe aan de release.
+
+Voer de gecontroleerde echte praktijkroute uit met `hkh-autopilot`. Houd deze proef gescheiden van
+de 19 deterministische Testbedscenario's: zij blijven synthetisch en herhaalbaar, terwijl de
+praktijkroute de werkelijk geconfigureerde Runtime-, Software Factory-, Git- en deploymentgrenzen
+bewijst.
 
 ## Verplichte releasebewijzen
 

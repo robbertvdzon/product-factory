@@ -32,6 +32,10 @@ openstaande MVP-eisen. De eindcontrole in stap 9 mag alleen slagen wanneer ieder
 MVP-specificatieset is gekoppeld aan werkende code, configuratie, migratie, UI, test of bewust
 operationeel bewijs. Een eis zonder eigenaar of bewijs blokkeert afronding.
 
+Tijdens de ontwikkeling is [HKH Autopilot](../praktijkproducten/hkh-autopilot.md) het eerste echte
+referentie- en praktijkproduct. De productspecifieke gegevens in dat document zijn geen generieke
+MVP-eisen en worden niet in code of productieseed hardgecodeerd.
+
 ## Volgorde
 
 | Stap | Plan | Resultaat |

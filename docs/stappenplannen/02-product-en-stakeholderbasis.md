@@ -29,6 +29,8 @@ het definitieve publieke contract afgehandeld, maar nog zonder Meeting Agent of 
 - [Overleggen met de Stakeholder](../stakeholder/overleggen.md)
 - [Frontend](../stakeholder/frontend.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
+- [Eerste praktijkproduct — HKH Autopilot](../praktijkproducten/hkh-autopilot.md), als concrete
+  ontwikkelconfiguratie en niet als generieke of hardgecodeerde productspecificatie
 
 ## Concrete opleveringen
 
@@ -62,6 +64,10 @@ Voeg voorwaartse Flywaymigraties, constraints en indexen toe voor:
 Maak voor ieder nieuw product transactioneel vier uitgeschakelde scheduleconfiguraties zonder
 `nextRunAt`. Seed in acceptatie uitsluitend vaste synthetische producten, signalen, vragen,
 overleggen en besluiten; productie krijgt geen demodata.
+
+Maak `hkh-autopilot` in de ontwikkelroute via hetzelfde publieke productcommand aan waarmee een
+Stakeholder ieder ander echt product aanmaakt. Gebruik daarvoor de vastgelegde praktijkconfiguratie;
+voeg geen speciale HKH-code, automatische productieseed of afwijkende validatieregels toe.
 
 ### Product-, signaal- en schedulelogica
 
