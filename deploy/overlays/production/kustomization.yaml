@@ -2,15 +2,17 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: product-factory
 resources:
-  - ../../base
-  - configmap.yaml
-  - database.yaml
-  - sealed-secret-product-factory.yaml
-  - ../../database
+- ../../base
+- configmap.yaml
+- database.yaml
+- sealed-secret-product-factory.yaml
+- ../../database
 patches:
-  - path: backend-secret-patch.yaml
+- path: backend-secret-patch.yaml
 images:
-  - name: ghcr.io/robbertvdzon/product-factory-backend
-    digest: sha256:d06a724a42c4dc5bb223ba653b6a5b39e7a87e9c2a8012db63c2e7037037a72d
-  - name: ghcr.io/robbertvdzon/product-factory-frontend
-    digest: sha256:353610ba2737a7428499c38c047955e6ab72e99f43926c9b0b7dddbe587132ed
+- digest: sha256:ec58ee54d63014808b33535e5b51bc0c6638358f1854a920404dca8363bde45e
+  name: ghcr.io/robbertvdzon/product-factory-backend
+  newName: ghcr.io/robbertvdzon/product-factory-backend
+- digest: sha256:a56edefa8c8a06651458a61913e257b9c21193e90577279dc576bcac103dba4b
+  name: ghcr.io/robbertvdzon/product-factory-frontend
+  newName: ghcr.io/robbertvdzon/product-factory-frontend
