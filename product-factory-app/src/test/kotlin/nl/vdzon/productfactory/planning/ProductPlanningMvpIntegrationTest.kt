@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.planning
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.ai.AiExecutionApplicationService
@@ -84,6 +85,24 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(backlog[1].dependencies).containsExactly(backlog[0].id)
         assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.ACTIVE)
         assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+    }
+
+    @Test
+    fun `planner responseschemas geven enum en const altijd een expliciet type`() {
+        planning.runProcessSession(productId)
+        ai.dispatchPending()
+        assertTypedLiterals(runtime.requests.single().responseSchema!!)
+
+        completeDispatchedJob(selection())
+        planning.runProcessSession(productId)
+        runtime.reset()
+        ai.dispatchPending()
+
+        val planSchema = runtime.requests.single().responseSchema!!
+        assertTypedLiterals(planSchema)
+        assertThat(planSchema.at("/properties/outcome/type").asText()).isEqualTo("string")
+        assertThat(planSchema.at("/properties/stories/items/properties/type/type").asText()).isEqualTo("string")
+        assertThat(planSchema.at("/properties/memoryChanges/items/properties/type/type").asText()).isEqualTo("string")
     }
 
     @Test
@@ -321,6 +340,14 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     private fun completeOnlyJob(result: ObjectNode) {
         ai.dispatchPending()
         completeDispatchedJob(result)
+    }
+
+    private fun assertTypedLiterals(schema: JsonNode) {
+        if (schema.has("enum") || schema.has("const")) {
+            assertThat(schema.has("type")).isTrue()
+        }
+        schema.path("properties").forEach(::assertTypedLiterals)
+        schema.path("items").takeUnless(JsonNode::isMissingNode)?.let(::assertTypedLiterals)
     }
 
     private fun completeDispatchedJob(result: ObjectNode) {
