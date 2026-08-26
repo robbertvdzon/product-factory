@@ -7,7 +7,9 @@ vier configureerbare schedules, vijf vertrouwde agentrollen, globale AI-modelins
 duurzame AI-uitvoering via de gedeelde Agent Runtime. Meeting Agent en notulenagent gebruiken
 dezelfde outbox-, status-, resultaat-, artifact- en credentialgrantgrens als Productontwerp MVP.
 De actieve Productontwerper bevriest product-, bron-, Git- en geheugenversies en publiceert complete,
-onveranderlijke epics met een duurzame, hervatbare processessie.
+onveranderlijke epics met een duurzame, hervatbare processessie. De actieve Planner claimt exacte
+epicversies, publiceert complete zelfstandige stories en beheert de productbrede backlog,
+herplanning, annulering en atomaire dispatchreservering.
 
 ## Vereisten
 
@@ -28,12 +30,14 @@ vroeg en duidelijk falen wanneer Maven toch met een andere Java-hoofdversie draa
 De backendroute `GET /api/foundation` bevestigt de actieve basis. Onder
 `GET /api/foundation/implementations` staan ook `agent-memory-impl` en de actieve
 `agent-runtime-outbox-v1`-variant van `ai-execution-impl` en de actieve
-`product-design-impl-mvp`-provider. De frontend biedt onder **Beheer**
+`product-design-impl-mvp`- en `product-planning-impl-mvp`-providers. De frontend biedt onder **Beheer**
 rolgebonden geheugen, peildatumhistorie, budgetten, globale AI-modellen, alleen-naamsgebonden
 agenttoegang en veilige AI-taakoperatie via de normale geauthenticeerde sessie en CSRF-beveiliging.
 Schedules worden al duurzaam gevalideerd en weergegeven, maar starten tot stap 9 niets automatisch.
 Onder **Producten → Ontwerp** kan de Stakeholder dezelfde publieke ontwerpfunctie handmatig starten
-of hervatten en epics, versie-inhoud, bronnen, AI-taken, no-ops en blokkades volgen.
+of hervatten en epics, versie-inhoud, bronnen, AI-taken, no-ops en blokkades volgen. Onder
+**Producten → Planning** staan backlog, stories, dependencies, prioriteitsredenen, workitems en
+processessies; daar kan planning worden gestart of gericht worden herpland.
 
 De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md). Het operationele
 overzicht voor deze capability staat in

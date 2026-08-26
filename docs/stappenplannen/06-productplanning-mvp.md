@@ -1,5 +1,10 @@
 # Stap 6 — Productplanning MVP
 
+Implementatiestatus: uitgevoerd. De actieve provider is `product-planning-impl-mvp`; migratie V8,
+de tweefasen-Plannerflow, workitems, story/backlogcontract, dispatchreservering, snelle
+leveringsgrenzen, REST/UI en Testbed 0.6.0 zijn onderdeel van dezelfde release. De automatische
+bewijzen staan in `ProductPlanningMvpIntegrationTest` en de vaste repositoryverificatie.
+
 ## Doel en eindtoestand
 
 Laat één Planneragent beschikbare epics en gericht planningswerk omzetten in complete,

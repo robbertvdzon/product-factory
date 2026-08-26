@@ -139,7 +139,8 @@ class MemoryAndAiIntegrationTest(
     @Test
     fun `globale AI instellingen zijn gevalideerd en geversioneerd`() {
         assertThat(ai.getAiJobConfigurations()).extracting<String> { it.jobKey.value }.containsExactly(
-            "MEETING.CONVERSE", "MEETING.SUMMARIZE", "PLANNING.SLICE_EPIC", "PRODUCT_DESIGN.CREATE_EPIC", "QUALITY.VERIFY_EPIC",
+            "MEETING.CONVERSE", "MEETING.SUMMARIZE", "PLANNING.SELECT_WORK", "PLANNING.SLICE_EPIC",
+            "PRODUCT_DESIGN.CREATE_EPIC", "QUALITY.VERIFY_EPIC",
         )
         val command = UpdateAiJobConfigurationCommand(
             AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), AiProvider.CLAUDE, "claude-sonnet-4-5", true, 0,

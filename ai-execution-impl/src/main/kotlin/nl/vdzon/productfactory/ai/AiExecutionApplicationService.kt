@@ -433,6 +433,7 @@ class AiExecutionApplicationService(
             "MEETING.CONVERSE" to "MEETING_AGENT",
             "MEETING.SUMMARIZE" to "MEETING_MINUTES_AGENT",
             "PRODUCT_DESIGN.CREATE_EPIC" to "PRODUCT_DESIGNER_MVP",
+            "PLANNING.SELECT_WORK" to "PLANNER_MVP",
             "PLANNING.SLICE_EPIC" to "PLANNER_MVP",
             "QUALITY.VERIFY_EPIC" to "TESTER_MVP",
         )

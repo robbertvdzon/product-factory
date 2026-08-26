@@ -1,6 +1,6 @@
 # Product Factory v2 — Productplanning MVP
 
-Status: voorstel voor de eerste implementatie.
+Status: geïmplementeerd als de actieve MVP-provider in stap 6.
 
 Deze implementatie gebruikt exact de publieke [Productplanning-API](api.md). Eén
 algemene Planner-agent kiest epics, maakt stories, verwerkt herstelwerk en bepaalt de backlogvolgorde.

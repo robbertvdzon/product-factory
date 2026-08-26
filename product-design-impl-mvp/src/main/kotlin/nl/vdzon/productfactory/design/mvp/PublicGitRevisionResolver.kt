@@ -1,12 +1,9 @@
 package nl.vdzon.productfactory.design.mvp
 
 import nl.vdzon.productfactory.api.shared.InvalidCommand
+import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
 import org.eclipse.jgit.api.Git
 import org.springframework.stereotype.Component
-
-interface PublicGitRevisionResolver {
-    fun resolveHead(publicGitUrl: String): String
-}
 
 @Component
 class JGitPublicGitRevisionResolver : PublicGitRevisionResolver {

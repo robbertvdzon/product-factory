@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.api.ai.*
 import nl.vdzon.productfactory.api.decisions.*
 import nl.vdzon.productfactory.api.design.*
+import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
 import nl.vdzon.productfactory.api.memory.*
 import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.product.*

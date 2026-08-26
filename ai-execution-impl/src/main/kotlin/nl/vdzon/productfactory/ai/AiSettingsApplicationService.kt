@@ -145,6 +145,7 @@ class AiSettingsApplicationService(
             JobDefinition(AiJobKey("MEETING.CONVERSE"), "Overleg voeren", AiProvider.CODEX, "gpt-5.6", true),
             JobDefinition(AiJobKey("MEETING.SUMMARIZE"), "Overleg samenvatten", AiProvider.CODEX, "gpt-5.6", true),
             JobDefinition(AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), "Epic ontwerpen", AiProvider.CODEX, "gpt-5.6", true),
+            JobDefinition(AiJobKey("PLANNING.SELECT_WORK"), "Planningswerk selecteren", AiProvider.CODEX, "gpt-5.6", true),
             JobDefinition(AiJobKey("PLANNING.SLICE_EPIC"), "Epic opdelen in stories", AiProvider.CODEX, "gpt-5.6", true),
             JobDefinition(AiJobKey("QUALITY.VERIFY_EPIC"), "Kwaliteit verifiëren", AiProvider.CODEX, "gpt-5.6", true),
         )

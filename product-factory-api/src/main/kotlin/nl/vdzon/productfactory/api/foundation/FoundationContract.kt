@@ -23,3 +23,7 @@ data class ImplementationManifest(
     val manifestVersion: String,
     val implementations: Map<String, ImplementationIdentity>,
 )
+
+interface PublicGitRevisionResolver {
+    fun resolveHead(publicGitUrl: String): String
+}

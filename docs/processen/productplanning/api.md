@@ -1,6 +1,6 @@
 # Product Factory v2 — Productplanning-API
 
-Status: eerste ontwerp van het publieke modulecontract.
+Status: geïmplementeerd publiek modulecontract vanaf stap 6.
 
 Dit document beschrijft de buitenkant van Productplanning. Andere modules mogen niet afhankelijk
 zijn van het aantal agents, interne concepten of de volgorde van planningsstappen. De volgende

@@ -7,7 +7,7 @@ import nl.vdzon.productfactory.ai.FakeRuntime
 import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.shared.*
-import nl.vdzon.productfactory.design.mvp.PublicGitRevisionResolver
+import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
 import nl.vdzon.productfactory.design.mvp.ProductDesignMvpService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy

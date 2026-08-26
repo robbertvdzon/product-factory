@@ -79,6 +79,14 @@ class AcceptanceTestControlService(
             title = "Productontwerp blokkeert ongeldige output",
             description = "Ontbrekende UX of onvolledige criteria publiceren geen epic en laten een herstelbare blokkade zien.",
         ),
+        TestScenarioSummary("product-planning-complete-epic", "1", "Complete epicplanning", "Selectie, hervatting, volledige storydekking en één productbrede TODO-volgorde."),
+        TestScenarioSummary("product-planning-urgent-priority", "1", "Urgente herprioriteit", "Een gericht prioriteitsworkitem herschikt uitsluitend TODO-stories met een zichtbare reden."),
+        TestScenarioSummary("product-planning-bugfix", "1", "Bugfixplanning", "Een exacte bugversie wordt één gekoppelde en pas daarna uitvoerbare bugfixstory."),
+        TestScenarioSummary("product-planning-epic-gap", "1", "Ontbrekende epicdekking", "Verificatiebewijs leidt tot aanvullende stories binnen de bestaande bevroren epic."),
+        TestScenarioSummary("product-planning-cancelled-dependency", "1", "Geannuleerde dependency", "Afhankelijk werk blijft geblokkeerd en maakt gericht herplanningswerk."),
+        TestScenarioSummary("product-planning-cancellation-marker", "1", "Annuleringsmarker en reservering", "Late planning en dispatch worden veilig tegen de duurzame epicannulering begrensd."),
+        TestScenarioSummary("product-planning-invalid-result", "1", "Ongeldige planneroutput", "Onvolledige dekking publiceert atomair geen gedeeltelijke storyset."),
+        TestScenarioSummary("product-planning-ai-recovery", "1", "Wachten en terminale taakfout", "Dezelfde sessie en epicclaim wachten, blokkeren zichtbaar en hervatten zonder duplicaat."),
     )
     private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
 
@@ -176,8 +184,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "product-design-mvp-v1"
-        private const val TESTBED_VERSION = "0.5.0"
+        private const val DATASET_VERSION = "product-planning-mvp-v1"
+        private const val TESTBED_VERSION = "0.6.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")

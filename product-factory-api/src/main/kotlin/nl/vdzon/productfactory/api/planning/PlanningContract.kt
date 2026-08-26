@@ -5,7 +5,7 @@ import java.time.Instant
 
 enum class StoryType { PRODUCT_STORY, BUGFIX }
 enum class StoryStatus { TODO, IN_PROGRESS, DONE, CANCELLED }
-enum class PlanningWorkItemType { BUGFIX, EPIC_GAP, EPIC_REPRIORITIZATION, MANUAL_REPLAN }
+enum class PlanningWorkItemType { PLAN_BUGFIX, PLAN_EPIC_GAP, REPLAN_CANCELLED_DEPENDENCY, REPRIORITIZE_EPIC, MANUAL_REPLAN }
 enum class DispatchReservationStatus { RESERVED, DISPATCHED, RELEASED, CANCELLED }
 
 data class StoryFilter(
@@ -34,6 +34,14 @@ data class StoryDetails(
     val version: Long,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val priorityReason: String? = null,
+    val bugId: BugId? = null,
+    val bugVersion: Long? = null,
+    val externalStoryId: String? = null,
+    val dispatchReservationId: String? = null,
+    val dispatchReservationStatus: DispatchReservationStatus? = null,
+    val verificationId: VerificationId? = null,
+    val verificationPassed: Boolean? = null,
 )
 data class PlanningWorkItemDetails(
     val id: PlanningWorkItemId,
@@ -45,13 +53,16 @@ data class PlanningWorkItemDetails(
     val status: WorkItemStatus,
     val createdAt: Instant,
     val version: Long,
+    val claimedBySessionId: ProcessSessionId? = null,
+    val resultSummary: String? = null,
+    val errorCode: String? = null,
 )
-data class RequestBugfixCommand(val productId: ProductId, val bugId: BugId, val bugVersion: Long, val evidenceId: VerificationId, val priority: Int, val idempotencyKey: String)
-data class RequestEpicGapPlanningCommand(val productId: ProductId, val epicId: EpicId, val epicVersion: Long, val verificationId: VerificationId, val missingCoverage: List<String>, val idempotencyKey: String)
-data class RequestEpicReprioritizationCommand(val productId: ProductId, val epicId: EpicId, val reason: String, val priority: Int, val idempotencyKey: String)
-data class RequestManualReplanCommand(val productId: ProductId, val reason: String, val linkedObjects: List<SourceReference>, val idempotencyKey: String)
-data class ReserveNextStoryForDispatchCommand(val productId: ProductId, val idempotencyKey: String)
-data class RevalidateDispatchReservationCommand(val reservationId: String, val expectedStoryVersion: Long, val idempotencyKey: String)
+data class RequestBugfixCommand(val productId: ProductId, val bugId: BugId, val bugVersion: Long, val evidenceId: VerificationId, val priority: Int, val actor: ActorReference, val idempotencyKey: String)
+data class RequestEpicGapPlanningCommand(val productId: ProductId, val epicId: EpicId, val epicVersion: Long, val verificationId: VerificationId, val missingCoverage: List<String>, val actor: ActorReference, val idempotencyKey: String)
+data class RequestEpicReprioritizationCommand(val productId: ProductId, val epicId: EpicId, val reason: String, val priority: Int, val actor: ActorReference, val idempotencyKey: String)
+data class RequestManualReplanCommand(val productId: ProductId, val reason: String, val linkedObjects: List<SourceReference>, val actor: ActorReference, val idempotencyKey: String)
+data class ReserveNextStoryForDispatchCommand(val productId: ProductId, val actor: ActorReference, val idempotencyKey: String)
+data class RevalidateDispatchReservationCommand(val reservationId: String, val expectedStoryVersion: Long, val externalStoryExists: Boolean, val actor: ActorReference, val idempotencyKey: String)
 data class StoryDispatchReservationDetails(
     val reservationId: String,
     val story: StoryDetails,
@@ -60,10 +71,10 @@ data class StoryDispatchReservationDetails(
     val expiresAt: Instant,
 )
 data class DispatchReservationValidation(val valid: Boolean, val reason: String? = null, val reservation: StoryDispatchReservationDetails? = null)
-data class RecordStoryDispatchedCommand(val reservationId: String, val externalStoryId: String, val expectedStoryVersion: Long, val idempotencyKey: String)
-data class RecordStoryDeliveryCommand(val storyId: StoryId, val externalStoryId: String, val deliveredCommitSha: String, val expectedVersion: Long, val idempotencyKey: String)
-data class RecordStoryCancellationCommand(val storyId: StoryId, val externalStoryId: String, val reason: String, val expectedVersion: Long, val idempotencyKey: String)
-data class RecordStoryVerificationCommand(val storyId: StoryId, val verificationId: VerificationId, val passed: Boolean, val expectedVersion: Long, val idempotencyKey: String)
+data class MarkStoryAsDispatchedCommand(val reservationId: String, val externalStoryId: String, val expectedStoryVersion: Long, val actor: ActorReference, val idempotencyKey: String)
+data class MarkStoryAsDevelopedCommand(val storyId: StoryId, val externalStoryId: String, val deliveredCommitSha: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
+data class MarkStoryAsCancelledCommand(val storyId: StoryId, val externalStoryId: String, val reason: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
+data class RecordStoryVerificationCommand(val storyId: StoryId, val verificationId: VerificationId, val passed: Boolean, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class CancelStoriesForEpicCommand(val productId: ProductId, val epicId: EpicId, val epicVersion: Long, val reason: String, val actor: ActorReference, val idempotencyKey: String)
 
 interface ProductPlanningService {
@@ -74,9 +85,9 @@ interface ProductPlanningService {
     fun requestManualReplan(command: RequestManualReplanCommand): PlanningWorkItemId
     fun reserveNextStoryForDispatch(command: ReserveNextStoryForDispatchCommand): StoryDispatchReservationDetails?
     fun revalidateDispatchReservation(command: RevalidateDispatchReservationCommand): DispatchReservationValidation
-    fun recordStoryDispatched(command: RecordStoryDispatchedCommand)
-    fun recordStoryDelivery(command: RecordStoryDeliveryCommand)
-    fun recordStoryCancellation(command: RecordStoryCancellationCommand)
+    fun markStoryAsDispatched(command: MarkStoryAsDispatchedCommand)
+    fun markStoryAsDeveloped(command: MarkStoryAsDevelopedCommand)
+    fun markStoryAsCancelled(command: MarkStoryAsCancelledCommand)
     fun recordStoryVerification(command: RecordStoryVerificationCommand)
     fun cancelStoriesForEpic(command: CancelStoriesForEpicCommand)
 }
