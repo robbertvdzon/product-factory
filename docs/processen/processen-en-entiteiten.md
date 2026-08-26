@@ -189,7 +189,7 @@ Deze contracten zijn momentopnamen en hebben geen eigen tabel of schrijver.
 | `DispatcherProductStatusDetails` | dispatcher uit externe status en eigen pogingen | operations en frontend | open extern werk, eventuele technische blokkade en laatste poging voor één product |
 | `DeliveryAttemptDetails` | dispatcher uit `DeliveryAttempt` | operations en frontend | read-only technische leveringshistorie zonder wijzigbaar productobject |
 | `SoftwareFactoryWork` | externe adapter | dispatcher | tijdelijk extern antwoord met uitsluitend status `OPEN`, `DONE` of `CANCELLED`, externe referentie en bij `DONE` de oplevercommit; nooit een vraag aan Product Factory |
-| `StoryDeliveryPackage` | dispatcher uit één `StoryDetails` | Software Factory | volledige, onveranderlijke story met titel, samenvatting, eventuele UX, assets, hashes en idempotentiesleutel |
+| `StoryDeliveryPackage` | dispatcher uit één `StoryDetails` | Software Factory | volledige, onveranderlijke storymomentopname die extern deterministisch wordt gemapt naar `title`, één volledige `description`, binaire `attachments` en een aparte idempotentieheader |
 
 ## Publieke productrepository als leesbron
 
@@ -331,8 +331,10 @@ UI-/REST-starts geven daarom altijd het product-ID mee.
   via haar `AiTask`-resultaten.
 - AI-uitvoering bewaakt maximaal één Runtime-job-ID en geaccepteerd resultaat per lokale taak;
   Agent Runtime bewaakt attempts, harde deadlines, leases en fencing.
-- Tekst, Markdown, JSON en SVG blijven tekst in `StoryDeliveryPackage`; binaire assets krijgen
-  begrensde attachments met MIME-type, grootte en hash en mogen alleen voor transport Base64 zijn.
+- Tekst, Markdown, JSON en SVG worden bij Software Factory-levering opgenomen in de volledige
+  `description`; alleen binaire assets worden attachments met MIME-type, werkelijke grootte en
+  SHA-256 en gebruiken voor JSON-transport Base64. Deze integratie legt geen eigen aantal- of
+  groottelimiet en geen MIME-allowlist op.
 
 ## Gerelateerde documenten
 

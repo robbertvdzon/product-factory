@@ -221,7 +221,7 @@ herordening verandert alleen de nummers van `TODO`-stories.
 
 Een `Story` bevat minimaal:
 
-- stabiel story-ID en product-ID;
+- stabiel story-ID als canonieke UUID-string en een stabiel product-ID;
 - `title`: één korte regel van enkele woorden voor backlog- en andere lijstweergaven;
 - `summary`: maximaal twee korte zinnen die onder de titel de kern van het werk uitleggen;
 - type `PRODUCT_STORY` of `BUGFIX`;
