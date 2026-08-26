@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.ai.AiExecutionApplicationService
 import nl.vdzon.productfactory.ai.FakeRuntime
+import nl.vdzon.productfactory.ai.RuntimeArtifactView
 import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
 import nl.vdzon.productfactory.api.planning.*
@@ -247,6 +248,13 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
                 put("uxDesign", "Een overzichtskaart opent een rustig bewijsdetail en behoudt een duidelijke terugroute.")
                 putArray("acceptanceCriteria").add(CRITERION_OVERVIEW).add(CRITERION_EVIDENCE)
                 put("slicabilityRationale", "Overzicht en bewijsdetail leveren elk zelfstandig gebruikerswaarde en vormen samen het complete pad.")
+                putArray("researchSources")
+                putObject("readiness").apply {
+                    put("readyForPlanning", true)
+                    put("requiresExternalData", false)
+                    putArray("unmetConditions")
+                    putArray("openQuestions")
+                }
             })
             putArray("processedSignalIds")
             putArray("memoryChanges")
@@ -293,6 +301,12 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     private fun completeDispatchedJob(result: ObjectNode) {
         val job = runtime.onlyJob()
         runtime.results[job.id] = result
+        if (result.path("epic").isObject) {
+            runtime.resultArtifacts[job.id] = listOf(
+                RuntimeArtifactView("ux-main", job.id, "ux-main.png", "image/png", 128, "1".repeat(64), java.time.Instant.now()),
+                RuntimeArtifactView("ux-empty", job.id, "ux-empty.png", "image/png", 128, "2".repeat(64), java.time.Instant.now()),
+            )
+        }
         runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
         ai.reconcileActive()
     }

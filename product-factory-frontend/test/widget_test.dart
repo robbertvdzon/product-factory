@@ -268,6 +268,33 @@ void main() {
     expect(gateway.createdId, 'hkh-autopilot');
   });
 
+  testWidgets('ontwerp toont onrijpe status bronnen en UX-modellen', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ProductWorkspacePage(
+          gateway: ResearchProductGateway(),
+          section: ProductWorkspaceSection.design,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Bronnen verbinden · NEEDS_RESEARCH'));
+    await tester.pump();
+
+    expect(find.text('Nog niet klaar voor planning'), findsOneWidget);
+    expect(find.text('UX-modellen'), findsOneWidget);
+    expect(find.text('Onderzochte bronnen'), findsOneWidget);
+    expect(
+      find.textContaining('Noord-Hollands Archief · VALIDATED'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Runtime-catalogus gebruikt de gekozen projectprefix', (
     tester,
   ) async {
@@ -554,6 +581,86 @@ class FakeProductGateway implements ProductGateway {
   Future<void> runDispatcher(String productId) async {}
   @override
   Future<void> runScheduledProcess(String productId, String process) async {}
+}
+
+class ResearchProductGateway extends FakeProductGateway {
+  const ResearchProductGateway();
+
+  static const product = ProductSummary(
+    id: 'hkh-autopilot',
+    name: 'HKH Autopilot',
+    status: 'ACTIVE',
+    dispatchingEnabled: false,
+    version: 1,
+  );
+
+  @override
+  Future<List<ProductSummary>> products() async => const [product];
+
+  @override
+  Future<ProductWorkspaceData> workspace(ProductSummary product) async =>
+      ProductWorkspaceData(
+        product: product,
+        assignment: const {},
+        testConfiguration: null,
+        schedules: const [],
+        signals: const [],
+        questions: const [],
+        meetings: const [],
+        decisions: const [],
+        decisionArchive: const [],
+        epics: const [
+          {
+            'id': {'value': 'epic-1'},
+            'title': 'Bronnen verbinden',
+            'status': 'NEEDS_RESEARCH',
+            'version': 1,
+            'summary': 'Eerst concrete bronnen valideren.',
+            'problem': 'Er zijn nog geen gevalideerde gegevensbronnen.',
+            'solution': 'Onderzoek en verbind publieke collecties.',
+            'uxDesign': 'Zoekscherm met bronverwijzingen.',
+            'uxArtifacts': [
+              {
+                'name': 'zoekscherm.png',
+                'mediaType': 'image/png',
+                'uri': '/api/ai/tasks/task-1/artifacts/main',
+              },
+            ],
+            'readiness': {
+              'readyForPlanning': false,
+              'unmetConditions': ['Valideer minimaal twee bronnen.'],
+              'openQuestions': [],
+            },
+            'researchSources': [
+              {
+                'name': 'Noord-Hollands Archief',
+                'provider': 'Noord-Hollands Archief',
+                'uri': 'https://example.org/archive',
+                'accessMethod': 'Publieke zoekroute',
+                'license': 'Rechten per object',
+                'coverage': 'Regionale historische records',
+                'status': 'VALIDATED',
+                'validationEvidence': 'Zoekroute geopend en records gevonden.',
+              },
+            ],
+            'acceptanceCriteria': ['Bronnen zijn zichtbaar.'],
+            'slicabilityRationale': 'Eén gebruikersroute.',
+            'directionReferences': [],
+          },
+        ],
+        designSessions: const [],
+        epicHistories: const {'epic-1': []},
+        stories: const [],
+        backlog: const [],
+        planningWorkItems: const [],
+        planningSessions: const [],
+        qualitySnapshot: null,
+        qualityHistory: const [],
+        bugs: const [],
+        verifications: const [],
+        qualityWorkItems: const [],
+        qualitySessions: const [],
+      );
 }
 
 class RecordingProductGateway extends FakeProductGateway {

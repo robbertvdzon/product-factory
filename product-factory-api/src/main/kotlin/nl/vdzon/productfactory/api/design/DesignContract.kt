@@ -3,8 +3,27 @@ package nl.vdzon.productfactory.api.design
 import nl.vdzon.productfactory.api.shared.*
 import java.time.Instant
 
-enum class EpicStatus { AVAILABLE, IN_PLANNING, ACTIVE, VERIFYING, COMPLETED, NOT_SUCCESSFUL, SUPERSEDED, WITHDRAWN, CANCELLED }
+enum class EpicStatus { NEEDS_RESEARCH, AVAILABLE, IN_PLANNING, ACTIVE, VERIFYING, COMPLETED, NOT_SUCCESSFUL, SUPERSEDED, WITHDRAWN, CANCELLED }
 enum class EpicVerificationOutcome { PASSED, NOT_SUCCESSFUL, NEEDS_WORK, BLOCKED }
+enum class ResearchSourceStatus { CANDIDATE, VALIDATED, BLOCKED }
+
+data class EpicResearchSource(
+    val name: String,
+    val provider: String,
+    val uri: String,
+    val accessMethod: String,
+    val license: String,
+    val coverage: String,
+    val status: ResearchSourceStatus,
+    val validationEvidence: String,
+)
+
+data class EpicReadinessDetails(
+    val readyForPlanning: Boolean,
+    val requiresExternalData: Boolean,
+    val unmetConditions: List<String> = emptyList(),
+    val openQuestions: List<String> = emptyList(),
+)
 
 data class EpicFilter(
     val productId: ProductId? = null,
@@ -27,6 +46,9 @@ data class EpicDetails(
     val createdAt: Instant,
     val updatedAt: Instant,
     val verificationId: VerificationId? = null,
+    val researchSources: List<EpicResearchSource> = emptyList(),
+    val readiness: EpicReadinessDetails = EpicReadinessDetails(false, false, listOf("Gereedheid is nog niet beoordeeld.")),
+    val uxArtifacts: List<ArtifactReference> = emptyList(),
 )
 data class ClaimEpicForPlanningCommand(val epicId: EpicId, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class MarkEpicActiveCommand(val epicId: EpicId, val plannedEpicVersion: Long, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)

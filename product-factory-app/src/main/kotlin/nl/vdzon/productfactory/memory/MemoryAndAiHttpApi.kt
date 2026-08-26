@@ -180,9 +180,16 @@ class AiTaskController(
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun cancel(@PathVariable taskId: String, @RequestBody request: CancelAiTaskRequest) = commands.cancelAiTask(AiTaskId(taskId), request.reason)
 
-    @GetMapping("/{taskId}/artifacts/{artifactId}", produces = [MediaType.APPLICATION_OCTET_STREAM_VALUE])
-    fun artifact(@PathVariable taskId: String, @PathVariable artifactId: String): ResponseEntity<ByteArray> =
-        ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(implementation.downloadArtifact(AiTaskId(taskId), artifactId))
+    @GetMapping("/{taskId}/artifacts/{artifactId}")
+    fun artifact(@PathVariable taskId: String, @PathVariable artifactId: String): ResponseEntity<ByteArray> {
+        val id = AiTaskId(taskId)
+        val mediaType = queries.getAiTaskResult(id)?.artifacts
+            ?.singleOrNull { it.uri.substringAfterLast('/') == artifactId }
+            ?.mediaType
+            ?.let { runCatching { MediaType.parseMediaType(it) }.getOrNull() }
+            ?: MediaType.APPLICATION_OCTET_STREAM
+        return ResponseEntity.ok().contentType(mediaType).body(implementation.downloadArtifact(id, artifactId))
+    }
 }
 
 @RestController

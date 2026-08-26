@@ -139,14 +139,15 @@ gaat als één opaque `AiTask` naar AI-uitvoering. De opdracht is niet om zoveel
 maken, maar om de belangrijkste aantoonbare en behapbare gebruikersverbetering volledig uit te
 werken. De huidige run publiceert nog niets en keert wachtend terug.
 
-Een volgende `runProcessSession(productId)` leest het onveranderlijke `AiTaskResult`. Als het nog niet klaar
-is, blijft de sessie wachten zonder een tweede taak te maken.
+De achtergrondcoördinator leest een afgerond `AiTaskResult` en hervat de sessie automatisch. Een
+onrijp ontwerp wordt als `NEEDS_RESEARCH` bewaard en krijgt binnen dezelfde sessie maximaal drie
+begrensde ontwerpiteraties. Daarna blijft de epic zichtbaar onrijp in plaats van planbaar te worden.
 
 De agent retourneert volgens een vast schema:
 
 - `NO_EPIC`, met een korte controleerbare reden; of
 - `CREATE_EPIC`, met een complete nieuwe epic; of
-- `REVISE_AVAILABLE_EPIC`, met epic-ID, verwachte versie en complete vervangende inhoud.
+- `REVISE_EPIC`, met epic-ID, verwachte versie en complete vervangende inhoud.
 
 De agent kan geen statusovergang of databasewijziging rechtstreeks uitvoeren.
 
@@ -165,12 +166,15 @@ Gewone code controleert minimaal:
 - een overtuigende uitleg dat de epic in kleine zelfstandige stories kan worden verdeeld;
 - afwezigheid van stories of een vooraf gemaakte backlog;
 - product-ID en geldige richtingsreferenties;
-- dat een herziene epic nog steeds `AVAILABLE` is en de verwachte versie heeft.
+- minimaal twee werkelijk gevalideerde publieke bronnen bij externe data-afhankelijkheid;
+- minimaal twee afbeeldingsartefacten bij zichtbare UX, waaronder hoofd- en lege of fouttoestand;
+- dat readiness geen onvervulde voorwaarden of open vragen bevat voordat status `AVAILABLE` volgt;
+- dat een herziene epic nog `NEEDS_RESEARCH` of `AVAILABLE` is en de verwachte versie heeft.
 
 Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
 AI-uitvoering; de procesmodule maakt daarvoor geen duplicerende taak.
-Een inhoudelijk ongeldig concept wordt niet gepubliceerd. In de MVP start daarvoor geen tweede
-critic-agent; de sessie eindigt met een zichtbare validatiefout en kan later opnieuw draaien.
+Een inhoudelijk ongeldig concept wordt niet gepubliceerd. Een geldig maar onrijp concept wordt
+duurzaam als `NEEDS_RESEARCH` gepubliceerd en begrensd verder ontworpen.
 
 ### Stap 5 — publiceren en input afhandelen
 

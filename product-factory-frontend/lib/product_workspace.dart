@@ -12,6 +12,13 @@ String _value(Object? value) {
   return value?.toString() ?? '';
 }
 
+String _backendResourceUrl(Object? value) {
+  final path = _value(value);
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  final base = AppConfiguration.backendUrl.replaceAll(RegExp(r'/$'), '');
+  return '$base${path.startsWith('/') ? path : '/$path'}';
+}
+
 final RegExp _productIdPattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,98}[a-z0-9]$');
 
 String? _productIdError(String value) {
@@ -1641,6 +1648,19 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             SelectableText(
               'Epic ${_value(epic['id'])} · versie ${epic['version']}',
             ),
+            if (epic['status'] == 'NEEDS_RESEARCH') ...[
+              const SizedBox(height: 8),
+              Card(
+                color: Theme.of(context).colorScheme.tertiaryContainer,
+                child: const ListTile(
+                  leading: Icon(Icons.manage_search_outlined),
+                  title: Text('Nog niet klaar voor planning'),
+                  subtitle: Text(
+                    'Productontwerp werkt eerst bronnen, open vragen en UX-modellen uit. Productplanning kan deze epic nog niet claimen.',
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Text('Probleem', style: Theme.of(context).textTheme.labelLarge),
             Text('${epic['problem']}'),
@@ -1652,6 +1672,90 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               Text('UX-ontwerp', style: Theme.of(context).textTheme.labelLarge),
               Text('${epic['uxDesign']}'),
             ],
+            if ((epic['uxArtifacts'] as List? ?? const []).isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'UX-modellen',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: (epic['uxArtifacts'] as List? ?? const []).map((raw) {
+                  final artifact = (raw as Map).cast<String, Object?>();
+                  return SizedBox(
+                    width: 380,
+                    child: Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Image.network(
+                            _backendResourceUrl(artifact['uri']),
+                            height: 240,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const SizedBox(
+                                  height: 160,
+                                  child: Center(
+                                    child: Text(
+                                      'UX-afbeelding kon niet worden geladen.',
+                                    ),
+                                  ),
+                                ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: SelectableText(_value(artifact['name'])),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text('Gereedheid', style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              (epic['readiness'] as Map?)?['readyForPlanning'] == true
+                  ? 'Gereed voor Productplanning'
+                  : 'Nog niet gereed voor Productplanning',
+            ),
+            ...((epic['readiness'] as Map?)?['unmetConditions'] as List? ??
+                    const [])
+                .map((condition) => Text('• $condition')),
+            ...((epic['readiness'] as Map?)?['openQuestions'] as List? ??
+                    const [])
+                .map((question) => Text('Open vraag: $question')),
+            const SizedBox(height: 8),
+            Text(
+              'Onderzochte bronnen',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            if ((epic['researchSources'] as List? ?? const []).isEmpty)
+              const Text('Nog geen concrete externe bronnen onderzocht.')
+            else
+              ...(epic['researchSources'] as List).map((raw) {
+                final source = (raw as Map).cast<String, Object?>();
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    source['status'] == 'VALIDATED'
+                        ? Icons.verified_outlined
+                        : source['status'] == 'BLOCKED'
+                        ? Icons.block_outlined
+                        : Icons.travel_explore_outlined,
+                  ),
+                  title: Text('${source['name']} · ${source['status']}'),
+                  subtitle: SelectableText(
+                    '${source['provider']}\n${source['coverage']}\n'
+                    'Toegang: ${source['accessMethod']} · Licentie: ${source['license']}\n'
+                    '${source['validationEvidence']}\n${source['uri']}',
+                  ),
+                );
+              }),
             const SizedBox(height: 8),
             Text(
               'Acceptatiecriteria',
@@ -1675,7 +1779,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 'v${version['version']} · ${version['status']} · ${version['title']}',
               ),
             ),
-            if (epic['status'] == 'AVAILABLE')
+            if (const {'NEEDS_RESEARCH', 'AVAILABLE'}.contains(epic['status']))
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(

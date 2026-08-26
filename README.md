@@ -6,9 +6,10 @@ agentgeheugen: productopdrachten, testomgevingen, signalen, agentvragen, overleg
 vier configureerbare schedules, vijf vertrouwde agentrollen, globale AI-modelinstellingen en
 duurzame AI-uitvoering via de gedeelde Agent Runtime. Meeting Agent en notulenagent gebruiken
 dezelfde outbox-, status-, resultaat-, artifact- en credentialgrantgrens als Productontwerp MVP.
-De actieve Productontwerper bevriest product-, bron-, Git- en geheugenversies en publiceert complete,
-onveranderlijke epics met een duurzame, hervatbare processessie. De actieve Planner claimt exacte
-epicversies, publiceert complete zelfstandige stories en beheert de productbrede backlog,
+De actieve Productontwerper bevriest product-, bron-, Git- en geheugenversies, onderzoekt concrete
+externe bronnen, bewaart UX-screenshots en houdt onrijpe epics op `NEEDS_RESEARCH` tijdens een
+begrensde, automatisch hervatte ontwerpcyclus. De actieve Planner claimt uitsluitend exacte
+gereedverklaarde epicversies, publiceert complete zelfstandige stories en beheert de productbrede backlog,
 herplanning, annulering en atomaire dispatchreservering. De actieve Tester controleert de werkelijk
 gedeployde revision, publiceert reproduceerbaar bewijs en bugs en bewaart onbeperkte retryhistorie
 plus onveranderlijke kwaliteitsbeelden.

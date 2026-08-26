@@ -19,7 +19,8 @@ implementatiemodules van hetzelfde `design`-contract in `product-factory-api`; d
 
 Productontwerp zet relevante productinformatie om in complete, behapbare epicdefinities. Iedere
 gepubliceerde epic beschrijft één eenduidig probleem, de gekozen oplossing, de relatie met de
-productrichting, eventueel het benodigde UX-ontwerp en testbare acceptatiecriteria.
+productrichting, onderzochte externe bronnen, het benodigde UX-ontwerp met visuele artefacten,
+een expliciete gereedheidsbeoordeling en testbare acceptatiecriteria.
 
 Productontwerp maakt geen stories en beheert geen backlog. De module is eigenaar en enige schrijver
 van de complete `Epic`: inhoud, versie en levenscyclusstatus. Andere modules gebruiken alleen de
@@ -186,15 +187,19 @@ De inhoud van een beschikbare epicdefinitie bestaat uitsluitend uit:
   verwijzing naar de gebruikte productopdrachtversie of besluit-ID met een korte uitleg;
 - `uxDesign` — optioneel; verplicht wanneer de oplossing zichtbaar gedrag of interactie verandert
   en afwezig wanneer geen UX-ontwerp nodig is;
+- `uxArtifacts` — duurzame afbeeldingsartefacten van hoofd-, lege en/of fouttoestanden wanneer de
+  gebruikersinteractie zichtbaar verandert;
+- `researchSources` — concrete publieke bronnen met aanbieder, URL, toegangsmethode, licentie,
+  dekking, status en reproduceerbaar validatiebewijs;
+- `readiness` — expliciete gereedheid voor planning, data-afhankelijkheid, onvervulde voorwaarden
+  en open vragen;
 - `acceptanceCriteria` — een lijst concrete, observeerbare en testbare voorwaarden waaronder de
   oplossing is geslaagd;
 - `slicabilityRationale` — waarom de epic behapbaar genoeg is om door Productplanning in kleine,
   zelfstandig uitvoerbare stories te worden verdeeld.
 
-Doelgroep, routes, toestanden, grenzen, bewijs, risico's en afhankelijkheden worden geen losse
-publieke epicvelden. Alleen informatie die voor deze epic werkelijk nodig is, wordt verwerkt in
-`problem`, `solution`, `uxDesign` of `acceptanceCriteria`. Onderzoek, bronnen, aannames en
-technische verkenningen blijven interne sessie-informatie.
+Doelgroep, routes, toestanden, grenzen, bewijs, risico's en afhankelijkheden worden alleen als
+afzonderlijk veld opgeslagen wanneer het publieke contract dat hierboven expliciet vereist.
 
 `title` en `summary` zijn opgeslagen presentatievelden en worden met iedere epicversie bevroren. Ze
 zijn geen vervanging voor de volledige epicinhoud en mogen daar niet mee in tegenspraak zijn. De
@@ -211,7 +216,7 @@ beschikbaar bewijs kan richting geven, maar is geen acceptatiecriterium voor dez
 
 Iedere gepubliceerde epicversie is inhoudelijk onveranderlijk.
 
-Zolang een epic `AVAILABLE` is, mag Productontwerp:
+Zolang een epic `NEEDS_RESEARCH` of `AVAILABLE` is, mag Productontwerp:
 
 - een nieuwe versie publiceren;
 - de vorige versie `SUPERSEDED` maken;
@@ -244,7 +249,7 @@ langlopende processessie nooit een inmiddels geclaimde epic overschrijven.
 ## Publieke levenscyclus van een epic
 
 ```text
-AVAILABLE ──claim──> IN_PLANNING ──stories gepubliceerd──> ACTIVE
+NEEDS_RESEARCH ──onderzoek, UX en readiness compleet──> AVAILABLE ──claim──> IN_PLANNING ──stories gepubliceerd──> ACTIVE
     ├──nieuwere versie──> SUPERSEDED                         ├──klaar voor complete beoordeling──> VERIFYING
     └──intrekken────────> WITHDRAWN                          │                       │
                                                              │                       ├──geslaagd──────> COMPLETED

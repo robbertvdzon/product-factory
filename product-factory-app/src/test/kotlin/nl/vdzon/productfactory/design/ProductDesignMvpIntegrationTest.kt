@@ -5,11 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.ai.AiExecutionApplicationService
 import nl.vdzon.productfactory.ai.FakeRuntime
+import nl.vdzon.productfactory.ai.RuntimeArtifactView
 import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
 import nl.vdzon.productfactory.design.mvp.ProductDesignMvpService
+import nl.vdzon.productfactory.design.mvp.ProductDesignAiOrchestrator
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -33,6 +35,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     private val queries: ProductDesignQueryService,
     private val ai: AiExecutionApplicationService,
     private val designImplementation: ProductDesignMvpService,
+    private val orchestrator: ProductDesignAiOrchestrator,
     private val runtime: FakeRuntime,
     private val mapper: ObjectMapper,
 ) {
@@ -59,6 +62,8 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         assertThat(epic.status).isEqualTo(EpicStatus.AVAILABLE)
         assertThat(epic.title).isEqualTo("Rustige voortgang")
         assertThat(epic.acceptanceCriteria).hasSize(2)
+        assertThat(epic.uxArtifacts).hasSize(2)
+        assertThat(epic.readiness.readyForPlanning).isTrue()
         val session = queries.findProcessSessions(ProcessSessionFilter(productId)).first()
         assertThat(session.status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
         assertThat(session.publications).containsExactly(SourceReference("EPIC", epic.id.value, epic.version))
@@ -140,6 +145,69 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         assertStrictObjectSchemas(schema)
         assertThat(schema.at("/properties/epic/properties/directionReferences/items/properties/type/enum").map(JsonNode::asText))
             .containsExactly("PRODUCT_ASSIGNMENT", "DECISION")
+        assertThat(schema.at("/properties/epic/properties/researchSources/items/properties/status/enum").map(JsonNode::asText))
+            .containsExactly("CANDIDATE", "VALIDATED", "BLOCKED")
+    }
+
+    @Test
+    fun `onrijpe data-afhankelijke epic blijft buiten planning en wordt begrensd verder ontworpen`() {
+        design.runProcessSession(productId)
+        completeOnlyJob(validEpic().also { result ->
+            val epic = result.path("epic") as ObjectNode
+            epic.put("solution", "Gebruik externe archieven en datasets als bronnen voor een betrouwbaar zoekresultaat.")
+            epic.path("readiness").let { it as ObjectNode }.apply {
+                put("readyForPlanning", false)
+                put("requiresExternalData", true)
+                putArray("unmetConditions").add("Concrete externe bronnen moeten nog worden gevalideerd.")
+            }
+        })
+        orchestrator.resumeReady()
+
+        val firstIterationSession = queries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        assertThat(firstIterationSession.status)
+            .withFailMessage("Ontwerpiteratie blokkeerde: %s / %s", firstIterationSession.errorCode, firstIterationSession.blockedReason)
+            .isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
+        var epic = queries.findEpics(EpicFilter(productId)).single()
+        assertThat(epic.status).isEqualTo(EpicStatus.NEEDS_RESEARCH)
+        assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
+        assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().aiTaskIds).hasSize(2)
+
+        val refined = validEpic().apply {
+            put("outcome", "REVISE_EPIC")
+            put("epicId", epic.id.value)
+            put("expectedVersion", epic.version)
+            val draft = path("epic") as ObjectNode
+            draft.put("solution", "Gebruik twee gevalideerde externe archieven en datasets als bronnen voor een betrouwbaar zoekresultaat.")
+            draft.putArray("researchSources").apply {
+                add(validatedSource("https://example.org/archive", "Gemeentearchief"))
+                add(validatedSource("https://example.org/museum", "Museumcollectie"))
+            }
+            (draft.path("readiness") as ObjectNode).apply {
+                put("readyForPlanning", true)
+                put("requiresExternalData", true)
+                putArray("unmetConditions")
+                putArray("openQuestions")
+            }
+        }
+        completeOnlyJob(refined)
+        orchestrator.resumeReady()
+
+        epic = queries.getEpic(epic.id)
+        assertThat(epic.status).isEqualTo(EpicStatus.AVAILABLE)
+        assertThat(epic.researchSources).hasSize(2)
+        assertThat(epic.readiness.readyForPlanning).isTrue()
+        assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+    }
+
+    private fun validatedSource(uri: String, name: String) = mapper.createObjectNode().apply {
+        put("name", name)
+        put("provider", name)
+        put("uri", uri)
+        put("accessMethod", "Publieke HTTPS-collectie met gedocumenteerde zoekroute")
+        put("license", "Publiek raadpleegbaar; rechten per object vermeld")
+        put("coverage", "Historische records, objectbeschrijvingen en datering voor de relevante regio")
+        put("status", "VALIDATED")
+        put("validationEvidence", "De collectiepagina en zoekfunctie zijn geopend en geven concrete resultaten met bronmetadata.")
     }
 
     private fun assertStrictObjectSchemas(schema: JsonNode) {
@@ -157,8 +225,12 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
 
     private fun completeOnlyJob(result: ObjectNode) {
         ai.dispatchPending()
-        val job = runtime.onlyJob()
+        val job = runtime.jobs.values.single { it.status != "SUCCEEDED" }
         runtime.results[job.id] = result
+        runtime.resultArtifacts[job.id] = listOf(
+            RuntimeArtifactView("ux-main", job.id, "ux-main.png", "image/png", 128, "1".repeat(64), java.time.Instant.now()),
+            RuntimeArtifactView("ux-empty", job.id, "ux-empty.png", "image/png", 128, "2".repeat(64), java.time.Instant.now()),
+        )
         runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
         ai.reconcileActive()
     }
@@ -175,6 +247,13 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
             put("uxDesign", "Eén scanbaar voortgangsblok met titel, samenvatting, status en bewijslink.")
             putArray("acceptanceCriteria").add("De Stakeholder ziet de actuele verbetering en status op het productoverzicht.").add("De bewijslink opent de opgeslagen bron zonder technische databasekennis.")
             put("slicabilityRationale", "De verbetering heeft één gebruikersdoel en kan langs overzicht, detail en bewijs in zelfstandige slices worden geleverd.")
+            putArray("researchSources")
+            putObject("readiness").apply {
+                put("readyForPlanning", true)
+                put("requiresExternalData", false)
+                putArray("unmetConditions")
+                putArray("openQuestions")
+            }
         })
         putArray("processedSignalIds")
         putArray("memoryChanges")

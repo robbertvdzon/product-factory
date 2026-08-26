@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.ai.AiExecutionApplicationService
 import nl.vdzon.productfactory.ai.FakeRuntime
+import nl.vdzon.productfactory.ai.RuntimeArtifactView
 import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.dispatcher.*
 import nl.vdzon.productfactory.api.foundation.DeploymentRevisionResolver
@@ -127,6 +128,12 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
     private fun completeDispatched(result: ObjectNode) {
         val job = runtime.onlyJob()
         runtime.results[job.id] = result
+        if (result.path("epic").isObject) {
+            runtime.resultArtifacts[job.id] = listOf(
+                RuntimeArtifactView("ux-main", job.id, "ux-main.png", "image/png", 128, "1".repeat(64), java.time.Instant.now()),
+                RuntimeArtifactView("ux-empty", job.id, "ux-empty.png", "image/png", 128, "2".repeat(64), java.time.Instant.now()),
+            )
+        }
         runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
         ai.reconcileActive()
     }
@@ -143,6 +150,13 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
             put("uxDesign", "Een rustige overzichtskaart met duidelijke status, actie en toegankelijke focusvolgorde.")
             putArray("acceptanceCriteria").add(CRITERION)
             put("slicabilityRationale", "Eén zelfstandige story levert de complete kleine gebruikersroute zonder verborgen vervolgwerk.")
+            putArray("researchSources")
+            putObject("readiness").apply {
+                put("readyForPlanning", true)
+                put("requiresExternalData", false)
+                putArray("unmetConditions")
+                putArray("openQuestions")
+            }
         })
         putArray("processedSignalIds")
         putArray("memoryChanges")

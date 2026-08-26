@@ -49,7 +49,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(12)
+        assertThat(result.migrationsExecuted).isEqualTo(13)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -77,6 +77,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("11")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("12")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("13")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -145,7 +147,7 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("12")
+                    assertThat(rows.getString(1)).isEqualTo("13")
                 }
             }
         }
@@ -160,7 +162,7 @@ class PostgresMigrationSmokeTest {
         assertThat(old.targetSchemaVersion.toString()).isEqualTo("8")
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(4)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(5)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_quality_process_session").use { rows ->
@@ -187,7 +189,7 @@ class PostgresMigrationSmokeTest {
         Flyway.configure().dataSource(url, postgres.username, postgres.password).target("9").load().migrate()
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(3)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(4)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_dispatcher_process_session").use { rows ->
@@ -211,7 +213,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(2)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(3)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_schedule_run").use { rows ->
@@ -239,7 +241,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(1)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(2)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery(
@@ -247,6 +249,51 @@ class PostgresMigrationSmokeTest {
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("gpt-5.6-sol")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `bestaande beschikbare epic wordt na readinessmigratie eerst onderzoekswerk`() {
+        val database = "productfactory_upgrade_v12_epic"
+        createDatabase(database)
+        val url = databaseUrl(database)
+        Flyway.configure().dataSource(url, postgres.username, postgres.password).target("12").load().migrate()
+        DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate(
+                    """INSERT INTO pf_product(product_id,name,status,dispatching_enabled,created_at,updated_at,updated_by_type,updated_by_id,version)
+                        VALUES ('migration-product','Migration product','ACTIVE',FALSE,NOW(),NOW(),'SYSTEM','migration',1)""".trimIndent(),
+                )
+                statement.executeUpdate(
+                    """INSERT INTO pf_epic(id,product_id,current_version,status,created_at,updated_at)
+                        VALUES ('00000000-0000-0000-0000-000000000013','migration-product',1,'AVAILABLE',NOW(),NOW())""".trimIndent(),
+                )
+                statement.executeUpdate(
+                    """INSERT INTO pf_epic_version(epic_id,version,title,summary,problem,solution,direction_references_json,ux_design,
+                        acceptance_criteria_json,slicability_rationale,source_references_json,status,actor_type,actor_id,created_at,supersedes_version)
+                        VALUES ('00000000-0000-0000-0000-000000000013',1,'Bestaande epic','Bestaande epic zonder readiness.',
+                        'Het onderzoek ontbreekt nog volledig.','Werk de oplossing later volledig uit.','[]',NULL,'["Onderzoek is compleet."]',
+                        'De epic wordt pas na onderzoek gesliced.','[]','AVAILABLE','SYSTEM','migration',NOW(),NULL)""".trimIndent(),
+                )
+            }
+        }
+
+        val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
+
+        assertThat(upgraded.migrationsExecuted).isEqualTo(1)
+        DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery(
+                    """SELECT status,research_sources_json,readiness_json,ux_artifacts_json FROM pf_epic_version
+                        WHERE epic_id='00000000-0000-0000-0000-000000000013' AND version=1""".trimIndent(),
+                ).use { rows ->
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("NEEDS_RESEARCH")
+                    assertThat(rows.getString(2)).isEqualTo("[]")
+                    assertThat(rows.getString(3)).contains("nog niet opnieuw op gereedheid beoordeeld")
+                    assertThat(rows.getString(4)).isEqualTo("[]")
                 }
             }
         }

@@ -358,6 +358,7 @@ tegen een oudere deployment afgekeurd.
 
 Een epic gebruikt:
 
+- `NEEDS_RESEARCH` — ontwerp, concrete bronnen, UX-modellen of open vragen zijn nog niet compleet;
 - `AVAILABLE` — complete versie die Productplanning mag kiezen;
 - `IN_PLANNING` — exacte versie is gekozen en bevroren;
 - `ACTIVE` — één of meer stories worden uitgevoerd of hersteld;

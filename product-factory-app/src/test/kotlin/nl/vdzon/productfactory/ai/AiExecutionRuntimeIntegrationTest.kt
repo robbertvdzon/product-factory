@@ -10,6 +10,7 @@ import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.product.CloseMeetingRequest
 import nl.vdzon.productfactory.product.MeetingAiOrchestrator
 import nl.vdzon.productfactory.product.MeetingMessageRequest
+import nl.vdzon.productfactory.memory.AiTaskController
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -38,6 +39,7 @@ class AiExecutionRuntimeIntegrationTest @Autowired constructor(
     private val runtime: FakeRuntime,
     private val productQueries: ProductQueryService,
     private val meetings: MeetingAiOrchestrator,
+    private val taskController: AiTaskController,
 ) {
     private var productId = ProductId("not-initialized")
 
@@ -99,11 +101,16 @@ class AiExecutionRuntimeIntegrationTest @Autowired constructor(
         assertThat(running.safeProgressPercent).isEqualTo(40)
         assertThat(running.runtimeAttemptCount).isEqualTo(1)
 
+        runtime.resultArtifacts[runtimeJob.id] = listOf(
+            RuntimeArtifactView("artifact-1", runtimeJob.id, "zoekscherm.png", "image/png", 6, "0".repeat(64), Instant.now()),
+        )
         runtime.jobs[runtimeJob.id] = runtime.jobs.getValue(runtimeJob.id).copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
         implementation.reconcileActive()
         assertThat(queries.getAiTask(taskId).status).isEqualTo(AiTaskStatus.SUCCEEDED)
         assertThat(queries.getAiTaskResult(taskId)?.responseJson).contains("antwoord")
         assertThat(queries.getAiTaskResult(taskId)?.artifacts?.single()?.uri).startsWith("/api/ai/tasks/")
+        assertThat(taskController.artifact(taskId.value, "artifact-1").headers.contentType).isEqualTo(org.springframework.http.MediaType.IMAGE_PNG)
+        assertThat(taskController.artifact(taskId.value, "artifact-1").body).isEqualTo("bewijs".toByteArray())
 
         val cancelTask = commands.requestAiTask(taskCommand("cancel"))
         implementation.dispatchPending()
@@ -174,6 +181,7 @@ class FakeRuntime : AgentRuntimeClient {
     val jobs = linkedMapOf<String, RuntimeJobView>()
     val environmentKeys = mutableListOf<RuntimeEnvironmentKey>()
     val results = mutableMapOf<String, com.fasterxml.jackson.databind.JsonNode>()
+    val resultArtifacts = mutableMapOf<String, List<RuntimeArtifactView>>()
     var loseFirstCreateResponse = false
     private var lost = false
 
@@ -191,7 +199,7 @@ class FakeRuntime : AgentRuntimeClient {
     override fun getJob(jobId: String) = jobs.getValue(jobId)
     override fun getResult(jobId: String) = RuntimeJobResult(
         jobId, results[jobId] ?: com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("antwoord", "gereed"),
-        listOf(RuntimeArtifactView("artifact-1", jobId, "bewijs.txt", "text/plain", 6, "0".repeat(64), Instant.now())), Instant.now(),
+        resultArtifacts[jobId] ?: listOf(RuntimeArtifactView("artifact-1", jobId, "bewijs.txt", "text/plain", 6, "0".repeat(64), Instant.now())), Instant.now(),
     )
     override fun cancelJob(jobId: String): RuntimeJobView = jobs.getValue(jobId).copy(status = "CANCELLED", phase = "CANCELLED").also { jobs[jobId] = it }
     override fun listEnvironmentKeys(projectPrefix: String) = environmentKeys.filter { it.projectPrefix == projectPrefix }
@@ -200,6 +208,6 @@ class FakeRuntime : AgentRuntimeClient {
     fun onlyJob() = jobs.values.single()
     fun distinctIdempotencyKeys() = requests.map { it.idempotencyKey }.distinct()
     fun jobCount() = jobs.size
-    fun reset() { requests.clear(); jobs.clear(); environmentKeys.clear(); results.clear(); loseFirstCreateResponse = false; lost = false }
+    fun reset() { requests.clear(); jobs.clear(); environmentKeys.clear(); results.clear(); resultArtifacts.clear(); loseFirstCreateResponse = false; lost = false }
     private fun idFor(key: String) = UUID.nameUUIDFromBytes(key.toByteArray()).toString()
 }
