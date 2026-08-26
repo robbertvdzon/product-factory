@@ -6,6 +6,18 @@ Maak één generieke Product Factory-façade waarmee iedere latere module een co
 duurzaam via de gedeelde Agent Runtime kan laten uitvoeren, zonder dat Product Factory een eigen
 technische queue, laptopworker of attemptadministratie bouwt.
 
+## Eindtoestand en ingangseisen
+
+Na deze stap kunnen Product Factory-modules complete AI-taken duurzaam aanvragen, laten uitvoeren,
+annuleren en hervatten via Agent Runtime v2. Overleggen gebruiken deze route voor gesprek en
+notulen; Productontwerp, Productplanning en Kwaliteitsbewaking gebruiken haar vanaf hun eigen stap.
+
+Begin alleen wanneer stap 3 gezond op acceptatie en productie staat en de actieve Agent Runtime-
+omgeving het hieronder genoemde v2-contract aanbiedt. Controleer dit met een geauthenticeerde
+contractsmoke vóór database- of domeinwerk. Een ontbrekend Runtime-v2-contract is een echte
+stopvoorwaarde voor afronding: een tijdelijke v1-adapter mag ontwikkeling faciliteren, maar komt
+niet als eindtoestand op `main`.
+
 ## Voorwaarde buiten deze repository
 
 De Agent Runtime implementeert eerst het vereenvoudigde `APPLICATION_WORK` v2-contract uit
@@ -127,6 +139,52 @@ projectcredentialwaarden. Idempotentie bewaakt maximaal één extern Runtime-job
 - Een bewust gestarte productiesmoke dient één echte, credentialloze testjob in en bewijst de route
   tot en met Codex of Claude zonder domeindata te publiceren.
 
+## Uitvoeringsvolgorde
+
+1. Verifieer Runtime v2, OpenAPI, authenticatiescopes, catalogus en server-side `MOCKED` op de
+   doelomgevingen zonder credentials te loggen.
+2. Pas het publieke AI-contract en het product-testomgevingcontract atomair aan; verwijder alle
+   oude worker- en credentialreferencevelden en herstel alle compileer- en contracttests.
+3. Voeg Runtimeconfiguratie, fail-closed guards, Sealed Secret-input en voorbeeldconfiguratie toe.
+4. Voeg de lokale taakcorrelatie, outbox, resultaatprojectie, environmentnamen en rolgrants toe met
+   voorwaartse Flywaymigraties en unieke idempotentieconstraints.
+5. Bouw en contracttest de Runtime-v2-client, inclusief veilige foutvertaling, time-outs, cancel,
+   catalogus, status, resultaat en artifacts.
+6. Implementeer transactionele taakaanvraag, outboxdispatch, reconciliatie en hervatting zonder
+   open serverthread. Verwijder eventueel resterende lokale worker-, attempt- of mockexecutorcode.
+7. Implementeer backend-side selectie van environmentkeys en de geversioneerde beheercommands.
+8. Activeer Meeting Agent en notulenagent: promptopbouw, meetingsnapshot, rolgericht antwoord,
+   notulen, vragenbeantwoording, besluiten en atomaire geheugenbatch.
+9. Bouw productinstellingen voor agenttoegang, AI-taakoperatie en complete overlegweergave.
+10. Breid Testbed uit met Runtime-fixtures en voer adapter-, herstel-, acceptatie- en
+    productie-smoketests uit voordat de release via `main` gaat.
+
+## Verplichte automatische bewijzen
+
+- verloren response en dubbele outboxdispatch leveren exact één extern Runtime-job-ID op;
+- een processessie of meeting gaat naar `WAITING_FOR_AI`, houdt geen lock/thread vast en hervat
+  zonder een tweede taak;
+- status, veilige progress, terminale fout, resultaat en artifacts worden correct gemapt en een
+  cancel wordt tot terminale bevestiging gereconcilieerd;
+- onbekende keys blokkeren lokaal, bekende offline keys wachten bij Runtime en alleen actieve
+  product-/rolgrants verlaten de backend;
+- frontend, prompt en modeloutput kunnen geen keynaam toevoegen en nergens verschijnt een waarde;
+- attachment- en artifactlimieten plus autorisatie worden aan beide kanten van de adaptergrens
+  getest;
+- `MOCKED` gebruikt op acceptatie exact dezelfde route als echte taken en is in productie onmogelijk;
+- meetingvragen, rolgerichte antwoorden, notulen, besluiten en geheugenbatch zijn idempotent en
+  brongetrouw;
+- PostgreSQL-migratie, REST-/frontendtests, Testbedreset en de vaste releasecontrole slagen.
+
+## Aanbevolen commitgrenzen
+
+1. Runtime-v2-contracten en verwijdering van de oude workergrens;
+2. configuratie, guards, migraties en lokale outbox;
+3. Runtime-client, dispatch, reconcile en cancel;
+4. environmentcatalogus, rolgrants, attachments en artifacts;
+5. overlegagents, frontend, Testbed en operationele weergave;
+6. hersteltests, documentatie en releasecorrecties.
+
 ## Buiten scope
 
 - technische workerimplementatie, Dockercontainer, providercredentials, queue, attempts, leases,
@@ -147,7 +205,7 @@ projectcredentialwaarden. Idempotentie bewaakt maximaal één extern Runtime-job
 - [Frontend](../stakeholder/frontend.md)
 - [Agent Runtime APPLICATION_WORK v2](https://github.com/robbertvdzon/agent-runtime/blob/main/docs/application-work-v2.md)
 
-## Klaar wanneer
+## Definitie van klaar
 
 Een Product Factory-proces kan via lokale outbox en Runtime v2 exact één echte of gemockte
 `APPLICATION_WORK`-job indienen, zonder eigen worker- of attemptcode. Een verloren response maakt
@@ -163,3 +221,8 @@ attemptdeadline ook bij worker- of laptopproblemen niet kan worden verlengd.
 `MOCKED` draait volledig server-side in Runtime-acceptatie; productie weigert het. Product Factory
 kan volledig op OpenShift draaien en heeft geen eigen laptopservice, terwijl echte providerprocessen
 voorlopig door de gedeelde lokale Runtime-worker worden uitgevoerd.
+
+Daarnaast zijn alle verplichte automatische bewijzen groen, toont `ImplementationManifest` de
+actieve AI-providerimplementatie en staat exact dezelfde release gezond op acceptatie en productie.
+Een tijdelijke Runtime-v1-adapter, lokale mockexecutor of gereserveerde Product Factory-worker mag
+dan niet meer actief of noodzakelijk zijn.

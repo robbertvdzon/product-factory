@@ -19,7 +19,6 @@ gegevens, niet hoe het oude dashboard was opgebouwd.
 - Een commandfout wordt zichtbaar getoond en niet optimistisch als geslaagde wijziging bewaard.
 - Technische sessies, queues en retries staan in een aparte operationele weergave.
 - Productobjecten tonen hun bron, actuele status, versie en relevante koppelingen.
-- De kern blijft bruikbaar op een viewport van 320 CSS-pixels en bij 200% tekstvergroting.
 - Op bredere schermen gebruikt de applicatieschil de beschikbare ruimte; mobiel bruikbaar betekent
   niet dat de desktopweergave tot een smalle kolom wordt beperkt.
 

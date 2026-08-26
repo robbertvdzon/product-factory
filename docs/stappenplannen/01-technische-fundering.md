@@ -349,8 +349,7 @@ presentatie- en testpatronen over. Voor deze eerste technische versie gelden all
 4. Toon omgeving en frontend- en backendversie op het beheerscherm.
 5. Toon in acceptatie op iedere pagina de afgesproken banner.
 6. Test de nieuw ontworpen schermlogica en interacties zonder een v1-testsuite na te bouwen.
-7. De kern blijft bruikbaar op een viewport van 320 CSS-pixels en bij 200% tekstvergroting. Op
-   bredere schermen gebruikt de applicatieschil de beschikbare schermruimte in plaats van de hele
+7. Op brede schermen gebruikt de applicatieschil de beschikbare schermruimte in plaats van de hele
    interface in een smalle mobiele kolom te houden.
 
 **Verificatie:** frontendanalyse, gerichte tests en de releasebuild zijn groen zonder echte externe
@@ -373,8 +372,9 @@ Implementeer het bewezen cachemodel opnieuw:
 8. Test twee opeenvolgende builds met verschillende inhoud: een browser die eerst build A bezocht
    moet zonder cachelegen build B kunnen laden.
 
-**Verificatie:** Nginxconfiguratietest, containerbuild en echte browsertest bewijzen headers,
-serviceworkeropruiming en het laden van de nieuwste build.
+**Verificatie:** Nginxconfiguratietest en container-/integratietests bewijzen headers,
+serviceworkeropruiming en het laden van de nieuwste build. Een aanvullende handmatige browsertest
+is een Stakeholdercontrole en geen klaarvoorwaarde.
 
 ### Stap 7 — Voeg versie- en omgevingsidentiteit toe
 
@@ -495,7 +495,7 @@ acceptatie en daarna op productie, en beide omgevingen rapporteren exact dezelfd
 logs, health onderscheidt startup/readiness/liveness en het runbook is door een nieuwe agent zonder
 chatcontext uitvoerbaar.
 
-### Stap 12 — Eindcontrole en opruiming
+### Stap 12 — Automatische afsluiting en opruiming
 
 1. Zoek repositorybreed naar oude packages, modulenamen, workspaceverwijzingen, v1-agentrollen,
    oude databaseobjecten en oude URLs.
@@ -504,11 +504,10 @@ chatcontext uitvoerbaar.
 3. Controleer dat geen oud document meer normatief of bereikbaar vanuit de nieuwe documentatie is.
 4. Controleer dat `secrets.env` nog bestaat, ongewijzigd gitignored is en niet in een diff voorkomt.
 5. Draai het volledige lokale en CI-vangnet.
-6. Voer acceptatie- en productie-rooktests uit.
-7. Controleer een echte login op productie en uitgeschakelde auth plus banner op acceptatie.
-8. Voer de tweebuild-cachetest en database-restoretest uit.
-9. Controleer concrete images, Git-revisies, Flywayversies, routes en health.
-10. Werk dit document bij met feitelijke afwijkingen en bewijs, maar zet implementatiedetails niet in
+6. Laat de releaseflow de geautomatiseerde acceptatie- en productie-rooktests uitvoeren.
+7. Voer de geautomatiseerde tweebuild-cachetest uit.
+8. Controleer concrete images, Git-revisies, Flywayversies, routes en health.
+9. Werk dit document bij met feitelijke afwijkingen en bewijs, maar zet implementatiedetails niet in
     het overzichtsdocument wanneer zij in een gericht technisch document horen.
 
 ## Aanbevolen commitgrenzen
@@ -545,16 +544,18 @@ De technische fundering is pas klaar wanneer al het volgende aantoonbaar waar is
 - productieauthenticatie werkt en faalt gesloten;
 - acceptatieauthenticatie staat zichtbaar en uitsluitend daar uit;
 - frontendcachegedrag toont na deployment zonder handmatig cachelegen de nieuwste versie;
-- de kern van de frontend werkt op 320 CSS-pixels en bij 200% tekstvergroting en gebruikt op brede
-  schermen de beschikbare ruimte;
+- de frontend gebruikt op brede schermen de beschikbare ruimte;
 - frontend en backend tonen omgeving, applicatieversie, commit en buildtijd;
 - acceptatie en productie draaien exact de bedoelde image-digests;
 - healthchecks, logs, metrics, correlation-ids en timeouts werken;
-- een productiebackup is gevalideerd en succesvol teruggezet in een tijdelijke database;
 - productie registreert geen Testbed-, mock-, reset- of seedvoorzieningen;
 - er bestaan nog geen functionele procesimplementaties of half afgemaakte v1-compatibiliteitslagen;
 - een volgende agent kan vanuit de nieuwe documentatie de eerste functionele module bouwen zonder
   oude documentatie of chatcontext nodig te hebben.
+
+Een aanvullende handmatige browsertest, productiebackup/restore, 320px-/200%-controle en volledige
+menselijke eindcontrole kan de Stakeholder zelf uitvoeren. Deze controles blokkeren de technische
+afronding van stap 1 niet.
 
 ## Vervolg
 

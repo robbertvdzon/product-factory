@@ -1,13 +1,36 @@
 # Stappenplannen voor de MVP
 
-Deze map beschrijft de volgorde waarin Product Factory wordt opgebouwd. De documenten zijn geen
-tweede set specificaties. Zij benoemen per stap alleen het doel, de globale scope, de relevante
-brondocumenten en het resultaat dat aantoonbaar moet werken.
+Deze map beschrijft de uitvoeringsvolgorde waarin Product Factory wordt opgebouwd. De
+specificatiedocumenten blijven normatief: zij bepalen de contracten, invarianten en het bedoelde
+gedrag. Ieder stappenplan vertaalt die eisen naar een zelfstandige uitvoeropdracht met een vaste
+volgorde, concrete opleveringen, verificatie en een definitie van klaar. Bij verschil gaat het
+gekoppelde specificatiedocument voor en wordt het stappenplan in dezelfde wijziging bijgewerkt.
 
-Iedere stap levert een samenhangende versie op. Die versie wordt eerst op acceptatie gecontroleerd
-en daarna naar productie gedeployed. Een volgende stap begint pas wanneer de voorgaande stap daar
-werkend staat. Functionele onvolledigheid is toegestaan; een onveilige of technisch kapotte release
-niet.
+Iedere stap levert een samenhangende versie op. Een push naar `main` doorloopt de in stap 1 gebouwde
+releaseflow: verificatie, eenmaal bouwen, deployment van die immutable artifacts naar acceptatie,
+rookcontrole en promotie van exact dezelfde digests naar productie. Een volgende stap begint pas
+wanneer de voorgaande stap op beide omgevingen gezond staat. Functionele onvolledigheid is alleen
+toegestaan waar het volgende stappenplan die ontbrekende capability expliciet overneemt; een
+onveilige of technisch kapotte release nooit.
+
+## Betekenis van "alle specificaties"
+
+Na stap 9 zijn alle normatieve eisen uit de onderstaande **MVP-specificatieset** geïmplementeerd en
+automatisch of operationeel aantoonbaar:
+
+- `docs/overzicht.md`, `docs/ketenscenarios.md` en `docs/processen/processen-en-entiteiten.md`;
+- alle documenten onder `docs/platform`;
+- alle documenten onder `docs/stakeholder`;
+- alle documenten onder `docs/gedeelde-modules`;
+- de publieke API- en `mvp.md`-documenten van Productontwerp, Productplanning en
+  Kwaliteitsbewaking;
+- `docs/processen/software-factory-dispatcher.md`;
+- alle geldende ADR's onder `docs/adr`.
+
+De drie procesdocumenten met de naam `uitgebreid.md` zijn expliciet toekomstontwerp en dus geen
+openstaande MVP-eisen. De eindcontrole in stap 9 mag alleen slagen wanneer iedere eis uit de
+MVP-specificatieset is gekoppeld aan werkende code, configuratie, migratie, UI, test of bewust
+operationeel bewijs. Een eis zonder eigenaar of bewijs blokkeert afronding.
 
 ## Volgorde
 
@@ -25,20 +48,45 @@ niet.
 
 ## Algemene regels voor iedere stap
 
+- Lees vóór implementatie het volledige stappenplan en alle gekoppelde normatieve bronnen.
+- Controleer eerst de actuele code en contracten. Een al aanwezige implementatie wordt bewezen en
+  zo nodig aangevuld; zij wordt niet blind opnieuw gebouwd.
 - Stap 1 maakt één `product-factory-api` met alle publieke capabilitypackages en interfaces. Latere
   stappen voegen per capability de echte implementatie toe of maken haar volgende interne
   onderdeel functioneel en activeren dat bewust in `product-factory-app`.
 - Bouw alleen wat voor die stap nodig is en loop niet vooruit op latere capabilities.
-- Gebruik de gekoppelde API- en ontwerpdocumenten als specificatie; kopieer die inhoud niet naar het
-  stappenplan.
+- Publieke modulecommunicatie loopt uitsluitend via `product-factory-api`; geen module leest of
+  schrijft tabellen of repositories van een andere eigenaar.
+- Iedere duurzame wijziging krijgt een voorwaartse Flywaymigratie, idempotentie waar het contract
+  dat vereist en een PostgreSQL-migratiesmoketest.
 - Werk backend, database, frontend, tests, beheerweergave en documentatie samenhangend bij voor zover
   de stap die raakt.
 - Gebruik in acceptatie synthetische data en de voorgeschreven mocks. Productie gebruikt echte
   configuratie en nooit acceptance-only voorzieningen.
-- Rond af met automatische tests, een deployment naar acceptatie, acceptatierooktests en daarna een
-  deployment van exact dezelfde artifacts naar productie.
+- Voeg per stap contracttests, domeintests, integratietests en gerichte frontendtests toe. Voeg een
+  Testbedscenario toe wanneer de stap een externe of AI-grens introduceert.
+- Push pas naar `main` wanneer de lokale en CI-verificatie groen zijn. Controleer daarna dat de
+  automatische release exact dezelfde artifactdigests op acceptatie en productie heeft gezet en
+  dat beide omgevingen gezond zijn.
 - Leg een afwijking eerst vast in het toepasselijke specificatiedocument en verwijs er daarna vanuit
   het stappenplan naar.
+
+Handmatige browsercontrole, een handmatige productiebackup, controle op 320px/200%-weergave en een
+volledige menselijke eindcontrole zijn acties van de Stakeholder. Zij mogen worden uitgevoerd, maar
+zijn geen automatische klaarvoorwaarde van stappen 2 tot en met 9.
+
+## Vaste afronding per stap
+
+Iedere stap sluit af met dezelfde bewijsset:
+
+1. de reactorbuild, backendtests, frontendanalyse/-tests en productiebuild slagen;
+2. nieuwe migraties slagen vanaf een lege PostgreSQL-database én boven op de vorige release;
+3. de gerichte API-, domein-, integratie- en Testbedscenario's slagen;
+4. de actieve implementatie en bronrevisie zijn zichtbaar in `ImplementationManifest` en Operatie;
+5. documentatie, voorbeeldconfiguratie en runbooks beschrijven de werkelijk gebouwde situatie;
+6. de releaseworkflow heeft dezelfde digests gezond op acceptatie en productie gezet.
+
+Een volgende stap mag ontbrekend bewijs uit een eerdere stap niet overnemen.
 
 ## Buiten deze route
 
