@@ -12,6 +12,10 @@ starten**. Een `WAITING_FOR_AI`-sessie wordt hervat; een actieve call geeft bewu
 schedulerrun. Maak alleen een nieuwe sessie wanneer de bestaande sessie een terminale eindstatus
 heeft.
 
+Productplanning hervat een terminale AI-taak automatisch en probeert een technische taakfout
+maximaal drie keer met dezelfde bevroren context. Handmatig hervatten is pas nodig wanneer die
+begrensde retryreeks als `BLOCKED` eindigt of wanneer configuratie eerst moest worden hersteld.
+
 ## AI-job uitgeschakeld of terminaal mislukt
 
 Controleer in **Instellingen → AI-jobs** of de job actief is en een productiegeschikte provider en

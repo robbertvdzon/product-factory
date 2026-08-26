@@ -11,6 +11,7 @@ import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.design.mvp.ProductDesignMvpService
+import nl.vdzon.productfactory.planning.mvp.ProductPlanningAiOrchestrator
 import nl.vdzon.productfactory.planning.mvp.ProductPlanningMvpService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -22,6 +23,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
 
@@ -36,7 +38,9 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     private val planning: ProductPlanningService,
     private val planningQueries: ProductPlanningQueryService,
     private val planningImpl: ProductPlanningMvpService,
+    private val planningOrchestrator: ProductPlanningAiOrchestrator,
     private val ai: AiExecutionApplicationService,
+    private val jdbc: JdbcTemplate,
     private val runtime: FakeRuntime,
     private val mapper: ObjectMapper,
 ) {
@@ -172,10 +176,10 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `terminale plannertaak houdt epicclaim en hervat dezelfde sessie voor nieuw werk`() {
+    fun `terminale plannertaak herstelt legacy blokkade en probeert begrensd automatisch opnieuw`() {
         planning.runProcessSession(productId)
         completeOnlyJob(selection())
-        planning.runProcessSession(productId)
+        planningOrchestrator.resumeReady()
         val sessionId = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().id
         assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.IN_PLANNING)
 
@@ -184,19 +188,40 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         val failed = runtime.onlyJob()
         runtime.jobs[failed.id] = failed.copy(status = "FAILED", phase = "FAILED", progressPercent = 100)
         ai.reconcileActive()
-        planning.runProcessSession(productId)
+        jdbc.update(
+            "UPDATE pf_planning_process_session SET status='BLOCKED',error_code='PLANNING_RESULT_INVALID' WHERE id=?",
+            sessionId.value,
+        )
+        planningOrchestrator.resumeReady()
 
         var session = planningQueries.getProcessSession(sessionId)
-        assertThat(session.status).isEqualTo(ProcessSessionStatus.BLOCKED)
-        assertThat(session.errorCode).isEqualTo("PLANNING_RESULT_INVALID")
+        assertThat(session.status).isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
+        assertThat(session.aiTaskIds).hasSize(3)
         assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.IN_PLANNING)
 
         runtime.reset()
-        planning.runProcessSession(productId)
         ai.dispatchPending()
+        val secondFailure = runtime.onlyJob()
+        runtime.jobs[secondFailure.id] = secondFailure.copy(status = "FAILED", phase = "FAILED", progressPercent = 100)
+        ai.reconcileActive()
+        planningOrchestrator.resumeReady()
+
         session = planningQueries.getProcessSession(sessionId)
         assertThat(session.status).isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
-        assertThat(session.aiTaskIds).hasSize(3)
+        assertThat(session.aiTaskIds).hasSize(4)
+
+        runtime.reset()
+        ai.dispatchPending()
+        val finalFailure = runtime.onlyJob()
+        runtime.jobs[finalFailure.id] = finalFailure.copy(status = "FAILED", phase = "FAILED", progressPercent = 100)
+        ai.reconcileActive()
+        planningOrchestrator.resumeReady()
+        planningOrchestrator.resumeReady()
+
+        session = planningQueries.getProcessSession(sessionId)
+        assertThat(session.status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(session.errorCode).isEqualTo("PLANNING_RESULT_INVALID")
+        assertThat(session.aiTaskIds).hasSize(4)
         assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId))).hasSize(1)
     }
 

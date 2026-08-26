@@ -26,6 +26,8 @@ import java.time.Duration
 import java.time.Instant
 import java.util.HexFormat
 import java.util.UUID
+import java.util.logging.Level
+import java.util.logging.Logger
 
 @Service
 class ProductPlanningMvpService(
@@ -49,6 +51,7 @@ class ProductPlanningMvpService(
     @Value("\${PF_GIT_REVISION:unknown}") private val sourceRevision: String,
 ) : ProductPlanningService, ProductPlanningQueryService {
     private val transactions = TransactionTemplate(transactionManager)
+    private val log = Logger.getLogger(javaClass.name)
 
     override fun runProcessSession(productId: ProductId) {
         flushPendingEffects()
@@ -63,6 +66,11 @@ class ProductPlanningMvpService(
                 }
             }
         }.onFailure { error ->
+            log.log(
+                Level.WARNING,
+                "planning_session_failed sessionId=${claimed.session.id.value} productId=${productId.value} failureType=${error.javaClass.simpleName}",
+                error,
+            )
             transactions.executeWithoutResult { blockSession(claimed.session.id, safeCode(error), safeMessage(error)) }
         }
         flushPendingEffects()
@@ -187,7 +195,15 @@ class ProductPlanningMvpService(
                     ?: throw InvalidCommand("Geslaagde Plannertaak mist haar resultaat.")
                 if (runtime.phase == "SELECTING") applySelection(session, result) else publishPlan(session, result)
             }
-            AiTaskStatus.FAILED, AiTaskStatus.CANCELLED -> throw InvalidCommand("Plannertaak eindigde zonder publiceerbaar resultaat.")
+            AiTaskStatus.FAILED -> {
+                if (runtime.attempt >= MAX_AUTOMATIC_AI_ATTEMPTS) {
+                    throw InvalidCommand("Plannertaak faalde na $MAX_AUTOMATIC_AI_ATTEMPTS automatische pogingen (${task.errorCode ?: "onbekende fout"}).")
+                }
+                val snapshot = sessionSnapshot(session.id)
+                val repository = sessionRepository(session.id)
+                requestTask(session.id, session.productId, runtime.phase, snapshot, repository.first, repository.second, runtime.attempt + 1)
+            }
+            AiTaskStatus.CANCELLED -> throw InvalidCommand("Plannertaak is geannuleerd en heeft geen publiceerbaar resultaat.")
             else -> jdbc.update("UPDATE pf_planning_process_session SET call_claimed_until=NULL,updated_at=? WHERE id=?", clock.instant(), session.id.value)
         }
     }
@@ -766,6 +782,7 @@ class ProductPlanningMvpService(
         private val PLAN_JOB = AiJobKey("PLANNING.SLICE_EPIC")
         private const val SELECT_PROMPT_VERSION = 1L
         private const val PLAN_PROMPT_VERSION = 1L
+        internal const val MAX_AUTOMATIC_AI_ATTEMPTS = 3
         private val CALL_CLAIM = Duration.ofMinutes(5)
         private val SHA = Regex("[0-9a-fA-F]{40}")
         private val FAR_FUTURE = Instant.parse("9999-12-31T23:59:59Z")

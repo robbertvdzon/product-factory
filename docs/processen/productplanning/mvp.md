@@ -69,7 +69,9 @@ rol opvragen.
 
 Voor iedere Planner-taak leest de procesruntime de betreffende `AiJobConfiguration`, neemt provider en
 model als vaste taakwaarden over en gebruikt [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). Een sessie met open
-taken krijgt `WAITING_FOR_AI`; een volgende run hervat haar zonder dubbele taak.
+taken krijgt `WAITING_FOR_AI`. De planningscoordinator hervat haar zodra de taak terminaal is,
+zonder dubbele taak of handmatige vervolgklik. Een technische taakfout krijgt maximaal drie
+automatische pogingen met dezelfde bevroren context; daarna wordt de sessie zichtbaar `BLOCKED`.
 
 ## Verloop van één processessie
 
@@ -83,7 +85,7 @@ lees eerst geclaimde IN_PLANNING epic, anders AVAILABLE epics
 queue selectie-AiTask
              │
              ▼
-WAITING_FOR_AI · latere run hervat
+WAITING_FOR_AI · coordinator hervat automatisch
              │
              ▼
 Planner-resultaat kiest relevante epic(s)
@@ -95,7 +97,7 @@ applicatie claimt exacte epicversie(s)
 queue plan-AiTask(s)
              │
              ▼
-WAITING_FOR_AI · latere run hervat
+WAITING_FOR_AI · coordinator hervat automatisch
              │
              ▼
 deterministische contract- en dekkingscontrole

@@ -146,8 +146,10 @@ rol en processessie. De vraag staat niet in Agentgeheugen. Een later antwoord wo
 een volgende taak van diezelfde rol toegevoegd.
 
 Een processessie bewaart haar AI-taak-ID's en keert met `WAITING_FOR_AI` terug zonder thread of lock
-vast te houden. Een volgende run voor hetzelfde product hervat dezelfde sessie. Ontbreken de
-resultaten nog, dan maakt zij geen duplicaten en blijft zij wachten.
+vast te houden. De planningscoordinator hervat dezelfde sessie automatisch zodra de taak terminaal
+is. Ontbreken de resultaten nog, dan maakt zij geen duplicaten en blijft zij wachten. Een technische
+taakfout wordt met dezelfde bevroren context maximaal drie keer geprobeerd; daarna blijft de sessie
+zichtbaar `BLOCKED` voor diagnose en bewuste hervatting.
 
 Tijdens een inhoudelijke sessie lost Productplanning de publieke Gitref read-only op en bevriest zij
 de Git-URL en exacte commit-SHA. Bij een echte `CODEX`- of `CLAUDE`-taak checkt de Runtime-worker die

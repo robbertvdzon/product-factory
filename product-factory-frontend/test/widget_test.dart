@@ -307,6 +307,34 @@ void main() {
     expect(find.byTooltip('Sluiten'), findsOneWidget);
   });
 
+  testWidgets('planning starten geeft direct zichtbare terugmelding', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ProductWorkspacePage(
+            gateway: ResearchProductGateway(),
+            section: ProductWorkspaceSection.planning,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Planning starten of hervatten'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Planning is gestart of hervat. De voortgang wordt automatisch bijgewerkt.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Runtime-catalogus gebruikt de gekozen projectprefix', (
     tester,
   ) async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -774,12 +775,47 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   ProductSummary? _selected;
   ProductWorkspaceData? _data;
   bool _busy = true;
+  bool _refreshingPlanning = false;
+  Timer? _planningRefreshTimer;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _loadProducts();
+    _planningRefreshTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) => _refreshPlanningProgress(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _planningRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshPlanningProgress() async {
+    final selected = _selected;
+    final data = _data;
+    final active = data?.planningSessions.any(
+      (session) =>
+          const {'RUNNING', 'WAITING_FOR_AI'}.contains(session['status']),
+    );
+    if (widget.section != ProductWorkspaceSection.planning ||
+        selected == null ||
+        active != true ||
+        _busy ||
+        _refreshingPlanning) {
+      return;
+    }
+    _refreshingPlanning = true;
+    try {
+      final refreshed = await widget.gateway.workspace(selected);
+      if (mounted) setState(() => _data = refreshed);
+    } finally {
+      _refreshingPlanning = false;
+    }
   }
 
   Future<void> _loadProducts([String? selectId]) async {
@@ -1362,8 +1398,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           label: const Text('Handmatige herplanning'),
         ),
         FilledButton.icon(
-          onPressed: () =>
-              _mutate(() => widget.gateway.runProductPlanning(data.product.id)),
+          onPressed: () => _runPlanning(data.product.id),
           icon: const Icon(Icons.play_arrow),
           label: const Text('Planning starten of hervatten'),
         ),
@@ -1581,6 +1616,21 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     controller.dispose();
     if (reason == null || reason.isEmpty) return;
     await _mutate(() => widget.gateway.requestManualReplan(productId, reason));
+  }
+
+  Future<void> _runPlanning(String productId) async {
+    final accepted = await _mutate(
+      () => widget.gateway.runProductPlanning(productId),
+    );
+    if (accepted && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Planning is gestart of hervat. De voortgang wordt automatisch bijgewerkt.',
+          ),
+        ),
+      );
+    }
   }
 
   Widget _quality(
@@ -2776,7 +2826,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     }
   }
 
-  Future<void> _mutate(Future<void> Function() operation) async {
+  Future<bool> _mutate(Future<void> Function() operation) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -2784,6 +2834,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     try {
       await operation();
       await _loadProducts(_selected?.id);
+      return true;
     } on ProductFailure catch (e) {
       if (mounted) {
         setState(() {
@@ -2793,6 +2844,15 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           _busy = false;
         });
       }
+      return false;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'De opdracht kon niet worden uitgevoerd.';
+          _busy = false;
+        });
+      }
+      return false;
     }
   }
 }
