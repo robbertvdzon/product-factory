@@ -11,7 +11,8 @@ data:
   PF_DB_USERNAME: productfactory_v2
   PF_SCHEDULES_ENABLED: "false"
   PF_AI_PROVIDER: DISABLED
-  PF_SOFTWARE_FACTORY_MODE: DISABLED
+  PF_SOFTWARE_FACTORY_MODE: REAL
+  PF_SOFTWARE_FACTORY_URL: https://dashboard.vdzonsoftware.nl/api/integrations/v2
   PF_EXTERNAL_MUTATIONS_ALLOWED: "false"
   PF_AGENT_RUNTIME_URL: https://agent-runtime.vdzonsoftware.nl
   PF_AI_RUNTIME_SCHEDULING_ENABLED: "true"

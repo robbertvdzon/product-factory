@@ -93,6 +93,12 @@ class AcceptanceTestControlService(
         TestScenarioSummary("quality-blocked-not-successful", "1", "Geblokkeerd of niet succesvol", "Retrybare testblokkade blijft historie; NOT_SUCCESSFUL vereist positief bewijs."),
         TestScenarioSummary("quality-deployment-pending", "1", "Oplevercommit nog niet live", "Achterlopende revision geeft DEPLOYMENT_PENDING en nooit een valse productafkeuring."),
         TestScenarioSummary("quality-runtime-retry", "1", "Ontbrekend mockantwoord en retry", "Vaste back-off, onbeperkte poginghistorie en handmatige Retry now zonder dubbele sessie."),
+        TestScenarioSummary("software-factory-idempotent", "1", "Idempotente storylevering", "Eén gereserveerde story wordt ook na herhaling exact één externe mockstory."),
+        TestScenarioSummary("software-factory-lost-response", "1", "Verloren create-response", "Externe lookup herstelt dezelfde storyKey zonder tweede story of attachment."),
+        TestScenarioSummary("software-factory-done", "1", "Externe oplevering", "DONE met volledige commit verwerkt planning en maakt exact één kwaliteitswerkitem."),
+        TestScenarioSummary("software-factory-cancelled", "1", "Externe annulering", "CANCELLED wordt lokaal feitelijk verwerkt zonder niet-bestaande storycontrole."),
+        TestScenarioSummary("software-factory-temporary-failure", "1", "Tijdelijke storing", "Een tijdelijke fout bewaart attempt, foutcode en begrensde volgende retry."),
+        TestScenarioSummary("software-factory-contract-failure", "1", "Contractbreuk", "Een ongeldige response blokkeert dispatch zichtbaar zonder planwerk of aangepaste story."),
     )
     private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
 
@@ -190,8 +196,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "quality-mvp-v1"
-        private const val TESTBED_VERSION = "0.7.0"
+        private const val DATASET_VERSION = "dispatcher-mvp-v1"
+        private const val TESTBED_VERSION = "0.8.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")

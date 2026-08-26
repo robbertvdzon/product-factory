@@ -1,5 +1,10 @@
 # Stap 8 — Software Factory-dispatcher
 
+Implementatiestatus: uitgevoerd. De actieve `software-factory-dispatcher-impl`-provider gebruikt
+uitsluitend het Software Factory-v2-contract, migratie V10 en een duurzaam idempotent
+`DeliveryAttempt`. Acceptatie gebruikt de stateful mock en Testbed 0.8.0; productie gebruikt de
+gesloten REAL-configuratie. De read-only productiesmoke meldde `connected=true` en `apiVersion=2`.
+
 ## Doel en eindtoestand
 
 Verbind de geprioriteerde backlog deterministisch met Software Factory. Na deze stap wordt per

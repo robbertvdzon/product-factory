@@ -3,8 +3,20 @@ package nl.vdzon.productfactory.api.dispatcher
 import nl.vdzon.productfactory.api.shared.*
 import java.time.Instant
 
-enum class DeliveryAttemptStatus { PENDING, ACCEPTED, RETRYABLE_FAILURE, CONTRACT_FAILURE, COMPLETED, CANCELLED }
-data class DispatcherProductStatusDetails(val productId: ProductId, val running: Boolean, val blocked: Boolean, val blockedReason: String?, val externalStoryId: String?, val updatedAt: Instant)
+enum class DeliveryAttemptStatus { PENDING, ACCEPTED, RETRYABLE_FAILURE, CONFIGURATION_FAILURE, AUTHORIZATION_FAILURE, CONTRACT_FAILURE, COMPLETED, CANCELLED }
+enum class ExternalStoryStatus { OPEN, DONE, CANCELLED }
+enum class LocalCommandStatus { NOT_REQUIRED, PENDING, APPLIED, FAILED }
+data class DispatcherProductStatusDetails(
+    val productId: ProductId,
+    val running: Boolean,
+    val blocked: Boolean,
+    val blockedReason: String?,
+    val externalStoryId: String?,
+    val externalStatus: ExternalStoryStatus? = null,
+    val lastAttemptId: DeliveryAttemptId? = null,
+    val retryAfter: Instant? = null,
+    val updatedAt: Instant,
+)
 data class DeliveryAttemptFilter(val productId: ProductId? = null, val storyId: StoryId? = null, val statuses: Set<DeliveryAttemptStatus> = emptySet(), val timeRange: TimeRange = TimeRange())
 data class DeliveryAttemptDetails(
     val id: DeliveryAttemptId,
@@ -12,10 +24,15 @@ data class DeliveryAttemptDetails(
     val storyId: StoryId,
     val reservationId: String,
     val externalStoryId: String?,
+    val externalStatus: ExternalStoryStatus?,
     val idempotencyKey: String,
+    val packageHash: String,
     val status: DeliveryAttemptStatus,
     val attemptCount: Int,
     val lastErrorCode: String?,
+    val lastErrorMessage: String?,
+    val localCommandStatus: LocalCommandStatus,
+    val deliveredCommitSha: String?,
     val retryAfter: Instant?,
     val createdAt: Instant,
     val updatedAt: Instant,

@@ -1,7 +1,7 @@
 # Product Factory v2 — Software Factory-dispatcher
 
-Status: specificatie voor implementatie in stap 8. Het externe Software Factory v2-contract is al
-beschikbaar; de Product Factory-adapter en dispatcher bestaan nog niet.
+Status: geïmplementeerd in stap 8. Het externe Software Factory-v2-contract en de Product
+Factory-dispatcher zijn actief; acceptatie gebruikt dezelfde contractvorm via de stateful mock.
 
 De Software Factory-dispatcher stuurt steeds de eerste uitvoerbare story naar Software Factory en
 verwerkt externe opleverstatussen. Hij is een apart uitvoerend onderdeel met een eigen schedule en

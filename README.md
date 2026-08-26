@@ -12,6 +12,9 @@ epicversies, publiceert complete zelfstandige stories en beheert de productbrede
 herplanning, annulering en atomaire dispatchreservering. De actieve Tester controleert de werkelijk
 gedeployde revision, publiceert reproduceerbaar bewijs en bugs en bewaart onbeperkte retryhistorie
 plus onveranderlijke kwaliteitsbeelden.
+De actieve dispatcher reserveert steeds hoogstens één uitvoerbare story, bevriest het volledige
+storypakket en verwerkt Software Factory-v2-statussen idempotent. Een verloren response, retry of
+lokale bevestigingsfout kan daardoor geen tweede externe story veroorzaken.
 
 ## Vereisten
 
@@ -32,7 +35,8 @@ vroeg en duidelijk falen wanneer Maven toch met een andere Java-hoofdversie draa
 De backendroute `GET /api/foundation` bevestigt de actieve basis. Onder
 `GET /api/foundation/implementations` staan ook `agent-memory-impl` en de actieve
 `agent-runtime-outbox-v1`-variant van `ai-execution-impl` en de actieve
-`product-design-impl-mvp`-, `product-planning-impl-mvp`- en `quality-impl-mvp`-providers. De frontend biedt onder **Beheer**
+`product-design-impl-mvp`-, `product-planning-impl-mvp`-, `quality-impl-mvp`- en
+`software-factory-dispatcher-impl`-providers. De frontend biedt onder **Beheer**
 rolgebonden geheugen, peildatumhistorie, budgetten, globale AI-modellen, alleen-naamsgebonden
 agenttoegang en veilige AI-taakoperatie via de normale geauthenticeerde sessie en CSRF-beveiliging.
 Schedules worden al duurzaam gevalideerd en weergegeven, maar starten tot stap 9 niets automatisch.
@@ -40,7 +44,9 @@ Onder **Producten → Ontwerp** kan de Stakeholder dezelfde publieke ontwerpfunc
 of hervatten en epics, versie-inhoud, bronnen, AI-taken, no-ops en blokkades volgen. Onder
 **Producten → Planning** staan backlog, stories, dependencies, prioriteitsredenen, workitems en
 processessies; daar kan planning worden gestart of gericht worden herpland. Onder **Kwaliteit**
-staan het actuele kwaliteitsbeeld, verificaties, bugs, bewijs, retries en Testersessies.
+staan het actuele kwaliteitsbeeld, verificaties, bugs, bewijs, retries en Testersessies. Onder
+**Planning** kan de Stakeholder de dispatcher starten en storyKey, externe status, reservering,
+idempotentiesleutel, pakkethash, retries, veilige fouten en lokale commandeffecten volgen.
 
 De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md). Het operationele
 overzicht voor deze capability staat in

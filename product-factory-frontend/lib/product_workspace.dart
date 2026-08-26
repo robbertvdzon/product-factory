@@ -58,6 +58,9 @@ class ProductWorkspaceData {
     required this.verifications,
     required this.qualityWorkItems,
     required this.qualitySessions,
+    this.dispatcherStatus = const {},
+    this.deliveryAttempts = const [],
+    this.dispatcherSessions = const [],
   });
   final ProductSummary product;
   final Map<String, Object?>? assignment;
@@ -81,6 +84,9 @@ class ProductWorkspaceData {
   final List<Map<String, Object?>> verifications;
   final List<Map<String, Object?>> qualityWorkItems;
   final List<Map<String, Object?>> qualitySessions;
+  final Map<String, Object?> dispatcherStatus;
+  final List<Map<String, Object?>> deliveryAttempts;
+  final List<Map<String, Object?>> dispatcherSessions;
 }
 
 abstract interface class ProductGateway {
@@ -144,6 +150,7 @@ abstract interface class ProductGateway {
   Future<void> reprioritizeEpic(String productId, String epicId, String reason);
   Future<void> runQuality(String productId);
   Future<void> retryQualityWorkItem(String workItemId);
+  Future<void> runDispatcher(String productId);
 }
 
 class HttpProductGateway implements ProductGateway {
@@ -190,6 +197,9 @@ class HttpProductGateway implements ProductGateway {
       _get('/api/products/$id/verifications'),
       _get('/api/products/$id/quality/work-items'),
       _get('/api/products/$id/quality/sessions'),
+      _get('/api/products/$id/dispatcher/status'),
+      _get('/api/products/$id/dispatcher/attempts'),
+      _get('/api/products/$id/dispatcher/sessions'),
     ]);
     List<Map<String, Object?>> list(int index) =>
         ((values[index] as List?) ?? const [])
@@ -228,6 +238,9 @@ class HttpProductGateway implements ProductGateway {
       verifications: list(17),
       qualityWorkItems: list(18),
       qualitySessions: list(19),
+      dispatcherStatus: (values[20] as Map).cast<String, Object?>(),
+      deliveryAttempts: list(21),
+      dispatcherSessions: list(22),
     );
   }
 
@@ -436,6 +449,13 @@ class HttpProductGateway implements ProductGateway {
   @override
   Future<void> retryQualityWorkItem(String workItemId) =>
       _send('POST', '/api/quality/work-items/$workItemId/retry', const {});
+
+  @override
+  Future<void> runDispatcher(String productId) => _send(
+    'POST',
+    '/api/products/$productId/dispatcher/sessions/run',
+    const {},
+  );
 
   String _key(String prefix) =>
       'ui-$prefix-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
@@ -737,6 +757,14 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
           icon: const Icon(Icons.play_arrow),
           label: const Text('Planning starten of hervatten'),
         ),
+        FilledButton.icon(
+          onPressed: data.product.dispatchingEnabled
+              ? () =>
+                    _mutate(() => widget.gateway.runDispatcher(data.product.id))
+              : null,
+          icon: const Icon(Icons.send_outlined),
+          label: const Text('Nu versturen of bijwerken'),
+        ),
       ],
     ),
     const SizedBox(height: 12),
@@ -781,6 +809,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
             if (story['dispatchReservationId'] != null)
               Text(
                 'Wordt verstuurd · reservering ${story['dispatchReservationId']}',
+              ),
+            if (story['externalStoryId'] != null)
+              SelectableText(
+                'Software Factory: ${story['externalStoryId']} · reservering ${story['dispatchReservationStatus']}',
               ),
             if (story['deliveredCommitSha'] != null)
               SelectableText('Oplevercommit ${story['deliveredCommitSha']}'),
@@ -841,6 +873,68 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
         subtitle: Text(
           '${session['resultSummary'] ?? session['blockedReason'] ?? 'Planner-AI wordt duurzaam gevolgd.'}\n'
           '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
+        ),
+      ),
+    ),
+    const Divider(height: 28),
+    Text(
+      'Software Factory-dispatcher',
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
+    Card(
+      color: data.dispatcherStatus['blocked'] == true
+          ? Theme.of(context).colorScheme.errorContainer
+          : null,
+      child: ListTile(
+        leading: Icon(
+          data.dispatcherStatus['blocked'] == true
+              ? Icons.error_outline
+              : Icons.sync_alt,
+        ),
+        title: Text(
+          data.dispatcherStatus['blocked'] == true
+              ? 'Dispatch geblokkeerd'
+              : 'Dispatcher gereed',
+        ),
+        subtitle: Text(
+          '${data.dispatcherStatus['blockedReason'] ?? 'Geen blijvende technische blokkade.'}\n'
+          'Extern ${data.dispatcherStatus['externalStoryId'] ?? 'geen story'} · ${data.dispatcherStatus['externalStatus'] ?? 'geen status'} · retry ${data.dispatcherStatus['retryAfter'] ?? 'niet gepland'}',
+        ),
+        isThreeLine: true,
+      ),
+    ),
+    ...data.deliveryAttempts.map(
+      (attempt) => ExpansionTile(
+        leading: const Icon(Icons.local_shipping_outlined),
+        title: Text(
+          '${attempt['status']} · ${attempt['externalStoryId'] ?? 'nog geen storyKey'}',
+        ),
+        subtitle: Text(
+          'Story ${_value(attempt['storyId'])} · poging ${attempt['attemptCount']} · lokaal ${attempt['localCommandStatus']}',
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectableText('Reservering ${attempt['reservationId']}'),
+          SelectableText('Idempotentiesleutel ${attempt['idempotencyKey']}'),
+          SelectableText('Pakkethash ${attempt['packageHash']}'),
+          Text('Externe status ${attempt['externalStatus'] ?? 'onbekend'}'),
+          Text('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
+          if (attempt['lastErrorCode'] != null)
+            Text('${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}'),
+          if (attempt['deliveredCommitSha'] != null)
+            SelectableText('Oplevercommit ${attempt['deliveredCommitSha']}'),
+        ],
+      ),
+    ),
+    ...data.dispatcherSessions.map(
+      (session) => ListTile(
+        dense: true,
+        leading: const Icon(Icons.history),
+        title: Text('${session['status']} · ${_value(session['id'])}'),
+        subtitle: Text(
+          '${session['resultSummary'] ?? session['blockedReason'] ?? 'Dispatchersessie actief.'}\n'
+          '${(session['implementation'] as Map?)?['artifact'] ?? 'software-factory-dispatcher-impl'}',
         ),
       ),
     ),

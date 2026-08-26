@@ -90,6 +90,7 @@ interface ProductPlanningService {
     fun markStoryAsCancelled(command: MarkStoryAsCancelledCommand)
     fun recordStoryVerification(command: RecordStoryVerificationCommand)
     fun cancelStoriesForEpic(command: CancelStoriesForEpicCommand)
+    fun flushPendingEffects()
 }
 
 interface ProductPlanningQueryService {

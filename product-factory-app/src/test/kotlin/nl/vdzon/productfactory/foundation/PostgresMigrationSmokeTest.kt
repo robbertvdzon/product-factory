@@ -18,7 +18,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(9)
+        assertThat(result.migrationsExecuted).isEqualTo(10)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -40,6 +40,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("8")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("9")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("10")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -108,14 +110,14 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("9")
+                    assertThat(rows.getString(1)).isEqualTo("10")
                 }
             }
         }
     }
 
     @Test
-    fun `vorige release migreert voorwaarts naar kwaliteitsbewaking`() {
+    fun `planning release migreert voorwaarts naar kwaliteit en dispatcher`() {
         val database = "productfactory_upgrade_v8"
         createDatabase(database)
         val url = databaseUrl(database)
@@ -123,10 +125,33 @@ class PostgresMigrationSmokeTest {
         assertThat(old.targetSchemaVersion.toString()).isEqualTo("8")
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(1)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(2)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_quality_process_session").use { rows ->
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getLong(1)).isZero()
+                }
+                statement.executeQuery("SELECT COUNT(*) FROM pf_delivery_attempt").use { rows ->
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getLong(1)).isZero()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `kwaliteitsrelease migreert voorwaarts naar dispatcher`() {
+        val database = "productfactory_upgrade_v9"
+        createDatabase(database)
+        val url = databaseUrl(database)
+        Flyway.configure().dataSource(url, postgres.username, postgres.password).target("9").load().migrate()
+
+        val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
+        assertThat(upgraded.migrationsExecuted).isEqualTo(1)
+        DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) FROM pf_dispatcher_process_session").use { rows ->
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getLong(1)).isZero()
                 }

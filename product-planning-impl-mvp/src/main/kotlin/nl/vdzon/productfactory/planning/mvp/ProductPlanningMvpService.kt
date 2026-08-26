@@ -51,7 +51,7 @@ class ProductPlanningMvpService(
     private val transactions = TransactionTemplate(transactionManager)
 
     override fun runProcessSession(productId: ProductId) {
-        flushQualityEffects()
+        flushPendingEffects()
         val claimed = transactions.execute { claimOrCreate(productId) } ?: error("Planningsclaim ontbreekt.")
         runCatching {
             transactions.executeWithoutResult {
@@ -65,7 +65,7 @@ class ProductPlanningMvpService(
         }.onFailure { error ->
             transactions.executeWithoutResult { blockSession(claimed.session.id, safeCode(error), safeMessage(error)) }
         }
-        flushQualityEffects()
+        flushPendingEffects()
     }
 
     private fun claimOrCreate(productId: ProductId): ClaimedSession {
@@ -659,7 +659,7 @@ class ProductPlanningMvpService(
         ) }, *args,
     )
 
-    fun flushQualityEffects() {
+    override fun flushPendingEffects() {
         val service = quality.ifAvailable ?: return
         jdbc.query("SELECT idempotency_key,effect_type,payload_json FROM pf_planning_quality_effect WHERE applied_at IS NULL ORDER BY created_at", { rs, _ -> Triple(rs.getString(1), rs.getString(2), mapper.readTree(rs.getString(3))) }).forEach { effect ->
             runCatching {
