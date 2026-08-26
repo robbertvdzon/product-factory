@@ -138,9 +138,11 @@ jobs:
 
           wait_for_environment() {
             local environment="$1"
-            for attempt in $(seq 1 60); do
-              if tools/smoke-test.sh "$environment" "$REVISION" >/dev/null 2>&1; then
-                tools/smoke-test.sh "$environment" "$REVISION"
+            local deadline=$((SECONDS + 600))
+            local smoke_output
+            while (( SECONDS < deadline )); do
+              if smoke_output="$(timeout 30s tools/smoke-test.sh "$environment" "$REVISION" 2>&1)"; then
+                echo "$smoke_output"
                 return 0
               fi
               sleep 10

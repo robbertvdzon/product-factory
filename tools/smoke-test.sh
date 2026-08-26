@@ -3,6 +3,7 @@ set -euo pipefail
 
 environment_name="${1:-}"
 expected_revision="${2:-}"
+curl_options=(--fail --silent --show-error --connect-timeout 5 --max-time 20)
 case "$environment_name" in
   acceptance)
     frontend_url="https://product-factory-acceptance.vdzonsoftware.nl"
@@ -20,12 +21,12 @@ case "$environment_name" in
     ;;
 esac
 
-frontend_headers="$(curl --fail --silent --show-error --head "$frontend_url/")"
-frontend_version="$(curl --fail --silent --show-error "$frontend_url/version.json")"
-session="$(curl --fail --silent --show-error "$backend_url/api/auth/session")"
-version="$(curl --fail --silent --show-error "$backend_url/api/version")"
-curl --fail --silent --show-error "$backend_url/actuator/health/liveness" >/dev/null
-curl --fail --silent --show-error "$backend_url/actuator/health/readiness" >/dev/null
+frontend_headers="$(curl "${curl_options[@]}" --head "$frontend_url/")"
+frontend_version="$(curl "${curl_options[@]}" "$frontend_url/version.json")"
+session="$(curl "${curl_options[@]}" "$backend_url/api/auth/session")"
+version="$(curl "${curl_options[@]}" "$backend_url/api/version")"
+curl "${curl_options[@]}" "$backend_url/actuator/health/liveness" >/dev/null
+curl "${curl_options[@]}" "$backend_url/actuator/health/readiness" >/dev/null
 
 test "$(jq -r '.authRequired' <<<"$session")" = "$expected_auth"
 test "$(jq -r '.environment' <<<"$session")" = "$environment_name"
