@@ -781,7 +781,7 @@ class ProductPlanningMvpService(
         private val SELECT_JOB = AiJobKey("PLANNING.SELECT_WORK")
         private val PLAN_JOB = AiJobKey("PLANNING.SLICE_EPIC")
         private const val SELECT_PROMPT_VERSION = 1L
-        private const val PLAN_PROMPT_VERSION = 1L
+        internal const val PLAN_PROMPT_VERSION = 2L
         internal const val MAX_AUTOMATIC_AI_ATTEMPTS = 3
         private val CALL_CLAIM = Duration.ofMinutes(5)
         private val SHA = Regex("[0-9a-fA-F]{40}")

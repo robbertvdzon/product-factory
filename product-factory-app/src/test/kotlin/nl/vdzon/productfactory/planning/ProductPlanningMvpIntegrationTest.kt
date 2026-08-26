@@ -241,6 +241,16 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(session.status).isEqualTo(ProcessSessionStatus.BLOCKED)
         assertThat(session.errorCode).isEqualTo("PLANNING_RESULT_INVALID")
         assertThat(session.aiTaskIds).hasSize(4)
+
+        jdbc.update(
+            "UPDATE pf_ai_task SET prompt_template_version=1 WHERE id=?",
+            session.aiTaskIds.last().value,
+        )
+        planningOrchestrator.resumeReady()
+        session = planningQueries.getProcessSession(sessionId)
+        assertThat(session.status).isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
+        assertThat(session.aiTaskIds).hasSize(5)
+
         assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId))).hasSize(1)
     }
 

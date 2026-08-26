@@ -21,10 +21,12 @@ class ProductPlanningAiOrchestrator(
             """SELECT DISTINCT s.product_id FROM pf_planning_process_session s
                 JOIN pf_ai_task t ON t.id=s.current_ai_task_id
                 WHERE (s.status='WAITING_FOR_AI' AND t.status IN ('SUCCEEDED','FAILED','CANCELLED'))
-                   OR (s.status='BLOCKED' AND t.status='FAILED' AND s.ai_attempt < ?)
+                   OR (s.status='BLOCKED' AND t.status='FAILED' AND
+                       (s.ai_attempt < ? OR (t.job_key='PLANNING.SLICE_EPIC' AND t.prompt_template_version < ?)))
                 ORDER BY s.product_id LIMIT 20""".trimIndent(),
             { rs, _ -> ProductId(rs.getString(1)) },
             ProductPlanningMvpService.MAX_AUTOMATIC_AI_ATTEMPTS,
+            ProductPlanningMvpService.PLAN_PROMPT_VERSION,
         )
         products.forEach { productId ->
             runCatching { planning.runProcessSession(productId) }
