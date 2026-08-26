@@ -2,12 +2,14 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: product-factory-acceptance
 resources:
-  - ../../base
-  - configmap.yaml
+- ../../base
+- configmap.yaml
 patches:
-  - path: routes-patch.yaml
+- path: routes-patch.yaml
 images:
-  - name: ghcr.io/robbertvdzon/product-factory-backend
-    digest: sha256:d06a724a42c4dc5bb223ba653b6a5b39e7a87e9c2a8012db63c2e7037037a72d
-  - name: ghcr.io/robbertvdzon/product-factory-frontend
-    digest: sha256:353610ba2737a7428499c38c047955e6ab72e99f43926c9b0b7dddbe587132ed
+- digest: sha256:c9245fbefaa5864fc208ecc2b346eca76a3c4981b0bb180ba4086adafd54c27d
+  name: ghcr.io/robbertvdzon/product-factory-backend
+  newName: ghcr.io/robbertvdzon/product-factory-backend
+- digest: sha256:6b7a2fdb598fa2715980f9a4cd2d99062d3a64819edb3b72e5cd5f0922e537ec
+  name: ghcr.io/robbertvdzon/product-factory-frontend
+  newName: ghcr.io/robbertvdzon/product-factory-frontend
