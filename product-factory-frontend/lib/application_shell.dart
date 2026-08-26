@@ -6,6 +6,7 @@ import 'build_identity.dart';
 import 'configuration.dart';
 import 'frontend_version_monitor.dart';
 import 'page_reload.dart';
+import 'product_workspace.dart';
 import 'testbed.dart';
 
 class ApplicationShell extends StatefulWidget {
@@ -20,6 +21,8 @@ class ApplicationShell extends StatefulWidget {
     this.currentBuildIdentity,
     this.testControlGateway,
     this.runtimeEnvironment,
+    this.productGateway,
+    this.csrfToken,
     super.key,
   });
 
@@ -33,6 +36,8 @@ class ApplicationShell extends StatefulWidget {
   final BuildIdentity? currentBuildIdentity;
   final TestControlGateway? testControlGateway;
   final String? runtimeEnvironment;
+  final ProductGateway? productGateway;
+  final String? csrfToken;
 
   @override
   State<ApplicationShell> createState() => _ApplicationShellState();
@@ -110,7 +115,11 @@ class _ApplicationShellState extends State<ApplicationShell> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final content = switch (_selectedIndex) {
-                  0 => const ProductPage(),
+                  0 => ProductWorkspacePage(
+                    gateway:
+                        widget.productGateway ??
+                        HttpProductGateway(csrfToken: widget.csrfToken),
+                  ),
                   1 => ManagementPage(
                     versionGateway: widget.versionGateway,
                     stakeholderEmail: widget.stakeholderEmail,
@@ -226,39 +235,6 @@ class AcceptanceBanner extends StatelessWidget {
         'Acceptatie — synthetische tijdelijke data — authenticatie uit',
         textAlign: TextAlign.center,
         style: TextStyle(fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-}
-
-class ProductPage extends StatelessWidget {
-  const ProductPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return _PageFrame(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Producten',
-            style: Theme.of(
-              context,
-            ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'De technische fundering is beschikbaar.',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 32),
-          const _EmptyState(
-            icon: Icons.inventory_2_outlined,
-            title: 'Nog geen producten',
-            message:
-                'Functionele productprocessen worden in een volgende release toegevoegd.',
-          ),
-        ],
       ),
     );
   }
@@ -402,43 +378,6 @@ class _IdentityRow extends StatelessWidget {
           SizedBox(width: 92, child: Text(label)),
           Expanded(child: SelectableText(value)),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Text(message),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

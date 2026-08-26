@@ -34,7 +34,7 @@ class AcceptanceFoundationSeederTest(
     @Test
     fun `acceptatie seedt vaste synthetische metadata`() {
         assertThat(repository.find("dataset.kind")).isEqualTo("synthetic-temporary")
-        assertThat(repository.find("dataset.version")).isEqualTo("foundation-v1")
+        assertThat(repository.find("dataset.version")).isEqualTo("product-stakeholder-v1")
     }
 
     @Test

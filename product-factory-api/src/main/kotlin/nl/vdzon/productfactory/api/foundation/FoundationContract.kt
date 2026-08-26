@@ -1,5 +1,7 @@
 package nl.vdzon.productfactory.api.foundation
 
+import nl.vdzon.productfactory.api.shared.ImplementationIdentity
+
 enum class FoundationState { READY }
 
 data class FoundationStatus(
@@ -15,4 +17,9 @@ data class BuildIdentity(
     val buildTime: String,
     val environment: String,
     val backendBuildIdentity: String,
+)
+
+data class ImplementationManifest(
+    val manifestVersion: String,
+    val implementations: Map<String, ImplementationIdentity>,
 )

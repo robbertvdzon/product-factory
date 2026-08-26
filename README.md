@@ -1,8 +1,9 @@
 # Product Factory
 
-Dit is de nieuwe technische basis van Product Factory. Release `0.1.0` bevat eerst de veilige
-backend- en frontendfundering; functionele procesimplementaties worden daarna capability voor
-capability toegevoegd.
+Product Factory bouwt en bewaakt producten vanuit één globale Stakeholderbediening. De huidige
+release bevat de technische fundering plus de product- en stakeholderbasis: productopdrachten,
+testomgevingen, signalen, agentvragen, overleggen, besluiten en vier configureerbare schedules.
+AI- en productprocessen worden in de volgende capabilities toegevoegd.
 
 ## Vereisten
 
@@ -20,7 +21,9 @@ vroeg en duidelijk falen wanneer Maven toch met een andere Java-hoofdversie draa
 ./product-factory frontend
 ```
 
-De backendroute `GET /api/foundation` bevestigt dat de technische basis actief is. De frontend toont
-bewust nog geen functionele processen.
+De backendroute `GET /api/foundation` bevestigt de actieve basis. Onder
+`GET /api/foundation/implementations` staan de gekozen product- en besluitenimplementaties; de
+frontend biedt het functionele beheer via de normale geauthenticeerde sessie en CSRF-beveiliging.
+Schedules worden al duurzaam gevalideerd en weergegeven, maar starten tot stap 9 niets automatisch.
 
 De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md).

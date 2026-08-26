@@ -1,5 +1,9 @@
 # Stap 2 — Product- en stakeholderbasis
 
+Implementatiebewijs wordt samen met deze stap onderhouden in de domein-, REST-, migratie-,
+Testbed- en frontendtests. De actieve providers zijn `product-impl` en `decisions-impl`; hun
+identiteit is operationeel zichtbaar via `GET /api/foundation/implementations`.
+
 ## Doel en eindtoestand
 
 Maak Product Factory zonder AI-processen bruikbaar voor de ene globale Stakeholder. Na deze stap

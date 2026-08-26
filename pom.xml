@@ -21,6 +21,8 @@
 
     <modules>
         <module>product-factory-api</module>
+        <module>product-impl</module>
+        <module>decisions-impl</module>
         <module>product-factory-app</module>
     </modules>
 
@@ -37,6 +39,16 @@
             <dependency>
                 <groupId>${project.groupId}</groupId>
                 <artifactId>product-factory-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>product-impl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>decisions-impl</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

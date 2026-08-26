@@ -10,6 +10,7 @@ import 'configuration.dart';
 import 'google_login_button.dart';
 import 'frontend_version_monitor.dart';
 import 'testbed.dart';
+import 'product_workspace.dart';
 
 void main() {
   runApp(ProductFactoryApp(federatedSignOut: GoogleSignIn.instance.signOut));
@@ -27,6 +28,7 @@ class ProductFactoryApp extends StatelessWidget {
     this.versionGateway,
     this.frontendVersionSource,
     this.testControlGateway,
+    this.productGateway,
   });
 
   final AuthenticationGateway? authenticationGateway;
@@ -35,6 +37,7 @@ class ProductFactoryApp extends StatelessWidget {
   final VersionGateway? versionGateway;
   final FrontendVersionSource? frontendVersionSource;
   final TestControlGateway? testControlGateway;
+  final ProductGateway? productGateway;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +56,7 @@ class ProductFactoryApp extends StatelessWidget {
         versionGateway: versionGateway ?? HttpVersionGateway(),
         frontendVersionSource: frontendVersionSource,
         testControlGateway: testControlGateway,
+        productGateway: productGateway,
       ),
     );
   }
@@ -66,6 +70,7 @@ class AuthenticationGate extends StatefulWidget {
     required this.versionGateway,
     this.frontendVersionSource,
     this.testControlGateway,
+    this.productGateway,
     super.key,
   });
 
@@ -75,6 +80,7 @@ class AuthenticationGate extends StatefulWidget {
   final VersionGateway versionGateway;
   final FrontendVersionSource? frontendVersionSource;
   final TestControlGateway? testControlGateway;
+  final ProductGateway? productGateway;
 
   @override
   State<AuthenticationGate> createState() => _AuthenticationGateState();
@@ -176,7 +182,9 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
         error: _error,
         frontendVersionSource: widget.frontendVersionSource,
         testControlGateway: widget.testControlGateway,
+        productGateway: widget.productGateway,
         runtimeEnvironment: status.environment,
+        csrfToken: status.csrfToken,
       );
     }
     return LoginPage(
@@ -276,6 +284,8 @@ class FoundationPage extends StatelessWidget {
     this.currentBuildIdentity,
     this.testControlGateway,
     this.runtimeEnvironment,
+    this.csrfToken,
+    this.productGateway,
     super.key,
   });
 
@@ -289,6 +299,8 @@ class FoundationPage extends StatelessWidget {
   final BuildIdentity? currentBuildIdentity;
   final TestControlGateway? testControlGateway;
   final String? runtimeEnvironment;
+  final String? csrfToken;
+  final ProductGateway? productGateway;
 
   @override
   Widget build(BuildContext context) => ApplicationShell(
@@ -302,5 +314,7 @@ class FoundationPage extends StatelessWidget {
     currentBuildIdentity: currentBuildIdentity,
     testControlGateway: testControlGateway,
     runtimeEnvironment: runtimeEnvironment,
+    csrfToken: csrfToken,
+    productGateway: productGateway,
   );
 }

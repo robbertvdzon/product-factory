@@ -33,15 +33,21 @@ class AcceptanceTestControlService(
     private val scenarios = listOf(
         TestScenarioSummary(
             key = "foundation-clean",
-            version = "1",
-            title = "Schone technische fundering",
-            description = "Herhaalbare synthetische basisdata zonder functionele processen.",
+            version = "2",
+            title = "Product- en stakeholderbasis",
+            description = "Herhaalbare producten, signalen, vragen, overleggen, schedules en besluiten.",
         ),
         TestScenarioSummary(
             key = "outbound-mutations-blocked",
             version = "1",
             title = "Externe mutaties geblokkeerd",
             description = "Bewijst dat acceptatie geen echte AI- of Software Factory-mutaties uitvoert.",
+        ),
+        TestScenarioSummary(
+            key = "product-history",
+            version = "1",
+            title = "Producthistorie en overleg",
+            description = "Synthetische actuele en historische toestanden voor alle stap-2-schermen.",
         ),
     )
     private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
@@ -140,8 +146,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "foundation-v1"
-        private const val TESTBED_VERSION = "0.1.0"
+        private const val DATASET_VERSION = "product-stakeholder-v1"
+        private const val TESTBED_VERSION = "0.2.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")

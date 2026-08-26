@@ -12,8 +12,15 @@ enum class UserSignalUrgency { LOW, NORMAL, HIGH, URGENT }
 enum class StakeholderQuestionStatus { OPEN, ANSWERED, WITHDRAWN }
 enum class MeetingStatus { REQUESTED, OPEN, CLOSED }
 enum class MeetingSenderRole { STAKEHOLDER, MEETING_AGENT, SYSTEM }
+enum class MeetingOutcomeStatus { SUCCEEDED, FAILED, ATTENTION_NEEDED }
 
-data class CreateProductCommand(val name: String, val idempotencyKey: String)
+data class CreateProductCommand(
+    val requestedId: ProductId? = null,
+    val name: String,
+    val status: ProductStatus = ProductStatus.ACTIVE,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
 data class UpdateProductAssignmentCommand(
     val productId: ProductId,
     val audience: String,
@@ -21,6 +28,7 @@ data class UpdateProductAssignmentCommand(
     val hardBoundaries: List<String>,
     val publicGitUrl: String,
     val expectedVersion: Long,
+    val actor: ActorReference,
     val idempotencyKey: String,
 )
 data class TestEnvironmentConfiguration(
@@ -31,15 +39,30 @@ data class TestEnvironmentConfiguration(
     val revisionJsonPath: String,
     val credentialReferences: List<String> = emptyList(),
     val dataBoundaries: List<String> = emptyList(),
+    val accessBoundaries: List<String> = emptyList(),
 )
 data class ConfigureTestableProductCommand(
     val productId: ProductId,
     val acceptance: TestEnvironmentConfiguration,
     val production: TestEnvironmentConfiguration? = null,
     val expectedVersion: Long,
+    val actor: ActorReference,
     val idempotencyKey: String,
 )
-data class SetProductDispatchingCommand(val productId: ProductId, val enabled: Boolean, val expectedVersion: Long, val idempotencyKey: String)
+data class SetProductStatusCommand(
+    val productId: ProductId,
+    val status: ProductStatus,
+    val expectedVersion: Long,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
+data class SetProductDispatchingCommand(
+    val productId: ProductId,
+    val enabled: Boolean,
+    val expectedVersion: Long,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
 data class WeeklyScheduleRule(val days: Set<DayOfWeek>, val times: Set<LocalTime>)
 data class SchedulePattern(val weeklyRules: List<WeeklyScheduleRule> = emptyList(), val intervalMinutes: Long? = null)
 data class UpdateProcessScheduleCommand(
@@ -49,6 +72,7 @@ data class UpdateProcessScheduleCommand(
     val timezone: String,
     val pattern: SchedulePattern,
     val expectedVersion: Long,
+    val actor: ActorReference,
     val idempotencyKey: String,
 )
 
@@ -92,17 +116,31 @@ data class SubmitUserSignalCommand(
     val source: String,
     val text: String,
     val attachments: List<ArtifactReference> = emptyList(),
+    val actor: ActorReference,
     val idempotencyKey: String,
 )
-data class MarkUserSignalInReviewCommand(val signalId: UserSignalId, val expectedVersion: Long, val idempotencyKey: String)
+data class MarkUserSignalInReviewCommand(
+    val signalId: UserSignalId,
+    val expectedVersion: Long,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
 data class RecordSignalInvestigationCommand(
     val signalId: UserSignalId,
     val verificationId: VerificationId,
     val outcome: String,
     val expectedVersion: Long,
+    val actor: ActorReference,
     val idempotencyKey: String,
 )
-data class LinkSignalToEpicCommand(val signalId: UserSignalId, val epicId: EpicId, val epicVersion: Long, val expectedVersion: Long, val idempotencyKey: String)
+data class LinkSignalToEpicCommand(
+    val signalId: UserSignalId,
+    val epicId: EpicId,
+    val epicVersion: Long,
+    val expectedVersion: Long,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
 data class UserSignalFilter(
     val productId: ProductId? = null,
     val statuses: Set<UserSignalStatus> = emptySet(),
@@ -123,6 +161,7 @@ data class UserSignalDetails(
     val verificationId: VerificationId? = null,
     val outcome: String? = null,
     val epicId: EpicId? = null,
+    val epicVersion: Long? = null,
     val createdAt: Instant,
     val version: Long,
 )
@@ -134,6 +173,7 @@ data class AskStakeholderCommand(
     val context: String,
     val processSessionId: ProcessSessionId,
     val linkedObjects: List<SourceReference> = emptyList(),
+    val actor: ActorReference,
     val idempotencyKey: String,
 )
 data class RecordStakeholderAnswerCommand(
@@ -142,9 +182,16 @@ data class RecordStakeholderAnswerCommand(
     val messageId: String,
     val answer: String,
     val expectedVersion: Long,
+    val actor: ActorReference,
     val idempotencyKey: String,
 )
-data class WithdrawStakeholderQuestionCommand(val questionId: StakeholderQuestionId, val reason: String, val expectedVersion: Long, val idempotencyKey: String)
+data class WithdrawStakeholderQuestionCommand(
+    val questionId: StakeholderQuestionId,
+    val reason: String,
+    val expectedVersion: Long,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
 data class StakeholderQuestionFilter(
     val productId: ProductId? = null,
     val agentRole: String? = null,
@@ -161,21 +208,47 @@ data class StakeholderQuestionDetails(
     val status: StakeholderQuestionStatus,
     val answer: String? = null,
     val meetingId: MeetingId? = null,
+    val answerMessageId: String? = null,
+    val withdrawalReason: String? = null,
     val createdAt: Instant,
     val answeredAt: Instant? = null,
+    val withdrawnAt: Instant? = null,
     val version: Long,
 )
 
-data class StartMeetingCommand(val productId: ProductId, val reason: String, val agenda: List<String>, val linkedObjects: List<SourceReference>, val idempotencyKey: String)
+data class StartMeetingCommand(
+    val productId: ProductId,
+    val reason: String,
+    val agenda: List<String>,
+    val linkedObjects: List<SourceReference>,
+    val requested: Boolean = false,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
 data class RecordMeetingMessageCommand(
     val meetingId: MeetingId,
     val senderRole: MeetingSenderRole,
     val text: String,
     val representedAgentRole: String? = null,
     val expectedVersion: Long,
+    val actor: ActorReference,
     val idempotencyKey: String,
 )
-data class CloseMeetingCommand(val meetingId: MeetingId, val minutes: String, val outcomes: List<String>, val expectedVersion: Long, val idempotencyKey: String)
+data class CloseMeetingCommand(
+    val meetingId: MeetingId,
+    val minutes: String,
+    val outcomes: List<MeetingOutcomeDetails>,
+    val expectedVersion: Long,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
+data class MeetingOutcomeDetails(
+    val description: String,
+    val commandType: String,
+    val target: SourceReference? = null,
+    val status: MeetingOutcomeStatus,
+    val errorCode: String? = null,
+)
 data class MeetingMessageDetails(
     val id: String,
     val senderRole: MeetingSenderRole,
@@ -192,7 +265,7 @@ data class MeetingDetails(
     val status: MeetingStatus,
     val messages: List<MeetingMessageDetails>,
     val minutes: String? = null,
-    val outcomes: List<String> = emptyList(),
+    val outcomes: List<MeetingOutcomeDetails> = emptyList(),
     val createdAt: Instant,
     val closedAt: Instant? = null,
     val version: Long,
@@ -202,6 +275,7 @@ interface ProductCommandService {
     fun createProduct(command: CreateProductCommand): ProductId
     fun updateProductAssignment(command: UpdateProductAssignmentCommand)
     fun configureTestableProduct(command: ConfigureTestableProductCommand)
+    fun setProductStatus(command: SetProductStatusCommand)
     fun setProductDispatching(command: SetProductDispatchingCommand)
     fun updateProcessSchedule(command: UpdateProcessScheduleCommand)
     fun submitUserSignal(command: SubmitUserSignalCommand): UserSignalId

@@ -6,6 +6,7 @@ import 'package:product_factory_frontend/authentication.dart';
 import 'package:product_factory_frontend/build_identity.dart';
 import 'package:product_factory_frontend/frontend_version_monitor.dart';
 import 'package:product_factory_frontend/main.dart';
+import 'package:product_factory_frontend/product_workspace.dart';
 import 'package:product_factory_frontend/testbed.dart';
 
 void main() {
@@ -15,6 +16,7 @@ void main() {
     final session = Completer<AuthenticationStatus>();
     await tester.pumpWidget(
       ProductFactoryApp(
+        productGateway: const FakeProductGateway(),
         authenticationGateway: FakeAuthenticationGateway(
           sessionResult: session.future,
         ),
@@ -42,6 +44,7 @@ void main() {
     var federatedSignOutCalled = false;
     await tester.pumpWidget(
       ProductFactoryApp(
+        productGateway: const FakeProductGateway(),
         authenticationGateway: gateway,
         versionGateway: FakeVersionGateway(),
         federatedSignOut: () async => federatedSignOutCalled = true,
@@ -76,8 +79,14 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
-      const MaterialApp(home: FoundationPage(showAcceptanceBanner: true)),
+      const MaterialApp(
+        home: FoundationPage(
+          showAcceptanceBanner: true,
+          productGateway: FakeProductGateway(),
+        ),
+      ),
     );
+    await tester.pumpAndSettle();
 
     expect(
       find.text(
@@ -96,6 +105,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProductFactoryApp(
+        productGateway: const FakeProductGateway(),
         authenticationGateway: FakeAuthenticationGateway(
           sessionResult: Future.value(
             const AuthenticationStatus(
@@ -126,7 +136,12 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1200, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      MaterialApp(home: FoundationPage(versionGateway: FakeVersionGateway())),
+      MaterialApp(
+        home: FoundationPage(
+          versionGateway: FakeVersionGateway(),
+          productGateway: const FakeProductGateway(),
+        ),
+      ),
     );
 
     expect(find.byType(NavigationRail), findsOneWidget);
@@ -146,6 +161,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: FoundationPage(
+          productGateway: const FakeProductGateway(),
           versionGateway: FakeVersionGateway(),
           frontendVersionSource: FakeFrontendVersionSource(
             concreteIdentity('0.1.0+bbbbbbbbbbbb'),
@@ -169,6 +185,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: FoundationPage(
+          productGateway: const FakeProductGateway(),
           showAcceptanceBanner: true,
           versionGateway: FakeVersionGateway(),
           testControlGateway: gateway,
@@ -179,7 +196,7 @@ void main() {
     await tester.tap(find.text('Acceptatietesten'));
     await tester.pumpAndSettle();
     expect(find.text('Schone technische fundering'), findsAtLeast(1));
-    expect(find.text('Dataset: foundation-v1'), findsOneWidget);
+    expect(find.text('Dataset: product-stakeholder-v1'), findsOneWidget);
 
     await tester.tap(find.text('Omgeving resetten'));
     await tester.pumpAndSettle();
@@ -200,7 +217,12 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1200, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      MaterialApp(home: FoundationPage(versionGateway: FakeVersionGateway())),
+      MaterialApp(
+        home: FoundationPage(
+          versionGateway: FakeVersionGateway(),
+          productGateway: const FakeProductGateway(),
+        ),
+      ),
     );
 
     expect(find.text('Acceptatietesten'), findsNothing);
@@ -276,8 +298,8 @@ class FakeTestControlGateway implements TestControlGateway {
         title: 'Schone technische fundering',
         description: 'Vaste synthetische basisdata.',
       ),
-      datasetVersion: 'foundation-v1',
-      testbedVersion: '0.1.0',
+      datasetVersion: 'product-stakeholder-v1',
+      testbedVersion: '0.2.0',
       currentStep: 0,
     ),
     scenarios: const [
@@ -298,4 +320,91 @@ class FakeTestControlGateway implements TestControlGateway {
 
   @override
   Future<void> activate(String scenarioKey, String browserSessionId) async {}
+}
+
+class FakeProductGateway implements ProductGateway {
+  const FakeProductGateway();
+  @override
+  Future<List<ProductSummary>> products() async => const [];
+  @override
+  Future<ProductWorkspaceData> workspace(ProductSummary product) =>
+      throw UnimplementedError();
+  @override
+  Future<void> addMeetingMessage(
+    String meetingId,
+    int version,
+    String text,
+  ) async {}
+  @override
+  Future<void> answerQuestion(
+    String questionId,
+    int version,
+    String meetingId,
+    String messageId,
+    String answer,
+  ) async {}
+  @override
+  Future<void> closeMeeting(
+    String meetingId,
+    int version,
+    String minutes,
+    String? openOutcome,
+  ) async {}
+  @override
+  Future<void> completeSignal(
+    String signalId,
+    int version,
+    String outcome,
+  ) async {}
+  @override
+  Future<void> createDecision(String productId, String decision) async {}
+  @override
+  Future<void> createMeeting(String productId, String reason) async {}
+  @override
+  Future<void> createProduct(String name, String? requestedId) async {}
+  @override
+  Future<void> createSignal(String productId, String text) async {}
+  @override
+  Future<void> reviewSignal(String signalId, int version) async {}
+  @override
+  Future<void> reviseDecision(
+    String productId,
+    String decisionId,
+    int version,
+    String decision,
+  ) async {}
+  @override
+  Future<void> saveAssignment(
+    String productId,
+    Map<String, Object?> body,
+  ) async {}
+  @override
+  Future<void> saveSchedule(
+    String productId,
+    String process,
+    Map<String, Object?> body,
+  ) async {}
+  @override
+  Future<void> saveTestConfiguration(
+    String productId,
+    Map<String, Object?> body,
+  ) async {}
+  @override
+  Future<void> setDispatching(ProductSummary product, bool enabled) async {}
+  @override
+  Future<void> setStatus(ProductSummary product, String status) async {}
+  @override
+  Future<void> supersedeDecision(
+    String productId,
+    String decisionId,
+    int version,
+    String replacement,
+  ) async {}
+  @override
+  Future<void> withdrawDecision(
+    String productId,
+    String decisionId,
+    int version,
+    String reason,
+  ) async {}
 }

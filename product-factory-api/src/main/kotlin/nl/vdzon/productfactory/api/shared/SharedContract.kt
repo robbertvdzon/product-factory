@@ -20,11 +20,13 @@ import java.time.Instant
 @JvmInline value class DeliveryAttemptId(val value: String)
 
 enum class ProductFactoryEnvironment { LOCAL, ACCEPTANCE, PRODUCTION }
+enum class ActorType { STAKEHOLDER, PROCESS, MEETING_MINUTES_AGENT, FACTORY, SYSTEM }
 enum class ProcessSessionStatus { RUNNING, WAITING_FOR_AI, BLOCKED, SUCCEEDED, FAILED, CANCELLED }
 enum class WorkItemStatus { PENDING, IN_PROGRESS, DONE, BLOCKED, FAILED }
 enum class ScheduledProcess { PRODUCT_DESIGN, PRODUCT_PLANNING, QUALITY_ASSURANCE, SOFTWARE_FACTORY_DISPATCHER }
 
 data class TimeRange(val from: Instant? = null, val until: Instant? = null)
+data class ActorReference(val type: ActorType, val id: String)
 data class SourceReference(val type: String, val id: String, val version: Long)
 data class ArtifactReference(val name: String, val mediaType: String, val uri: String)
 data class EvidenceDetails(val description: String, val artifacts: List<ArtifactReference> = emptyList())
@@ -52,3 +54,7 @@ data class ProcessSessionDetails(
 )
 
 class ProcessAlreadyRunning(val productId: ProductId) : RuntimeException("Er draait al een processessie voor ${productId.value}")
+class AggregateNotFound(message: String) : RuntimeException(message)
+class VersionConflict(message: String) : RuntimeException(message)
+class IdempotencyConflict(message: String) : RuntimeException(message)
+class InvalidCommand(message: String) : RuntimeException(message)
