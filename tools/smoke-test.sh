@@ -21,6 +21,7 @@ case "$environment_name" in
 esac
 
 frontend_headers="$(curl --fail --silent --show-error --head "$frontend_url/")"
+frontend_version="$(curl --fail --silent --show-error "$frontend_url/version.json")"
 session="$(curl --fail --silent --show-error "$backend_url/api/auth/session")"
 version="$(curl --fail --silent --show-error "$backend_url/api/version")"
 curl --fail --silent --show-error "$backend_url/actuator/health/liveness" >/dev/null
@@ -32,6 +33,7 @@ test "$(jq -r '.environment' <<<"$version")" = "$environment_name"
 test "$(jq -r '.applicationVersion' <<<"$version")" = "0.1.0"
 if [[ -n "$expected_revision" ]]; then
   test "$(jq -r '.gitRevision' <<<"$version")" = "$expected_revision"
+  test "$(jq -r '.gitRevision' <<<"$frontend_version")" = "$expected_revision"
 fi
 rg -qi '^cache-control: no-cache' <<<"$frontend_headers"
 printf 'smoke-test: %s versie=%s revisie=%s authRequired=%s\n' \

@@ -23,6 +23,11 @@ tools/verify-deployment.sh
 Images worden gepubliceerd als `sha-<volledige-commit>` en in beide overlays op digest gepind.
 Gebruik nooit uitsluitend `main` of een andere mutable tag voor een rollout.
 
+Na een geslaagde `Repository verification` op `main` bouwt `release.yml` automatisch één set
+images. De workflow pint en rooktest eerst acceptatie. Alleen daarna pint hij exact dezelfde
+digests in productie en wacht hij op de productierooktest. Een nieuwere push naar `main` vervangt
+een nog niet gepromoveerde oudere release; een mislukte acceptatierooktest bereikt productie niet.
+
 ## Secrets maken en roteren
 
 Het plaintext bronbestand blijft uitsluitend `secrets.env` in de repositoryroot. Het is
@@ -39,11 +44,11 @@ Commit alleen het versleutelde SealedSecret. Na rotatie: render, deploy naar pro
 een gezonde backendrollout en controleer een nieuwe login. Acceptatie krijgt geen productie-
 SealedSecret of externe tokens.
 
-## Handmatige rollout
+## Handmatige fallback
 
-Zet automatische Argo-synchronisatie uit tijdens de allereerste rollout. Render en controleer
-eerst beide overlays. Deploy daarna acceptatie, voer de read-only rooktest uit en promoveer pas
-daarna exact dezelfde imagedigests naar productie:
+Gebruik deze route alleen als de automatische GitOps-promotie bewust is uitgeschakeld. Render en
+controleer eerst beide overlays. Deploy daarna acceptatie, voer de read-only rooktest uit en
+promoveer pas daarna exact dezelfde imagedigests naar productie:
 
 ```bash
 kustomize build deploy/overlays/acceptance | oc apply -f -

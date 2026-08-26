@@ -1,0 +1,171 @@
+name: Build and promote release
+
+on:
+  workflow_run:
+    workflows: [Repository verification]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: product-factory-release-main
+  cancel-in-progress: true
+
+jobs:
+  metadata:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      revision: ${{ steps.release.outputs.revision }}
+      build_time: ${{ steps.release.outputs.build_time }}
+    steps:
+      - id: release
+        shell: bash
+        env:
+          VERIFIED_REVISION: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          echo "revision=${VERIFIED_REVISION}" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+  backend:
+    needs: metadata
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.revision }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: product-factory-app/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/robbertvdzon/product-factory-backend:sha-${{ needs.metadata.outputs.revision }}
+          build-args: |
+            SOURCE_REVISION=${{ needs.metadata.outputs.revision }}
+            BUILD_TIME=${{ needs.metadata.outputs.build_time }}
+          cache-from: type=gha,scope=product-factory-backend
+          cache-to: type=gha,mode=max,scope=product-factory-backend
+
+  frontend:
+    needs: metadata
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.revision }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: product-factory-frontend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/robbertvdzon/product-factory-frontend:sha-${{ needs.metadata.outputs.revision }}
+          build-args: |
+            SOURCE_REVISION=${{ needs.metadata.outputs.revision }}
+            BUILD_TIME=${{ needs.metadata.outputs.build_time }}
+          cache-from: type=gha,scope=product-factory-frontend
+          cache-to: type=gha,mode=max,scope=product-factory-frontend
+
+  promote:
+    needs: [metadata, backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: "5.8.0"
+      - name: Promote through acceptance to production
+        shell: bash
+        env:
+          REVISION: ${{ needs.metadata.outputs.revision }}
+          BACKEND_DIGEST: ${{ needs.backend.outputs.digest }}
+          FRONTEND_DIGEST: ${{ needs.frontend.outputs.digest }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+
+          if [[ "$(git rev-parse origin/main)" != "$REVISION" ]]; then
+            echo "Release $REVISION is vervangen door een nieuwere main; promotie overgeslagen."
+            exit 0
+          fi
+
+          pin_overlay() {
+            local overlay="$1"
+            (
+              cd "deploy/overlays/$overlay"
+              kustomize edit set image \
+                "ghcr.io/robbertvdzon/product-factory-backend=ghcr.io/robbertvdzon/product-factory-backend@${BACKEND_DIGEST}" \
+                "ghcr.io/robbertvdzon/product-factory-frontend=ghcr.io/robbertvdzon/product-factory-frontend@${FRONTEND_DIGEST}"
+            )
+          }
+
+          wait_for_environment() {
+            local environment="$1"
+            for attempt in $(seq 1 60); do
+              if tools/smoke-test.sh "$environment" "$REVISION" >/dev/null 2>&1; then
+                tools/smoke-test.sh "$environment" "$REVISION"
+                return 0
+              fi
+              sleep 10
+            done
+            echo "Rooktest voor $environment bereikte revisie $REVISION niet binnen tien minuten." >&2
+            return 1
+          }
+
+          pin_overlay acceptance
+          git add deploy/overlays/acceptance/kustomization.yaml
+          git commit -m "deploy: promote $REVISION to acceptance [skip ci]"
+          git push origin HEAD:main
+          acceptance_commit="$(git rev-parse HEAD)"
+
+          wait_for_environment acceptance
+
+          git fetch origin main
+          if [[ "$(git rev-parse origin/main)" != "$acceptance_commit" ]]; then
+            echo "Main wijzigde tijdens acceptatie; productiepromotie van $REVISION overgeslagen."
+            exit 0
+          fi
+
+          pin_overlay production
+          git add deploy/overlays/production/kustomization.yaml
+          git commit -m "deploy: promote $REVISION to production [skip ci]"
+          git push origin HEAD:main
+
+          wait_for_environment production
