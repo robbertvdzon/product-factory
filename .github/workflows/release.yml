@@ -147,6 +147,7 @@ jobs:
               fi
               sleep 10
             done
+            echo "$smoke_output" >&2
             echo "Rooktest voor $environment bereikte revisie $REVISION niet binnen tien minuten." >&2
             return 1
           }

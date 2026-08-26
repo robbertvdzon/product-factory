@@ -36,7 +36,7 @@ if [[ -n "$expected_revision" ]]; then
   test "$(jq -r '.gitRevision' <<<"$version")" = "$expected_revision"
   test "$(jq -r '.gitRevision' <<<"$frontend_version")" = "$expected_revision"
 fi
-rg -qi '^cache-control: no-cache' <<<"$frontend_headers"
+grep -qi '^cache-control: no-cache' <<<"$frontend_headers"
 printf 'smoke-test: %s versie=%s revisie=%s authRequired=%s\n' \
   "$environment_name" \
   "$(jq -r '.applicationVersion' <<<"$version")" \
