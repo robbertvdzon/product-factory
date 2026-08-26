@@ -245,6 +245,7 @@ class HttpProductGateway implements ProductGateway {
         'text': text,
         'expectedVersion': version,
         'idempotencyKey': _key('message'),
+        'targetAgentRole': 'MEETING_AGENT',
       });
   @override
   Future<void> closeMeeting(
@@ -253,15 +254,6 @@ class HttpProductGateway implements ProductGateway {
     String minutes,
     String? openOutcome,
   ) => _send('POST', '/api/products/meetings/$meetingId/close', {
-    'minutes': minutes,
-    'outcomes': <Object>[
-      if (openOutcome?.trim().isNotEmpty == true)
-        {
-          'description': openOutcome!.trim(),
-          'commandType': 'manualFollowUp',
-          'status': 'ATTENTION_NEEDED',
-        },
-    ],
     'expectedVersion': version,
     'idempotencyKey': _key('close'),
   });
@@ -746,19 +738,17 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
         : data.meetings
               .map(
                 (m) => Card(
-                  child: ListTile(
+                  child: ExpansionTile(
                     title: Text(_value(m['reason'])),
                     subtitle: Text(
-                      'Agenda: ${(m['agenda'] as List? ?? const []).join(', ')}\n'
-                      '${(m['messages'] as List? ?? const []).length} berichten · versie ${m['version']}\n'
-                      'Doorwerking: ${(m['outcomes'] as List? ?? const []).map((o) => o is Map ? o['status'] : o).join(', ').trim().isEmpty ? 'geen' : (m['outcomes'] as List).map((o) => o is Map ? o['status'] : o).join(', ')}',
+                      '${(m['messages'] as List? ?? const []).length} berichten · versie ${m['version']} · ${_value(m['status'])}',
                     ),
-                    isThreeLine: true,
                     trailing: Wrap(
                       children: [
                         if (m['status'] != 'CLOSED')
                           IconButton(
-                            tooltip: 'Bericht toevoegen',
+                            tooltip:
+                                'Bericht toevoegen en Meeting Agent laten reageren',
                             onPressed: () => _textAction(
                               'Stakeholderbericht',
                               'Bericht',
@@ -772,13 +762,55 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
                           ),
                         if (m['status'] != 'CLOSED')
                           IconButton(
-                            tooltip: 'Overleg sluiten',
+                            tooltip: 'Notulenagent starten',
                             onPressed: () => _closeMeeting(m),
-                            icon: const Icon(Icons.check_circle_outline),
+                            icon: const Icon(Icons.summarize_outlined),
                           ),
-                        Chip(label: Text(_value(m['status']))),
                       ],
                     ),
+                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Agenda: ${(m['agenda'] as List? ?? const []).join(', ')}',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...(m['messages'] as List? ?? const []).map((message) {
+                        final row = (message as Map).cast<String, Object?>();
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            row['senderRole'] == 'STAKEHOLDER'
+                                ? Icons.person_outline
+                                : Icons.smart_toy_outlined,
+                          ),
+                          title: Text(
+                            '${row['senderRole']}${row['representedAgentRole'] == null ? '' : ' · ${row['representedAgentRole']}'}',
+                          ),
+                          subtitle: Text('${row['text']}\n${row['createdAt']}'),
+                        );
+                      }),
+                      if (m['minutes'] != null)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.description_outlined),
+                          title: const Text('Brongetrouwe notulen'),
+                          subtitle: Text('${m['minutes']}'),
+                        ),
+                      ...(m['outcomes'] as List? ?? const []).map((outcome) {
+                        final row = (outcome as Map).cast<String, Object?>();
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.account_tree_outlined),
+                          title: Text('${row['description']}'),
+                          subtitle: Text(
+                            '${row['commandType']} · ${row['status']}${row['errorCode'] == null ? '' : ' · ${row['errorCode']}'}',
+                          ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
               )
@@ -1221,32 +1253,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
   }
 
   Future<void> _closeMeeting(Map<String, Object?> meeting) async {
-    final minutes = TextEditingController();
-    final openOutcome = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Overleg sluiten'),
-        content: SizedBox(
-          width: 560,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: minutes,
-                minLines: 3,
-                maxLines: 8,
-                decoration: const InputDecoration(labelText: 'Notulen'),
-              ),
-              TextField(
-                controller: openOutcome,
-                decoration: const InputDecoration(
-                  labelText: 'Nog openstaande doorwerking (optioneel)',
-                  helperText: 'Wordt zichtbaar als aandacht nodig.',
-                ),
-              ),
-            ],
-          ),
+        title: const Text('Notulenagent starten'),
+        content: const Text(
+          'De notulenagent verwerkt de volledige overlegcontext via Agent Runtime. Het overleg sluit pas nadat notulen, antwoorden, besluiten en de geheugenbatch geldig zijn toegepast.',
         ),
         actions: [
           TextButton(
@@ -1255,18 +1267,18 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sluiten'),
+            child: const Text('Starten'),
           ),
         ],
       ),
     );
-    if (ok == true && minutes.text.trim().isNotEmpty) {
+    if (ok == true) {
       await _mutate(
         () => widget.gateway.closeMeeting(
           _value(meeting['id']),
           (meeting['version'] as num).toInt(),
-          minutes.text.trim(),
-          openOutcome.text,
+          '',
+          null,
         ),
       );
     }

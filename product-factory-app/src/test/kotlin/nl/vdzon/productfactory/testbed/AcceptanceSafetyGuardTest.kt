@@ -39,4 +39,6 @@ class AcceptanceSafetyGuardTest {
         .withProperty("PF_AI_PROVIDER", "MOCKED")
         .withProperty("PF_SOFTWARE_FACTORY_MODE", "MOCKED")
         .withProperty("PF_EXTERNAL_MUTATIONS_ALLOWED", "false")
+        .withProperty("PF_AGENT_RUNTIME_URL", "https://agent-runtime-acceptance.vdzonsoftware.nl")
+        .withProperty("PF_AGENT_RUNTIME_TOKEN", "scoped-consumer-token")
 }

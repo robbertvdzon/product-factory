@@ -71,8 +71,8 @@ daarnaast een revisionendpoint en een vaste regel
 om daaruit de werkelijk gedeployde Git-commit of release te lezen. Story- en bugfixverificatie kan
 daardoor aantonen of de `deliveredCommitSha` al op de doelomgeving staat.
 
-De bestaande Kotlin-DTO `TestEnvironmentConfiguration` bevat nog `credentialReferences`; stap 4
-verwijdert dit veld. Projectcredentialnamen worden dynamisch via Agent Runtime ontdekt en door de
+De Kotlin-DTO `TestEnvironmentConfiguration` bevat geen `credentialReferences` meer.
+Projectcredentialnamen worden dynamisch via Agent Runtime ontdekt en door de
 AI-uitvoeringscapability afzonderlijk per product en agentrol beheerd. De productmodule bewaart geen
 credentialnamen of -waarden in de testomgevingconfiguratie.
 

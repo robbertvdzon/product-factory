@@ -12,3 +12,5 @@ data:
   PF_AI_PROVIDER: MOCKED
   PF_SOFTWARE_FACTORY_MODE: MOCKED
   PF_EXTERNAL_MUTATIONS_ALLOWED: "false"
+  PF_AGENT_RUNTIME_URL: https://agent-runtime-acceptance.vdzonsoftware.nl
+  PF_AI_RUNTIME_SCHEDULING_ENABLED: "true"

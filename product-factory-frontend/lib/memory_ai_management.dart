@@ -56,7 +56,27 @@ abstract interface class MemoryAiGateway {
   );
 }
 
-class HttpMemoryAiGateway implements MemoryAiGateway {
+abstract interface class AgentRuntimeGateway {
+  Future<List<Map<String, Object?>>> aiTasks();
+  Future<List<Map<String, Object?>>> environmentCatalog(String projectPrefix);
+  Future<List<Map<String, Object?>>> productEnvironmentKeys(String productId);
+  Future<void> refreshEnvironmentCatalog(String projectPrefix);
+  Future<void> setProductEnvironmentKey(
+    String productId,
+    String name,
+    bool active,
+    int expectedVersion,
+  );
+  Future<void> setAgentEnvironmentGrant(
+    String productId,
+    String name,
+    String role,
+    bool granted,
+  );
+  Future<void> cancelAiTask(String taskId, String reason);
+}
+
+class HttpMemoryAiGateway implements MemoryAiGateway, AgentRuntimeGateway {
   HttpMemoryAiGateway({this.csrfToken, http.Client? client, String? backendUrl})
     : _client = client ?? createHttpClient(),
       _backendUrl = (backendUrl ?? AppConfiguration.backendUrl).replaceAll(
@@ -173,6 +193,59 @@ class HttpMemoryAiGateway implements MemoryAiGateway {
     },
   );
 
+  @override
+  Future<List<Map<String, Object?>>> aiTasks() => _list('/api/ai/tasks');
+  @override
+  Future<List<Map<String, Object?>>> environmentCatalog(
+    String projectPrefix,
+  ) => _list(
+    '/api/ai/environment-catalog?projectPrefix=${Uri.encodeQueryComponent(projectPrefix)}',
+  );
+  @override
+  Future<List<Map<String, Object?>>> productEnvironmentKeys(
+    String productId,
+  ) => _list(
+    '/api/products/${Uri.encodeComponent(productId)}/agent-environment-keys',
+  );
+  @override
+  Future<void> refreshEnvironmentCatalog(String projectPrefix) => _send(
+    'POST',
+    '/api/ai/environment-catalog/refresh',
+    {'projectPrefix': projectPrefix},
+  );
+  @override
+  Future<void> setProductEnvironmentKey(
+    String productId,
+    String name,
+    bool active,
+    int expectedVersion,
+  ) => _send(
+    'PUT',
+    '/api/products/${Uri.encodeComponent(productId)}/agent-environment-keys/${Uri.encodeComponent(name)}',
+    {
+      'active': active,
+      'expectedVersion': expectedVersion,
+      'idempotencyKey': _key('product-environment-key'),
+    },
+  );
+  @override
+  Future<void> setAgentEnvironmentGrant(
+    String productId,
+    String name,
+    String role,
+    bool granted,
+  ) => _send(
+    'PUT',
+    '/api/products/${Uri.encodeComponent(productId)}/agent-environment-keys/${Uri.encodeComponent(name)}/roles/${Uri.encodeComponent(role)}',
+    {'granted': granted, 'idempotencyKey': _key('agent-key-grant')},
+  );
+  @override
+  Future<void> cancelAiTask(String taskId, String reason) => _send(
+    'POST',
+    '/api/ai/tasks/${Uri.encodeComponent(taskId)}/cancel',
+    {'reason': reason},
+  );
+
   String _key(String prefix) =>
       'ui-$prefix-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
   Uri _uri(String path) => Uri.parse('$_backendUrl$path');
@@ -233,6 +306,9 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
   List<Map<String, Object?>> _roles = const [];
   List<Map<String, Object?>> _items = const [];
   List<Map<String, Object?>> _ai = const [];
+  List<Map<String, Object?>> _tasks = const [];
+  List<Map<String, Object?>> _catalog = const [];
+  List<Map<String, Object?>> _productKeys = const [];
   Map<String, Object?>? _budget;
   String? _productId;
   String? _role;
@@ -252,6 +328,8 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       final values = await Future.wait([
         widget.gateway.products(),
         widget.gateway.aiSettings(),
+        if (widget.gateway case final AgentRuntimeGateway runtime)
+          runtime.aiTasks(),
       ]);
       final products = values[0];
       final selected =
@@ -263,10 +341,22 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           ? _role
           : (roles.isEmpty ? null : _v(roles.first['key']));
       final scoped = await _loadScope(selected, role);
+      final runtimeValues =
+          widget.gateway is AgentRuntimeGateway && selected != null
+          ? await Future.wait([
+              (widget.gateway as AgentRuntimeGateway).environmentCatalog('HKH'),
+              (widget.gateway as AgentRuntimeGateway).productEnvironmentKeys(
+                selected,
+              ),
+            ])
+          : const <List<Map<String, Object?>>>[];
       if (!mounted) return;
       setState(() {
         _products = products;
         _ai = values[1];
+        _tasks = values.length > 2 ? values[2] : const [];
+        _catalog = runtimeValues.isEmpty ? const [] : runtimeValues[0];
+        _productKeys = runtimeValues.isEmpty ? const [] : runtimeValues[1];
         _productId = selected;
         _roles = roles;
         _role = role;
@@ -304,6 +394,10 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       final roles = await widget.gateway.roles(value);
       final role = roles.isEmpty ? null : _v(roles.first['key']);
       final scoped = await _loadScope(value, role);
+      final productKeys = widget.gateway is AgentRuntimeGateway
+          ? await (widget.gateway as AgentRuntimeGateway)
+                .productEnvironmentKeys(value)
+          : <Map<String, Object?>>[];
       if (mounted) {
         setState(() {
           _productId = value;
@@ -311,6 +405,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           _role = role;
           _budget = scoped.$1;
           _items = scoped.$2;
+          _productKeys = productKeys;
         });
       }
     } catch (error) {
@@ -486,10 +581,54 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       Text('AI-modellen', style: Theme.of(context).textTheme.headlineMedium),
       const SizedBox(height: 6),
       const Text(
-        'Geldt voor alle producten. Taakuitvoering wordt pas in stap 4 geactiveerd.',
+        'Geldt voor alle producten. Iedere taak loopt duurzaam via de gedeelde Agent Runtime.',
       ),
       const SizedBox(height: 12),
       ..._ai.map(_aiCard),
+      if (widget.gateway is AgentRuntimeGateway) ...[
+        const Divider(height: 48),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Agenttoegang · HKH',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _refreshCatalog,
+              icon: const Icon(Icons.sync),
+              label: const Text('Runtime-catalogus verversen'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Alleen namen en beschikbaarheid worden getoond. Waarden verlaten Agent Runtime nooit.',
+        ),
+        const SizedBox(height: 12),
+        if (_catalog.isEmpty)
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.key_off_outlined),
+              title: Text('Nog geen Runtime-keynamen geladen'),
+            ),
+          ),
+        ..._catalog.map(_environmentKeyCard),
+        const Divider(height: 48),
+        Text(
+          'AI-taakoperatie',
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Domeincorrelatie en veilige voortgang staan hier; workers en technische attempts staan in de Runtime-monitor.',
+        ),
+        const SizedBox(height: 12),
+        if (_tasks.isEmpty)
+          const Card(child: ListTile(title: Text('Nog geen AI-taken.'))),
+        ..._tasks.map(_taskCard),
+      ],
     ],
   );
 
@@ -583,6 +722,134 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           icon: const Icon(Icons.edit_outlined),
         ),
       ),
+    );
+  }
+
+  Widget _environmentKeyCard(Map<String, Object?> catalogKey) {
+    final name = '${catalogKey['name']}';
+    final configured = _productKeys
+        .where((key) => key['name'] == name)
+        .firstOrNull;
+    final active = configured?['active'] == true;
+    final grants = (configured?['grantedAgentRoles'] as List? ?? const [])
+        .map((value) => '$value')
+        .toSet();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile(
+              value: active,
+              onChanged: _productId == null
+                  ? null
+                  : (value) => _setProductKey(
+                      name,
+                      value,
+                      (configured?['version'] as num?)?.toInt() ?? 0,
+                    ),
+              title: Text(name),
+              subtitle: Text(
+                catalogKey['available'] == true
+                    ? '${catalogKey['matchingOnlineWorkers']} passende online worker(s)'
+                    : 'Bekend, maar nu niet beschikbaar bij een online worker',
+              ),
+              secondary: Icon(
+                catalogKey['available'] == true
+                    ? Icons.key_outlined
+                    : Icons.key_off_outlined,
+              ),
+            ),
+            if (active)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _roles.map((role) {
+                  final key = _v(role['key']);
+                  final granted = grants.contains(key);
+                  return FilterChip(
+                    selected: granted,
+                    label: Text('${role['displayName']}'),
+                    onSelected: (value) => _setGrant(name, key, value),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _taskCard(Map<String, Object?> task) {
+    final status = '${task['status']}';
+    final terminal = const {
+      'SUCCEEDED',
+      'FAILED',
+      'CANCELLED',
+    }.contains(status);
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          status == 'SUCCEEDED'
+              ? Icons.check_circle_outline
+              : status == 'FAILED'
+              ? Icons.error_outline
+              : status == 'CANCELLED'
+              ? Icons.cancel_outlined
+              : Icons.pending_outlined,
+        ),
+        title: Text('${_v(task['jobKey'])} · $status'),
+        subtitle: Text(
+          'Product ${_v(task['productId']).isEmpty ? '—' : _v(task['productId'])} · rol ${task['agentRole']}\n'
+          'Runtime ${task['runtimeJobId'] ?? 'nog niet ingediend'} · fase ${task['runtimePhase'] ?? 'outbox'} · attemptprojectie ${task['runtimeAttemptCount']}\n'
+          '${task['safeProgress'] ?? task['errorCode'] ?? 'Geen aanvullende veilige voortgang'}',
+        ),
+        trailing: terminal
+            ? null
+            : IconButton(
+                tooltip: 'Taak annuleren',
+                icon: const Icon(Icons.stop_circle_outlined),
+                onPressed: () => _cancelTask(_v(task['id'])),
+              ),
+      ),
+    );
+  }
+
+  Future<void> _refreshCatalog() => _mutate(
+    () => (widget.gateway as AgentRuntimeGateway).refreshEnvironmentCatalog(
+      'HKH',
+    ),
+  );
+
+  Future<void> _setProductKey(String name, bool active, int expectedVersion) =>
+      _mutate(
+        () => (widget.gateway as AgentRuntimeGateway).setProductEnvironmentKey(
+          _productId!,
+          name,
+          active,
+          expectedVersion,
+        ),
+      );
+
+  Future<void> _setGrant(String name, String role, bool granted) => _mutate(
+    () => (widget.gateway as AgentRuntimeGateway).setAgentEnvironmentGrant(
+      _productId!,
+      name,
+      role,
+      granted,
+    ),
+  );
+
+  Future<void> _cancelTask(String taskId) async {
+    final reason = await _reasonDialog(
+      'AI-taak annuleren',
+      'Waarom wordt deze taak geannuleerd?',
+    );
+    if (reason == null) return;
+    await _mutate(
+      () =>
+          (widget.gateway as AgentRuntimeGateway).cancelAiTask(taskId, reason),
     );
   }
 

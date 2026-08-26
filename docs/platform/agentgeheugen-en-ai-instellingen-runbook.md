@@ -12,11 +12,11 @@ capabilities. De functionele invarianten blijven normatief vastgelegd in
 | Capability | Artifact | Variant |
 |---|---|---|
 | `agent-memory` | `agent-memory-impl` | `append-only-jdbc` |
-| `ai-execution` | `ai-execution-impl` | `settings-only` |
+| `ai-execution` | `ai-execution-impl` | `agent-runtime-outbox-v1` |
 
-Flywayversies 4 en 5 zijn respectievelijk eigenaar van het agentgeheugen en de globale
-AI-jobinstellingen. Er bestaan in deze release bewust geen AI-taak-, attempt-, lease-,
-credentialgrant- of outboxtabellen.
+Flywayversies 4, 5 en 6 zijn respectievelijk eigenaar van het agentgeheugen, globale
+AI-jobinstellingen en de lokale Runtime-correlatie/outbox. Product Factory bewaart geen worker,
+attempt, lease, fencing token, artifactbytes of credentialwaarden.
 
 ## Operationele controles
 
@@ -29,6 +29,9 @@ credentialgrant- of outboxtabellen.
 4. Controleer op acceptatie via Testbed het scenario `memory-and-ai-settings`. Een reset laadt
    uitsluitend synthetische rollen, actuele/vervangen/ingetrokken items, leesaudit en
    mockconfiguraties.
+5. Controleer `GET /api/operations/step-4`: een lokale taak toont outboxstatus, Runtime-job-ID,
+   externe fase en veilige progress. Technische attempts en workers horen uitsluitend in de
+   Agent Runtime-monitor.
 
 ## Foutgedrag en herstel
 
@@ -38,8 +41,11 @@ credentialgrant- of outboxtabellen.
   expliciete, geversioneerde configuratiewijziging om.
 - Een ongeldige rol, actor, meetingstatus, provider of model wordt fail-closed afgewezen.
 - `MOCKED` wordt in productie zowel bij configureren als gebruiken geweigerd.
-- Iedere AI-taakaanvraag retourneert in stap 3 `CapabilityNotAvailable` (HTTP 501). Dit is gezond
-  gedrag tot stap 4 en vereist geen herstelactie.
+- Een taak in `PENDING_SUBMISSION` blijft veilig in de transactionele outbox. Herstel de
+  Runtimeverbinding; dezelfde Runtime-idempotentiesleutel wordt opnieuw gebruikt en kan dus geen
+  dubbele externe job maken.
+- Een bekende offline key laat de Runtime-taak wachten. Een onbekende key of niet-actieve grant
+  wordt al lokaal afgewezen. Voeg nooit waarden aan Product Factory-configuratie of prompts toe.
 - Een mislukte meetingbatch schrijft niets. Lees de actuele versies opnieuw en pas de volledige
   batch opnieuw toe; voer geen gedeeltelijke databasecorrectie uit.
 

@@ -624,12 +624,10 @@ class ProductApplicationService(
         if (!revisionEndpoint.startsWith('/') || revisionEndpoint.contains("..")) throw InvalidCommand("Ongeldig revisionendpoint.")
         val revisionPath = input.revisionJsonPath.trim().removePrefix("$.")
         if (!revisionPath.matches(Regex("[A-Za-z][A-Za-z0-9_.-]{0,100}"))) throw InvalidCommand("Ongeldige revisionregel.")
-        val credentials = input.credentialReferences.map(String::trim).filter(String::isNotEmpty).distinct()
-        if (credentials.any { !ENVIRONMENT_KEY.matches(it) }) throw InvalidCommand("Ongeldige credentialreferentie.")
         val data = normalizedTextList(input.dataBoundaries, "Datagrenzen", true)
         val access = normalizedTextList(input.accessBoundaries, "Toegangsgrenzen", true)
         if (production && access.isEmpty()) throw InvalidCommand("Productie vereist expliciete toegangsgrenzen.")
-        return TestEnvironmentConfiguration(name, baseUrl, routes, revisionEndpoint, revisionPath, credentials, data, access)
+        return TestEnvironmentConfiguration(name, baseUrl, routes, revisionEndpoint, revisionPath, data, access)
     }
 
     private fun validatePublicGitUrl(value: String): String {

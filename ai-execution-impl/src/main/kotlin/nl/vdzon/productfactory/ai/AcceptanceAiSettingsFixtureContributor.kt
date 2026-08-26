@@ -13,11 +13,13 @@ import org.springframework.stereotype.Component
 @Profile("acceptance")
 class AcceptanceAiSettingsFixtureContributor(
     private val settings: AiSettingsApplicationService,
+    private val execution: AiExecutionApplicationService,
 ) : AcceptanceFixtureContributor {
     override val key = "ai-settings"
-    override val order = 400
+    override val order = 100
 
     override fun reset(context: AcceptanceFixtureContext) {
+        execution.deleteAllOwnedExecutionData()
         settings.deleteAllOwnedConfiguration()
         settings.getAiJobConfigurations().forEach { configuration ->
             settings.updateAiJobConfiguration(UpdateAiJobConfigurationCommand(

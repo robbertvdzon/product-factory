@@ -6,6 +6,8 @@ import nl.vdzon.productfactory.api.product.ProductQueryService
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.auth.ResolvedSession
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import java.time.Instant
@@ -47,6 +49,10 @@ data class UpdateAiSettingsRequest(
 )
 
 data class MemoryIdResponse(val id: String)
+data class CancelAiTaskRequest(val reason: String)
+data class RefreshEnvironmentCatalogRequest(val projectPrefix: String)
+data class SetProductEnvironmentKeyRequest(val active: Boolean, val expectedVersion: Long, val idempotencyKey: String)
+data class SetAgentEnvironmentGrantRequest(val granted: Boolean, val idempotencyKey: String)
 
 @RestController
 @RequestMapping("/api/products/{productId}/agent-memory")
@@ -151,6 +157,72 @@ class AiSettingsController(
 }
 
 @RestController
+@RequestMapping("/api/ai/tasks")
+class AiTaskController(
+    private val commands: AiExecutionService,
+    private val queries: AiExecutionQueryService,
+    private val implementation: nl.vdzon.productfactory.ai.AiExecutionApplicationService,
+) {
+    @GetMapping
+    fun all(
+        @RequestParam(required = false) productId: String?,
+        @RequestParam(required = false) status: Set<AiTaskStatus>?,
+        @RequestParam(required = false) jobKey: String?,
+    ) = queries.findAiTasks(AiTaskFilter(productId?.let(::ProductId), status.orEmpty(), jobKey?.let(::AiJobKey)))
+
+    @GetMapping("/{taskId}")
+    fun one(@PathVariable taskId: String) = queries.getAiTask(AiTaskId(taskId))
+
+    @GetMapping("/{taskId}/result")
+    fun result(@PathVariable taskId: String) = queries.getAiTaskResult(AiTaskId(taskId))
+
+    @PostMapping("/{taskId}/cancel")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun cancel(@PathVariable taskId: String, @RequestBody request: CancelAiTaskRequest) = commands.cancelAiTask(AiTaskId(taskId), request.reason)
+
+    @GetMapping("/{taskId}/artifacts/{artifactId}", produces = [MediaType.APPLICATION_OCTET_STREAM_VALUE])
+    fun artifact(@PathVariable taskId: String, @PathVariable artifactId: String): ResponseEntity<ByteArray> =
+        ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(implementation.downloadArtifact(AiTaskId(taskId), artifactId))
+}
+
+@RestController
+class AgentEnvironmentAccessController(
+    private val commands: AiExecutionService,
+    private val queries: AiExecutionQueryService,
+) {
+    @GetMapping("/api/ai/environment-catalog")
+    fun catalog(@RequestParam projectPrefix: String) = queries.getEnvironmentCatalog(projectPrefix)
+
+    @PostMapping("/api/ai/environment-catalog/refresh")
+    fun refresh(@RequestBody request: RefreshEnvironmentCatalogRequest) =
+        commands.refreshEnvironmentCatalog(RefreshEnvironmentCatalogCommand(request.projectPrefix))
+
+    @GetMapping("/api/products/{productId}/agent-environment-keys")
+    fun productKeys(@PathVariable productId: String) = queries.getProductEnvironmentKeys(ProductId(productId))
+
+    @PutMapping("/api/products/{productId}/agent-environment-keys/{name}")
+    fun setProductKey(
+        @PathVariable productId: String,
+        @PathVariable name: String,
+        @RequestBody request: SetProductEnvironmentKeyRequest,
+        authentication: Authentication?,
+    ) = commands.setProductEnvironmentKey(SetProductEnvironmentKeyCommand(
+        ProductId(productId), name, request.active, request.expectedVersion, authentication.memoryStakeholder(), request.idempotencyKey,
+    ))
+
+    @PutMapping("/api/products/{productId}/agent-environment-keys/{name}/roles/{role}")
+    fun setGrant(
+        @PathVariable productId: String,
+        @PathVariable name: String,
+        @PathVariable role: String,
+        @RequestBody request: SetAgentEnvironmentGrantRequest,
+        authentication: Authentication?,
+    ) = commands.setAgentEnvironmentGrant(SetAgentEnvironmentGrantCommand(
+        ProductId(productId), name, role, request.granted, authentication.memoryStakeholder(), request.idempotencyKey,
+    ))
+}
+
+@RestController
 @RequestMapping("/api/operations/step-3")
 class MemoryAndAiOperationsController(
     private val memory: AgentMemoryQueryService,
@@ -161,6 +233,16 @@ class MemoryAndAiOperationsController(
     fun overview() = mapOf(
         "rolesByProduct" to products.findProducts().associate { it.id.value to memory.getAgentRoleCatalog(it.id) },
         "aiJobConfigurations" to ai.getAiJobConfigurations(),
-        "aiTasks" to mapOf("available" to false, "message" to "Beschikbaar vanaf stap 4"),
+        "aiTasks" to mapOf("available" to true, "tasks" to ai.findAiTasks(AiTaskFilter())),
+    )
+}
+
+@RestController
+@RequestMapping("/api/operations/step-4")
+class AgentRuntimeOperationsController(private val ai: AiExecutionQueryService) {
+    @GetMapping
+    fun overview() = mapOf(
+        "tasks" to ai.findAiTasks(AiTaskFilter()),
+        "runtimeMonitor" to "Agent Runtime toont technische workers en attempts; Product Factory toont alleen domeincorrelatie.",
     )
 }

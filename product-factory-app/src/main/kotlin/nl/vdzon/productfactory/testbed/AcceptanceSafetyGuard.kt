@@ -23,9 +23,17 @@ class AcceptanceSafetyGuard(
         check(environment.getProperty("PF_SOFTWARE_FACTORY_TOKEN").isNullOrBlank()) {
             "Acceptatie weigert een Software Factory-schrijftoken."
         }
-        check(environment.getProperty("PF_AGENT_WORKER_TOKEN").isNullOrBlank()) {
-            "Acceptatie weigert een externe AI-workercredential."
+        check(environment.getProperty("PF_AGENT_RUNTIME_URL") == "https://agent-runtime-acceptance.vdzonsoftware.nl") {
+            "Acceptatie mag alleen naar de Agent Runtime-acceptatieomgeving schrijven."
         }
+        val consumerToken = environment.getProperty("PF_AGENT_RUNTIME_TOKEN")
+        check(!consumerToken.isNullOrBlank()) { "Acceptatie vereist een gescopete Runtime-consumentcredential." }
+        val testControlToken = environment.getProperty("PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN")
+        check(testControlToken.isNullOrBlank() || testControlToken != consumerToken) {
+            "De Runtime-test-controlcredential moet afzonderlijk gescoped zijn."
+        }
+        check(environment.getProperty("PF_AGENT_WORKER_TOKEN").isNullOrBlank()) { "Acceptatie weigert een workercredential." }
+        check(environment.getProperty("PF_AGENT_RUNTIME_ADMIN_TOKEN").isNullOrBlank()) { "Acceptatie weigert een Runtime-admincredential." }
     }
 
     private fun requireValue(key: String, expected: String) {
@@ -41,6 +49,7 @@ class AcceptanceSafetyGuard(
             "PF_AI_PROVIDER" to "MOCKED",
             "PF_SOFTWARE_FACTORY_MODE" to "MOCKED",
             "PF_EXTERNAL_MUTATIONS_ALLOWED" to "false",
+            "PF_AGENT_RUNTIME_URL" to "",
         )
     }
 }

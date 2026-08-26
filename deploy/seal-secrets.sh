@@ -14,6 +14,7 @@ REQUIRED_KEYS=(
   PF_GOOGLE_CLIENT_ID
   PF_STAKEHOLDER_EMAILS
   PF_SESSION_SIGNING_SECRET
+  PF_AGENT_RUNTIME_TOKEN
 )
 
 command -v kubeseal >/dev/null 2>&1 || { echo "Error: kubeseal ontbreekt in PATH." >&2; exit 1; }
@@ -22,6 +23,10 @@ command -v kubeseal >/dev/null 2>&1 || { echo "Error: kubeseal ontbreekt in PATH
 
 value_for() {
   local wanted="$1"
+  if [[ "$wanted" == "PF_AGENT_RUNTIME_TOKEN" && -n "${PF_AGENT_RUNTIME_TOKEN:-}" ]]; then
+    printf '%s\n' "$PF_AGENT_RUNTIME_TOKEN"
+    return
+  fi
   awk -v key="$wanted" 'index($0, key "=") == 1 { print substr($0, length(key) + 2) }' "$SOURCE_FILE" | tail -1
 }
 

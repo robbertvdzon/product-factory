@@ -18,7 +18,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(5)
+        assertThat(result.migrationsExecuted).isEqualTo(6)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -32,6 +32,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("4")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("5")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("6")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -100,7 +102,7 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("5")
+                    assertThat(rows.getString(1)).isEqualTo("6")
                 }
             }
         }

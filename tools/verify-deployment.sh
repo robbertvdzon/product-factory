@@ -36,3 +36,4 @@ for overlay in acceptance production; do
 done
 
 kubeseal --validate < deploy/overlays/production/sealed-secret-product-factory.yaml
+kubeseal --validate < deploy/overlays/acceptance/sealed-secret-agent-runtime.yaml

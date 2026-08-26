@@ -19,7 +19,7 @@ class FoundationController(
     fun getFoundation(): FoundationStatus = FoundationStatus(
         application = "Product Factory",
         state = FoundationState.READY,
-        message = "Productbasis, besluiten, agentgeheugen en globale AI-instellingen zijn actief; AI-taakuitvoering volgt in stap 4.",
+        message = "Productbasis, besluiten, agentgeheugen en duurzame AI-uitvoering via Agent Runtime zijn actief.",
     )
 
     @GetMapping("/implementations")
@@ -33,7 +33,7 @@ class FoundationController(
                 "product" to ImplementationIdentity("product-impl", "jdbc", version, revision),
                 "decisions" to ImplementationIdentity("decisions-impl", "jdbc", version, revision),
                 "agent-memory" to ImplementationIdentity("agent-memory-impl", "append-only-jdbc", version, revision),
-                "ai-execution" to ImplementationIdentity("ai-execution-impl", "settings-only", version, revision),
+                "ai-execution" to ImplementationIdentity("ai-execution-impl", "agent-runtime-outbox-v1", version, revision),
             ),
         )
     }

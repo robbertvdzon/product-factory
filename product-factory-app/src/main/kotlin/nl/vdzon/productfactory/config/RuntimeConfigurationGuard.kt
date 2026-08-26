@@ -21,6 +21,8 @@ data class RuntimeSettings(
             "PF_SESSION_SIGNING_SECRET",
             "PF_PUBLIC_FRONTEND_URL",
             "PF_PUBLIC_BACKEND_URL",
+            "PF_AGENT_RUNTIME_URL",
+            "PF_AGENT_RUNTIME_TOKEN",
         )
 
         fun validate(values: Map<String, String>): RuntimeSettings {
@@ -43,9 +45,17 @@ data class RuntimeSettings(
                 check(values.getValue("PF_PUBLIC_BACKEND_URL").startsWith("https://")) {
                     "De publieke productie-backend-URL moet HTTPS gebruiken."
                 }
+                check(values.getValue("PF_AGENT_RUNTIME_URL").startsWith("https://")) {
+                    "De productie-Agent-Runtime-URL moet HTTPS gebruiken."
+                }
+                check(values["PF_AI_PROVIDER"] != "MOCKED") { "Productie weigert de MOCKED AI-provider." }
             }
             if (environment == RuntimeEnvironment.ACCEPTANCE) {
                 check(!authRequired) { "Acceptatie moet authenticatie expliciet uitgeschakeld houden." }
+                check(values["PF_AGENT_RUNTIME_URL"] == "https://agent-runtime-acceptance.vdzonsoftware.nl") {
+                    "Acceptatie mag alleen de Agent Runtime-acceptatieomgeving gebruiken."
+                }
+                check(!values["PF_AGENT_RUNTIME_TOKEN"].isNullOrBlank()) { "Acceptatie vereist een gescopete Runtime-consumentcredential." }
             }
             return RuntimeSettings(environment, authRequired)
         }
@@ -72,5 +82,9 @@ class RuntimeConfigurationGuard(
         "PF_SESSION_SIGNING_SECRET",
         "PF_PUBLIC_FRONTEND_URL",
         "PF_PUBLIC_BACKEND_URL",
+        "PF_AGENT_RUNTIME_URL",
+        "PF_AGENT_RUNTIME_TOKEN",
+        "PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN",
+        "PF_AI_PROVIDER",
     ).mapNotNull { key -> getProperty(key)?.let { key to it } }.toMap()
 }

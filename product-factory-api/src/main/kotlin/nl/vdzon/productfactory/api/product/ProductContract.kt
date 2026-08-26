@@ -37,7 +37,6 @@ data class TestEnvironmentConfiguration(
     val allowedRoutes: List<String>,
     val revisionEndpoint: String,
     val revisionJsonPath: String,
-    val credentialReferences: List<String> = emptyList(),
     val dataBoundaries: List<String> = emptyList(),
     val accessBoundaries: List<String> = emptyList(),
 )

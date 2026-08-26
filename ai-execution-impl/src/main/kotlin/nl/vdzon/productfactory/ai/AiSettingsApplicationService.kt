@@ -19,10 +19,10 @@ class AiSettingsApplicationService(
     private val jdbc: JdbcTemplate,
     private val clock: Clock,
     @Value("\${PF_ENVIRONMENT:local}") environment: String,
-) : AiExecutionService, AiExecutionQueryService {
+) {
     private val environment = environment.lowercase()
 
-    override fun updateAiJobConfiguration(command: UpdateAiJobConfigurationCommand): AiJobConfigurationDetails {
+    fun updateAiJobConfiguration(command: UpdateAiJobConfigurationCommand): AiJobConfigurationDetails {
         validateActor(command.actor)
         val fingerprint = fingerprint(command)
         replay(command.idempotencyKey, fingerprint)?.let { return getAiJobConfiguration(command.jobKey) }
@@ -47,7 +47,7 @@ class AiSettingsApplicationService(
     }
 
     @Transactional(readOnly = true)
-    override fun getAiJobConfiguration(jobKey: AiJobKey): AiJobConfigurationDetails {
+    fun getAiJobConfiguration(jobKey: AiJobKey): AiJobConfigurationDetails {
         val definition = definition(jobKey)
         return currentConfiguration(jobKey) ?: AiJobConfigurationDetails(
             jobKey, definition.displayName, definition.defaultProvider, definition.defaultModel,
@@ -56,27 +56,7 @@ class AiSettingsApplicationService(
     }
 
     @Transactional(readOnly = true)
-    override fun getAiJobConfigurations(): List<AiJobConfigurationDetails> = definitions().map { getAiJobConfiguration(it.jobKey) }
-
-    override fun requestAiTask(command: RequestAiTaskCommand): AiTaskId {
-        if (environment == "production" && command.provider == AiProvider.MOCKED) {
-            throw InvalidCommand("MOCKED AI-uitvoering is in productie niet toegestaan.")
-        }
-        throw CapabilityNotAvailable("AI-taakuitvoering is beschikbaar vanaf stap 4; er is geen taak of outboxrecord aangemaakt.")
-    }
-
-    override fun cancelAiTask(taskId: AiTaskId, reason: String) {
-        throw CapabilityNotAvailable("AI-taakuitvoering is beschikbaar vanaf stap 4; er is niets geannuleerd.")
-    }
-
-    override fun getAiTask(taskId: AiTaskId): AiTaskDetails =
-        throw CapabilityNotAvailable("AI-taakuitvoering is beschikbaar vanaf stap 4.")
-
-    override fun getAiTaskResult(taskId: AiTaskId): AiTaskResultDetails? =
-        throw CapabilityNotAvailable("AI-taakuitvoering is beschikbaar vanaf stap 4.")
-
-    override fun findAiTasks(filter: AiTaskFilter): List<AiTaskDetails> =
-        throw CapabilityNotAvailable("AI-taakuitvoering is beschikbaar vanaf stap 4.")
+    fun getAiJobConfigurations(): List<AiJobConfigurationDetails> = definitions().map { getAiJobConfiguration(it.jobKey) }
 
     fun registerTrustedJobKeys() {
         TRUSTED_JOBS.forEach { definition ->

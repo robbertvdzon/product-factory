@@ -47,14 +47,18 @@ data class VersionedRequest(val expectedVersion: Long, val idempotencyKey: Strin
 data class InvestigationRequest(val verificationId: String, val outcome: String, val expectedVersion: Long, val idempotencyKey: String)
 data class EpicLinkRequest(val epicId: String, val epicVersion: Long, val expectedVersion: Long, val idempotencyKey: String)
 data class MeetingRequest(val reason: String, val agenda: List<String> = emptyList(), val linkedObjects: List<SourceReference> = emptyList(), val requested: Boolean = false, val idempotencyKey: String)
-data class MeetingMessageRequest(val text: String, val expectedVersion: Long, val idempotencyKey: String)
-data class CloseMeetingRequest(val minutes: String, val outcomes: List<MeetingOutcomeDetails> = emptyList(), val expectedVersion: Long, val idempotencyKey: String)
+data class MeetingMessageRequest(val text: String, val expectedVersion: Long, val idempotencyKey: String, val targetAgentRole: String? = null)
+data class CloseMeetingRequest(val expectedVersion: Long, val idempotencyKey: String, val minutes: String? = null, val outcomes: List<MeetingOutcomeDetails> = emptyList())
 data class AnswerQuestionRequest(val meetingId: String, val messageId: String, val answer: String, val expectedVersion: Long, val idempotencyKey: String)
 data class WithdrawQuestionRequest(val reason: String, val expectedVersion: Long, val idempotencyKey: String)
 
 @RestController
 @RequestMapping("/api/products")
-class ProductController(private val commands: ProductCommandService, private val queries: ProductQueryService) {
+class ProductController(
+    private val commands: ProductCommandService,
+    private val queries: ProductQueryService,
+    private val meetingAi: MeetingAiOrchestrator,
+) {
     @GetMapping fun products() = queries.findProducts()
     @GetMapping("/{productId}") fun product(@PathVariable productId: String) = queries.getProduct(ProductId(productId))
 
@@ -119,10 +123,10 @@ class ProductController(private val commands: ProductCommandService, private val
     @PostMapping("/{productId}/meetings") @ResponseStatus(HttpStatus.CREATED)
     fun meeting(@PathVariable productId: String, @RequestBody request: MeetingRequest, authentication: Authentication?) = IdResponse(commands.startMeeting(StartMeetingCommand(ProductId(productId), request.reason, request.agenda, request.linkedObjects, request.requested, authentication.stakeholderActor(), request.idempotencyKey)).value)
     @GetMapping("/meetings/{meetingId}") fun meeting(@PathVariable meetingId: String) = queries.getMeeting(MeetingId(meetingId))
-    @PostMapping("/meetings/{meetingId}/messages") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun message(@PathVariable meetingId: String, @RequestBody request: MeetingMessageRequest, authentication: Authentication?) = commands.recordMeetingMessage(RecordMeetingMessageCommand(MeetingId(meetingId), MeetingSenderRole.STAKEHOLDER, request.text, null, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
-    @PostMapping("/meetings/{meetingId}/close") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun close(@PathVariable meetingId: String, @RequestBody request: CloseMeetingRequest, authentication: Authentication?) = commands.closeMeeting(CloseMeetingCommand(MeetingId(meetingId), request.minutes, request.outcomes, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
+    @PostMapping("/meetings/{meetingId}/messages") @ResponseStatus(HttpStatus.ACCEPTED)
+    fun message(@PathVariable meetingId: String, @RequestBody request: MeetingMessageRequest, authentication: Authentication?) = meetingAi.addStakeholderMessage(MeetingId(meetingId), request, authentication.stakeholderActor())
+    @PostMapping("/meetings/{meetingId}/close") @ResponseStatus(HttpStatus.ACCEPTED)
+    fun close(@PathVariable meetingId: String, @RequestBody request: CloseMeetingRequest) = meetingAi.requestMinutes(MeetingId(meetingId), request)
 }
 
 data class CreateDecisionRequest(val decision: String, val origin: DecisionOrigin = DecisionOrigin.STAKEHOLDER, val idempotencyKey: String)

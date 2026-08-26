@@ -21,6 +21,8 @@ import org.springframework.test.web.servlet.post
         "PF_AUTH_REQUIRED=false",
         "PF_SOFTWARE_FACTORY_TOKEN=",
         "PF_AGENT_WORKER_TOKEN=",
+        "PF_AGENT_RUNTIME_URL=https://agent-runtime-acceptance.vdzonsoftware.nl",
+        "PF_AGENT_RUNTIME_TOKEN=test-consumer-token",
     ],
 )
 @AutoConfigureMockMvc
@@ -34,7 +36,7 @@ class AcceptanceFoundationSeederTest(
     @Test
     fun `acceptatie seedt vaste synthetische metadata`() {
         assertThat(repository.find("dataset.kind")).isEqualTo("synthetic-temporary")
-        assertThat(repository.find("dataset.version")).isEqualTo("memory-ai-settings-v1")
+        assertThat(repository.find("dataset.version")).isEqualTo("agent-runtime-meetings-v1")
     }
 
     @Test

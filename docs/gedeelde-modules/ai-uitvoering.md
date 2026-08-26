@@ -21,7 +21,7 @@ Product Factory blijft eigenaar van:
 Agent Runtime kent geen Productontwerper, Planner, Tester, overlegrol, product, epic, story of bug.
 Product Factory stuurt een complete `APPLICATION_WORK`-job en verwerkt later het opaque technische
 resultaat. Het vereenvoudigde externe contract staat in
-[`agent-runtime/docs/application-work-v2.md`](https://github.com/robbertvdzon/agent-runtime/blob/main/docs/application-work-v2.md).
+[`agent-runtime/docs/jobs-en-uitvoering.md`](https://github.com/robbertvdzon/agent-runtime/blob/main/docs/jobs-en-uitvoering.md).
 
 ## Verdeling van verantwoordelijkheden
 
@@ -157,7 +157,7 @@ artifactreferenties en terminale foutinformatie tonen.
 
 ## Extern Runtime-request
 
-De adapter vertaalt een lokale taak naar het minimale v2-request:
+De adapter vertaalt een lokale taak naar het minimale actuele `/v1`-request:
 
 ```json
 {
@@ -357,4 +357,4 @@ Factory-proces of vervolgtaak starten.
 - [Agentgeheugen](agentgeheugen.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
 - [Frontend](../stakeholder/frontend.md)
-- [Agent Runtime APPLICATION_WORK v2](https://github.com/robbertvdzon/agent-runtime/blob/main/docs/application-work-v2.md)
+- [Agent Runtime — jobs en uitvoering](https://github.com/robbertvdzon/agent-runtime/blob/main/docs/jobs-en-uitvoering.md)

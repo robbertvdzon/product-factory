@@ -23,7 +23,7 @@ bestuurbaar blijven.
 |---|---|---|---|
 | Product Factory-modules | echte Maven-implementaties met hun interne Modulith-structuur | één echte appbuild met gekozen implementaties | één echte appbuild met gekozen implementaties |
 | database | nieuwe in-memory database per test of testsuite | in-memory database, opnieuw te vullen via reset | duurzame ondersteunde productiedatabase |
-| AI-uitvoering | echte Product Factory-façade/outbox tegen een Runtime v2-stub of testserver | echte façade tegen Agent Runtime-acceptatie | echte façade tegen Agent Runtime-productie |
+| AI-uitvoering | echte Product Factory-façade/outbox tegen een actuele Runtime-stub of testserver | echte façade tegen Agent Runtime-acceptatie | echte façade tegen Agent Runtime-productie |
 | AI-provider | Runtime `MOCKED` met voorbereide antwoorden | Runtime `MOCKED` met voorbereide antwoorden | gedeelde Runtime-worker met `CODEX` of `CLAUDE` in Docker |
 | Software Factory | `MockSoftwareFactory` uit Testbed | `MockSoftwareFactory` uit Testbed | echte Software Factory |
 | Git | lokale tijdelijke testrepository | publieke repository read-only via HTTPS, zonder token | publieke repository read-only via HTTPS, zonder token |
@@ -172,7 +172,7 @@ response-schema van de bijbehorende job.
 De normale Product Factory-acceptatieflow test geen laptopstoringen. Agent Runtime test in zijn
 eigen repository claims, heartbeat, slaap, workerrestart, reconciliatie, retry, fencing, harde
 attemptdeadline, inputattachments, outputartifactcollectie en een laat oud resultaat. Product
-Factory test alleen zijn v2-clientcontract, outbox/idempotentie, statusvertaling en domeinhervatting.
+Factory test alleen zijn actuele clientcontract, outbox/idempotentie, statusvertaling en domeinhervatting.
 Een credentialcontracttest bewijst gezamenlijk dat alleen toegestane environmentkeynamen in de job
 staan en dat Product Factory of Runtime nooit waarden bewaart; de bewust geselecteerde waarden zijn
 alleen in de tijdelijke agentcontainer leesbaar.

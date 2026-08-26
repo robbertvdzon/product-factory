@@ -55,6 +55,12 @@ class AcceptanceTestControlService(
             title = "Agentgeheugen en AI-instellingen",
             description = "Vaste rollen, actuele/vervangen/ingetrokken geheugenregels, leesaudit en globale mockconfiguraties.",
         ),
+        TestScenarioSummary(
+            key = "agent-runtime-recovery",
+            version = "1",
+            title = "Agent Runtime en overlegagents",
+            description = "Duurzame outbox, statusreconciliatie, backend-keygrants, Meeting Agent en notulenagent.",
+        ),
     )
     private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
 
@@ -152,8 +158,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "memory-ai-settings-v1"
-        private const val TESTBED_VERSION = "0.3.0"
+        private const val DATASET_VERSION = "agent-runtime-meetings-v1"
+        private const val TESTBED_VERSION = "0.4.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")

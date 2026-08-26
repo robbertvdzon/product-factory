@@ -4,8 +4,10 @@ namespace: product-factory-acceptance
 resources:
 - ../../base
 - configmap.yaml
+- sealed-secret-agent-runtime.yaml
 patches:
 - path: routes-patch.yaml
+- path: backend-runtime-secret-patch.yaml
 images:
 - digest: sha256:268cefdadb0a3dbd38a14a97ec9e36d1e3ed3f25c13768d06d2c5a3cc5946b99
   name: ghcr.io/robbertvdzon/product-factory-backend

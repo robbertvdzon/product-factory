@@ -26,6 +26,9 @@ class RuntimeSettingsTest {
             "PF_SESSION_SIGNING_SECRET" to "x".repeat(32),
             "PF_PUBLIC_FRONTEND_URL" to "https://product-factory.example.invalid",
             "PF_PUBLIC_BACKEND_URL" to "https://product-factory-api.example.invalid",
+            "PF_AGENT_RUNTIME_URL" to "https://agent-runtime.example.invalid",
+            "PF_AGENT_RUNTIME_TOKEN" to "consumer-token",
+            "PF_AI_PROVIDER" to "CODEX",
         )
 
         assertThatThrownBy { RuntimeSettings.validate(complete) }

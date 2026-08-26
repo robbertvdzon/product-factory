@@ -137,7 +137,7 @@ class MemoryAndAiIntegrationTest(
     }
 
     @Test
-    fun `globale AI instellingen zijn gevalideerd versioned en taakuitvoering maakt niets aan`() {
+    fun `globale AI instellingen zijn gevalideerd en geversioneerd`() {
         assertThat(ai.getAiJobConfigurations()).extracting<String> { it.jobKey.value }.containsExactly(
             "MEETING.CONVERSE", "MEETING.SUMMARIZE", "PLANNING.SLICE_EPIC", "PRODUCT_DESIGN.CREATE_EPIC", "QUALITY.VERIFY_EPIC",
         )
@@ -159,15 +159,7 @@ class MemoryAndAiIntegrationTest(
                 UpdateAiJobConfigurationCommand(AiJobKey("MEETING.CONVERSE"), AiProvider.MOCKED, "scenario", true, 0, STAKEHOLDER, "prod-mocked-${UUID.randomUUID()}"),
             )
         }.isInstanceOf(InvalidCommand::class.java).hasMessageContaining("productie")
-        assertThatThrownBy {
-            ai.requestAiTask(
-                RequestAiTaskCommand(
-                    AiJobKey("MEETING.CONVERSE"), null, "test", null, AiProvider.CODEX, "gpt-5.6", 0,
-                    "test", "{}", "{}", idempotencyKey = "task-unavailable-${UUID.randomUUID()}",
-                ),
-            )
-        }.isInstanceOf(CapabilityNotAvailable::class.java).hasMessageContaining("stap 4")
-        assertThat(jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE lower(table_name) IN ('pf_ai_task','pf_ai_outbox')")).isEmpty()
+        assertThat(jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE lower(table_name)='pf_ai_task'")).hasSize(1)
     }
 
     @Test
