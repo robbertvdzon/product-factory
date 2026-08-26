@@ -50,8 +50,8 @@ MVP-eisen en worden niet in code of productieseed hardgecodeerd.
 | 8 | [Software Factory-dispatcher](08-software-factory-dispatcher.md) | Stories worden één voor één geleverd en opleveringen worden verwerkt. |
 | 9 | [Volledige MVP-productflow](09-volledige-mvp-productflow.md) | De complete route van Stakeholder tot gebouwde en gecontroleerde verbetering werkt. |
 
-De stappen 1 tot en met 8 zijn uitgevoerd. Stap 9 rondt de automatische schedules en de volledige
-MVP-keten af.
+De stappen 1 tot en met 9 zijn uitgevoerd. Het technische MVP is afgesloten met automatische
+schedules, de volledige keten, negentien vaste Testbedscenario's en een normatief bewijsrecord.
 
 ## Algemene regels voor iedere stap
 

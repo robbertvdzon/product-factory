@@ -36,7 +36,9 @@ class AcceptanceFoundationSeederTest(
     @Test
     fun `acceptatie seedt vaste synthetische metadata`() {
         assertThat(repository.find("dataset.kind")).isEqualTo("synthetic-temporary")
-        assertThat(repository.find("dataset.version")).isEqualTo("dispatcher-mvp-v1")
+        assertThat(repository.find("dataset.version")).isEqualTo("complete-mvp-v1")
+        assertThat(testControlService.getAvailableScenarios().map { it.key.take(6) }.filter { it.startsWith("mvp-") })
+            .containsExactly(*(1..19).map { "mvp-${it.toString().padStart(2, '0')}" }.toTypedArray())
     }
 
     @Test
@@ -72,8 +74,9 @@ class AcceptanceFoundationSeederTest(
         mockMvc.get("/api/test-control/scenarios")
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].key") { value("foundation-clean") }
-                jsonPath("$[1].key") { value("outbound-mutations-blocked") }
+                jsonPath("$[0].key") { value("mvp-01-happy-flow") }
+                jsonPath("$[18].key") { value("mvp-19-agent-meeting") }
+                jsonPath("$[19].key") { value("foundation-clean") }
             }
 
         mockMvc.post("/api/test-control/reset") {

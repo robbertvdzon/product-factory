@@ -170,6 +170,59 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(planningQueries.findPlanningWorkItems(productId).single().status).isEqualTo(WorkItemStatus.DONE)
     }
 
+    @Test
+    fun `terminale plannertaak houdt epicclaim en hervat dezelfde sessie voor nieuw werk`() {
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planning.runProcessSession(productId)
+        val sessionId = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().id
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.IN_PLANNING)
+
+        runtime.reset()
+        ai.dispatchPending()
+        val failed = runtime.onlyJob()
+        runtime.jobs[failed.id] = failed.copy(status = "FAILED", phase = "FAILED", progressPercent = 100)
+        ai.reconcileActive()
+        planning.runProcessSession(productId)
+
+        var session = planningQueries.getProcessSession(sessionId)
+        assertThat(session.status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(session.errorCode).isEqualTo("PLANNING_RESULT_INVALID")
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.IN_PLANNING)
+
+        runtime.reset()
+        planning.runProcessSession(productId)
+        ai.dispatchPending()
+        session = planningQueries.getProcessSession(sessionId)
+        assertThat(session.status).isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
+        assertThat(session.aiTaskIds).hasSize(3)
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId))).hasSize(1)
+    }
+
+    @Test
+    fun `geannuleerde dependency blijft onvervuld en maakt gericht herplanningswerk`() {
+        publishPlan()
+        val reservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-dependency"))!!
+        planning.markStoryAsDispatched(MarkStoryAsDispatchedCommand(
+            reservation.reservationId, "SF-dependency", reservation.story.version, PROCESS, "dispatch-dependency",
+        ))
+        val inProgress = planningQueries.getStory(reservation.story.id)
+
+        planning.markStoryAsCancelled(MarkStoryAsCancelledCommand(
+            inProgress.id, "SF-dependency", "Externe levering is geannuleerd.", inProgress.version, PROCESS, "cancel-dependency",
+        ))
+
+        val stories = planningQueries.findStories(StoryFilter(productId))
+        val cancelled = stories.single { it.id == inProgress.id }
+        val dependent = stories.single { it.id != inProgress.id }
+        assertThat(cancelled.status).isEqualTo(StoryStatus.CANCELLED)
+        assertThat(dependent.status).isEqualTo(StoryStatus.TODO)
+        assertThat(dependent.dependencies).contains(cancelled.id)
+        assertThat(planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-blocked"))).isNull()
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().type)
+            .isEqualTo(PlanningWorkItemType.REPLAN_CANCELLED_DEPENDENCY)
+    }
+
     private fun publishPlan() {
         planning.runProcessSession(productId)
         completeOnlyJob(selection())

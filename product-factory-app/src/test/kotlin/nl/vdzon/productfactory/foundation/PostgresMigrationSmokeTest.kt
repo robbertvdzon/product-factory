@@ -18,7 +18,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(10)
+        assertThat(result.migrationsExecuted).isEqualTo(11)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -42,6 +42,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("9")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("10")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("11")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -110,7 +112,7 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("10")
+                    assertThat(rows.getString(1)).isEqualTo("11")
                 }
             }
         }
@@ -125,7 +127,7 @@ class PostgresMigrationSmokeTest {
         assertThat(old.targetSchemaVersion.toString()).isEqualTo("8")
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(2)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(3)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_quality_process_session").use { rows ->
@@ -133,6 +135,10 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getLong(1)).isZero()
                 }
                 statement.executeQuery("SELECT COUNT(*) FROM pf_delivery_attempt").use { rows ->
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getLong(1)).isZero()
+                }
+                statement.executeQuery("SELECT COUNT(*) FROM pf_schedule_run").use { rows ->
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getLong(1)).isZero()
                 }
@@ -148,10 +154,34 @@ class PostgresMigrationSmokeTest {
         Flyway.configure().dataSource(url, postgres.username, postgres.password).target("9").load().migrate()
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(1)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(2)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_dispatcher_process_session").use { rows ->
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getLong(1)).isZero()
+                }
+                statement.executeQuery("SELECT COUNT(*) FROM pf_schedule_run").use { rows ->
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getLong(1)).isZero()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `dispatcherrelease migreert voorwaarts naar scheduler`() {
+        val database = "productfactory_upgrade_v10"
+        createDatabase(database)
+        val url = databaseUrl(database)
+        Flyway.configure().dataSource(url, postgres.username, postgres.password).target("10").load().migrate()
+
+        val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
+
+        assertThat(upgraded.migrationsExecuted).isEqualTo(1)
+        DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) FROM pf_schedule_run").use { rows ->
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getLong(1)).isZero()
                 }

@@ -74,6 +74,11 @@ losse interne backendroute.
   `/api/version` dat de opgeleverde commit werkelijk op acceptatie staat. Activeer schedules en
   dispatching alleen bewust via de normale Stakeholderbediening.
 
+De generieke technische keten en alle deterministische scenario's zijn afgerond. De concrete
+HKH-productgegevens blijven via de gewone productiebediening vastgelegd worden; een echte
+Software Factory-levering wordt pas gestart nadat de Stakeholder daar in Product Factory bewust
+dispatching en de gewenste schedules voor heeft geactiveerd.
+
 ## Veranderlijke operationele toestand
 
 Live deploymentrevisions, actuele Argo CD-status, gekozen AI-modellen, Runtime-workerbeschikbaarheid

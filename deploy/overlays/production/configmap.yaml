@@ -9,8 +9,8 @@ data:
   PF_PUBLIC_BACKEND_URL: https://product-factory-api.vdzonsoftware.nl
   PF_DB_URL: jdbc:postgresql://product-factory-postgres:5432/productfactory_v2
   PF_DB_USERNAME: productfactory_v2
-  PF_SCHEDULES_ENABLED: "false"
-  PF_AI_PROVIDER: DISABLED
+  PF_SCHEDULES_ENABLED: "true"
+  PF_AI_PROVIDER: CODEX
   PF_SOFTWARE_FACTORY_MODE: REAL
   PF_SOFTWARE_FACTORY_URL: https://dashboard.vdzonsoftware.nl/api/integrations/v2
   PF_EXTERNAL_MUTATIONS_ALLOWED: "false"

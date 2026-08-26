@@ -3,8 +3,8 @@
 De CronJob maakt dagelijks om 02:17 UTC een PostgreSQL custom-format dump in de afzonderlijke map
 `productfactory-v2`. Een dump wordt pas onder zijn definitieve naam geplaatst nadat
 `pg_restore --list` slaagt; de SHA-256-checksum wordt ernaast bewaard. De bewaartermijn is veertien
-dagen. De backup-PVC en CronJob worden pas als onderdeel van de handmatige deployment in stap 9
-aangemaakt.
+dagen. De backup-PVC en CronJob maken deel uit van de production-overlay en worden door de
+automatische releaseflow beheerd.
 
 Herstel altijd naar een nieuw aangemaakte, lege tijdelijke database. Valideer daarna minimaal:
 

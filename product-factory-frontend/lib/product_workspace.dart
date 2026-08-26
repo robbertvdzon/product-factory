@@ -40,6 +40,7 @@ class ProductWorkspaceData {
     required this.assignment,
     required this.testConfiguration,
     required this.schedules,
+    this.scheduleRuns = const [],
     required this.signals,
     required this.questions,
     required this.meetings,
@@ -66,6 +67,7 @@ class ProductWorkspaceData {
   final Map<String, Object?>? assignment;
   final Map<String, Object?>? testConfiguration;
   final List<Map<String, Object?>> schedules;
+  final List<Map<String, Object?>> scheduleRuns;
   final List<Map<String, Object?>> signals;
   final List<Map<String, Object?>> questions;
   final List<Map<String, Object?>> meetings;
@@ -151,6 +153,7 @@ abstract interface class ProductGateway {
   Future<void> runQuality(String productId);
   Future<void> retryQualityWorkItem(String workItemId);
   Future<void> runDispatcher(String productId);
+  Future<void> runScheduledProcess(String productId, String process);
 }
 
 class HttpProductGateway implements ProductGateway {
@@ -200,6 +203,7 @@ class HttpProductGateway implements ProductGateway {
       _get('/api/products/$id/dispatcher/status'),
       _get('/api/products/$id/dispatcher/attempts'),
       _get('/api/products/$id/dispatcher/sessions'),
+      _get('/api/products/$id/schedule-runs'),
     ]);
     List<Map<String, Object?>> list(int index) =>
         ((values[index] as List?) ?? const [])
@@ -241,6 +245,7 @@ class HttpProductGateway implements ProductGateway {
       dispatcherStatus: (values[20] as Map).cast<String, Object?>(),
       deliveryAttempts: list(21),
       dispatcherSessions: list(22),
+      scheduleRuns: list(23),
     );
   }
 
@@ -456,6 +461,17 @@ class HttpProductGateway implements ProductGateway {
     '/api/products/$productId/dispatcher/sessions/run',
     const {},
   );
+
+  @override
+  Future<void> runScheduledProcess(String productId, String process) => switch (
+    process
+  ) {
+    'PRODUCT_DESIGN' => runProductDesign(productId),
+    'PRODUCT_PLANNING' => runProductPlanning(productId),
+    'QUALITY_ASSURANCE' => runQuality(productId),
+    'SOFTWARE_FACTORY_DISPATCHER' => runDispatcher(productId),
+    _ => throw const ProductFailure(400, 'Onbekend uitvoerend proces.'),
+  };
 
   String _key(String prefix) =>
       'ui-$prefix-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
@@ -1588,24 +1604,77 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
     ProductWorkspaceData data,
   ) => _section('Instellingen · Automatisering', Icons.schedule_outlined, [
     const Text(
-      'Schedules worden nu alleen opgeslagen en getoond; automatische starts worden pas in stap 9 geactiveerd.',
+      'Ieder proces heeft een eigen ritme. Uitgeschakeld betekent alleen dat het niet automatisch start; Nu starten blijft beschikbaar.',
     ),
     const SizedBox(height: 8),
     ...data.schedules.map(
       (s) => Card(
-        child: ListTile(
-          title: Text(_value(s['process']).replaceAll('_', ' ')),
-          subtitle: Text(
-            '${s['timezone']} · nextRunAt: ${s['nextRunAt'] ?? '—'} · versie ${s['version']}',
-          ),
-          trailing: Switch(
-            value: s['enabled'] == true,
-            onChanged: (enabled) => _schedule(data.product.id, s, enabled),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: ListTile(
+            title: Text(_value(s['process']).replaceAll('_', ' ')),
+            subtitle: Text(
+              '${_humanPattern((s['pattern'] as Map?)?.cast<String, Object?>())}\n'
+              '${s['timezone']} · volgende start ${s['nextRunAt'] ?? 'uitgeschakeld'} · versie ${s['version']}',
+            ),
+            isThreeLine: true,
+            trailing: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () => _mutate(
+                    () => widget.gateway.runScheduledProcess(
+                      data.product.id,
+                      _value(s['process']),
+                    ),
+                  ),
+                  child: const Text('Nu starten'),
+                ),
+                Switch(
+                  value: s['enabled'] == true,
+                  onChanged: (enabled) =>
+                      _schedule(data.product.id, s, enabled),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     ),
+    const Divider(height: 28),
+    Text('Recente automatische starts', style: Theme.of(context).textTheme.titleMedium),
+    if (data.scheduleRuns.isEmpty)
+      const Text('Nog geen automatische start geclaimd.')
+    else
+      ...data.scheduleRuns.map(
+        (run) => ListTile(
+          leading: Icon(
+            run['status'] == 'SUCCEEDED'
+                ? Icons.check_circle_outline
+                : run['status'] == 'SKIPPED'
+                ? Icons.skip_next_outlined
+                : Icons.error_outline,
+          ),
+          title: Text('${run['process']} · ${run['status']}'),
+          subtitle: Text(
+            'Gepland ${run['scheduledFor']} · ${run['resultSummary'] ?? run['errorCode'] ?? 'geclaimd'}',
+          ),
+        ),
+      ),
   ]);
+
+  String _humanPattern(Map<String, Object?>? pattern) {
+    if (pattern == null) return 'Geen ritme ingesteld';
+    final interval = pattern['intervalMinutes'];
+    if (interval != null) return 'Elke $interval minuten';
+    final rules = (pattern['weeklyRules'] as List? ?? const []).whereType<Map>();
+    if (rules.isEmpty) return 'Geen ritme ingesteld';
+    return rules.map((rule) {
+      final days = (rule['days'] as List? ?? const []).join(', ');
+      final times = (rule['times'] as List? ?? const []).join(', ');
+      return '$days om $times';
+    }).join(' · ');
+  }
 
   Widget _section(
     String title,

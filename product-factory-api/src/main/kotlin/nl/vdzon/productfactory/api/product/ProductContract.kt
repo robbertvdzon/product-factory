@@ -107,6 +107,18 @@ data class ProcessScheduleDetails(
     val updatedAt: Instant,
     val version: Long,
 )
+enum class ScheduleRunStatus { CLAIMED, SUCCEEDED, SKIPPED, FAILED }
+data class ScheduleRunDetails(
+    val id: String,
+    val productId: ProductId,
+    val process: ScheduledProcess,
+    val scheduledFor: Instant,
+    val status: ScheduleRunStatus,
+    val resultSummary: String?,
+    val errorCode: String?,
+    val claimedAt: Instant,
+    val finishedAt: Instant?,
+)
 
 data class SubmitUserSignalCommand(
     val productId: ProductId,
@@ -296,10 +308,15 @@ interface ProductQueryService {
     fun getTestableProduct(productId: ProductId): TestableProductDetails
     fun getProcessSchedule(productId: ProductId, process: ScheduledProcess): ProcessScheduleDetails
     fun getProcessSchedules(productId: ProductId): List<ProcessScheduleDetails>
+    fun findScheduleRuns(productId: ProductId? = null): List<ScheduleRunDetails>
     fun getUserSignal(userSignalId: UserSignalId): UserSignalDetails
     fun findUserSignals(filter: UserSignalFilter): List<UserSignalDetails>
     fun getStakeholderQuestion(questionId: StakeholderQuestionId): StakeholderQuestionDetails
     fun findStakeholderQuestions(filter: StakeholderQuestionFilter): List<StakeholderQuestionDetails>
     fun getMeeting(meetingId: MeetingId): MeetingDetails
     fun findMeetings(productId: ProductId, status: MeetingStatus? = null): List<MeetingDetails>
+}
+
+interface ProductScheduleRunner {
+    fun runDueSchedules()
 }

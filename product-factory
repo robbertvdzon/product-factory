@@ -19,6 +19,7 @@ use_java_21() {
 case "${1:-help}" in
   verify)
     use_java_21
+    tools/audit-mvp-specifications.sh
     mvn -B --no-transfer-progress verify
     (cd product-factory-frontend && flutter pub get && flutter analyze && flutter test)
     tools/build-frontend.sh

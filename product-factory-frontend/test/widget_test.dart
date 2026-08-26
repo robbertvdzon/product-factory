@@ -487,4 +487,6 @@ class FakeProductGateway implements ProductGateway {
   Future<void> retryQualityWorkItem(String workItemId) async {}
   @override
   Future<void> runDispatcher(String productId) async {}
+  @override
+  Future<void> runScheduledProcess(String productId, String process) async {}
 }

@@ -15,6 +15,10 @@ plus onveranderlijke kwaliteitsbeelden.
 De actieve dispatcher reserveert steeds hoogstens één uitvoerbare story, bevriest het volledige
 storypakket en verwerkt Software Factory-v2-statussen idempotent. Een verloren response, retry of
 lokale bevestigingsfout kan daardoor geen tweede externe story veroorzaken.
+De productmodule claimt geactiveerde procesritmes atomair, haalt na downtime maximaal één run in
+en start uitsluitend de publieke ontwerp-, planning-, kwaliteits- of dispatcherfunctie. De
+volledige technische MVP-keten en alle negentien vaste afwijkende scenario's zijn in Testbeddataset
+`complete-mvp-v1` aantoonbaar.
 
 ## Vereisten
 
@@ -39,7 +43,9 @@ De backendroute `GET /api/foundation` bevestigt de actieve basis. Onder
 `software-factory-dispatcher-impl`-providers. De frontend biedt onder **Beheer**
 rolgebonden geheugen, peildatumhistorie, budgetten, globale AI-modellen, alleen-naamsgebonden
 agenttoegang en veilige AI-taakoperatie via de normale geauthenticeerde sessie en CSRF-beveiliging.
-Schedules worden al duurzaam gevalideerd en weergegeven, maar starten tot stap 9 niets automatisch.
+Schedules worden duurzaam gevalideerd, weergegeven en in productie alleen uitgevoerd wanneer de
+Stakeholder ze voor het betreffende product bewust heeft geactiveerd. Acceptatie houdt automatische
+starts uit en gebruikt een bestuurbare klok en Test Control.
 Onder **Producten → Ontwerp** kan de Stakeholder dezelfde publieke ontwerpfunctie handmatig starten
 of hervatten en epics, versie-inhoud, bronnen, AI-taken, no-ops en blokkades volgen. Onder
 **Producten → Planning** staan backlog, stories, dependencies, prioriteitsredenen, workitems en
@@ -49,5 +55,6 @@ staan het actuele kwaliteitsbeeld, verificaties, bugs, bewijs, retries en Tester
 idempotentiesleutel, pakkethash, retries, veilige fouten en lokale commandeffecten volgen.
 
 De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md). Het operationele
-overzicht voor deze capability staat in
-[`docs/platform/agentgeheugen-en-ai-instellingen-runbook.md`](docs/platform/agentgeheugen-en-ai-instellingen-runbook.md).
+overzicht en de bewijsregistratie staan in het
+[`MVP-operatierunbook`](docs/platform/mvp-operatie-runbook.md) en het
+[`MVP-bewijsrecord`](docs/mvp-bewijsrecord.md).

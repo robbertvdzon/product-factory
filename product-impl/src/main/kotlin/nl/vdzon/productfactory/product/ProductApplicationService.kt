@@ -437,6 +437,16 @@ class ProductApplicationService(
     }
 
     @Transactional(readOnly = true)
+    override fun findScheduleRuns(productId: ProductId?): List<ScheduleRunDetails> = jdbc.query(
+        """SELECT id,product_id,process,scheduled_for,status,result_summary,error_code,claimed_at,finished_at
+            FROM pf_schedule_run ${if (productId == null) "" else "WHERE product_id=?"} ORDER BY claimed_at DESC""".trimIndent(),
+        { rs, _ -> ScheduleRunDetails(
+            rs.getString(1), ProductId(rs.getString(2)), ScheduledProcess.valueOf(rs.getString(3)), rs.getTimestamp(4).toInstant(),
+            ScheduleRunStatus.valueOf(rs.getString(5)), rs.getString(6), rs.getString(7), rs.getTimestamp(8).toInstant(), rs.getTimestamp(9)?.toInstant(),
+        ) }, *listOfNotNull(productId?.value).toTypedArray(),
+    )
+
+    @Transactional(readOnly = true)
     override fun getUserSignal(userSignalId: UserSignalId): UserSignalDetails = try {
         jdbc.queryForObject(
             "SELECT * FROM pf_user_signal WHERE signal_id=?",
@@ -510,6 +520,7 @@ class ProductApplicationService(
         jdbc.update("DELETE FROM pf_stakeholder_question")
         jdbc.update("DELETE FROM pf_meeting")
         jdbc.update("DELETE FROM pf_user_signal")
+        jdbc.update("DELETE FROM pf_schedule_run")
         jdbc.update("DELETE FROM pf_process_schedule")
         jdbc.update("DELETE FROM pf_testable_product_configuration")
         jdbc.update("DELETE FROM pf_product_assignment")

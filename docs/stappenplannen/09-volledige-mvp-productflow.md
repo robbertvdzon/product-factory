@@ -1,5 +1,10 @@
 # Stap 9 — Volledige MVP-productflow en specificatieafsluiting
 
+Implementatiestatus: uitgevoerd. Productie voert uitsluitend bewust per product geactiveerde
+schedules uit; acceptatie houdt automatische starts uit. Testbed 0.9.0 bevat de vaste scenario's
+`mvp-01` tot en met `mvp-19`, de volledige moduleketen heeft een echte integratietest en het
+[MVP-bewijsrecord](../mvp-bewijsrecord.md) wordt door de specificatieaudit bewaakt.
+
 ## Doel en eindtoestand
 
 Rond de losse capabilities af als één begrijpelijke, geautomatiseerde en beheerbare productcyclus:

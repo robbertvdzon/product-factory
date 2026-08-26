@@ -91,6 +91,7 @@ class ProductController(
     )
 
     @GetMapping("/{productId}/schedules") fun schedules(@PathVariable productId: String) = queries.getProcessSchedules(ProductId(productId))
+    @GetMapping("/{productId}/schedule-runs") fun scheduleRuns(@PathVariable productId: String) = queries.findScheduleRuns(ProductId(productId))
     @PutMapping("/{productId}/schedules/{process}") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun schedule(@PathVariable productId: String, @PathVariable process: ScheduledProcess, @RequestBody request: ScheduleRequest, authentication: Authentication?) = commands.updateProcessSchedule(
         UpdateProcessScheduleCommand(ProductId(productId), process, request.enabled, request.timezone, request.pattern, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),

@@ -121,12 +121,24 @@ class QualityMvpIntegrationTest @Autowired constructor(
             (path("results")[0] as ObjectNode).apply {
                 put("explanation", "De kernroute mist aantoonbaar het tweede afgesproken resultaat.")
                 putArray("missingCoverage").add(CRITERION)
+                putArray("bugs").addObject().apply {
+                    put("title", "Epicroute verliest bewijs")
+                    put("summary", "De complete epicroute toont het opgeslagen bewijs niet betrouwbaar.")
+                    put("actualBehaviour", "De route eindigt reproduceerbaar zonder het afgesproken bewijsdetail.")
+                    put("expectedBehaviour", "De complete route toont het opgeslagen bewijsdetail en een veilige terugroute.")
+                    putArray("reproductionSteps").add("Open de complete epicroute.").add("Activeer de bewijsactie.")
+                    put("impact", "Het centrale gebruikersdoel van de epic is niet aantoonbaar bereikt.")
+                    put("severity", "P1")
+                    set<ObjectNode>("evidence", proof("Epiccontrole toont de afwijking tegen de exacte revision."))
+                }
             }
         })
 
         assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().missingCoverage).containsExactly(CRITERION)
+        assertThat(qualityQueries.findBugs(BugFilter(productId))).hasSize(1)
         assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.ACTIVE)
-        assertThat(planningQueries.findPlanningWorkItems(productId).single().type).isEqualTo(PlanningWorkItemType.PLAN_EPIC_GAP)
+        assertThat(planningQueries.findPlanningWorkItems(productId).map { it.type })
+            .containsExactlyInAnyOrder(PlanningWorkItemType.PLAN_EPIC_GAP, PlanningWorkItemType.PLAN_BUGFIX)
     }
 
     @Test
@@ -189,6 +201,30 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().outcome).isEqualTo(VerificationOutcome.BLOCKED)
         assertThat(qualityQueries.findQualityWorkItems(productId).single().retryable).isTrue()
         assertThat(qualityQueries.getCurrentQuality(productId)).isNull()
+
+        quality.retryQualityWorkItem(work)
+        val retry = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(retry.id).isEqualTo(work)
+        assertThat(retry.status).isEqualTo(WorkItemStatus.PENDING)
+        assertThat(retry.attemptCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `geblokkeerde epiccontrole blijft verifying en hetzelfde workitem wordt retrybaar`() {
+        jdbc.update("UPDATE pf_epic SET status='VERIFYING' WHERE id=?", epicId.value)
+        jdbc.update("UPDATE pf_epic_version SET status='VERIFYING' WHERE epic_id=? AND version=1", epicId.value)
+        val epic = designQueries.getEpic(epicId)
+        val work = quality.requestEpicVerification(RequestEpicVerificationCommand(productId, epic.id, epic.version, "acceptance", 80, "blocked-epic"))
+        completeSession(result(work, "BLOCKED").apply {
+            (path("results")[0] as ObjectNode).put("blockedReason", "De testomgeving levert tijdelijk geen bronantwoord.")
+        })
+
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.VERIFYING)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().retryable).isTrue()
+        quality.retryQualityWorkItem(work)
+        val retry = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(retry.id).isEqualTo(work)
+        assertThat(retry.status).isEqualTo(WorkItemStatus.PENDING)
     }
 
     @Test

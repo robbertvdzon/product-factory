@@ -31,6 +31,25 @@ class AcceptanceTestControlService(
 ) : TestControlService, ApplicationRunner {
     private val contributors = contributors.sortedWith(compareBy({ it.order }, { it.key }))
     private val scenarios = listOf(
+        TestScenarioSummary("mvp-01-happy-flow", "1", "Happy flow", "Productinput wordt epic, complete story, externe levering, story- en epictest en een voltooide epic."),
+        TestScenarioSummary("mvp-02-prioritized-backlog", "1", "Geprioriteerde backlog", "Complete storysets vormen één unieke productbrede TODO-volgorde."),
+        TestScenarioSummary("mvp-03-stakeholder-priority", "1", "Stakeholderprioriteit", "Alleen TODO-werk wordt met blijvende reden en historie opnieuw geprioriteerd."),
+        TestScenarioSummary("mvp-04-story-rejected", "1", "Story afgekeurd", "De opgeleverde story blijft DONE terwijl bug- en herstelwerk ontstaan."),
+        TestScenarioSummary("mvp-05-bugfix-not-resolved", "1", "Bugfix onvoldoende", "Dezelfde bug blijft OPEN en kan een volgende gewone bugfixstory krijgen."),
+        TestScenarioSummary("mvp-06-factory-cancelled", "1", "Factory annuleert story", "CANCELLED wordt feitelijk verwerkt en blokkeert een latere epicbeoordeling niet."),
+        TestScenarioSummary("mvp-07-temporarily-untestable", "1", "Tijdelijk niet testbaar", "Pogingen en back-off blijven bewaard; Retry now maakt geen dubbele sessie."),
+        TestScenarioSummary("mvp-08-missing-epic-coverage", "1", "Ontbrekende epicdekking", "Gerichte dekkingsstories ontstaan binnen dezelfde bevroren epic."),
+        TestScenarioSummary("mvp-09-bug-in-epic-check", "1", "Bug in epiccontrole", "Bug en bugfixwerk brengen NEEDS_WORK gecontroleerd terug naar ACTIVE."),
+        TestScenarioSummary("mvp-10-epic-check-blocked", "1", "Epiccontrole geblokkeerd", "De epic blijft VERIFYING en hetzelfde workitem blijft retrybaar."),
+        TestScenarioSummary("mvp-11-goal-not-reached", "1", "Gebruikersdoel niet bereikt", "Positief bewijs eindigt expliciet in NOT_SUCCESSFUL."),
+        TestScenarioSummary("mvp-12-stakeholder-cancels-epic", "1", "Stakeholder stopt epic", "Marker, stories en reservering volgen de atomaire annuleringsvolgorde."),
+        TestScenarioSummary("mvp-13-factory-temporarily-offline", "1", "Factory tijdelijk onbereikbaar", "Retry en externe lookup behouden exact één externe story."),
+        TestScenarioSummary("mvp-14-planning-terminal-failure", "1", "Planning terminaal mislukt", "De epic blijft IN_PLANNING en dezelfde claim wordt voor nieuw werk hervat."),
+        TestScenarioSummary("mvp-15-deployment-pending", "1", "Oplevercommit nog niet live", "Kwaliteit blijft BLOCKED met DEPLOYMENT_PENDING tot de revision exact gelijk is."),
+        TestScenarioSummary("mvp-16-two-products", "1", "Twee producten tegelijk", "Per module loopt één sessie per product en verschillende producten lopen onafhankelijk."),
+        TestScenarioSummary("mvp-17-dependency-cancelled", "1", "Dependency geannuleerd", "De dependency geldt niet als voldaan en gericht herplanningswerk ontstaat."),
+        TestScenarioSummary("mvp-18-process-schedules", "1", "Eigen procesritmes", "Aan/uit, interval, weekregels, tijdzone, DST, wijziging en één inhaalrun zijn deterministisch."),
+        TestScenarioSummary("mvp-19-agent-meeting", "1", "Agentvraag in overleg", "Agenda, bronantwoord, rolgesprek, notulen en hervatte procescontext blijven verbonden."),
         TestScenarioSummary(
             key = "foundation-clean",
             version = "2",
@@ -196,8 +215,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "dispatcher-mvp-v1"
-        private const val TESTBED_VERSION = "0.8.0"
+        private const val DATASET_VERSION = "complete-mvp-v1"
+        private const val TESTBED_VERSION = "0.9.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")
