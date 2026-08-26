@@ -601,16 +601,80 @@ class ProductFailure implements Exception {
   final String message;
 }
 
+enum ProductWorkspaceSection {
+  overview,
+  design,
+  planning,
+  quality,
+  signals,
+  meetings,
+  decisions,
+  settings,
+  operation,
+}
+
+String _sectionEyebrow(ProductWorkspaceSection section) => switch (section) {
+  ProductWorkspaceSection.overview => 'PRODUCT',
+  ProductWorkspaceSection.design => 'PRODUCTONTWERP',
+  ProductWorkspaceSection.planning => 'PRODUCTPLANNING',
+  ProductWorkspaceSection.quality => 'KWALITEITSBEWAKING',
+  ProductWorkspaceSection.signals => 'STAKEHOLDER',
+  ProductWorkspaceSection.meetings => 'SAMENWERKING',
+  ProductWorkspaceSection.decisions => 'RICHTING',
+  ProductWorkspaceSection.settings => 'INSTELLINGEN',
+  ProductWorkspaceSection.operation => 'OPERATIE',
+};
+
+String _sectionTitle(ProductWorkspaceSection section) => switch (section) {
+  ProductWorkspaceSection.overview => 'Overzicht',
+  ProductWorkspaceSection.design => 'Verbeteringen als complete epics',
+  ProductWorkspaceSection.planning => 'Geprioriteerde backlog',
+  ProductWorkspaceSection.quality => 'Kwaliteit',
+  ProductWorkspaceSection.signals => 'Signalen',
+  ProductWorkspaceSection.meetings => 'Overleggen',
+  ProductWorkspaceSection.decisions => 'Besluiten',
+  ProductWorkspaceSection.settings => 'Instellingen',
+  ProductWorkspaceSection.operation => 'Runs, queues en leveringen',
+};
+
+String _sectionDescription(
+  ProductWorkspaceSection section,
+) => switch (section) {
+  ProductWorkspaceSection.overview =>
+    'Wat er nu gebeurt en wat aandacht vraagt.',
+  ProductWorkspaceSection.design =>
+    'Iedere epic bevat één duidelijke gebruikersverbetering, scope, succescriteria en UX.',
+  ProductWorkspaceSection.planning =>
+    'Alle open stories in de volgorde waarin Software Factory ze kan oppakken.',
+  ProductWorkspaceSection.quality =>
+    'Testwerk, bewezen bugs en controleerbare resultaten op één plek.',
+  ProductWorkspaceSection.signals =>
+    'Gebruikerssignalen en hun zichtbare verwerking.',
+  ProductWorkspaceSection.meetings =>
+    'Vragen van agents, gesprekken, notulen en expliciete uitkomsten.',
+  ProductWorkspaceSection.decisions =>
+    'Actuele richting, peildatum en volledige historie.',
+  ProductWorkspaceSection.settings =>
+    'Product, omgevingen, levering en automatisering op één plek.',
+  ProductWorkspaceSection.operation =>
+    'Processessies, AI-uitvoering en Software Factory-dispatch.',
+};
+
 class ProductWorkspacePage extends StatefulWidget {
-  const ProductWorkspacePage({required this.gateway, super.key});
+  const ProductWorkspacePage({
+    required this.gateway,
+    this.section = ProductWorkspaceSection.overview,
+    this.trailingContent,
+    super.key,
+  });
   final ProductGateway gateway;
+  final ProductWorkspaceSection section;
+  final Widget? trailingContent;
   @override
   State<ProductWorkspacePage> createState() => _ProductWorkspacePageState();
 }
 
-class _ProductWorkspacePageState extends State<ProductWorkspacePage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabs;
+class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   List<ProductSummary> _products = const [];
   ProductSummary? _selected;
   ProductWorkspaceData? _data;
@@ -620,14 +684,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 9, vsync: this);
     _loadProducts();
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
   }
 
   Future<void> _loadProducts([String? selectId]) async {
@@ -665,14 +722,16 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-    padding: EdgeInsets.symmetric(
-      horizontal: MediaQuery.sizeOf(context).width < 600 ? 20 : 48,
-      vertical: 32,
+    padding: EdgeInsets.fromLTRB(
+      MediaQuery.sizeOf(context).width < 600 ? 20 : 42,
+      MediaQuery.sizeOf(context).width < 600 ? 28 : 44,
+      MediaQuery.sizeOf(context).width < 600 ? 20 : 42,
+      64,
     ),
     child: Align(
       alignment: Alignment.topLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1120),
+        constraints: const BoxConstraints(maxWidth: 1180),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -682,20 +741,39 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
               spacing: 24,
               runSpacing: 12,
               children: [
-                Text(
-                  'Producten',
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _sectionEyebrow(widget.section),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _sectionTitle(widget.section),
+                      style: Theme.of(context).textTheme.displaySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 680),
+                      child: Text(_sectionDescription(widget.section)),
+                    ),
+                  ],
+                ),
+                if (widget.section == ProductWorkspaceSection.overview ||
+                    widget.section == ProductWorkspaceSection.settings)
+                  FilledButton.icon(
+                    onPressed: _createProduct,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Nieuw product'),
                   ),
-                ),
-                FilledButton.icon(
-                  onPressed: _createProduct,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Product aanmaken'),
-                ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 28),
             if (_error != null)
               Card(
                 color: Theme.of(context).colorScheme.errorContainer,
@@ -708,68 +786,95 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
                 ),
               ),
             if (_busy) const LinearProgressIndicator(),
-            if (!_busy && _products.isEmpty)
-              const Card(
-                child: ListTile(
-                  leading: Icon(Icons.inventory_2_outlined),
-                  title: Text('Nog geen producten'),
-                  subtitle: Text(
-                    'Maak het eerste product aan via hetzelfde publieke command als ieder volgend product.',
+            if (!_busy && _products.isEmpty) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final copy = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Nog geen producten',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Maak het eerste product aan om richting, ontwerp, planning en kwaliteit te volgen.',
+                          ),
+                        ],
+                      );
+                      final action = FilledButton.icon(
+                        onPressed: _createProduct,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Product aanmaken'),
+                      );
+                      if (constraints.maxWidth < 520) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.inventory_2_outlined, size: 32),
+                            const SizedBox(height: 16),
+                            copy,
+                            const SizedBox(height: 20),
+                            action,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          const Icon(Icons.inventory_2_outlined, size: 32),
+                          const SizedBox(width: 18),
+                          Expanded(child: copy),
+                          const SizedBox(width: 18),
+                          action,
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
+              if (widget.trailingContent != null) ...[
+                const SizedBox(height: 20),
+                widget.trailingContent!,
+              ],
+            ],
             if (_products.isNotEmpty) ...[
-              DropdownButtonFormField<String>(
-                initialValue: _selected?.id,
-                decoration: const InputDecoration(
-                  labelText: 'Actief product',
-                  border: OutlineInputBorder(),
-                ),
-                items: _products
-                    .map(
-                      (p) => DropdownMenuItem(
-                        value: p.id,
-                        child: Text('${p.name} · ${p.status}'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (id) => _loadProducts(id),
-              ),
-              const SizedBox(height: 20),
-              if (_data != null) _overview(_data!),
-              const SizedBox(height: 20),
-              TabBar(
-                controller: _tabs,
-                isScrollable: true,
-                tabs: const [
-                  Tab(text: 'Opdracht'),
-                  Tab(text: 'Ontwerp'),
-                  Tab(text: 'Planning'),
-                  Tab(text: 'Kwaliteit'),
-                  Tab(text: 'Signalen'),
-                  Tab(text: 'Vragen van agents'),
-                  Tab(text: 'Overleggen'),
-                  Tab(text: 'Besluiten'),
-                  Tab(text: 'Automatisering'),
-                ],
-              ),
-              SizedBox(
-                height: 520,
-                child: TabBarView(
-                  controller: _tabs,
-                  children: [
-                    _assignment(_data!),
-                    _design(_data!),
-                    _planning(_data!),
-                    _quality(_data!),
-                    _signals(_data!),
-                    _questions(_data!),
-                    _meetings(_data!),
-                    _decisions(_data!),
-                    _schedules(_data!),
-                  ],
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selected?.id,
+                    decoration: const InputDecoration(
+                      labelText: 'Product',
+                      prefixIcon: Icon(Icons.inventory_2_outlined),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                    ),
+                    items: _products
+                        .map(
+                          (p) => DropdownMenuItem(
+                            value: p.id,
+                            child: Text('${p.name} · ${p.status}'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (id) => _loadProducts(id),
+                  ),
                 ),
               ),
+              const SizedBox(height: 22),
+              if (_data != null) _sectionContent(_data!),
             ],
           ],
         ),
@@ -777,7 +882,265 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
     ),
   );
 
-  Widget _overview(ProductWorkspaceData data) => Card(
+  Widget _sectionContent(ProductWorkspaceData data) => switch (widget.section) {
+    ProductWorkspaceSection.overview => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _overview(data),
+        const SizedBox(height: 20),
+        _overviewAttention(data),
+      ],
+    ),
+    ProductWorkspaceSection.design => _design(data),
+    ProductWorkspaceSection.planning => _planning(data),
+    ProductWorkspaceSection.quality => _quality(data),
+    ProductWorkspaceSection.signals => _signals(data),
+    ProductWorkspaceSection.meetings => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [_questions(data), const SizedBox(height: 20), _meetings(data)],
+    ),
+    ProductWorkspaceSection.decisions => _decisions(data),
+    ProductWorkspaceSection.settings => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _productControls(data),
+        const SizedBox(height: 20),
+        _assignment(data),
+        const SizedBox(height: 20),
+        _schedules(data),
+        if (widget.trailingContent != null) ...[
+          const SizedBox(height: 20),
+          widget.trailingContent!,
+        ],
+      ],
+    ),
+    ProductWorkspaceSection.operation => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _operation(data),
+        if (widget.trailingContent != null) ...[
+          const SizedBox(height: 20),
+          widget.trailingContent!,
+        ],
+      ],
+    ),
+  };
+
+  Widget _overview(ProductWorkspaceData data) {
+    final assignment = data.assignment;
+    final goal = assignment?['goal']?.toString().trim();
+    final currentEpic = data.epics.where((epic) {
+      return const {
+        'ACTIVE',
+        'IN_PLANNING',
+        'VERIFYING',
+      }.contains(epic['status']);
+    }).firstOrNull;
+    final currentStory = data.backlog.where((story) {
+      return story['status'] == 'IN_PROGRESS';
+    }).firstOrNull;
+    final epicStories = currentEpic == null
+        ? const <Map<String, Object?>>[]
+        : data.stories
+              .where(
+                (story) => _value(story['epicId']) == _value(currentEpic['id']),
+              )
+              .toList();
+    final done = epicStories.where((story) => story['status'] == 'DONE').length;
+    final progress = epicStories.isEmpty ? 0.0 : done / epicStories.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xffedf8f1), Color(0xfff8fbf7)],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xffd3e7da)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'PRODUCTDOEL',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.4,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                goal?.isNotEmpty == true
+                    ? goal!
+                    : 'Leg het productdoel vast bij Instellingen.',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'NU',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.4,
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            currentEpic?['title']?.toString() ??
+                                'Nog geen actieve epic',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (currentEpic != null)
+                      Chip(label: Text('${currentEpic['status']}')),
+                  ],
+                ),
+                if (currentEpic != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '${_value(currentEpic['id'])} · $done van ${epicStories.length} stories opgeleverd',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 7,
+                      backgroundColor: const Color(0xffe8ede9),
+                    ),
+                  ),
+                ],
+                if (currentStory != null) ...[
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xfff2f6f2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.north_east, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Software Factory bouwt',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              Text(
+                                '${_value(currentStory['id'])} · ${currentStory['title']}',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Chip(label: Text('In uitvoering')),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _overviewAttention(ProductWorkspaceData data) {
+    final openSignals = data.signals
+        .where((signal) => signal['status'] != 'PROCESSED')
+        .toList();
+    final openQuestions = data.questions
+        .where((question) => question['status'] == 'OPEN')
+        .toList();
+    final blockedWork = data.qualityWorkItems.where((item) {
+      return const {'BLOCKED', 'FAILED'}.contains(item['status']);
+    }).toList();
+    final total =
+        openSignals.length + openQuestions.length + blockedWork.length;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('AANDACHT', style: Theme.of(context).textTheme.labelSmall),
+            const SizedBox(height: 6),
+            Text(
+              total == 0 ? 'Geen open punten' : '$total open punten',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            if (total == 0)
+              const Text('Er zijn nu geen blokkades, vragen of open signalen.')
+            else ...[
+              ...blockedWork
+                  .take(3)
+                  .map(
+                    (item) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.error_outline),
+                      title: Text('${item['type']} · ${item['status']}'),
+                      subtitle: Text('${item['explanation']}'),
+                    ),
+                  ),
+              ...openQuestions
+                  .take(3)
+                  .map(
+                    (question) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.question_answer_outlined),
+                      title: Text(_value(question['question'])),
+                      subtitle: const Text('Vraag van een agent'),
+                    ),
+                  ),
+              ...openSignals
+                  .take(3)
+                  .map(
+                    (signal) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.radio_button_unchecked),
+                      title: Text(_value(signal['text'])),
+                      subtitle: const Text('Open gebruikerssignaal'),
+                    ),
+                  ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _productControls(ProductWorkspaceData data) => Card(
     child: Padding(
       padding: const EdgeInsets.all(20),
       child: Wrap(
@@ -827,6 +1190,68 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
       ),
     ),
   );
+
+  Widget _operation(
+    ProductWorkspaceData data,
+  ) => _section('Operatie', Icons.monitor_heart_outlined, [
+    Text('Processessies', style: Theme.of(context).textTheme.titleMedium),
+    const SizedBox(height: 8),
+    ...[
+      ...data.designSessions.map((session) => ('Ontwerp', session)),
+      ...data.planningSessions.map((session) => ('Planning', session)),
+      ...data.qualitySessions.map((session) => ('Kwaliteit', session)),
+      ...data.dispatcherSessions.map((session) => ('Dispatcher', session)),
+    ].map(
+      (entry) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.play_circle_outline),
+        title: Text('${entry.$1} · ${entry.$2['status']}'),
+        subtitle: Text(
+          '${entry.$2['resultSummary'] ?? entry.$2['blockedReason'] ?? _value(entry.$2['id'])}',
+        ),
+      ),
+    ),
+    const Divider(height: 32),
+    Text(
+      'Software Factory-dispatch',
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
+    const SizedBox(height: 8),
+    ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        data.dispatcherStatus['blocked'] == true
+            ? Icons.error_outline
+            : Icons.sync_alt,
+      ),
+      title: Text(
+        data.dispatcherStatus['blocked'] == true
+            ? 'Dispatch geblokkeerd'
+            : 'Dispatcher gereed',
+      ),
+      subtitle: Text(
+        '${data.dispatcherStatus['blockedReason'] ?? 'Geen blijvende technische blokkade.'}',
+      ),
+    ),
+    ...data.deliveryAttempts.map(
+      (attempt) => ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        title: Text(
+          '${attempt['status']} · ${attempt['externalStoryId'] ?? _value(attempt['storyId'])}',
+        ),
+        subtitle: Text('Poging ${attempt['attemptCount']}'),
+        childrenPadding: const EdgeInsets.only(bottom: 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectableText('Reservering ${attempt['reservationId']}'),
+          Text('Externe status ${attempt['externalStatus'] ?? 'onbekend'}'),
+          Text('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
+          if (attempt['lastErrorCode'] != null)
+            Text('${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}'),
+        ],
+      ),
+    ),
+  ]);
 
   Widget _planning(
     ProductWorkspaceData data,

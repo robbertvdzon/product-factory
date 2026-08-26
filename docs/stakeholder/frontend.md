@@ -7,12 +7,15 @@ entiteit bezit.
 Voor de Stakeholder is deze gebruikersinterface de normale ingang tot Product Factory: overleggen,
 signalen, besluiten, prioriteitsacties en handmatige processessies beginnen hier.
 
-De frontend wordt volledig opnieuw gemaakt. De v1-code, widgets, schermindeling en specifieke
-presentatiepatronen worden niet hergebruikt. Dit document beschrijft gewenst gedrag en publieke
-gegevens, niet hoe het oude dashboard was opgebouwd.
+De frontend wordt volledig opnieuw gemaakt. De v1-code, widgets en het oude dashboard worden niet
+hergebruikt. Het afzonderlijke Product Factory v2-UX-concept van vóór de technische herbouw is wél
+de visuele basis. De blijvende ontwerpprincipes, schermindeling en bewuste latere uitbreidingen staan
+in [UX-referentie](../ux/README.md). Dit document beschrijft gewenst gedrag en publieke gegevens.
 
 ## Ontwerpregels
 
+- De applicatieschil, kleurtaal, informatiehiërarchie en responsive navigatie volgen de vastgelegde
+  v2-UX-referentie.
 - De gewone schermen gebruiken producttaal en geen agent-, prompt-, queue- of databasetaal.
 - De frontend leest actuele gegevens en historie via publieke read-only queries.
 - Zij schrijft nooit rechtstreeks in een moduletabel.

@@ -96,7 +96,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Nog geen producten'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    // Renderfouten worden door de binding als testfout gerapporteerd.
   });
 
   testWidgets('backendbevestiging activeert acceptatiebanner en Testbed', (
@@ -146,8 +146,12 @@ void main() {
       ),
     );
 
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.text('Overzicht'), findsAtLeast(1));
     await tester.tap(find.text('Beheer'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Richting, geheugen en techniek'), findsOneWidget);
+    await tester.tap(find.text('Release-informatie'));
     await tester.pumpAndSettle();
 
     expect(find.text('Frontend'), findsOneWidget);

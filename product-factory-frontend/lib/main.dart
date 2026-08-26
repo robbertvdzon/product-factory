@@ -12,6 +12,7 @@ import 'frontend_version_monitor.dart';
 import 'memory_ai_management.dart';
 import 'testbed.dart';
 import 'product_workspace.dart';
+import 'product_factory_theme.dart';
 
 void main() {
   runApp(ProductFactoryApp(federatedSignOut: GoogleSignIn.instance.signOut));
@@ -47,11 +48,7 @@ class ProductFactoryApp extends StatelessWidget {
     return MaterialApp(
       title: 'Product Factory',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff155e75)),
-        scaffoldBackgroundColor: const Color(0xfff6f8f8),
-        useMaterial3: true,
-      ),
+      theme: productFactoryTheme(),
       home: AuthenticationGate(
         gateway: authenticationGateway ?? HttpAuthenticationGateway(),
         googleLoginButtonBuilder: googleLoginButtonBuilder,

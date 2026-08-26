@@ -293,9 +293,16 @@ class MemoryAiFailure implements Exception {
   final String message;
 }
 
+enum MemoryAiView { all, memory, settings, operation }
+
 class MemoryAiManagementPanel extends StatefulWidget {
-  const MemoryAiManagementPanel({required this.gateway, super.key});
+  const MemoryAiManagementPanel({
+    required this.gateway,
+    this.view = MemoryAiView.all,
+    super.key,
+  });
   final MemoryAiGateway gateway;
+  final MemoryAiView view;
   @override
   State<MemoryAiManagementPanel> createState() =>
       _MemoryAiManagementPanelState();
@@ -327,24 +334,43 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
   Future<void> _load() async {
     _start();
     try {
+      final showMemory =
+          widget.view == MemoryAiView.all || widget.view == MemoryAiView.memory;
+      final showSettings =
+          widget.view == MemoryAiView.all ||
+          widget.view == MemoryAiView.settings;
+      final showOperation =
+          widget.view == MemoryAiView.all ||
+          widget.view == MemoryAiView.operation;
       final values = await Future.wait([
-        widget.gateway.products(),
-        widget.gateway.aiSettings(),
-        if (widget.gateway case final AgentRuntimeGateway runtime)
-          runtime.aiTasks(),
+        if (showMemory || showSettings)
+          widget.gateway.products()
+        else
+          Future.value(<Map<String, Object?>>[]),
+        if (showSettings)
+          widget.gateway.aiSettings()
+        else
+          Future.value(<Map<String, Object?>>[]),
+        if (showOperation)
+          if (widget.gateway case final AgentRuntimeGateway runtime)
+            runtime.aiTasks(),
       ]);
       final products = values[0];
       final selected =
           _productId ?? (products.isEmpty ? null : _v(products.first['id']));
-      final roles = selected == null
+      final roles = selected == null || (!showMemory && !showSettings)
           ? <Map<String, Object?>>[]
           : await widget.gateway.roles(selected);
       final role = roles.any((r) => _v(r['key']) == _role)
           ? _role
           : (roles.isEmpty ? null : _v(roles.first['key']));
-      final scoped = await _loadScope(selected, role);
+      final scoped = showMemory
+          ? await _loadScope(selected, role)
+          : (null, const <Map<String, Object?>>[]);
       final runtimeValues =
-          widget.gateway is AgentRuntimeGateway && selected != null
+          showSettings &&
+              widget.gateway is AgentRuntimeGateway &&
+              selected != null
           ? await Future.wait([
               (widget.gateway as AgentRuntimeGateway).environmentCatalog(
                 _projectPrefix,
@@ -397,8 +423,14 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
     try {
       final roles = await widget.gateway.roles(value);
       final role = roles.isEmpty ? null : _v(roles.first['key']);
-      final scoped = await _loadScope(value, role);
-      final productKeys = widget.gateway is AgentRuntimeGateway
+      final scoped =
+          widget.view == MemoryAiView.all || widget.view == MemoryAiView.memory
+          ? await _loadScope(value, role)
+          : (null, const <Map<String, Object?>>[]);
+      final productKeys =
+          (widget.view == MemoryAiView.all ||
+                  widget.view == MemoryAiView.settings) &&
+              widget.gateway is AgentRuntimeGateway
           ? await (widget.gateway as AgentRuntimeGateway)
                 .productEnvironmentKeys(value)
           : <Map<String, Object?>>[];
@@ -421,6 +453,10 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
 
   Future<void> _selectRole(String? value) async {
     if (value == null || _productId == null) return;
+    if (widget.view == MemoryAiView.settings) {
+      setState(() => _role = value);
+      return;
+    }
     _start();
     try {
       final scoped = await _loadScope(_productId, value);
@@ -439,223 +475,252 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Divider(height: 48),
-      Text('Agentgeheugen', style: Theme.of(context).textTheme.headlineMedium),
-      const SizedBox(height: 6),
-      const Text(
-        'Beheer actuele kennis en de volledige, append-only historie per product, capability en vertrouwde agentrol.',
-      ),
-      const SizedBox(height: 16),
-      if (_error != null)
-        Card(
-          color: Theme.of(context).colorScheme.errorContainer,
-          child: ListTile(
-            title: Text(_error!),
-            trailing: TextButton(
-              onPressed: _load,
-              child: const Text('Opnieuw'),
+  Widget build(BuildContext context) {
+    final showMemory =
+        widget.view == MemoryAiView.all || widget.view == MemoryAiView.memory;
+    final showSettings =
+        widget.view == MemoryAiView.all || widget.view == MemoryAiView.settings;
+    final showOperation =
+        widget.view == MemoryAiView.all ||
+        widget.view == MemoryAiView.operation;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showMemory) ...[
+          const Divider(height: 48),
+          Text(
+            'Agentgeheugen',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Beheer actuele kennis en de volledige, append-only historie per product, capability en vertrouwde agentrol.',
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (_error != null)
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: ListTile(
+              title: Text(_error!),
+              trailing: TextButton(
+                onPressed: _load,
+                child: const Text('Opnieuw'),
+              ),
             ),
           ),
-        ),
-      if (_busy) const LinearProgressIndicator(),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 16,
-        runSpacing: 12,
-        children: [
-          SizedBox(
-            width: 360,
-            child: DropdownButtonFormField<String>(
-              isExpanded: true,
-              initialValue: _productId,
-              decoration: const InputDecoration(
-                labelText: 'Product',
-                border: OutlineInputBorder(),
+        if (_busy) const LinearProgressIndicator(),
+        if (showMemory) ...[const SizedBox(height: 12), _scopeSelector()],
+        if (showMemory && _roleDefinition != null) ...[
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.smart_toy_outlined),
+              title: Text(
+                '${_roleDefinition!['displayName']} · ${_roleDefinition!['implementationVariant']}',
               ),
-              items: _products
-                  .map(
-                    (p) => DropdownMenuItem(
-                      value: _v(p['id']),
-                      child: Text('${p['name']} · ${_v(p['id'])}'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: _busy ? null : _selectProduct,
-            ),
-          ),
-          SizedBox(
-            width: 360,
-            child: DropdownButtonFormField<String>(
-              isExpanded: true,
-              initialValue: _role,
-              decoration: const InputDecoration(
-                labelText: 'Capability · agentrol',
-                border: OutlineInputBorder(),
+              subtitle: Text(
+                '${_roleDefinition!['purpose']}\nGrenzen: ${(_roleDefinition!['boundaries'] as List? ?? const []).join(' · ')}',
               ),
-              items: _roles
-                  .map(
-                    (r) => DropdownMenuItem(
-                      value: _v(r['key']),
-                      child: Text('${r['capability']} · ${r['displayName']}'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: _busy ? null : _selectRole,
             ),
           ),
         ],
-      ),
-      if (_roleDefinition != null) ...[
-        const SizedBox(height: 12),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.smart_toy_outlined),
-            title: Text(
-              '${_roleDefinition!['displayName']} · ${_roleDefinition!['implementationVariant']}',
-            ),
-            subtitle: Text(
-              '${_roleDefinition!['purpose']}\nGrenzen: ${(_roleDefinition!['boundaries'] as List? ?? const []).join(' · ')}',
-            ),
-          ),
-        ),
-      ],
-      if (_budget != null) ...[
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            Chip(
-              label: Text(
-                '${_budget!['usedItems']}/${_budget!['maximumActiveItems']} actieve items',
-              ),
-            ),
-            Chip(
-              label: Text(
-                '${_budget!['usedCharacters']}/${_budget!['maximumTotalCharacters']} tekens',
-              ),
-            ),
-            Chip(
-              label: Text(
-                'max. ${_budget!['maximumItemCharacters']} tekens per item',
-              ),
-            ),
-          ],
-        ),
-      ],
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          OutlinedButton.icon(
-            onPressed: _pickDate,
-            icon: const Icon(Icons.history),
-            label: Text(
-              _date == null
-                  ? 'Actuele toestand'
-                  : 'Geldig op ${_date!.toIso8601String().substring(0, 10)}',
-            ),
-          ),
-          if (_date != null)
-            TextButton(
-              onPressed: () {
-                setState(() => _date = null);
-                _selectRole(_role);
-              },
-              child: const Text('Terug naar actueel'),
-            ),
-          FilledButton.icon(
-            onPressed: _role == null || _date != null ? null : _add,
-            icon: const Icon(Icons.add),
-            label: const Text('Geheugenitem toevoegen'),
-          ),
-        ],
-      ),
-      const SizedBox(height: 8),
-      if (_items.isEmpty && !_busy)
-        const Card(
-          child: ListTile(
-            title: Text('Geen geheugenitems voor deze selectie.'),
-          ),
-        ),
-      ..._items.map(_memoryCard),
-      const Divider(height: 48),
-      Text('AI-modellen', style: Theme.of(context).textTheme.headlineMedium),
-      const SizedBox(height: 6),
-      const Text(
-        'Geldt voor alle producten. Iedere taak loopt duurzaam via de gedeelde Agent Runtime.',
-      ),
-      const SizedBox(height: 12),
-      ..._ai.map(_aiCard),
-      if (widget.gateway is AgentRuntimeGateway) ...[
-        const Divider(height: 48),
-        Text(
-          'Agenttoegang · $_projectPrefix',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 320,
-              child: TextFormField(
-                initialValue: _projectPrefix,
-                enabled: !_busy,
-                decoration: InputDecoration(
-                  labelText: 'Runtime-projectprefix',
-                  helperText: 'Bijvoorbeeld HKH of HKH_AUTOPILOT',
-                  errorText: _projectPrefixError,
-                  border: const OutlineInputBorder(),
+        if (showMemory && _budget != null) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(
+                label: Text(
+                  '${_budget!['usedItems']}/${_budget!['maximumActiveItems']} actieve items',
                 ),
-                textCapitalization: TextCapitalization.characters,
-                onChanged: (value) => setState(() {
-                  _projectPrefix = value;
-                  _projectPrefixError = null;
-                }),
-                onFieldSubmitted: (_) => _refreshCatalog(),
               ),
-            ),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _refreshCatalog,
-              icon: const Icon(Icons.sync),
-              label: const Text('Runtime-catalogus verversen'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Alleen namen en beschikbaarheid worden getoond. Waarden verlaten Agent Runtime nooit.',
-        ),
-        const SizedBox(height: 12),
-        if (_catalog.isEmpty)
+              Chip(
+                label: Text(
+                  '${_budget!['usedCharacters']}/${_budget!['maximumTotalCharacters']} tekens',
+                ),
+              ),
+              Chip(
+                label: Text(
+                  'max. ${_budget!['maximumItemCharacters']} tekens per item',
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (showMemory) const SizedBox(height: 12),
+        if (showMemory)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _pickDate,
+                icon: const Icon(Icons.history),
+                label: Text(
+                  _date == null
+                      ? 'Actuele toestand'
+                      : 'Geldig op ${_date!.toIso8601String().substring(0, 10)}',
+                ),
+              ),
+              if (_date != null)
+                TextButton(
+                  onPressed: () {
+                    setState(() => _date = null);
+                    _selectRole(_role);
+                  },
+                  child: const Text('Terug naar actueel'),
+                ),
+              FilledButton.icon(
+                onPressed: _role == null || _date != null ? null : _add,
+                icon: const Icon(Icons.add),
+                label: const Text('Geheugenitem toevoegen'),
+              ),
+            ],
+          ),
+        if (showMemory) const SizedBox(height: 8),
+        if (showMemory && _items.isEmpty && !_busy)
           const Card(
             child: ListTile(
-              leading: Icon(Icons.key_off_outlined),
-              title: Text('Nog geen Runtime-keynamen geladen'),
+              title: Text('Geen geheugenitems voor deze selectie.'),
             ),
           ),
-        ..._catalog.map(_environmentKeyCard),
-        const Divider(height: 48),
-        Text(
-          'AI-taakoperatie',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Domeincorrelatie en veilige voortgang staan hier; workers en technische attempts staan in de Runtime-monitor.',
-        ),
-        const SizedBox(height: 12),
-        if (_tasks.isEmpty)
-          const Card(child: ListTile(title: Text('Nog geen AI-taken.'))),
-        ..._tasks.map(_taskCard),
+        if (showMemory) ..._items.map(_memoryCard),
+        if (showSettings) ...[
+          const Divider(height: 48),
+          Text(
+            'AI-modellen',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Geldt voor alle producten. Iedere taak loopt duurzaam via de gedeelde Agent Runtime.',
+          ),
+          const SizedBox(height: 12),
+          ..._ai.map(_aiCard),
+        ],
+        if (showSettings && widget.gateway is AgentRuntimeGateway) ...[
+          const Divider(height: 48),
+          Text(
+            'Agenttoegang · $_projectPrefix',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Koppel uitsluitend bekende Runtime-keynamen aan dit product en geef per agentrol expliciet toegang.',
+          ),
+          const SizedBox(height: 12),
+          _scopeSelector(),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 320,
+                child: TextFormField(
+                  initialValue: _projectPrefix,
+                  enabled: !_busy,
+                  decoration: InputDecoration(
+                    labelText: 'Runtime-projectprefix',
+                    helperText: 'Bijvoorbeeld HKH of HKH_AUTOPILOT',
+                    errorText: _projectPrefixError,
+                    border: const OutlineInputBorder(),
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                  onChanged: (value) => setState(() {
+                    _projectPrefix = value;
+                    _projectPrefixError = null;
+                  }),
+                  onFieldSubmitted: (_) => _refreshCatalog(),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _refreshCatalog,
+                icon: const Icon(Icons.sync),
+                label: const Text('Runtime-catalogus verversen'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Alleen namen en beschikbaarheid worden getoond. Waarden verlaten Agent Runtime nooit.',
+          ),
+          const SizedBox(height: 12),
+          if (_catalog.isEmpty)
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.key_off_outlined),
+                title: Text('Nog geen Runtime-keynamen geladen'),
+              ),
+            ),
+          ..._catalog.map(_environmentKeyCard),
+        ],
+        if (showOperation && widget.gateway is AgentRuntimeGateway) ...[
+          const Divider(height: 48),
+          Text(
+            'AI-taakoperatie',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Domeincorrelatie en veilige voortgang staan hier; workers en technische attempts staan in de Runtime-monitor.',
+          ),
+          const SizedBox(height: 12),
+          if (_tasks.isEmpty)
+            const Card(child: ListTile(title: Text('Nog geen AI-taken.'))),
+          ..._tasks.map(_taskCard),
+        ],
       ],
+    );
+  }
+
+  Widget _scopeSelector() => Wrap(
+    spacing: 16,
+    runSpacing: 12,
+    children: [
+      SizedBox(
+        width: 360,
+        child: DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: _productId,
+          decoration: const InputDecoration(
+            labelText: 'Product',
+            border: OutlineInputBorder(),
+          ),
+          items: _products
+              .map(
+                (p) => DropdownMenuItem(
+                  value: _v(p['id']),
+                  child: Text('${p['name']} · ${_v(p['id'])}'),
+                ),
+              )
+              .toList(),
+          onChanged: _busy ? null : _selectProduct,
+        ),
+      ),
+      SizedBox(
+        width: 360,
+        child: DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: _role,
+          decoration: const InputDecoration(
+            labelText: 'Capability · agentrol',
+            border: OutlineInputBorder(),
+          ),
+          items: _roles
+              .map(
+                (r) => DropdownMenuItem(
+                  value: _v(r['key']),
+                  child: Text('${r['capability']} · ${r['displayName']}'),
+                ),
+              )
+              .toList(),
+          onChanged: _busy ? null : _selectRole,
+        ),
+      ),
     ],
   );
 
