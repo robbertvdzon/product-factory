@@ -26,7 +26,7 @@ class AiSettingsApplicationService(
         validateActor(command.actor)
         val fingerprint = fingerprint(command)
         replay(command.idempotencyKey, fingerprint)?.let { return getAiJobConfiguration(command.jobKey) }
-        val definition = definition(command.jobKey)
+        definition(command.jobKey)
         val current = currentConfiguration(command.jobKey)
         val currentVersion = current?.version ?: 0L
         if (currentVersion != command.expectedVersion) throw VersionConflict("AI-jobconfiguratie is intussen gewijzigd.")
@@ -42,7 +42,8 @@ class AiSettingsApplicationService(
             "INSERT INTO pf_ai_settings_command(idempotency_key,job_key,request_fingerprint,result_version,actor_type,actor_id,applied_at) VALUES (?,?,?,?,?,?,?)",
             command.idempotencyKey, command.jobKey.value, fingerprint, nextVersion, command.actor.type.name, command.actor.id, now,
         )
-        return AiJobConfigurationDetails(command.jobKey, definition.displayName, command.provider, command.model.trim(), command.enabled, nextVersion, now, command.actor)
+        return currentConfiguration(command.jobKey)
+            ?: error("De zojuist opgeslagen AI-jobconfiguratie ontbreekt.")
     }
 
     @Transactional(readOnly = true)
