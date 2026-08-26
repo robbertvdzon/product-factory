@@ -18,7 +18,7 @@ class ProductApiErrorHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun notFound(error: AggregateNotFound) = ApiError("NOT_FOUND", error.message ?: "Niet gevonden.")
 
-    @ExceptionHandler(VersionConflict::class, IdempotencyConflict::class)
+    @ExceptionHandler(VersionConflict::class, IdempotencyConflict::class, ProcessAlreadyRunning::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun conflict(error: RuntimeException) = ApiError("CONFLICT", error.message ?: "Conflict.")
 

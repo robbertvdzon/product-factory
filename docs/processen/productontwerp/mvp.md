@@ -1,6 +1,6 @@
 # Product Factory v2 — Productontwerp MVP
 
-Status: voorstel voor de eerste implementatie.
+Status: actieve MVP-implementatie (`product-design-impl-mvp`).
 
 Deze implementatie gebruikt exact de publieke [Productontwerp-API](api.md). Zij is
 bewust klein: één algemene AI-agent doet het inhoudelijke ontwerpwerk. Er is geen droombeeld, geen

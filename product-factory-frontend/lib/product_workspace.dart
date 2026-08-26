@@ -45,6 +45,9 @@ class ProductWorkspaceData {
     required this.meetings,
     required this.decisions,
     required this.decisionArchive,
+    required this.epics,
+    required this.designSessions,
+    required this.epicHistories,
   });
   final ProductSummary product;
   final Map<String, Object?>? assignment;
@@ -55,6 +58,9 @@ class ProductWorkspaceData {
   final List<Map<String, Object?>> meetings;
   final List<Map<String, Object?>> decisions;
   final List<Map<String, Object?>> decisionArchive;
+  final List<Map<String, Object?>> epics;
+  final List<Map<String, Object?>> designSessions;
+  final Map<String, List<Map<String, Object?>>> epicHistories;
 }
 
 abstract interface class ProductGateway {
@@ -110,6 +116,9 @@ abstract interface class ProductGateway {
     int version,
     String replacement,
   );
+  Future<void> runProductDesign(String productId);
+  Future<void> withdrawEpic(String epicId, int version, String reason);
+  Future<void> cancelEpic(String epicId, int version, String reason);
 }
 
 class HttpProductGateway implements ProductGateway {
@@ -144,11 +153,23 @@ class HttpProductGateway implements ProductGateway {
       _get('/api/products/$id/meetings'),
       _get('/api/products/$id/decisions'),
       _get('/api/products/$id/decisions/archive'),
+      _get('/api/products/$id/epics'),
+      _get('/api/products/$id/design/sessions'),
     ]);
     List<Map<String, Object?>> list(int index) =>
         ((values[index] as List?) ?? const [])
             .map((e) => (e as Map).cast<String, Object?>())
             .toList();
+    final epics = list(8);
+    final historyEntries = await Future.wait(
+      epics.map((epic) async {
+        final epicId = Uri.encodeComponent(_value(epic['id']));
+        final versions = ((await _get('/api/epics/$epicId/history')) as List)
+            .map((e) => (e as Map).cast<String, Object?>())
+            .toList();
+        return MapEntry(_value(epic['id']), versions);
+      }),
+    );
     return ProductWorkspaceData(
       product: product,
       assignment: (values[0] as Map?)?.cast<String, Object?>(),
@@ -159,6 +180,9 @@ class HttpProductGateway implements ProductGateway {
       meetings: list(5),
       decisions: list(6),
       decisionArchive: list(7),
+      epics: epics,
+      designSessions: list(9),
+      epicHistories: Map.fromEntries(historyEntries),
     );
   }
 
@@ -313,6 +337,26 @@ class HttpProductGateway implements ProductGateway {
     'idempotencyKey': _key('supersede'),
   });
 
+  @override
+  Future<void> runProductDesign(String productId) =>
+      _send('POST', '/api/products/$productId/design/sessions/run', const {});
+
+  @override
+  Future<void> withdrawEpic(String epicId, int version, String reason) =>
+      _send('POST', '/api/epics/$epicId/withdraw', {
+        'reason': reason,
+        'expectedVersion': version,
+        'idempotencyKey': _key('epic-withdraw'),
+      });
+
+  @override
+  Future<void> cancelEpic(String epicId, int version, String reason) =>
+      _send('POST', '/api/epics/$epicId/cancel', {
+        'reason': reason,
+        'expectedVersion': version,
+        'idempotencyKey': _key('epic-cancel'),
+      });
+
   String _key(String prefix) =>
       'ui-$prefix-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
   Uri _uri(String path) => Uri.parse('$_backendUrl$path');
@@ -386,7 +430,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 6, vsync: this);
+    _tabs = TabController(length: 7, vsync: this);
     _loadProducts();
   }
 
@@ -509,6 +553,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
                 isScrollable: true,
                 tabs: const [
                   Tab(text: 'Opdracht'),
+                  Tab(text: 'Ontwerp'),
                   Tab(text: 'Signalen'),
                   Tab(text: 'Vragen van agents'),
                   Tab(text: 'Overleggen'),
@@ -522,6 +567,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
                   controller: _tabs,
                   children: [
                     _assignment(_data!),
+                    _design(_data!),
                     _signals(_data!),
                     _questions(_data!),
                     _meetings(_data!),
@@ -580,13 +626,128 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
             ),
           ),
           const Chip(
-            avatar: Icon(Icons.pause_circle_outline),
-            label: Text('AI-processen nog niet beschikbaar'),
+            avatar: Icon(Icons.auto_awesome_outlined),
+            label: Text('Productontwerp actief'),
           ),
         ],
       ),
     ),
   );
+
+  Widget _design(
+    ProductWorkspaceData data,
+  ) => _section('Ontwerp', Icons.architecture_outlined, [
+    Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        FilledButton.icon(
+          onPressed: () =>
+              _mutate(() => widget.gateway.runProductDesign(data.product.id)),
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Productontwerp starten of hervatten'),
+        ),
+      ],
+    ),
+    const SizedBox(height: 12),
+    Text('Epics', style: Theme.of(context).textTheme.titleMedium),
+    if (data.epics.isEmpty)
+      const Text('Nog geen epics gepubliceerd.')
+    else
+      ...data.epics.map(
+        (epic) => ExpansionTile(
+          leading: const Icon(Icons.view_agenda_outlined),
+          title: Text('${epic['title']} · ${epic['status']}'),
+          subtitle: Text('${epic['summary']}'),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SelectableText(
+              'Epic ${_value(epic['id'])} · versie ${epic['version']}',
+            ),
+            const SizedBox(height: 8),
+            Text('Probleem', style: Theme.of(context).textTheme.labelLarge),
+            Text('${epic['problem']}'),
+            const SizedBox(height: 8),
+            Text('Oplossing', style: Theme.of(context).textTheme.labelLarge),
+            Text('${epic['solution']}'),
+            if (epic['uxDesign'] != null) ...[
+              const SizedBox(height: 8),
+              Text('UX-ontwerp', style: Theme.of(context).textTheme.labelLarge),
+              Text('${epic['uxDesign']}'),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              'Acceptatiecriteria',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            ...(epic['acceptanceCriteria'] as List? ?? const []).map(
+              (criterion) => Text('• $criterion'),
+            ),
+            const SizedBox(height: 8),
+            Text('Behapbaarheid: ${epic['slicabilityRationale']}'),
+            Text(
+              'Bronnen: ${(epic['directionReferences'] as List? ?? const []).length} richtingsreferentie(s)',
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Versiehistorie',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            ...(data.epicHistories[_value(epic['id'])] ?? const []).map(
+              (version) => Text(
+                'v${version['version']} · ${version['status']} · ${version['title']}',
+              ),
+            ),
+            if (epic['status'] == 'AVAILABLE')
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => _epicReasonAction(epic, cancel: false),
+                  icon: const Icon(Icons.archive_outlined),
+                  label: const Text('Epic intrekken'),
+                ),
+              ),
+            if (const {
+              'IN_PLANNING',
+              'ACTIVE',
+              'VERIFYING',
+            }.contains(epic['status']))
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => _epicReasonAction(epic, cancel: true),
+                  icon: const Icon(Icons.cancel_outlined),
+                  label: const Text('Epic annuleren'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    const Divider(height: 28),
+    Text('Processessies', style: Theme.of(context).textTheme.titleMedium),
+    if (data.designSessions.isEmpty)
+      const Text('Nog geen ontwerpsessies gestart.')
+    else
+      ...data.designSessions.map(
+        (session) => ListTile(
+          leading: Icon(
+            session['status'] == 'SUCCEEDED'
+                ? Icons.check_circle_outline
+                : session['status'] == 'BLOCKED'
+                ? Icons.error_outline
+                : Icons.hourglass_top,
+          ),
+          title: Text('${session['status']} · ${_value(session['id'])}'),
+          subtitle: Text(
+            '${session['resultSummary'] ?? session['blockedReason'] ?? 'AI-taak wordt duurzaam gevolgd.'}\n'
+            '${(session['implementation'] as Map?)?['artifact'] ?? 'product-design-impl-mvp'} · '
+            '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken\n'
+            'Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
+          ),
+          isThreeLine: true,
+        ),
+      ),
+  ]);
 
   Widget _assignment(ProductWorkspaceData data) {
     final a = data.assignment;
@@ -694,6 +855,49 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
       label: const Text('Toevoegen'),
     ),
   );
+
+  Future<void> _epicReasonAction(
+    Map<String, Object?> epic, {
+    required bool cancel,
+  }) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(cancel ? 'Epic annuleren' : 'Epic intrekken'),
+        content: TextField(
+          controller: controller,
+          maxLength: 1000,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Reden',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Terug'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Bevestigen'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (reason == null || reason.isEmpty) return;
+    final id = _value(epic['id']);
+    final version = (epic['version'] as num).toInt();
+    await _mutate(
+      () => cancel
+          ? widget.gateway.cancelEpic(id, version, reason)
+          : widget.gateway.withdrawEpic(id, version, reason),
+    );
+  }
+
   Widget _questions(ProductWorkspaceData data) => _section(
     'Vragen van agents',
     Icons.question_answer_outlined,

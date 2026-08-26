@@ -61,6 +61,24 @@ class AcceptanceTestControlService(
             title = "Agent Runtime en overlegagents",
             description = "Duurzame outbox, statusreconciliatie, backend-keygrants, Meeting Agent en notulenagent.",
         ),
+        TestScenarioSummary(
+            key = "product-design-valid-epic",
+            version = "1",
+            title = "Productontwerp publiceert geldige epic",
+            description = "Eén bevroren ontwerpsessie wacht, hervat en publiceert een complete geversioneerde epic.",
+        ),
+        TestScenarioSummary(
+            key = "product-design-no-op",
+            version = "1",
+            title = "Productontwerp zonder zinvol werk",
+            description = "Ongewijzigde bronnen eindigen zichtbaar en zonder tweede AI-taak als succesvolle no-op.",
+        ),
+        TestScenarioSummary(
+            key = "product-design-invalid-result",
+            version = "1",
+            title = "Productontwerp blokkeert ongeldige output",
+            description = "Ontbrekende UX of onvolledige criteria publiceren geen epic en laten een herstelbare blokkade zien.",
+        ),
     )
     private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
 
@@ -158,8 +176,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "agent-runtime-meetings-v1"
-        private const val TESTBED_VERSION = "0.4.0"
+        private const val DATASET_VERSION = "product-design-mvp-v1"
+        private const val TESTBED_VERSION = "0.5.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")

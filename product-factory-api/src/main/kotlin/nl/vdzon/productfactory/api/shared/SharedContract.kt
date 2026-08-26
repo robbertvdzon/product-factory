@@ -51,6 +51,8 @@ data class ProcessSessionDetails(
     val resultSummary: String? = null,
     val blockedReason: String? = null,
     val errorCode: String? = null,
+    val repositoryUrl: String? = null,
+    val repositoryCommitSha: String? = null,
 )
 
 class ProcessAlreadyRunning(val productId: ProductId) : RuntimeException("Er draait al een processessie voor ${productId.value}")

@@ -1,5 +1,16 @@
 # Stap 5 — Productontwerp MVP
 
+## Implementatierecord
+
+De actieve provider is `product-design-impl-mvp` met variant `single-agent`. Migratie V7 bewaart
+epics, onveranderlijke epicversies, hervatbare processessies, bevroren bronnen en geheugenversies,
+AI-taakcorrelaties, lifecycle-idempotentie en duurzame annuleringsoperaties. De publieke REST- en
+UI-route gebruikt rechtstreeks `runProcessSession(productId)`; Operatie toont dezelfde sessie- en
+AI-taakgegevens. Gerichte integratietests bewijzen wachten zonder duplicaat, geldige publicatie,
+ongeldige output zonder bijeffecten, bewuste retry, no-op, parallelle producten en de publieke
+epiclevenscyclus. Testbed 0.5.0 registreert versieerbare ontwerpresultaatscenario's; de daadwerkelijke
+mockuitvoering blijft server-side eigendom van Agent Runtime.
+
 ## Doel en eindtoestand
 
 Laat één Productontwerperagent relevante productinput omzetten in complete, duidelijke en

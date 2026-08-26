@@ -425,6 +425,8 @@ class FakeProductGateway implements ProductGateway {
   @override
   Future<void> reviewSignal(String signalId, int version) async {}
   @override
+  Future<void> runProductDesign(String productId) async {}
+  @override
   Future<void> reviseDecision(
     String productId,
     String decisionId,
@@ -465,4 +467,8 @@ class FakeProductGateway implements ProductGateway {
     int version,
     String reason,
   ) async {}
+  @override
+  Future<void> withdrawEpic(String epicId, int version, String reason) async {}
+  @override
+  Future<void> cancelEpic(String epicId, int version, String reason) async {}
 }

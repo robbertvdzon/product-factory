@@ -1,6 +1,6 @@
 # Product Factory v2 — Productontwerp-API
 
-Status: eerste ontwerp van het publieke modulecontract.
+Status: geïmplementeerd publiek modulecontract voor de MVP-provider.
 
 Dit document beschrijft uitsluitend de buitenkant van de module Productontwerp. Andere modules
 mogen niet afhankelijk zijn van agents, prompts, interne entiteiten of de volgorde van interne

@@ -5,7 +5,9 @@ release bevat de technische fundering, de product- en stakeholderbasis en gecont
 agentgeheugen: productopdrachten, testomgevingen, signalen, agentvragen, overleggen, besluiten,
 vier configureerbare schedules, vijf vertrouwde agentrollen, globale AI-modelinstellingen en
 duurzame AI-uitvoering via de gedeelde Agent Runtime. Meeting Agent en notulenagent gebruiken
-dezelfde outbox-, status-, resultaat-, artifact- en credentialgrantgrens als latere processen.
+dezelfde outbox-, status-, resultaat-, artifact- en credentialgrantgrens als Productontwerp MVP.
+De actieve Productontwerper bevriest product-, bron-, Git- en geheugenversies en publiceert complete,
+onveranderlijke epics met een duurzame, hervatbare processessie.
 
 ## Vereisten
 
@@ -25,10 +27,13 @@ vroeg en duidelijk falen wanneer Maven toch met een andere Java-hoofdversie draa
 
 De backendroute `GET /api/foundation` bevestigt de actieve basis. Onder
 `GET /api/foundation/implementations` staan ook `agent-memory-impl` en de actieve
-`agent-runtime-outbox-v1`-variant van `ai-execution-impl`. De frontend biedt onder **Beheer**
+`agent-runtime-outbox-v1`-variant van `ai-execution-impl` en de actieve
+`product-design-impl-mvp`-provider. De frontend biedt onder **Beheer**
 rolgebonden geheugen, peildatumhistorie, budgetten, globale AI-modellen, alleen-naamsgebonden
 agenttoegang en veilige AI-taakoperatie via de normale geauthenticeerde sessie en CSRF-beveiliging.
 Schedules worden al duurzaam gevalideerd en weergegeven, maar starten tot stap 9 niets automatisch.
+Onder **Producten → Ontwerp** kan de Stakeholder dezelfde publieke ontwerpfunctie handmatig starten
+of hervatten en epics, versie-inhoud, bronnen, AI-taken, no-ops en blokkades volgen.
 
 De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md). Het operationele
 overzicht voor deze capability staat in

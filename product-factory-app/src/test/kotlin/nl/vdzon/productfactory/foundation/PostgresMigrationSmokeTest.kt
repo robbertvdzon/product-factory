@@ -18,7 +18,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(6)
+        assertThat(result.migrationsExecuted).isEqualTo(7)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -34,6 +34,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("5")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("6")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("7")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -102,7 +104,27 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("6")
+                    assertThat(rows.getString(1)).isEqualTo("7")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `vorige release migreert voorwaarts naar productontwerp`() {
+        val database = "productfactory_upgrade_v6"
+        createDatabase(database)
+        val url = databaseUrl(database)
+        val old = Flyway.configure().dataSource(url, postgres.username, postgres.password).target("6").load().migrate()
+        assertThat(old.targetSchemaVersion.toString()).isEqualTo("6")
+
+        val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
+        assertThat(upgraded.migrationsExecuted).isEqualTo(1)
+        DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) FROM pf_design_process_session").use { rows ->
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getLong(1)).isZero()
                 }
             }
         }
