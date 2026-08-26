@@ -1,6 +1,7 @@
 # Product Factory v2 — Software Factory-dispatcher
 
-Status: eerste ontwerp van de technische adapter en zijn contract.
+Status: specificatie voor implementatie in stap 8. Het externe Software Factory v2-contract is al
+beschikbaar; de Product Factory-adapter en dispatcher bestaan nog niet.
 
 De Software Factory-dispatcher stuurt steeds de eerste uitvoerbare story naar Software Factory en
 verwerkt externe opleverstatussen. Hij is een apart uitvoerend onderdeel met een eigen schedule en
@@ -55,6 +56,33 @@ productstatus toont onder meer open extern werk, eventuele technische blokkade e
 De sessiehistorie toont per product ook no-opruns, overgeslagen schedulerbotsingen, verzendingen,
 statussynchronisaties en de uiteindelijke uitkomst; nieuwste sessies staan eerst.
 
+## Extern HTTP-contract
+
+De productie-adapter gebruikt de geconfigureerde basis-URL `PF_SOFTWARE_FACTORY_URL`. Voor de
+productieomgeving is die waarde exact:
+
+```text
+https://dashboard.vdzonsoftware.nl/api/integrations/v2
+```
+
+Het contract bestaat uitsluitend uit deze routes:
+
+| Methode en relatief pad | Gebruik |
+|---|---|
+| `GET /status` | Verbinding, Software Factory-versie en API-versie controleren |
+| `POST /stories` | Eén complete story met eventuele binaire attachments idempotent aanmaken en queueën |
+| `GET /stories/{storyKey}` | Publieke status van één bekende externe story lezen |
+| `GET /stories?productId=...&status=OPEN` | Open extern werk voor één product lezen |
+| `GET /stories?idempotencyKey=...` | Na een timeout of verloren response de eerdere aanmaak terugvinden |
+
+Iedere call gebruikt `Authorization: Bearer <token>`. Product Factory leest de waarde uit
+`PF_SOFTWARE_FACTORY_TOKEN`; Software Factory configureert dezelfde waarde onder
+`SF_PRODUCT_FACTORY_TOKEN`. Tokenwaarden staan nooit in een URL, requestbody, database of log.
+
+Productie gebruikt modus `REAL` en bovenstaande HTTPS-URL. Acceptatie gebruikt modus `MOCKED`,
+heeft geen productiecredential en routeert uitsluitend naar `MockSoftwareFactory`. Lokaal blijven
+modus en URL expliciet configureerbaar; `DISABLED` voert geen externe call uit.
+
 ## Input
 
 | Contract | Eigenaar | Gebruik |
@@ -90,27 +118,108 @@ De dispatcher schrijft niet rechtstreeks in `Story` of `PlanningWorkItem`. Zijn 
 is de enige schrijver van de eigen `ProcessSession` en `DeliveryAttempt`; inhoudelijke veranderingen lopen via de publieke
 Productplanning-commands en hun invarianten.
 
-## StoryDeliveryPackage
+## StoryDeliveryPackage en transportmapping
 
-Het pakket bevat minimaal:
+`StoryDeliveryPackage` is intern een volledige, onveranderlijke momentopname van één exacte
+storyversie. Het bewaart voldoende structuur om het transport herhaalbaar op te bouwen, maar die
+interne structuur wordt niet als een groot extern veldmodel gepubliceerd.
 
-- stabiel story-ID, storyversie, product-ID en type;
-- de opgeslagen `title` en `summary` voor herkenning in Software Factory;
-- zelfstandig gebruikersgedrag en gebruikerswaarde;
-- alle acceptatiecriteria;
-- waar de story UX bevat: het relevante volledige UX-ontwerp en alle schermtoestanden;
-- tekstuele assets als UTF-8 en binaire assets met MIME-type, grootte, hash en transportencoding;
-- afhankelijkheden en technische grenzen;
-- exacte epic-, bug- en andere bronversies;
-- inhoudshash en idempotentiesleutel;
-- geen verwijzing die Software Factory verplicht terug te vragen bij Product Factory.
+De adapter zet het pakket deterministisch om naar precies deze requestbody:
 
-Het externe contract is bewust eenrichtingsverkeer voor inhoud: Software Factory accepteert en
-bouwt dit complete pakket. Daarna kan Product Factory alleen de status opvragen. Een vraagroute of
-answer-endpoint bestaat niet.
+```json
+{
+  "productId": "hkh-autopilot",
+  "sourceStoryId": "550e8400-e29b-41d4-a716-446655440000",
+  "sourceStoryVersion": 3,
+  "type": "PRODUCT_STORY",
+  "targetRepositoryUrl": "https://github.com/example/hkh-autopilot.git",
+  "title": "Toon lege afsprakenlijst",
+  "description": "## Gedrag\n...de volledige zelfstandige story in Markdown...",
+  "attachments": [
+    {
+      "id": "appointments-empty-mobile",
+      "fileName": "appointments-empty-mobile.png",
+      "mediaType": "image/png",
+      "sizeBytes": 183042,
+      "sha256": "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a",
+      "contentBase64": "iVBORw0KGgoAAA..."
+    }
+  ]
+}
+```
 
-Tekst, Markdown, JSON en SVG blijven tekst. Alleen binaire inhoud gebruikt Base64 wanneer het
-externe transport uitsluitend JSON ondersteunt.
+De mapping volgt deze regels:
+
+- `sourceStoryId` is de canonieke UUID-string van de Product Factory-story en
+  `sourceStoryVersion` is positief. `type` is uitsluitend `PRODUCT_STORY` of `BUGFIX`.
+- `targetRepositoryUrl` is de publieke HTTPS-Git-URL uit de productconfiguratie, zonder credentials,
+  query of fragment. `title` is één niet-lege regel en `description` is niet leeg.
+- `description` bevat in vaste Markdownopbouw de opgeslagen samenvatting, zichtbaar gedrag,
+  gebruikerswaarde, acceptatiecriteria, relevante scenario's, UX, afhankelijkheden, technische
+  grenzen en bronversies. Software Factory hoeft daarvoor geen epic of ander Product Factory-object
+  op te vragen.
+- Tekst, Markdown, JSON, SVG en andere tekstassets worden in `description` opgenomen. Alleen
+  binaire bestanden staan in `attachments` en gebruiken voor dit JSON-transport Base64.
+- Ieder binair attachment bevat een stabiel ID, originele bestandsnaam, MIME-type, werkelijke
+  bytegrootte en SHA-256. ID's en bestandsnamen zijn binnen het pakket uniek; bestandsnamen bevatten
+  geen padsegmenten. Product Factory berekent de metadata uit de opgeslagen bytes.
+- De integratie legt geen eigen maximum op aan aantal of grootte en gebruikt geen MIME-allowlist.
+  Technische transportcapaciteit is geen functioneel acceptatiecriterium of Product Factory-regel.
+- De client stuurt geen `contentHash`. Software Factory valideert de attachmentmetadata en berekent
+  zelf een pakkethash over de genormaliseerde storyinhoud en attachmentmetadata.
+
+Bij `POST /stories` staat daarnaast een stabiele header:
+
+```http
+Idempotency-Key: product-factory:<productId>:story:<sourceStoryId>:v<sourceStoryVersion>
+```
+
+De eerste aanmaak retourneert HTTP 201 met `created: true`. Dezelfde inhoud retourneert bij iedere
+herhaling HTTP 200 met dezelfde `storyKey` en `created: false`, ook met een andere
+idempotentiesleutel. Dezelfde sleutel met gewijzigde inhoud geeft HTTP 409. Een retry na gedeeltelijke
+attachmentopslag verstuurt exact hetzelfde verzoek opnieuw; Software Factory vult ontbrekende
+attachments aan en queuet de story pas als alles is opgeslagen.
+
+Een succesvolle aanmaak heeft deze kleine response:
+
+```json
+{
+  "storyKey": "SF-2314",
+  "created": true,
+  "status": "OPEN"
+}
+```
+
+De story- en lijstqueries gebruiken dezelfde publieke projectie:
+
+```json
+{
+  "storyKey": "SF-2314",
+  "productId": "hkh-autopilot",
+  "sourceStoryId": "550e8400-e29b-41d4-a716-446655440000",
+  "sourceStoryVersion": 3,
+  "status": "OPEN",
+  "deliveredCommitSha": null,
+  "cancelReason": null,
+  "updatedAt": "2026-08-26T08:00:00Z"
+}
+```
+
+`GET /stories` zet deze objecten onder `items`. Minimaal `productId` of `idempotencyKey` is
+verplicht; de optionele statusfilter accepteert alleen `OPEN`, `DONE` en `CANCELLED`. `GET /status`
+retourneert `connected`, `factoryVersion` en `apiVersion`; productie accepteert alleen
+`apiVersion=2` en verzendt geen story zolang `connected` niet `true` is.
+
+Fouten hebben altijd de vorm `code`, `message` en `retryable`. De adapter bepaalt retrygedrag op
+`retryable` en HTTP-status: authenticatie-, validatie- en conflictresponses worden niet blind
+herhaald; een timeout, verloren response of tijdelijke 5xx volgt eerst de lookup met dezelfde
+idempotentiesleutel. Een response met onbekende velden mag vooruitcompatibel worden gelezen, maar
+ontbrekende verplichte velden, een onbekende publieke status of `DONE` zonder volledige
+`deliveredCommitSha` is een contractfout.
+
+Het externe contract is bewust eenrichtingsverkeer voor inhoud. Na aanmaak leest Product Factory
+alleen `OPEN`, `DONE` of `CANCELLED`. `DONE` bevat verplicht `deliveredCommitSha`; `CANCELLED`
+bevat waar beschikbaar `cancelReason`. Een vraag- of answer-endpoint bestaat niet.
 
 ## Verloop van één dispatchersessie
 
@@ -149,8 +258,8 @@ Iedere sessie valideert eerst dat het meegegeven product actief is en dispatchin
    afhankelijkheidsvrije `TODO`-story zonder annuleringsmarker en retourneert de onveranderlijke
    reservering;
 6. vormt zonder inhoudelijke beslissing het pakket;
-7. maakt met een stabiele idempotentiesleutel voor dit product maximaal één externe Software
-   Factory-story;
+7. roept `POST /stories` aan met het volledige request en de stabiele idempotentiesleutel voor deze
+   productstoryversie;
 8. roept `markStoryAsDispatched(...)` aan met reserverings-ID, extern ID en verwachte storyversie.
 
 Bij een tijdelijke externe fout blijft dezelfde reservering bij dezelfde idempotentiesleutel horen.
@@ -248,9 +357,9 @@ externe story aangemaakt.
 ## Integratie- en acceptatietesten
 
 Integratietests en acceptatie gebruiken `MockSoftwareFactory` uit Product Factory Testbed. Deze
-stateful simulator implementeert hetzelfde versioned externe contract als de echte Software
-Factory. De dispatcher bevat geen testvertakking en gebruikt alleen een ander geconfigureerd
-endpoint.
+stateful simulator implementeert dezelfde routes, request- en responsemodellen, idempotentie en
+statusprojectie als het hierboven vastgelegde v2-contract. De dispatcher bevat geen testvertakking;
+alleen de geconfigureerde provider is anders.
 
 De simulator ondersteunt minimaal storyaanmaak, idempotente herhaling, open werk, statusverloop,
 oplevering met commit, annulering of verwijdering, tijdelijke transportfouten, een verloren response
@@ -273,4 +382,6 @@ een externe story afronden, annuleren of de volgende call laten mislukken. De da
 - [Kwaliteitsbewaking-API](kwaliteitsbewaking/api.md)
 - [Processen en entiteiten](processen-en-entiteiten.md)
 - [Integratie- en acceptatietesten](../platform/integratie-en-acceptatietesten.md)
+- [Configuratie en secrets](../platform/configuratie-en-secrets.md)
+- [ADR 0003 — aparte machinekoppeling met Software Factory](../adr/0003-product-factory-integratietoken.md)
 - [Maven en Spring Modulith](../platform/maven-en-spring-modulith.md)

@@ -310,7 +310,7 @@ Eén sessie verwerkt precies één product en kan daarvoor maximaal één nieuwe
 
 | Gegeven | Betekenis |
 |---|---|
-| `StoryDeliveryPackage` | Volledige momentopname van de story, inclusief opgeslagen titel, samenvatting en alle benodigde UX en assets. |
+| `StoryDeliveryPackage` | Volledige interne storymomentopname die voor Software Factory v2 deterministisch wordt gemapt naar titel, één zelfstandige Markdownomschrijving, binaire attachments en een idempotentieheader. |
 | Storycommands | Reservering en meldingen `markStoryAsDispatched(...)`, `markStoryAsDeveloped(...)` en `markStoryAsCancelled(...)` aan Productplanning. |
 | `DeliveryAttempt` | Technische historie van de Software Factory-dispatcher over verzending, response, fout en retry. |
 

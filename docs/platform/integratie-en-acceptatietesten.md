@@ -42,7 +42,8 @@ Bij het opstarten geldt een fail-closed controle. Met `environment = ACCEPTANCE`
 - moeten alle `AiJobConfiguration`s provider `MOCKED` gebruiken;
 - moet `PF_AGENT_RUNTIME_URL` exact naar Agent Runtime-acceptatie wijzen;
 - mag de Runtime-credential geen worker-, admin- of productiecredential zijn;
-- moet het Software Factory-endpoint naar `MockSoftwareFactory` wijzen;
+- moet `PF_SOFTWARE_FACTORY_MODE=MOCKED` uitsluitend `MockSoftwareFactory` selecteren en mogen de
+  echte `PF_SOFTWARE_FACTORY_URL` en `PF_SOFTWARE_FACTORY_TOKEN` niet aanwezig zijn;
 - moet authenticatie uitstaan;
 - mogen geen externe schrijfcredentials aanwezig zijn;
 - mogen Git-URL's alleen een toegestane publieke HTTPS-host gebruiken;
@@ -179,13 +180,25 @@ alleen in de tijdelijke agentcontainer leesbaar.
 ## MockSoftwareFactory
 
 `MockSoftwareFactory` implementeert het echte externe contract dat de dispatcher gebruikt. Hij
-heeft een eigen in-memory storyadministratie en ondersteunt dezelfde idempotentiesleutel als de
-echte Software Factory.
+heeft een eigen in-memory storyadministratie en ondersteunt dezelfde idempotentiesleutel en
+server-side pakkethash als de echte Software Factory. De productie-adapter gebruikt
+`https://dashboard.vdzonsoftware.nl/api/integrations/v2`; de mock implementeert semantisch exact de
+routevormen `GET /status`, `POST /stories`, `GET /stories/{storyKey}` en de twee ondersteunde
+`GET /stories`-queries uit de
+[dispatcherspecificatie](../processen/software-factory-dispatcher.md#extern-http-contract).
+
+De mock accepteert hetzelfde kleine externe request: identificatie, repository-URL, type, titel,
+één volledige `description` en alleen binaire `attachments` met ID, bestandsnaam, MIME-type,
+werkelijke grootte, SHA-256 en Base64-inhoud. Hij verwacht geen losse UX-, criteria-, textasset- of
+`contentHash`-velden en voegt geen aantal-, grootte- of MIME-allowlist toe.
 
 De simulator kan:
 
 - een `StoryDeliveryPackage` aannemen en een stabiel extern story-ID teruggeven;
-- hetzelfde antwoord teruggeven bij herhaling van dezelfde idempotentiesleutel;
+- hetzelfde antwoord teruggeven bij herhaling van dezelfde inhoud, ook met een andere
+  idempotentiesleutel, en een conflict geven bij dezelfde sleutel met gewijzigde inhoud;
+- een gedeeltelijk ontvangen attachmentset bij een identieke retry idempotent aanvullen en pas
+  daarna de story als gequeued behandelen;
 - open werk per product tonen;
 - een story handmatig of automatisch door statusfasen laten lopen;
 - een open story als geannuleerd of verwijderd teruggeven;
