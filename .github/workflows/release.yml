@@ -5,6 +5,16 @@ on:
     workflows: [Repository verification]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Volledige, reeds geverifieerde main-revision
+        required: true
+        type: string
+      verification_run_id:
+        description: Succesvolle Repository verification-run voor exact deze revision
+        required: true
+        type: string
 
 permissions: {}
 
@@ -14,18 +24,32 @@ concurrency:
 
 jobs:
   metadata:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     outputs:
       revision: ${{ steps.release.outputs.revision }}
       build_time: ${{ steps.release.outputs.build_time }}
     steps:
+      - name: Validate manually supplied verification evidence
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_REVISION: ${{ inputs.revision }}
+          VERIFICATION_RUN_ID: ${{ inputs.verification_run_id }}
+        run: |
+          set -euo pipefail
+          actual_revision="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VERIFICATION_RUN_ID}" --jq .head_sha)"
+          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VERIFICATION_RUN_ID}" --jq .conclusion)"
+          test "$conclusion" = success
+          test "$actual_revision" = "$VERIFIED_REVISION"
       - id: release
         shell: bash
         env:
-          VERIFIED_REVISION: ${{ github.event.workflow_run.head_sha }}
+          VERIFIED_REVISION: ${{ github.event_name == 'workflow_dispatch' && inputs.revision || github.event.workflow_run.head_sha }}
         run: |
           echo "revision=${VERIFIED_REVISION}" >> "$GITHUB_OUTPUT"
           echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
