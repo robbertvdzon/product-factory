@@ -1,0 +1,28 @@
+name: Diagnose release smoke test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect acceptance connectivity
+        shell: bash
+        run: |
+          set +e
+          command -v curl
+          command -v jq
+          command -v rg
+          curl --fail --show-error --connect-timeout 5 --max-time 20 --head \
+            https://product-factory-acceptance.vdzonsoftware.nl/
+          curl --fail --show-error --connect-timeout 5 --max-time 20 \
+            https://product-factory-acceptance.vdzonsoftware.nl/version.json
+          curl --fail --show-error --connect-timeout 5 --max-time 20 \
+            https://product-factory-api-acceptance.vdzonsoftware.nl/api/version
+          tools/smoke-test.sh acceptance e066c7b82c3c974d40edb2079bc349f538c90deb
+          exit $?
