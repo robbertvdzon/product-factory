@@ -136,7 +136,10 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         design.runProcessSession(productId)
         ai.dispatchPending()
 
-        assertStrictObjectSchemas(runtime.requests.single().responseSchema!!)
+        val schema = runtime.requests.single().responseSchema!!
+        assertStrictObjectSchemas(schema)
+        assertThat(schema.at("/properties/epic/properties/directionReferences/items/properties/type/enum").map(JsonNode::asText))
+            .containsExactly("PRODUCT_ASSIGNMENT", "DECISION")
     }
 
     private fun assertStrictObjectSchemas(schema: JsonNode) {
