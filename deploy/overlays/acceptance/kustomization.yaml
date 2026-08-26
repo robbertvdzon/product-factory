@@ -9,9 +9,9 @@ patches:
 - path: routes-patch.yaml
 - path: backend-runtime-secret-patch.yaml
 images:
-- digest: sha256:a7aaaddba3ebdbfa2db56a753ef578f023d5940389daa17aea93d2ba073dbf8a
+- digest: sha256:827a7ff3af4a0e6ab3d983feb2a3170dbd719ee521e5bbb8f6d34839044391ca
   name: ghcr.io/robbertvdzon/product-factory-backend
   newName: ghcr.io/robbertvdzon/product-factory-backend
-- digest: sha256:f603a26a60b1a2a1ed3d5b9be295ba347e8f77fd7da34a04a0b5abb8e513a80e
+- digest: sha256:385b466ee534831f3d0125e6e5580c769e5c8f757c3fa505dadc3ef280b3e600
   name: ghcr.io/robbertvdzon/product-factory-frontend
   newName: ghcr.io/robbertvdzon/product-factory-frontend
