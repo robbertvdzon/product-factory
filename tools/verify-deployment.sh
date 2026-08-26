@@ -4,6 +4,16 @@ set -euo pipefail
 REPOSITORY_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPOSITORY_ROOT"
 
+ruby -e '
+  modules = File.read("pom.xml").scan(%r{<module>([^<]+)</module>}).flatten
+  dockerfile = File.read("product-factory-app/Dockerfile")
+  missing = modules.reject do |name|
+    dockerfile.include?("COPY #{name}/pom.xml #{name}/pom.xml") &&
+      dockerfile.include?("COPY #{name}/src #{name}/src")
+  end
+  abort("Backend-Dockerfile mist Mavenmodules: #{missing.join(", ")}") unless missing.empty?
+'
+
 for overlay in acceptance production; do
   rendered="$(kustomize build "deploy/overlays/$overlay")"
   printf '%s' "$rendered" | kubectl create --dry-run=client --validate=false -f - >/dev/null
