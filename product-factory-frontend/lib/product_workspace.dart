@@ -52,6 +52,12 @@ class ProductWorkspaceData {
     required this.backlog,
     required this.planningWorkItems,
     required this.planningSessions,
+    required this.qualitySnapshot,
+    required this.qualityHistory,
+    required this.bugs,
+    required this.verifications,
+    required this.qualityWorkItems,
+    required this.qualitySessions,
   });
   final ProductSummary product;
   final Map<String, Object?>? assignment;
@@ -69,6 +75,12 @@ class ProductWorkspaceData {
   final List<Map<String, Object?>> backlog;
   final List<Map<String, Object?>> planningWorkItems;
   final List<Map<String, Object?>> planningSessions;
+  final Map<String, Object?>? qualitySnapshot;
+  final List<Map<String, Object?>> qualityHistory;
+  final List<Map<String, Object?>> bugs;
+  final List<Map<String, Object?>> verifications;
+  final List<Map<String, Object?>> qualityWorkItems;
+  final List<Map<String, Object?>> qualitySessions;
 }
 
 abstract interface class ProductGateway {
@@ -130,6 +142,8 @@ abstract interface class ProductGateway {
   Future<void> runProductPlanning(String productId);
   Future<void> requestManualReplan(String productId, String reason);
   Future<void> reprioritizeEpic(String productId, String epicId, String reason);
+  Future<void> runQuality(String productId);
+  Future<void> retryQualityWorkItem(String workItemId);
 }
 
 class HttpProductGateway implements ProductGateway {
@@ -170,6 +184,12 @@ class HttpProductGateway implements ProductGateway {
       _get('/api/products/$id/backlog'),
       _get('/api/products/$id/planning/work-items'),
       _get('/api/products/$id/planning/sessions'),
+      _optional('/api/products/$id/quality/current'),
+      _get('/api/products/$id/quality/history'),
+      _get('/api/products/$id/bugs'),
+      _get('/api/products/$id/verifications'),
+      _get('/api/products/$id/quality/work-items'),
+      _get('/api/products/$id/quality/sessions'),
     ]);
     List<Map<String, Object?>> list(int index) =>
         ((values[index] as List?) ?? const [])
@@ -202,6 +222,12 @@ class HttpProductGateway implements ProductGateway {
       backlog: list(11),
       planningWorkItems: list(12),
       planningSessions: list(13),
+      qualitySnapshot: (values[14] as Map?)?.cast<String, Object?>(),
+      qualityHistory: list(15),
+      bugs: list(16),
+      verifications: list(17),
+      qualityWorkItems: list(18),
+      qualitySessions: list(19),
     );
   }
 
@@ -403,6 +429,14 @@ class HttpProductGateway implements ProductGateway {
     },
   );
 
+  @override
+  Future<void> runQuality(String productId) =>
+      _send('POST', '/api/products/$productId/quality/sessions/run', const {});
+
+  @override
+  Future<void> retryQualityWorkItem(String workItemId) =>
+      _send('POST', '/api/quality/work-items/$workItemId/retry', const {});
+
   String _key(String prefix) =>
       'ui-$prefix-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
   Uri _uri(String path) => Uri.parse('$_backendUrl$path');
@@ -476,7 +510,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 8, vsync: this);
+    _tabs = TabController(length: 9, vsync: this);
     _loadProducts();
   }
 
@@ -601,6 +635,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
                   Tab(text: 'Opdracht'),
                   Tab(text: 'Ontwerp'),
                   Tab(text: 'Planning'),
+                  Tab(text: 'Kwaliteit'),
                   Tab(text: 'Signalen'),
                   Tab(text: 'Vragen van agents'),
                   Tab(text: 'Overleggen'),
@@ -616,6 +651,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
                     _assignment(_data!),
                     _design(_data!),
                     _planning(_data!),
+                    _quality(_data!),
                     _signals(_data!),
                     _questions(_data!),
                     _meetings(_data!),
@@ -675,7 +711,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
           ),
           const Chip(
             avatar: Icon(Icons.auto_awesome_outlined),
-            label: Text('Ontwerp en planning actief'),
+            label: Text('Ontwerp, planning en kwaliteit actief'),
           ),
         ],
       ),
@@ -748,6 +784,13 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
               ),
             if (story['deliveredCommitSha'] != null)
               SelectableText('Oplevercommit ${story['deliveredCommitSha']}'),
+            if (story['deliveredCommitSha'] != null &&
+                story['verificationId'] == null)
+              const Text('Wacht op deployment of kwaliteitscontrole'),
+            if (story['verificationId'] != null)
+              Text(
+                'Getest: ${story['verificationPassed'] == true ? 'geslaagd' : 'afgekeurd'} · verificatie ${_value(story['verificationId'])}',
+              ),
           ],
         ),
       ),
@@ -835,6 +878,129 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage>
     if (reason == null || reason.isEmpty) return;
     await _mutate(() => widget.gateway.requestManualReplan(productId, reason));
   }
+
+  Widget _quality(
+    ProductWorkspaceData data,
+  ) => _section('Kwaliteitsbewaking', Icons.verified_outlined, [
+    Align(
+      alignment: Alignment.centerRight,
+      child: FilledButton.icon(
+        onPressed: () =>
+            _mutate(() => widget.gateway.runQuality(data.product.id)),
+        icon: const Icon(Icons.play_arrow),
+        label: const Text('Kwaliteit starten of hervatten'),
+      ),
+    ),
+    if (data.qualitySnapshot == null)
+      const Text('Nog geen werkelijk getest kwaliteitsbeeld.')
+    else
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.fact_check_outlined),
+          title: Text(
+            '${data.qualitySnapshot!['environment']} · ${data.qualitySnapshot!['capturedAt']}',
+          ),
+          subtitle: Text(
+            'Geteste revision ${data.qualitySnapshot!['productRevision']}\n'
+            'Open bugs: ${data.qualitySnapshot!['openBugsBySeverity']}\n'
+            'Risico’s: ${(data.qualitySnapshot!['risks'] as List? ?? const []).join(', ')}',
+          ),
+          isThreeLine: true,
+        ),
+      ),
+    const Divider(height: 28),
+    Text('Werk en retries', style: Theme.of(context).textTheme.titleMedium),
+    if (data.qualityWorkItems.isEmpty)
+      const Text('Geen kwaliteitswerk in de queue.')
+    else
+      ...data.qualityWorkItems.map(
+        (item) => ListTile(
+          leading: Icon(
+            item['status'] == 'DONE'
+                ? Icons.check_circle_outline
+                : item['status'] == 'BLOCKED' || item['status'] == 'FAILED'
+                ? Icons.warning_amber_outlined
+                : Icons.hourglass_top,
+          ),
+          title: Text(
+            '${item['type']} · ${item['status']}${item['attentionNeeded'] == true ? ' · Aandacht nodig' : ''}',
+          ),
+          subtitle: Text(
+            '${item['blockedReason'] ?? item['result'] ?? 'Gericht testwerk staat klaar.'}\n'
+            'Poging ${item['attemptCount']} · retry ${item['retryAfter'] ?? 'niet gepland'}',
+          ),
+          trailing: item['retryable'] == true
+              ? TextButton(
+                  onPressed: () => _mutate(
+                    () =>
+                        widget.gateway.retryQualityWorkItem(_value(item['id'])),
+                  ),
+                  child: const Text('Retry now'),
+                )
+              : null,
+          isThreeLine: true,
+        ),
+      ),
+    const Divider(height: 28),
+    Text('Verificaties', style: Theme.of(context).textTheme.titleMedium),
+    ...data.verifications.map(
+      (verification) => ExpansionTile(
+        title: Text(
+          '${verification['targetType']} · ${verification['outcome']}',
+        ),
+        subtitle: Text(
+          '${_value(verification['targetId'])} v${verification['targetVersion']} · ${verification['environment']}',
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectableText(
+            'Verificatie ${_value(verification['id'])} · geteste revision ${verification['testedRevision'] ?? 'niet beschikbaar'}',
+          ),
+          Text(
+            'Controles: ${(verification['checks'] as List? ?? const []).join(', ')}',
+          ),
+          Text(
+            'Bewijs: ${(verification['evidence'] as Map?)?['description'] ?? 'Geen publiek bewijs'}',
+          ),
+          if (verification['blockedReason'] != null)
+            Text('Blokkade: ${verification['blockedReason']}'),
+        ],
+      ),
+    ),
+    const Divider(height: 28),
+    Text('Bugs', style: Theme.of(context).textTheme.titleMedium),
+    ...data.bugs.map(
+      (bug) => ExpansionTile(
+        title: Text('${bug['title']} · ${bug['severity']} · ${bug['status']}'),
+        subtitle: Text('${bug['summary']}'),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Werkelijk: ${bug['actualBehaviour']}'),
+          Text('Verwacht: ${bug['expectedBehaviour']}'),
+          Text(
+            'Reproduceren: ${(bug['reproductionSteps'] as List? ?? const []).join(' → ')}',
+          ),
+          Text(
+            'Bewijs: ${(bug['evidence'] as Map?)?['description'] ?? 'Geen publiek bewijs'}',
+          ),
+        ],
+      ),
+    ),
+    const Divider(height: 28),
+    Text('Processessies', style: Theme.of(context).textTheme.titleMedium),
+    ...data.qualitySessions.map(
+      (session) => ListTile(
+        leading: const Icon(Icons.science_outlined),
+        title: Text('${session['status']} · ${_value(session['id'])}'),
+        subtitle: Text(
+          '${session['resultSummary'] ?? session['blockedReason'] ?? 'Tester-AI wordt duurzaam gevolgd.'}\n'
+          '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
+        ),
+      ),
+    ),
+  ]);
 
   Widget _design(
     ProductWorkspaceData data,

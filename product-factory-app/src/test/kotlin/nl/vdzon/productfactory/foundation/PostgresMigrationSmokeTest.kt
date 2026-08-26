@@ -18,7 +18,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(8)
+        assertThat(result.migrationsExecuted).isEqualTo(9)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -38,6 +38,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("7")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("8")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("9")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -106,25 +108,25 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("8")
+                    assertThat(rows.getString(1)).isEqualTo("9")
                 }
             }
         }
     }
 
     @Test
-    fun `vorige release migreert voorwaarts naar productplanning`() {
-        val database = "productfactory_upgrade_v7"
+    fun `vorige release migreert voorwaarts naar kwaliteitsbewaking`() {
+        val database = "productfactory_upgrade_v8"
         createDatabase(database)
         val url = databaseUrl(database)
-        val old = Flyway.configure().dataSource(url, postgres.username, postgres.password).target("7").load().migrate()
-        assertThat(old.targetSchemaVersion.toString()).isEqualTo("7")
+        val old = Flyway.configure().dataSource(url, postgres.username, postgres.password).target("8").load().migrate()
+        assertThat(old.targetSchemaVersion.toString()).isEqualTo("8")
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
         assertThat(upgraded.migrationsExecuted).isEqualTo(1)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
-                statement.executeQuery("SELECT COUNT(*) FROM pf_planning_process_session").use { rows ->
+                statement.executeQuery("SELECT COUNT(*) FROM pf_quality_process_session").use { rows ->
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getLong(1)).isZero()
                 }

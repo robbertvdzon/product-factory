@@ -27,6 +27,7 @@
         <module>ai-execution-impl</module>
         <module>product-design-impl-mvp</module>
         <module>product-planning-impl-mvp</module>
+        <module>quality-impl-mvp</module>
         <module>product-factory-app</module>
     </modules>
 
@@ -73,6 +74,11 @@
             <dependency>
                 <groupId>${project.groupId}</groupId>
                 <artifactId>product-planning-impl-mvp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>quality-impl-mvp</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

@@ -1,5 +1,10 @@
 # Stap 7 — Kwaliteitsbewaking MVP
 
+Implementatiestatus: uitgevoerd. De actieve provider is `quality-impl-mvp`; migratie V9, de
+Testerflow, revisioncontrole, vaste onbeperkte retryhistorie, onveranderlijke verificaties, bugs en
+snapshots, vervolgcommands, REST/UI en Testbed 0.7.0 horen bij dezelfde release. De automatische
+bewijzen staan in `QualityMvpIntegrationTest` en de vaste repositoryverificatie.
+
 ## Doel en eindtoestand
 
 Laat één Testeragent gericht kwaliteitswerk uitvoeren op de werkelijk gedeployde productversie en

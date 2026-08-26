@@ -398,7 +398,7 @@ class ProductPlanningMvpService(
     override fun requestBugfix(command: RequestBugfixCommand): PlanningWorkItemId {
         validateActor(command.actor)
         val bug = qualityQueries.ifAvailable?.getBug(command.bugId) ?: throw CapabilityNotAvailable("Kwaliteitsbewaking is nog niet actief.")
-        if (bug.productId != command.productId || bug.version != command.bugVersion || bug.status !in setOf(BugStatus.OPEN, BugStatus.IN_FIX)) throw VersionConflict("Bugbron is niet actueel.")
+        if (bug.productId != command.productId || bug.version != command.bugVersion || bug.status != BugStatus.OPEN) throw VersionConflict("Bugbron is niet actueel.")
         return createWorkItem(command.productId, PlanningWorkItemType.PLAN_BUGFIX, SourceReference("BUG", command.bugId.value, command.bugVersion),
             "Bugfix op basis van bewijs ${command.evidenceId.value}", command.priority, command.idempotencyKey, command)
     }

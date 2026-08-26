@@ -27,3 +27,7 @@ data class ImplementationManifest(
 interface PublicGitRevisionResolver {
     fun resolveHead(publicGitUrl: String): String
 }
+
+interface DeploymentRevisionResolver {
+    fun resolve(baseUrl: String, revisionEndpoint: String, revisionJsonPath: String): String
+}

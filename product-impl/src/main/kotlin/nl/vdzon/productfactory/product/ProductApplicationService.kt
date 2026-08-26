@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.shared.*
+import nl.vdzon.productfactory.api.quality.*
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
@@ -21,6 +23,7 @@ class ProductApplicationService(
     private val jdbc: JdbcTemplate,
     private val mapper: ObjectMapper,
     private val clock: Clock,
+    private val quality: ObjectProvider<QualityService>,
 ) : ProductCommandService, ProductQueryService {
 
     override fun createProduct(command: CreateProductCommand): ProductId {
@@ -169,6 +172,11 @@ class ProductApplicationService(
             json(command.attachments), UserSignalStatus.OPEN.name, now, now, command.actor.type.name, command.actor.id, 1L,
         )
         remember(command.idempotencyKey, "SUBMIT_USER_SIGNAL", id.value, fingerprint, id.value, command.actor, now)
+        if (command.category == UserSignalCategory.QUALITY_CONCERN) {
+            quality.ifAvailable?.requestSignalInvestigation(RequestSignalInvestigationCommand(
+                command.productId, id, 1L, "acceptance", "signal-quality-${id.value}-v1",
+            ))
+        }
         return id
     }
 

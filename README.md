@@ -9,7 +9,9 @@ dezelfde outbox-, status-, resultaat-, artifact- en credentialgrantgrens als Pro
 De actieve Productontwerper bevriest product-, bron-, Git- en geheugenversies en publiceert complete,
 onveranderlijke epics met een duurzame, hervatbare processessie. De actieve Planner claimt exacte
 epicversies, publiceert complete zelfstandige stories en beheert de productbrede backlog,
-herplanning, annulering en atomaire dispatchreservering.
+herplanning, annulering en atomaire dispatchreservering. De actieve Tester controleert de werkelijk
+gedeployde revision, publiceert reproduceerbaar bewijs en bugs en bewaart onbeperkte retryhistorie
+plus onveranderlijke kwaliteitsbeelden.
 
 ## Vereisten
 
@@ -30,14 +32,15 @@ vroeg en duidelijk falen wanneer Maven toch met een andere Java-hoofdversie draa
 De backendroute `GET /api/foundation` bevestigt de actieve basis. Onder
 `GET /api/foundation/implementations` staan ook `agent-memory-impl` en de actieve
 `agent-runtime-outbox-v1`-variant van `ai-execution-impl` en de actieve
-`product-design-impl-mvp`- en `product-planning-impl-mvp`-providers. De frontend biedt onder **Beheer**
+`product-design-impl-mvp`-, `product-planning-impl-mvp`- en `quality-impl-mvp`-providers. De frontend biedt onder **Beheer**
 rolgebonden geheugen, peildatumhistorie, budgetten, globale AI-modellen, alleen-naamsgebonden
 agenttoegang en veilige AI-taakoperatie via de normale geauthenticeerde sessie en CSRF-beveiliging.
 Schedules worden al duurzaam gevalideerd en weergegeven, maar starten tot stap 9 niets automatisch.
 Onder **Producten → Ontwerp** kan de Stakeholder dezelfde publieke ontwerpfunctie handmatig starten
 of hervatten en epics, versie-inhoud, bronnen, AI-taken, no-ops en blokkades volgen. Onder
 **Producten → Planning** staan backlog, stories, dependencies, prioriteitsredenen, workitems en
-processessies; daar kan planning worden gestart of gericht worden herpland.
+processessies; daar kan planning worden gestart of gericht worden herpland. Onder **Kwaliteit**
+staan het actuele kwaliteitsbeeld, verificaties, bugs, bewijs, retries en Testersessies.
 
 De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md). Het operationele
 overzicht voor deze capability staat in

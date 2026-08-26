@@ -1,6 +1,6 @@
 # Product Factory v2 — Kwaliteitsbewaking MVP
 
-Status: voorstel voor de eerste implementatie.
+Status: geïmplementeerd als de actieve MVP-provider in stap 7.
 
 Deze implementatie gebruikt exact de publieke
 [Kwaliteitsbewaking-API](api.md). Eén algemene Tester-agent bereidt het testwerk voor,

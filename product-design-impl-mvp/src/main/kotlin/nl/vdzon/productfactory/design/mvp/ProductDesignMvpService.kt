@@ -10,6 +10,7 @@ import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
 import nl.vdzon.productfactory.api.memory.*
 import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.product.*
+import nl.vdzon.productfactory.api.quality.*
 import nl.vdzon.productfactory.api.shared.*
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
@@ -42,6 +43,7 @@ class ProductDesignMvpService(
     private val git: PublicGitRevisionResolver,
     private val planning: ObjectProvider<ProductPlanningService>,
     private val planningQueries: ObjectProvider<ProductPlanningQueryService>,
+    private val qualityQueries: ObjectProvider<QualityQueryService>,
     transactionManager: PlatformTransactionManager,
     @Value("\${PF_APPLICATION_VERSION:0.1.0-SNAPSHOT}") private val implementationVersion: String,
     @Value("\${PF_GIT_REVISION:unknown}") private val sourceRevision: String,
@@ -101,6 +103,8 @@ class ProductDesignMvpService(
         val questions = products.findStakeholderQuestions(StakeholderQuestionFilter(productId, ROLE.value))
         val existingEpics = findEpics(EpicFilter(productId))
         val stories = planningQueries.ifAvailable?.findStories(StoryFilter(productId)).orEmpty()
+        val bugs = qualityQueries.ifAvailable?.findBugs(BugFilter(productId)).orEmpty()
+        val qualitySnapshot = qualityQueries.ifAvailable?.getCurrentQuality(productId)
         val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant())
 
         val sources = buildList {
@@ -110,6 +114,8 @@ class ProductDesignMvpService(
             questions.forEach { add(SourceReference("STAKEHOLDER_QUESTION", it.id.value, it.version)) }
             existingEpics.forEach { add(SourceReference("EPIC", it.id.value, it.version)) }
             stories.forEach { add(SourceReference("STORY", it.id.value, it.version)) }
+            bugs.forEach { add(SourceReference("BUG", it.id.value, it.version)) }
+            qualitySnapshot?.sources?.forEach { add(it) }
             currentMemory.forEach { add(SourceReference("MEMORY_VERSION", it.activeVersionId.value, 1)) }
         }.sortedWith(compareBy(SourceReference::type, SourceReference::id, SourceReference::version))
         val snapshot = linkedMapOf<String, Any?>(
@@ -120,6 +126,8 @@ class ProductDesignMvpService(
             "stakeholderQuestions" to questions,
             "epics" to existingEpics,
             "downstreamStories" to stories,
+            "qualitySnapshot" to qualitySnapshot,
+            "openAndHistoricalBugs" to bugs,
             "agentMemory" to currentMemory,
             "git" to RepositorySnapshot(assignment.publicGitUrl, gitSha),
         )

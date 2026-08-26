@@ -19,7 +19,7 @@ class FoundationController(
     fun getFoundation(): FoundationStatus = FoundationStatus(
         application = "Product Factory",
         state = FoundationState.READY,
-        message = "Productbasis, Agent Runtime-uitvoering, Productontwerp MVP en Productplanning MVP zijn actief.",
+        message = "Productbasis, Agent Runtime-uitvoering, Productontwerp, Productplanning en Kwaliteitsbewaking MVP zijn actief.",
     )
 
     @GetMapping("/implementations")
@@ -36,6 +36,7 @@ class FoundationController(
                 "ai-execution" to ImplementationIdentity("ai-execution-impl", "agent-runtime-outbox-v1", version, revision),
                 "product-design" to ImplementationIdentity("product-design-impl-mvp", "single-agent", version, revision),
                 "product-planning" to ImplementationIdentity("product-planning-impl-mvp", "single-planner", version, revision),
+                "quality" to ImplementationIdentity("quality-impl-mvp", "single-tester", version, revision),
             ),
         )
     }

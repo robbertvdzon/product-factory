@@ -481,4 +481,8 @@ class FakeProductGateway implements ProductGateway {
     String epicId,
     String reason,
   ) async {}
+  @override
+  Future<void> runQuality(String productId) async {}
+  @override
+  Future<void> retryQualityWorkItem(String workItemId) async {}
 }

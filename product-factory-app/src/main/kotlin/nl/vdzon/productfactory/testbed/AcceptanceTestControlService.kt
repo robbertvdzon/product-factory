@@ -87,6 +87,12 @@ class AcceptanceTestControlService(
         TestScenarioSummary("product-planning-cancellation-marker", "1", "Annuleringsmarker en reservering", "Late planning en dispatch worden veilig tegen de duurzame epicannulering begrensd."),
         TestScenarioSummary("product-planning-invalid-result", "1", "Ongeldige planneroutput", "Onvolledige dekking publiceert atomair geen gedeeltelijke storyset."),
         TestScenarioSummary("product-planning-ai-recovery", "1", "Wachten en terminale taakfout", "Dezelfde sessie en epicclaim wachten, blokkeren zichtbaar en hervatten zonder duplicaat."),
+        TestScenarioSummary("quality-story-pass-fail", "1", "Storycontrole geslaagd of afgekeurd", "Exacte oplevercommit, observeerbaar bewijs en gerichte storyuitkomst."),
+        TestScenarioSummary("quality-bugfix-not-resolved", "1", "Bugfix niet opgelost", "De story blijft opgeleverd, dezelfde bug blijft open en nieuw herstelwerk ontstaat."),
+        TestScenarioSummary("quality-epic-findings", "1", "Epicbugs en ontbrekende dekking", "NEEDS_WORK publiceert bugs, dekkingsbewijs en uitsluitend gerichte planningcommands."),
+        TestScenarioSummary("quality-blocked-not-successful", "1", "Geblokkeerd of niet succesvol", "Retrybare testblokkade blijft historie; NOT_SUCCESSFUL vereist positief bewijs."),
+        TestScenarioSummary("quality-deployment-pending", "1", "Oplevercommit nog niet live", "Achterlopende revision geeft DEPLOYMENT_PENDING en nooit een valse productafkeuring."),
+        TestScenarioSummary("quality-runtime-retry", "1", "Ontbrekend mockantwoord en retry", "Vaste back-off, onbeperkte poginghistorie en handmatige Retry now zonder dubbele sessie."),
     )
     private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
 
@@ -184,8 +190,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "product-planning-mvp-v1"
-        private const val TESTBED_VERSION = "0.6.0"
+        private const val DATASET_VERSION = "quality-mvp-v1"
+        private const val TESTBED_VERSION = "0.7.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")

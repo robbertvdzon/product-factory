@@ -3,10 +3,10 @@ package nl.vdzon.productfactory.api.quality
 import nl.vdzon.productfactory.api.shared.*
 import java.time.Instant
 
-enum class BugStatus { OPEN, IN_FIX, RESOLVED, CLOSED }
-enum class BugSeverity { LOW, MEDIUM, HIGH, CRITICAL }
+enum class BugStatus { OPEN, RESOLVED, INVALID }
+enum class BugSeverity { P0, P1, P2, P3 }
 enum class VerificationTargetType { STORY, EPIC, BUGFIX, USER_SIGNAL }
-enum class VerificationOutcome { PASSED, FAILED, BLOCKED }
+enum class VerificationOutcome { PASSED, FAILED, NEEDS_WORK, BLOCKED, NOT_SUCCESSFUL }
 enum class QualityWorkItemType { VERIFY_STORY, VERIFY_EPIC, RETEST_BUGFIX, INVESTIGATE_USER_SIGNAL }
 
 data class BugFilter(val productId: ProductId? = null, val epicId: EpicId? = null, val statuses: Set<BugStatus> = emptySet())
@@ -26,6 +26,11 @@ data class BugDetails(
     val status: BugStatus,
     val sourceSignalIds: List<UserSignalId> = emptyList(),
     val version: Long,
+    val sourceStoryId: StoryId? = null,
+    val sourceVerificationId: VerificationId? = null,
+    val linkedStoryIds: List<StoryId> = emptyList(),
+    val createdAt: Instant = Instant.EPOCH,
+    val updatedAt: Instant = Instant.EPOCH,
 )
 data class VerificationFilter(
     val productId: ProductId? = null,
@@ -79,6 +84,18 @@ data class QualityWorkItemDetails(
     val retryable: Boolean,
     val retryAfter: Instant? = null,
     val attentionNeeded: Boolean,
+    val createdAt: Instant = Instant.EPOCH,
+    val version: Long = 1,
+    val claimedBySessionId: ProcessSessionId? = null,
+    val attempts: List<QualityAttemptDetails> = emptyList(),
+)
+data class QualityAttemptDetails(
+    val attempt: Int,
+    val startedAt: Instant,
+    val finishedAt: Instant? = null,
+    val status: WorkItemStatus,
+    val errorCode: String? = null,
+    val reason: String? = null,
 )
 data class RequestStoryVerificationCommand(val productId: ProductId, val storyId: StoryId, val storyVersion: Long, val environment: String, val priority: Int, val idempotencyKey: String)
 data class RequestEpicVerificationCommand(val productId: ProductId, val epicId: EpicId, val epicVersion: Long, val environment: String, val priority: Int, val idempotencyKey: String)

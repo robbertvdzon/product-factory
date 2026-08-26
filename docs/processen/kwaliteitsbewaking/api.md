@@ -1,6 +1,6 @@
 # Product Factory v2 — Kwaliteitsbewaking-API
 
-Status: eerste ontwerp van het publieke modulecontract.
+Status: geïmplementeerd publiek modulecontract vanaf stap 7.
 
 Dit document beschrijft uitsluitend de buitenkant van Kwaliteitsbewaking. Andere modules mogen niet
 afhankelijk zijn van agents, testorganisatie, interne observaties of de volgorde van teststappen. De
