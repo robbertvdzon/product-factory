@@ -1,9 +1,10 @@
 # Product Factory
 
 Product Factory bouwt en bewaakt producten vanuit één globale Stakeholderbediening. De huidige
-release bevat de technische fundering plus de product- en stakeholderbasis: productopdrachten,
-testomgevingen, signalen, agentvragen, overleggen, besluiten en vier configureerbare schedules.
-AI- en productprocessen worden in de volgende capabilities toegevoegd.
+release bevat de technische fundering, de product- en stakeholderbasis en gecontroleerd
+agentgeheugen: productopdrachten, testomgevingen, signalen, agentvragen, overleggen, besluiten,
+vier configureerbare schedules, vijf vertrouwde agentrollen en globale AI-modelinstellingen.
+AI-taakuitvoering en de productprocessen worden in de volgende capabilities toegevoegd.
 
 ## Vereisten
 
@@ -22,8 +23,12 @@ vroeg en duidelijk falen wanneer Maven toch met een andere Java-hoofdversie draa
 ```
 
 De backendroute `GET /api/foundation` bevestigt de actieve basis. Onder
-`GET /api/foundation/implementations` staan de gekozen product- en besluitenimplementaties; de
-frontend biedt het functionele beheer via de normale geauthenticeerde sessie en CSRF-beveiliging.
+`GET /api/foundation/implementations` staan ook `agent-memory-impl` en het settings-only deel van
+`ai-execution-impl`. De frontend biedt onder **Beheer** rolgebonden geheugen, peildatumhistorie,
+budgetten en globale AI-modellen via de normale geauthenticeerde sessie en CSRF-beveiliging.
+AI-taakaanvragen falen tot stap 4 expliciet met HTTP 501 en maken geen taak- of outboxrecord.
 Schedules worden al duurzaam gevalideerd en weergegeven, maar starten tot stap 9 niets automatisch.
 
-De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md).
+De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md). Het operationele
+overzicht voor deze capability staat in
+[`docs/platform/agentgeheugen-en-ai-instellingen-runbook.md`](docs/platform/agentgeheugen-en-ai-instellingen-runbook.md).

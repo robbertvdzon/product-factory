@@ -4,10 +4,14 @@ COPY pom.xml ./
 COPY product-factory-api/pom.xml product-factory-api/pom.xml
 COPY product-impl/pom.xml product-impl/pom.xml
 COPY decisions-impl/pom.xml decisions-impl/pom.xml
+COPY agent-memory-impl/pom.xml agent-memory-impl/pom.xml
+COPY ai-execution-impl/pom.xml ai-execution-impl/pom.xml
 COPY product-factory-app/pom.xml product-factory-app/pom.xml
 COPY product-factory-api/src product-factory-api/src
 COPY product-impl/src product-impl/src
 COPY decisions-impl/src decisions-impl/src
+COPY agent-memory-impl/src agent-memory-impl/src
+COPY ai-execution-impl/src ai-execution-impl/src
 COPY product-factory-app/src product-factory-app/src
 RUN mvn -B --no-transfer-progress -pl product-factory-app -am package -DskipTests
 

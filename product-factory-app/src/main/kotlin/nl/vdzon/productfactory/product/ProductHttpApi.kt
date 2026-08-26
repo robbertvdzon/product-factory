@@ -25,6 +25,10 @@ class ProductApiErrorHandler {
     @ExceptionHandler(InvalidCommand::class, IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun invalid(error: RuntimeException) = ApiError("INVALID_COMMAND", error.message ?: "Ongeldige opdracht.")
+
+    @ExceptionHandler(CapabilityNotAvailable::class)
+    @ResponseStatus(HttpStatus.NOT_IMPLEMENTED)
+    fun unavailable(error: CapabilityNotAvailable) = ApiError("CAPABILITY_NOT_AVAILABLE", error.message ?: "Capability nog niet beschikbaar.")
 }
 
 private fun Authentication?.stakeholderActor(): ActorReference {

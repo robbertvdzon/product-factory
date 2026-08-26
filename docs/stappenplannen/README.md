@@ -50,6 +50,9 @@ MVP-eisen en worden niet in code of productieseed hardgecodeerd.
 | 8 | [Software Factory-dispatcher](08-software-factory-dispatcher.md) | Stories worden één voor één geleverd en opleveringen worden verwerkt. |
 | 9 | [Volledige MVP-productflow](09-volledige-mvp-productflow.md) | De complete route van Stakeholder tot gebouwde en gecontroleerde verbetering werkt. |
 
+De stappen 1 en 2 zijn uitgebracht. Stap 3 is geïmplementeerd en wordt na de groene releaseflow als
+uitgebracht beschouwd; stappen 4 tot en met 9 volgen in deze volgorde.
+
 ## Algemene regels voor iedere stap
 
 - Lees vóór implementatie het volledige stappenplan en alle gekoppelde normatieve bronnen.

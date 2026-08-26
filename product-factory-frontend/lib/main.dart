@@ -9,6 +9,7 @@ import 'build_identity.dart';
 import 'configuration.dart';
 import 'google_login_button.dart';
 import 'frontend_version_monitor.dart';
+import 'memory_ai_management.dart';
 import 'testbed.dart';
 import 'product_workspace.dart';
 
@@ -29,6 +30,7 @@ class ProductFactoryApp extends StatelessWidget {
     this.frontendVersionSource,
     this.testControlGateway,
     this.productGateway,
+    this.memoryAiGateway,
   });
 
   final AuthenticationGateway? authenticationGateway;
@@ -38,6 +40,7 @@ class ProductFactoryApp extends StatelessWidget {
   final FrontendVersionSource? frontendVersionSource;
   final TestControlGateway? testControlGateway;
   final ProductGateway? productGateway;
+  final MemoryAiGateway? memoryAiGateway;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +60,7 @@ class ProductFactoryApp extends StatelessWidget {
         frontendVersionSource: frontendVersionSource,
         testControlGateway: testControlGateway,
         productGateway: productGateway,
+        memoryAiGateway: memoryAiGateway,
       ),
     );
   }
@@ -71,6 +75,7 @@ class AuthenticationGate extends StatefulWidget {
     this.frontendVersionSource,
     this.testControlGateway,
     this.productGateway,
+    this.memoryAiGateway,
     super.key,
   });
 
@@ -81,6 +86,7 @@ class AuthenticationGate extends StatefulWidget {
   final FrontendVersionSource? frontendVersionSource;
   final TestControlGateway? testControlGateway;
   final ProductGateway? productGateway;
+  final MemoryAiGateway? memoryAiGateway;
 
   @override
   State<AuthenticationGate> createState() => _AuthenticationGateState();
@@ -183,6 +189,7 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
         frontendVersionSource: widget.frontendVersionSource,
         testControlGateway: widget.testControlGateway,
         productGateway: widget.productGateway,
+        memoryAiGateway: widget.memoryAiGateway,
         runtimeEnvironment: status.environment,
         csrfToken: status.csrfToken,
       );
@@ -286,6 +293,7 @@ class FoundationPage extends StatelessWidget {
     this.runtimeEnvironment,
     this.csrfToken,
     this.productGateway,
+    this.memoryAiGateway,
     super.key,
   });
 
@@ -301,6 +309,7 @@ class FoundationPage extends StatelessWidget {
   final String? runtimeEnvironment;
   final String? csrfToken;
   final ProductGateway? productGateway;
+  final MemoryAiGateway? memoryAiGateway;
 
   @override
   Widget build(BuildContext context) => ApplicationShell(
@@ -316,5 +325,6 @@ class FoundationPage extends StatelessWidget {
     runtimeEnvironment: runtimeEnvironment,
     csrfToken: csrfToken,
     productGateway: productGateway,
+    memoryAiGateway: memoryAiGateway,
   );
 }

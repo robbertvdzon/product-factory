@@ -1,5 +1,14 @@
 # Stap 3 — Agentgeheugen en AI-instellingen
 
+## Implementatiestatus
+
+De implementatie van deze stap is compleet in de codebasis. De automatische bewijsset bestaat uit
+de append-only databaseconstraints, de PostgreSQL-migratiesmoketest, gerichte geheugen- en
+AI-integratietests, REST-/frontendtests en het acceptatiescenario `memory-and-ai-settings`.
+Releasepromotie naar acceptatie en productie blijft de laatste vaste afrondingshandeling van deze
+stap; de gebruikte endpoints en herstelcontroles staan in het
+[operationele runbook](../platform/agentgeheugen-en-ai-instellingen-runbook.md).
+
 ## Doel en eindtoestand
 
 Voeg de duurzame, gecontroleerde context en centrale modelkeuzes toe die alle latere agenttaken

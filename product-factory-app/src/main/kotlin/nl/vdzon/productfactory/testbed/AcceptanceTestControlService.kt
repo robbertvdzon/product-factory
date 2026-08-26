@@ -49,6 +49,12 @@ class AcceptanceTestControlService(
             title = "Producthistorie en overleg",
             description = "Synthetische actuele en historische toestanden voor alle stap-2-schermen.",
         ),
+        TestScenarioSummary(
+            key = "memory-and-ai-settings",
+            version = "1",
+            title = "Agentgeheugen en AI-instellingen",
+            description = "Vaste rollen, actuele/vervangen/ingetrokken geheugenregels, leesaudit en globale mockconfiguraties.",
+        ),
     )
     private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
 
@@ -146,8 +152,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "product-stakeholder-v1"
-        private const val TESTBED_VERSION = "0.2.0"
+        private const val DATASET_VERSION = "memory-ai-settings-v1"
+        private const val TESTBED_VERSION = "0.3.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")

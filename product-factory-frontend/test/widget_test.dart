@@ -6,6 +6,7 @@ import 'package:product_factory_frontend/authentication.dart';
 import 'package:product_factory_frontend/build_identity.dart';
 import 'package:product_factory_frontend/frontend_version_monitor.dart';
 import 'package:product_factory_frontend/main.dart';
+import 'package:product_factory_frontend/memory_ai_management.dart';
 import 'package:product_factory_frontend/product_workspace.dart';
 import 'package:product_factory_frontend/testbed.dart';
 
@@ -140,6 +141,7 @@ void main() {
         home: FoundationPage(
           versionGateway: FakeVersionGateway(),
           productGateway: const FakeProductGateway(),
+          memoryAiGateway: const FakeMemoryAiGateway(),
         ),
       ),
     );
@@ -239,6 +241,62 @@ class FakeVersionGateway implements VersionGateway {
     environment: 'production',
     buildIdentity: '0.1.0+0123456789ab',
   );
+}
+
+class FakeMemoryAiGateway implements MemoryAiGateway {
+  const FakeMemoryAiGateway();
+  @override
+  Future<List<Map<String, Object?>>> products() async => const [];
+  @override
+  Future<List<Map<String, Object?>>> aiSettings() async => const [];
+  @override
+  Future<List<Map<String, Object?>>> roles(String productId) async => const [];
+  @override
+  Future<Map<String, Object?>> budget(String productId, String role) =>
+      throw UnimplementedError();
+  @override
+  Future<List<Map<String, Object?>>> items(
+    String productId,
+    String role, {
+    DateTime? date,
+  }) => throw UnimplementedError();
+  @override
+  Future<List<Map<String, Object?>>> history(
+    String productId,
+    String role,
+    String itemId,
+  ) => throw UnimplementedError();
+  @override
+  Future<void> add(
+    String productId,
+    String role,
+    String title,
+    String content,
+    String reason,
+  ) => throw UnimplementedError();
+  @override
+  Future<void> replace(
+    String productId,
+    String role,
+    Map<String, Object?> item,
+    String title,
+    String content,
+    String reason,
+  ) => throw UnimplementedError();
+  @override
+  Future<void> retract(
+    String productId,
+    String role,
+    Map<String, Object?> item,
+    String reason,
+  ) => throw UnimplementedError();
+  @override
+  Future<void> updateAi(
+    Map<String, Object?> setting,
+    String provider,
+    String model,
+    bool enabled,
+  ) => throw UnimplementedError();
 }
 
 class FakeFrontendVersionSource implements FrontendVersionSource {

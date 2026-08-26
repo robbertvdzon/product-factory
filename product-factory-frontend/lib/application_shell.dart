@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'build_identity.dart';
 import 'configuration.dart';
 import 'frontend_version_monitor.dart';
+import 'memory_ai_management.dart';
 import 'page_reload.dart';
 import 'product_workspace.dart';
 import 'testbed.dart';
@@ -22,6 +23,7 @@ class ApplicationShell extends StatefulWidget {
     this.testControlGateway,
     this.runtimeEnvironment,
     this.productGateway,
+    this.memoryAiGateway,
     this.csrfToken,
     super.key,
   });
@@ -37,6 +39,7 @@ class ApplicationShell extends StatefulWidget {
   final TestControlGateway? testControlGateway;
   final String? runtimeEnvironment;
   final ProductGateway? productGateway;
+  final MemoryAiGateway? memoryAiGateway;
   final String? csrfToken;
 
   @override
@@ -124,6 +127,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
                     versionGateway: widget.versionGateway,
                     stakeholderEmail: widget.stakeholderEmail,
                     runtimeEnvironment: widget.runtimeEnvironment,
+                    memoryAiGateway:
+                        widget.memoryAiGateway ??
+                        HttpMemoryAiGateway(csrfToken: widget.csrfToken),
                   ),
                   _ => AcceptanceTestsPage(
                     gateway:
@@ -243,12 +249,14 @@ class AcceptanceBanner extends StatelessWidget {
 class ManagementPage extends StatefulWidget {
   const ManagementPage({
     required this.versionGateway,
+    required this.memoryAiGateway,
     this.stakeholderEmail,
     this.runtimeEnvironment,
     super.key,
   });
 
   final VersionGateway versionGateway;
+  final MemoryAiGateway memoryAiGateway;
   final String? stakeholderEmail;
   final String? runtimeEnvironment;
 
@@ -321,6 +329,7 @@ class _ManagementPageState extends State<ManagementPage> {
               );
             },
           ),
+          MemoryAiManagementPanel(gateway: widget.memoryAiGateway),
           if (widget.stakeholderEmail != null) ...[
             const SizedBox(height: 16),
             Text('Ingelogd als ${widget.stakeholderEmail}'),
