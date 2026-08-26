@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.design
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.ai.AiExecutionApplicationService
@@ -128,6 +129,27 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
 
         assertThat(queries.findProcessSessions(ProcessSessionFilter()).filter { it.status == ProcessSessionStatus.WAITING_FOR_AI }.map { it.productId })
             .contains(productId, other)
+    }
+
+    @Test
+    fun `responseschema voldoet recursief aan strikte objectregels`() {
+        design.runProcessSession(productId)
+        ai.dispatchPending()
+
+        assertStrictObjectSchemas(runtime.requests.single().responseSchema!!)
+    }
+
+    private fun assertStrictObjectSchemas(schema: JsonNode) {
+        val types = schema.path("type").let { type ->
+            if (type.isArray) type.map(JsonNode::asText).toSet() else setOf(type.asText())
+        }
+        if ("object" in types) {
+            assertThat(schema.path("additionalProperties").asBoolean(true)).isFalse()
+            assertThat(schema.path("required").map(JsonNode::asText).toSet())
+                .isEqualTo(schema.path("properties").fieldNames().asSequence().toSet())
+            schema.path("properties").forEach(::assertStrictObjectSchemas)
+        }
+        schema.path("items").takeUnless(JsonNode::isMissingNode)?.let(::assertStrictObjectSchemas)
     }
 
     private fun completeOnlyJob(result: ObjectNode) {

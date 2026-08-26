@@ -142,12 +142,12 @@ class AiSettingsApplicationService(
         private val CLAUDE_MODEL = Regex("claude-[A-Za-z0-9._-]{1,100}")
         private val MOCK_PROFILE = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
         val TRUSTED_JOBS = listOf(
-            JobDefinition(AiJobKey("MEETING.CONVERSE"), "Overleg voeren", AiProvider.CODEX, "gpt-5.6", true),
-            JobDefinition(AiJobKey("MEETING.SUMMARIZE"), "Overleg samenvatten", AiProvider.CODEX, "gpt-5.6", true),
-            JobDefinition(AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), "Epic ontwerpen", AiProvider.CODEX, "gpt-5.6", true),
-            JobDefinition(AiJobKey("PLANNING.SELECT_WORK"), "Planningswerk selecteren", AiProvider.CODEX, "gpt-5.6", true),
-            JobDefinition(AiJobKey("PLANNING.SLICE_EPIC"), "Epic opdelen in stories", AiProvider.CODEX, "gpt-5.6", true),
-            JobDefinition(AiJobKey("QUALITY.VERIFY_EPIC"), "Gericht kwaliteitswerk uitvoeren", AiProvider.CODEX, "gpt-5.6", true),
+            JobDefinition(AiJobKey("MEETING.CONVERSE"), "Overleg voeren", AiProvider.CODEX, "gpt-5.6-sol", true),
+            JobDefinition(AiJobKey("MEETING.SUMMARIZE"), "Overleg samenvatten", AiProvider.CODEX, "gpt-5.6-sol", true),
+            JobDefinition(AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), "Epic ontwerpen", AiProvider.CODEX, "gpt-5.6-sol", true),
+            JobDefinition(AiJobKey("PLANNING.SELECT_WORK"), "Planningswerk selecteren", AiProvider.CODEX, "gpt-5.6-sol", true),
+            JobDefinition(AiJobKey("PLANNING.SLICE_EPIC"), "Epic opdelen in stories", AiProvider.CODEX, "gpt-5.6-sol", true),
+            JobDefinition(AiJobKey("QUALITY.VERIFY_EPIC"), "Gericht kwaliteitswerk uitvoeren", AiProvider.CODEX, "gpt-5.6-sol", true),
         )
     }
 }

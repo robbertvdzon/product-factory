@@ -138,10 +138,15 @@ class MemoryAndAiIntegrationTest(
 
     @Test
     fun `globale AI instellingen zijn gevalideerd en geversioneerd`() {
-        assertThat(ai.getAiJobConfigurations()).extracting<String> { it.jobKey.value }.containsExactly(
+        val defaults = ai.getAiJobConfigurations()
+        assertThat(defaults).extracting<String> { it.jobKey.value }.containsExactly(
             "MEETING.CONVERSE", "MEETING.SUMMARIZE", "PLANNING.SELECT_WORK", "PLANNING.SLICE_EPIC",
             "PRODUCT_DESIGN.CREATE_EPIC", "QUALITY.VERIFY_EPIC",
         )
+        assertThat(defaults).allSatisfy {
+            assertThat(it.provider).isEqualTo(AiProvider.CODEX)
+            assertThat(it.model).isEqualTo("gpt-5.6-sol")
+        }
         val command = UpdateAiJobConfigurationCommand(
             AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), AiProvider.CLAUDE, "claude-sonnet-4-5", true, 0,
             STAKEHOLDER, "ai-settings-${UUID.randomUUID()}",

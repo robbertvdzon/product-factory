@@ -153,7 +153,7 @@ class AiExecutionRuntimeIntegrationTest @Autowired constructor(
     }
 
     private fun taskCommand(key: String) = RequestAiTaskCommand(
-        AiJobKey("MEETING.CONVERSE"), productId, "meeting", null, "MEETING_AGENT", AiProvider.CODEX, "gpt-5.6", 0,
+        AiJobKey("MEETING.CONVERSE"), productId, "meeting", null, "MEETING_AGENT", AiProvider.CODEX, "gpt-5.6-sol", 0,
         1, "Beantwoord de overlegvraag zonder technische keynamen.", """{"type":"object"}""", executionTimeout = Duration.ofMinutes(5), idempotencyKey = key,
     )
 

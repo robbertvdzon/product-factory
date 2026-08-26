@@ -164,7 +164,7 @@ De adapter vertaalt een lokale taak naar het minimale actuele `/v1`-request:
   "jobKind": "APPLICATION_WORK",
   "idempotencyKey": "stabiele-product-factory-sleutel",
   "provider": "CODEX",
-  "model": "gpt-5.6",
+  "model": "gpt-5.6-sol",
   "prompt": "complete prompt",
   "responseSchema": {},
   "executionTimeoutSeconds": 3600,

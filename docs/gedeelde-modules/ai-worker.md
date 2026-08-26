@@ -47,7 +47,7 @@ lokaal; die velden gaan niet naar Runtime.
   "jobKind": "APPLICATION_WORK",
   "idempotencyKey": "stabiele-product-factory-sleutel",
   "provider": "CODEX",
-  "model": "gpt-5.6",
+  "model": "gpt-5.6-sol",
   "prompt": "volledige opdracht",
   "responseSchema": {},
   "executionTimeoutSeconds": 3600,
