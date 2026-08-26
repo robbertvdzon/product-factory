@@ -7,7 +7,7 @@ Deze implementatie gebruikt exact de publieke
 [MVP](mvp.md) intern uit met gespecialiseerde rollen, parallelle testtaken,
 risicogestuurde testrotatie, onafhankelijke kritiek en permanent geheugen per agentrol.
 
-Zij wordt gebouwd als `quality-impl-advanced`. Spring Modulith bewaakt de hieronder beschreven
+Zij wordt gebouwd als `quality-impl-advanced`. Spring Modulith structureert de hieronder beschreven
 interne delen; de main-module neemt dit artifact of de MVP op, nooit beide.
 
 ## Interne entiteiten

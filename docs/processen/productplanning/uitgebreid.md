@@ -8,7 +8,7 @@ permanent geheugen per agentrol en een afzonderlijke kritiekstap. De
 [Software Factory-dispatcher](../software-factory-dispatcher.md) blijft dezelfde deterministische
 adapter.
 
-Zij wordt gebouwd als `product-planning-impl-advanced`. Spring Modulith bewaakt de hieronder
+Zij wordt gebouwd als `product-planning-impl-advanced`. Spring Modulith structureert de hieronder
 beschreven interne delen; de main-module neemt dit artifact of de MVP op, nooit beide.
 
 ## Interne entiteiten

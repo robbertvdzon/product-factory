@@ -11,8 +11,8 @@ of een publiek event en injecteren niet rechtstreeks zo'n repository. Flywaymigr
 schema en repositories maken de SQL- en databasemapping expliciet.
 
 Software Factory groepeert repositories eveneens bij de capability die de data bezit. Publieke
-ports schermen de opslag af en Modulith-tests verhinderen dat een willekeurige module interne
-repositorypackages gebruikt.
+ports schermen de opslag af en de module-indeling houdt interne repositorypackages buiten het
+publieke contract.
 
 Product Factory v2 gebruikt één fysieke database, maar dat betekent niet dat iedere module alle
 tabellen mag lezen of schrijven. Zonder logisch eigendom worden domeininvarianten, transacties en

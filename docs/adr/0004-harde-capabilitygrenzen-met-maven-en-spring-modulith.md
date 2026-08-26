@@ -37,8 +37,9 @@ modulariteit:
 - Spring Modulith mag binnen een implementatiemodule de interne functionele delen structureren,
   maar vervangt de Maven-grens tussen capabilities niet.
 
-Maven Enforcer, composition-tests en module-lokale Modulith-tests bewaken deze regels. Nieuwe
-afhankelijkheden worden expliciet toegestaan; wildcards en stilzwijgende uitzonderingslijsten zijn
+Maven-dependencyregels, Maven Enforcer en composition-tests bewaken de harde capabilitygrenzen.
+Voor de interne Spring Modulith-structuur geldt geen verplichte afzonderlijke grenstest of CI-check.
+Nieuwe Maven-afhankelijkheden worden expliciet toegestaan; stilzwijgende uitzonderingslijsten zijn
 niet toegestaan.
 
 ## Consequences
@@ -51,5 +52,5 @@ niet toegestaan.
   van het contract met andere capabilities.
 - De ene API-module kan geen cyclische Maven-afhankelijkheid met een andere API-module krijgen.
   Capability-eigendom wordt daarom aanvullend met packages, contracttests en schrijftests bewaakt.
-- Er ontstaan meer implementatiemodules en architectuurtests dan in een ongepartitioneerde
-  applicatie. Dat is geaccepteerde structurele overhead.
+- Er ontstaan meer implementatiemodules dan in een ongepartitioneerde applicatie. Dat is
+  geaccepteerde structurele overhead.

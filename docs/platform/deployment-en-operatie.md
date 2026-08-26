@@ -36,15 +36,13 @@ wordt de automatische deploymentflow geactiveerd.
 Daarna doorloopt een wijziging op `main` de volgende eenvoudige buildstraat:
 
 1. bouw de volledige Maven-reactor en voer de backendtests uit;
-2. controleer de Spring Modulith-grenzen binnen implementatiemodules;
-3. voer Kotlinanalyse uit;
-4. analyseer en test de nieuwe frontend;
-5. maak een releasebuild van backend en frontend;
-6. bouw de echte backend- en frontendcontainerimages;
-7. render de Kustomize-overlays voor acceptatie en productie;
-8. publiceer de images met een immutable Git-SHA-tag of digest;
-9. deploy eerst naar acceptatie en voer een korte rooktest uit;
-10. promoveer daarna dezelfde image-inhoud naar productie.
+2. analyseer en test de nieuwe frontend;
+3. maak een releasebuild van backend en frontend;
+4. bouw de echte backend- en frontendcontainerimages;
+5. render de Kustomize-overlays voor acceptatie en productie;
+6. publiceer de images met een immutable Git-SHA-tag of digest;
+7. deploy eerst naar acceptatie en voer een korte rooktest uit;
+8. promoveer daarna dezelfde image-inhoud naar productie.
 
 Dit is gewone CI/CD. Het zware v1-systeem met apart worktreebewijs, door agents gemeten
 revisioncontracten en uitgebreide Factory-attestatie wordt niet overgenomen.

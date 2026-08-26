@@ -7,7 +7,7 @@ Deze implementatie gebruikt exact de publieke [Productontwerp-API](api.md). Zij 
 permanent geheugen per agentrol. Andere modules zien alleen dezelfde `EpicDetails`, commands,
 queries en `ProcessSessionDetails`.
 
-Zij wordt gebouwd als `product-design-impl-advanced`. Spring Modulith bewaakt de hieronder
+Zij wordt gebouwd als `product-design-impl-advanced`. Spring Modulith structureert de hieronder
 beschreven interne delen; de main-module neemt dit artifact of de MVP op, nooit beide.
 
 ## Interne productverkenning

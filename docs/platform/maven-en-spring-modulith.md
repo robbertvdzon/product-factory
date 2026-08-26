@@ -6,7 +6,7 @@ Product Factory gebruikt twee niveaus van modulariteit met elk een eigen doel:
 
 - **Maven-modules** vormen de harde grens tussen één gedeeld publiek API-contract,
   capability-implementaties en de uitvoerbare applicatie;
-- **Spring Modulith** structureert en controleert uitsluitend de binnenkant van een
+- **Spring Modulith** structureert uitsluitend de binnenkant van een
   implementatiemodule wanneer die intern ingewikkeld genoeg is.
 
 Er is één uitvoerbare `product-factory-app` en één publieke Maven-module `product-factory-api`.
@@ -156,17 +156,11 @@ nooit zelf. Attempts, leases, fencing en technische resultaten worden niet als t
 module geïmplementeerd. Beide onderdelen horen bij dezelfde Maven-capability en delen uitsluitend
 expliciete interne interfaces.
 
-Iedere implementatiemodule krijgt haar eigen Modulith-verificatietest. Die controleert:
-
-- geen cycli tussen interne application modules;
-- toegang tot interne packages alleen volgens de vastgelegde interfaces;
-- expliciet toegestane interne afhankelijkheden;
-- geïsoleerde moduletests waar dat nuttig is.
-
-De module-local verificatie gebruikt de package-root van de betreffende implementatie. De
-`product-factory-app` hoeft de API-JAR's niet als Spring Modulith-modules te behandelen. Wanneer
-runtime-documentatie of observability ook de interne modules moet tonen, registreert de
-implementatie haar rootpackages expliciet; dit verandert de Maven-grens niet.
+Er geldt geen verplichte Spring Modulith-verificatietest of afzonderlijke Modulith-check in CI.
+De harde capabilitygrenzen worden op Maven-niveau bepaald. Implementaties mogen hun interne
+onderdelen gericht functioneel testen waar dat nuttig is. Wanneer runtime-documentatie of
+observability de interne modules moet tonen, registreert de implementatie haar rootpackages
+expliciet; dit verandert de Maven-grens niet.
 
 Een kleine implementatie hoeft niet kunstmatig veel interne Modulith-modules te krijgen. De Maven-
 grens blijft ook geldig wanneer de MVP intern maar één of twee functionele packages heeft.
@@ -253,7 +247,7 @@ bewijzen, bijvoorbeeld:
 
 Daarbovenop bestaan:
 
-- implementatiespecifieke unit- en Spring Modulith-tests;
+- implementatiespecifieke unit- en integratietests;
 - repository- en migratiecompatibiliteitstests;
 - één app-compositiontest die exact één provider per API controleert;
 - integratietests met Product Factory Testbed;

@@ -316,7 +316,7 @@ UI-/REST-starts geven daarom altijd het product-ID mee.
 - Alleen de ene `product-factory-app` heeft dependencies op implementatiemodules en neemt bij
   build-time exact één implementatie per op dat moment geactiveerde capability op. Een publiek
   contract mag dus al bestaan voordat zijn implementatie in een latere MVP-stap wordt toegevoegd.
-- Spring Modulith structureert en verifieert uitsluitend de interne functionele delen van een
+- Spring Modulith structureert uitsluitend de interne functionele delen van een
   implementatiemodule; het vervangt de harde Maven-grens niet.
 - Iedere eigenaar beheert in haar gekozen implementatie eigen aggregates, repositories en
   transacties, ook in één fysieke database.

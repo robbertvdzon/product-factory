@@ -480,7 +480,7 @@ een nog niet geactiveerde capability kan al wel haar publieke contract in `produ
 hebben. Er bestaat
 geen runtime-toggle en twee varianten schrijven nooit tegelijk dezelfde productdata. Spring
 Modulith wordt uitsluitend binnen een implementatiemodule gebruikt om haar interne functionele
-delen te structureren en te testen. `product-factory-api` gebruikt geen Spring Modulith.
+delen te structureren. `product-factory-api` gebruikt geen Spring Modulith.
 
 Iedere processessie bewaart haar `implementationId` en `implementationVersion`. Zolang terugkeer
 naar de MVP ondersteund wordt, blijven publieke objecten en het duurzame schema compatibel en zijn

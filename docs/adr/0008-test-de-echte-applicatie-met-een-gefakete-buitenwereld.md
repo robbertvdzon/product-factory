@@ -22,7 +22,7 @@ bewijzen die keten niet.
 
 De teststrategie bestaat uit elkaar aanvullende lagen:
 
-- snelle architectuurtests bewaken Maven-, Modulith-, contract- en composition-rootgrenzen;
+- snelle architectuurtests bewaken waar nodig Maven-, contract- en composition-rootgrenzen;
 - unittests testen pure policies, parsers, state-overgangen en berekeningen zonder Spring-context;
 - repository- en migratietests draaien tegen een tijdelijke echte PostgreSQL-instantie;
 - integratietests starten de echte betrokken Product Factory-modules met echte configuratie,

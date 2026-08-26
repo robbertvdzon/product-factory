@@ -123,7 +123,6 @@ actualiseren en naar hun definitieve plek verplaatsen.
 | `v2/files/deploy/**` | bruikbare Kustomize-, OpenShift-, Sealed Secret- en backuppatronen behouden |
 | `v2/files/deploy/seal-secrets.sh` | behouden en aanpassen aan de nieuwe verplichte sleutels |
 | `v2/files/docker-compose.yml` | als lokale composition root volledig herschrijven |
-| `v2/files/quality/detekt.yml` | behouden wanneer de nieuwe backend Kotlin gebruikt |
 | `v2/files/product-factory` | als eenvoudige lokale CLI herschrijven |
 | `v2/files/dashboard-frontend/nginx.conf` | cache-, security- en SPA-patronen behouden of gelijkwaardig opnieuw bouwen |
 | `v2/files/tools/agent-worker-launchagent` | alleen het installatie-, restart- en logconcept behouden; workercontract herschrijven |
@@ -458,8 +457,6 @@ secrets of rootcontainer, probes worden gezond en beide omgevingen tonen de juis
    uitgevoerd en geslaagd.
 4. Draai minimaal:
    - volledige Maven `verify`;
-   - Spring Modulith-grenstests;
-   - Detekt;
    - frontendanalyse en -tests;
    - frontend- en backendreleasebuild;
    - PostgreSQL-migratiesmoketest;
@@ -541,7 +538,7 @@ De technische fundering is pas klaar wanneer al het volgende aantoonbaar waar is
 - `secrets.env` is behouden, gitignored en niet gelekt;
 - de nieuwe applicatie gebruikt nergens functionele `v2`-namen;
 - alle nieuwe documenten staan rechtstreeks onder `docs`;
-- Maven-, Modulith-, Kotlin- en frontendchecks zijn groen;
+- Maven- en frontendchecks zijn groen;
 - backend- en frontendcontainers zijn immutable gebouwd en draaien als niet-root;
 - productie gebruikt de nieuwe PostgreSQL-database en een nieuwe credential;
 - acceptatie gebruikt uitsluitend resetbare synthetische in-memory data;
