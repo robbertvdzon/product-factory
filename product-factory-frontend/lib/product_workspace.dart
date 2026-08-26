@@ -19,6 +19,94 @@ String _backendResourceUrl(Object? value) {
   return '$base${path.startsWith('/') ? path : '/$path'}';
 }
 
+Future<void> _openUxArtifact(
+  BuildContext context,
+  Map<String, Object?> artifact,
+) => showDialog<void>(
+  context: context,
+  builder: (_) => _ZoomableUxArtifactDialog(artifact: artifact),
+);
+
+class _ZoomableUxArtifactDialog extends StatefulWidget {
+  const _ZoomableUxArtifactDialog({required this.artifact});
+
+  final Map<String, Object?> artifact;
+
+  @override
+  State<_ZoomableUxArtifactDialog> createState() =>
+      _ZoomableUxArtifactDialogState();
+}
+
+class _ZoomableUxArtifactDialogState extends State<_ZoomableUxArtifactDialog> {
+  final TransformationController _transformation = TransformationController();
+  double _scale = 1;
+
+  @override
+  void dispose() {
+    _transformation.dispose();
+    super.dispose();
+  }
+
+  void _setScale(double scale) {
+    final bounded = scale.clamp(.5, 8.0);
+    _transformation.value = Matrix4.diagonal3Values(bounded, bounded, 1);
+    setState(() => _scale = bounded);
+  }
+
+  @override
+  Widget build(BuildContext context) => Dialog.fullscreen(
+    child: Scaffold(
+      appBar: AppBar(
+        title: Text(_value(widget.artifact['name'])),
+        actions: [
+          IconButton(
+            tooltip: 'Uitzoomen',
+            onPressed: _scale > .5 ? () => _setScale(_scale / 1.5) : null,
+            icon: const Icon(Icons.zoom_out),
+          ),
+          IconButton(
+            tooltip: 'Zoom herstellen',
+            onPressed: () => _setScale(1),
+            icon: const Icon(Icons.center_focus_strong),
+          ),
+          IconButton(
+            tooltip: 'Inzoomen',
+            onPressed: _scale < 8 ? () => _setScale(_scale * 1.5) : null,
+            icon: const Icon(Icons.zoom_in),
+          ),
+          IconButton(
+            tooltip: 'Sluiten',
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
+      body: ColoredBox(
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        child: InteractiveViewer(
+          transformationController: _transformation,
+          minScale: .5,
+          maxScale: 8,
+          boundaryMargin: const EdgeInsets.all(200),
+          trackpadScrollCausesScale: true,
+          onInteractionUpdate: (_) => setState(
+            () => _scale = _transformation.value.getMaxScaleOnAxis(),
+          ),
+          child: Center(
+            child: Image.network(
+              _backendResourceUrl(widget.artifact['uri']),
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Center(
+                child: Text('UX-afbeelding kon niet worden geladen.'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 final RegExp _productIdPattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,98}[a-z0-9]$');
 
 String? _productIdError(String value) {
@@ -1691,19 +1779,52 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Image.network(
-                            _backendResourceUrl(artifact['uri']),
-                            height: 240,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const SizedBox(
-                                  height: 160,
-                                  child: Center(
-                                    child: Text(
-                                      'UX-afbeelding kon niet worden geladen.',
+                          Tooltip(
+                            message: 'Open UX-model en zoom in',
+                            child: InkWell(
+                              onTap: () => _openUxArtifact(context, artifact),
+                              child: Stack(
+                                alignment: Alignment.topRight,
+                                children: [
+                                  Image.network(
+                                    _backendResourceUrl(artifact['uri']),
+                                    height: 240,
+                                    width: double.infinity,
+                                    fit: BoxFit.contain,
+                                    errorBuilder:
+                                        (
+                                          context,
+                                          error,
+                                          stackTrace,
+                                        ) => const SizedBox(
+                                          height: 160,
+                                          child: Center(
+                                            child: Text(
+                                              'UX-afbeelding kon niet worden geladen.',
+                                            ),
+                                          ),
+                                        ),
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Padding(
+                                        padding: EdgeInsets.all(7),
+                                        child: Icon(
+                                          Icons.open_in_full,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
+                              ),
+                            ),
                           ),
                           Padding(
                             padding: const EdgeInsets.all(10),

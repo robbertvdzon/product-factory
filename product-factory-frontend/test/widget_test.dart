@@ -293,6 +293,18 @@ void main() {
       find.textContaining('Noord-Hollands Archief · VALIDATED'),
       findsOneWidget,
     );
+
+    final uxModel = find.byTooltip('Open UX-model en zoom in');
+    final openAction = find.descendant(
+      of: uxModel,
+      matching: find.byType(InkWell),
+    );
+    tester.widget<InkWell>(openAction).onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Uitzoomen'), findsOneWidget);
+    expect(find.byTooltip('Zoom herstellen'), findsOneWidget);
+    expect(find.byTooltip('Inzoomen'), findsOneWidget);
+    expect(find.byTooltip('Sluiten'), findsOneWidget);
   });
 
   testWidgets('Runtime-catalogus gebruikt de gekozen projectprefix', (
