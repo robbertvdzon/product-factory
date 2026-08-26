@@ -2,8 +2,12 @@ FROM maven:3.9.11-eclipse-temurin-21@sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b
 WORKDIR /source
 COPY pom.xml ./
 COPY product-factory-api/pom.xml product-factory-api/pom.xml
+COPY product-impl/pom.xml product-impl/pom.xml
+COPY decisions-impl/pom.xml decisions-impl/pom.xml
 COPY product-factory-app/pom.xml product-factory-app/pom.xml
 COPY product-factory-api/src product-factory-api/src
+COPY product-impl/src product-impl/src
+COPY decisions-impl/src decisions-impl/src
 COPY product-factory-app/src product-factory-app/src
 RUN mvn -B --no-transfer-progress -pl product-factory-app -am package -DskipTests
 
