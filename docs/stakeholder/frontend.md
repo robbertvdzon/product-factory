@@ -29,8 +29,9 @@ in [UX-referentie](../ux/README.md). Dit document beschrijft gewenst gedrag en p
   twintig seconden stil opnieuw op. Een inhoudsvergelijking voorkomt een widgetupdate wanneer de
   publieke gegevens ongewijzigd zijn, zodat selectie, scrollpositie en open interacties behouden
   blijven.
-- Gewone paginatekst is via één selectieregio kopieerbaar; invoervelden en interactieve controls
-  houden hun normale gedrag.
+- Inhoudelijke paginatekst gebruikt echte selecteerbare tekstwidgets, zodat zowel dubbelklikken als
+  gewone muissleepselectie op Flutter Web betrouwbaar werkt. Navigatie-, knop- en uitklaplabels
+  blijven bedieningselementen en houden hun normale klikgedrag.
 - Op bredere schermen gebruikt de applicatieschil de beschikbare ruimte; mobiel bruikbaar betekent
   niet dat de desktopweergave tot een smalle kolom wordt beperkt.
 

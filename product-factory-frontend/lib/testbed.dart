@@ -216,14 +216,14 @@ class _AcceptanceTestsPageState extends State<AcceptanceTestsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          SelectableText(
             'Acceptatietesten',
             style: Theme.of(
               context,
             ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
-          const Text(
+          const SelectableText(
             'Kies een vast scenario en herstel de synthetische testdata naar een bekende toestand.',
           ),
           const SizedBox(height: 24),
@@ -255,17 +255,19 @@ class _AcceptanceTestsPageState extends State<AcceptanceTestsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                SelectableText(
                   'Actief scenario',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 12),
-                Text(snapshot.active.scenario.title),
+                SelectableText(snapshot.active.scenario.title),
                 const SizedBox(height: 8),
-                Text('Dataset: ${snapshot.active.datasetVersion}'),
-                Text('Testbed: ${snapshot.active.testbedVersion}'),
-                Text('Scenarioversie: ${snapshot.active.scenario.version}'),
-                Text('Stap: ${snapshot.active.currentStep}'),
+                SelectableText('Dataset: ${snapshot.active.datasetVersion}'),
+                SelectableText('Testbed: ${snapshot.active.testbedVersion}'),
+                SelectableText(
+                  'Scenarioversie: ${snapshot.active.scenario.version}',
+                ),
+                SelectableText('Stap: ${snapshot.active.currentStep}'),
               ],
             ),
           ),
@@ -311,7 +313,7 @@ class _AcceptanceTestsPageState extends State<AcceptanceTestsPage> {
         ],
         if (_commandError != null) ...[
           const SizedBox(height: 16),
-          Text(
+          SelectableText(
             _commandError!,
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
@@ -324,8 +326,8 @@ class _AcceptanceTestsPageState extends State<AcceptanceTestsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Acceptatieomgeving resetten?'),
-        content: const Text(
+        title: const SelectableText('Acceptatieomgeving resetten?'),
+        content: const SelectableText(
           'Alle tijdelijke acceptatiewijzigingen verdwijnen. De vaste synthetische data wordt opnieuw geladen.',
         ),
         actions: [
@@ -432,7 +434,7 @@ class _TestbedError extends StatelessWidget {
     color: Theme.of(context).colorScheme.errorContainer,
     child: ListTile(
       leading: const Icon(Icons.cloud_off),
-      title: const Text('Testbed kon niet worden geladen'),
+      title: const SelectableText('Testbed kon niet worden geladen'),
       trailing: TextButton(onPressed: onRetry, child: const Text('Opnieuw')),
     ),
   );

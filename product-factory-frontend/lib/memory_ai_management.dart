@@ -542,12 +542,12 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       children: [
         if (showMemory) ...[
           const Divider(height: 48),
-          Text(
+          SelectableText(
             'Agentgeheugen',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 6),
-          const Text(
+          const SelectableText(
             'Beheer actuele kennis en de volledige, append-only historie per product, capability en vertrouwde agentrol.',
           ),
           const SizedBox(height: 16),
@@ -556,7 +556,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           Card(
             color: Theme.of(context).colorScheme.errorContainer,
             child: ListTile(
-              title: Text(_error!),
+              title: SelectableText(_error!),
               trailing: TextButton(
                 onPressed: _load,
                 child: const Text('Opnieuw'),
@@ -570,10 +570,10 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           Card(
             child: ListTile(
               leading: const Icon(Icons.smart_toy_outlined),
-              title: Text(
+              title: SelectableText(
                 '${_roleDefinition!['displayName']} · ${_roleDefinition!['implementationVariant']}',
               ),
-              subtitle: Text(
+              subtitle: SelectableText(
                 '${_roleDefinition!['purpose']}\nGrenzen: ${(_roleDefinition!['boundaries'] as List? ?? const []).join(' · ')}',
               ),
             ),
@@ -637,18 +637,18 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
         if (showMemory && _items.isEmpty && !_busy)
           const Card(
             child: ListTile(
-              title: Text('Geen geheugenitems voor deze selectie.'),
+              title: SelectableText('Geen geheugenitems voor deze selectie.'),
             ),
           ),
         if (showMemory) ..._items.map(_memoryCard),
         if (showSettings) ...[
           const Divider(height: 48),
-          Text(
+          SelectableText(
             'AI-modellen',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 6),
-          const Text(
+          const SelectableText(
             'Geldt voor alle producten. Iedere taak loopt duurzaam via de gedeelde Agent Runtime.',
           ),
           const SizedBox(height: 12),
@@ -656,12 +656,12 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
         ],
         if (showSettings && widget.gateway is AgentRuntimeGateway) ...[
           const Divider(height: 48),
-          Text(
+          SelectableText(
             'Agenttoegang · $_projectPrefix',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 6),
-          const Text(
+          const SelectableText(
             'Koppel uitsluitend bekende Runtime-keynamen aan dit product en geef per agentrol expliciet toegang.',
           ),
           const SizedBox(height: 12),
@@ -699,7 +699,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          const SelectableText(
             'Alleen namen en beschikbaarheid worden getoond. Waarden verlaten Agent Runtime nooit.',
           ),
           const SizedBox(height: 12),
@@ -707,24 +707,26 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
             const Card(
               child: ListTile(
                 leading: Icon(Icons.key_off_outlined),
-                title: Text('Nog geen Runtime-keynamen geladen'),
+                title: SelectableText('Nog geen Runtime-keynamen geladen'),
               ),
             ),
           ..._catalog.map(_environmentKeyCard),
         ],
         if (showOperation && widget.gateway is AgentRuntimeGateway) ...[
           const Divider(height: 48),
-          Text(
+          SelectableText(
             'AI-taakoperatie',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 6),
-          const Text(
+          const SelectableText(
             'Domeincorrelatie en veilige voortgang staan hier; workers en technische attempts staan in de Runtime-monitor.',
           ),
           const SizedBox(height: 12),
           if (_tasks.isEmpty)
-            const Card(child: ListTile(title: Text('Nog geen AI-taken.'))),
+            const Card(
+              child: ListTile(title: SelectableText('Nog geen AI-taken.')),
+            ),
           ..._tasks.map(_taskCard),
         ],
       ],
@@ -797,20 +799,20 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      SelectableText(
                         '${item['title']}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 6),
-                      Text('${item['content']}'),
+                      SelectableText('${item['content']}'),
                       const SizedBox(height: 8),
-                      Text(
+                      SelectableText(
                         'Versie ${_v(item['activeVersionId'])} · geldig vanaf ${item['validFrom']}',
                       ),
-                      Text(
+                      SelectableText(
                         'Bron: ${actor['type'] ?? 'ONBEKEND'} · ${actor['id'] ?? '-'} · reden: ${item['reason']}',
                       ),
-                      Text(
+                      SelectableText(
                         item['sourceMeetingId'] == null
                             ? 'Geen bronoverleg · ${reads.length} geregistreerde lezing(en)'
                             : 'Bronoverleg ${_v(item['sourceMeetingId'])} · ${reads.length} geregistreerde lezing(en)',
@@ -858,8 +860,10 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           setting['enabled'] == true ? Icons.toggle_on : Icons.toggle_off,
           size: 36,
         ),
-        title: Text('${setting['displayName']} · ${_v(setting['jobKey'])}'),
-        subtitle: Text(
+        title: SelectableText(
+          '${setting['displayName']} · ${_v(setting['jobKey'])}',
+        ),
+        subtitle: SelectableText(
           '${setting['provider']} / ${setting['model']} · versie ${setting['version']}\nGewijzigd door ${updatedBy['type'] ?? 'SYSTEM'} · ${updatedBy['id'] ?? 'trusted-default'} op ${setting['updatedAt']}',
         ),
         trailing: IconButton(
@@ -895,8 +899,8 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
                       value,
                       (configured?['version'] as num?)?.toInt() ?? 0,
                     ),
-              title: Text(name),
-              subtitle: Text(
+              title: SelectableText(name),
+              subtitle: SelectableText(
                 catalogKey['available'] == true
                     ? '${catalogKey['matchingOnlineWorkers']} passende online worker(s)'
                     : 'Bekend, maar nu niet beschikbaar bij een online worker',
@@ -945,8 +949,8 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
               ? Icons.cancel_outlined
               : Icons.pending_outlined,
         ),
-        title: Text('${_v(task['jobKey'])} · $status'),
-        subtitle: Text(
+        title: SelectableText('${_v(task['jobKey'])} · $status'),
+        subtitle: SelectableText(
           'Product ${_v(task['productId']).isEmpty ? '—' : _v(task['productId'])} · rol ${task['agentRole']}\n'
           'Runtime ${task['runtimeJobId'] ?? 'nog niet ingediend'} · fase ${task['runtimePhase'] ?? 'outbox'} · attemptprojectie ${task['runtimeAttemptCount']}\n'
           '${task['safeProgress'] ?? task['errorCode'] ?? 'Geen aanvullende veilige voortgang'}',
@@ -1075,7 +1079,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Historie · ${item['title']}'),
+          title: SelectableText('Historie · ${item['title']}'),
           content: SizedBox(
             width: 680,
             child: ListView(
@@ -1085,10 +1089,10 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
                     (row['actor'] as Map?)?.cast<String, Object?>() ?? const {};
                 return ListTile(
                   isThreeLine: true,
-                  title: Text(
+                  title: SelectableText(
                     'Versie ${row['versionNumber']} · ${row['status']}',
                   ),
-                  subtitle: Text(
+                  subtitle: SelectableText(
                     '${row['title']}\n${row['content']}\n${row['validFrom']} — ${row['validUntil'] ?? 'heden'} · ${actor['type']}/${actor['id']} · ${row['reason']}',
                   ),
                 );
@@ -1119,7 +1123,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
     final result = await showDialog<(String, String, String)>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
+        title: SelectableText(title),
         content: SizedBox(
           width: 600,
           child: Column(
@@ -1176,7 +1180,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
+        title: SelectableText(title),
         content: TextField(
           controller: controller,
           maxLines: 3,
@@ -1210,7 +1214,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('${setting['displayName']} wijzigen'),
+          title: SelectableText('${setting['displayName']} wijzigen'),
           content: SizedBox(
             width: 520,
             child: Column(
@@ -1218,7 +1222,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
               children: [
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Geldt voor alle producten.'),
+                  child: SelectableText('Geldt voor alle producten.'),
                 ),
                 DropdownButtonFormField<String>(
                   initialValue: provider,
@@ -1242,7 +1246,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
                 ),
                 SwitchListTile(
                   value: enabled,
-                  title: const Text('Ingeschakeld'),
+                  title: const SelectableText('Ingeschakeld'),
                   onChanged: (value) => setDialogState(() => enabled = value),
                 ),
               ],

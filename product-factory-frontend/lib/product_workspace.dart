@@ -59,7 +59,7 @@ class _ZoomableUxArtifactDialogState extends State<_ZoomableUxArtifactDialog> {
   Widget build(BuildContext context) => Dialog.fullscreen(
     child: Scaffold(
       appBar: AppBar(
-        title: Text(_value(widget.artifact['name'])),
+        title: SelectableText(_value(widget.artifact['name'])),
         actions: [
           IconButton(
             tooltip: 'Uitzoomen',
@@ -99,7 +99,7 @@ class _ZoomableUxArtifactDialogState extends State<_ZoomableUxArtifactDialog> {
               _backendResourceUrl(widget.artifact['uri']),
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const Center(
-                child: Text('UX-afbeelding kon niet worden geladen.'),
+                child: SelectableText('UX-afbeelding kon niet worden geladen.'),
               ),
             ),
           ),
@@ -117,7 +117,7 @@ List<Widget> _uxArtifactGallery(
   if (rawArtifacts.isEmpty) return const [];
   return [
     const SizedBox(height: 12),
-    Text(title, style: Theme.of(context).textTheme.labelLarge),
+    SelectableText(title, style: Theme.of(context).textTheme.labelLarge),
     const SizedBox(height: 6),
     Wrap(
       spacing: 12,
@@ -147,7 +147,7 @@ List<Widget> _uxArtifactGallery(
                               const SizedBox(
                                 height: 160,
                                 child: Center(
-                                  child: Text(
+                                  child: SelectableText(
                                     'UX-afbeelding kon niet worden geladen.',
                                   ),
                                 ),
@@ -217,7 +217,7 @@ class _CreateProductDialogState extends State<_CreateProductDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Product aanmaken'),
+    title: const SelectableText('Product aanmaken'),
     content: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -980,13 +980,13 @@ class _ProcessSessionTile extends StatelessWidget {
     dense: dense,
     contentPadding: EdgeInsets.zero,
     leading: Icon(icon),
-    title: Text(
+    title: SelectableText(
       '${label == null ? '' : '$label · '}${session['status']} · ${_value(session['id'])}',
     ),
     subtitle: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (details?.trim().isNotEmpty == true) Text(details!),
+        if (details?.trim().isNotEmpty == true) SelectableText(details!),
         _ProcessTiming(session: session),
       ],
     ),
@@ -1046,15 +1046,17 @@ class _ProcessTimingState extends State<_ProcessTiming> {
   Widget build(BuildContext context) {
     final started = _parseInstant(widget.session['startedAt']);
     final finished = _parseInstant(widget.session['finishedAt']);
-    if (started == null) return const Text('Starttijd niet beschikbaar');
+    if (started == null) {
+      return const SelectableText('Starttijd niet beschikbaar');
+    }
     final duration = (finished ?? _now).difference(started);
     if (_active) {
-      return Text(
+      return SelectableText(
         'Gestart ${_dateTimeLabel(started)} · actief: ja · loopt ${_durationLabel(duration)}',
         style: Theme.of(context).textTheme.bodySmall,
       );
     }
-    return Text(
+    return SelectableText(
       'Gestart ${_dateTimeLabel(started)} · '
       '${finished == null ? 'niet meer actief' : 'geëindigd ${_dateTimeLabel(finished)}'} · '
       'duur ${_durationLabel(duration)}',
@@ -1228,7 +1230,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    SelectableText(
                       _sectionEyebrow(widget.section),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
@@ -1237,14 +1239,16 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
+                    SelectableText(
                       _sectionTitle(widget.section),
                       style: Theme.of(context).textTheme.displaySmall,
                     ),
                     const SizedBox(height: 8),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 680),
-                      child: Text(_sectionDescription(widget.section)),
+                      child: SelectableText(
+                        _sectionDescription(widget.section),
+                      ),
                     ),
                   ],
                 ),
@@ -1262,7 +1266,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               Card(
                 color: Theme.of(context).colorScheme.errorContainer,
                 child: ListTile(
-                  title: Text(_error!),
+                  title: SelectableText(_error!),
                   trailing: TextButton(
                     onPressed: _loadProducts,
                     child: const Text('Opnieuw'),
@@ -1279,7 +1283,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                       final copy = Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: const [
-                          Text(
+                          SelectableText(
                             'Nog geen producten',
                             style: TextStyle(
                               fontSize: 18,
@@ -1287,7 +1291,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                             ),
                           ),
                           SizedBox(height: 4),
-                          Text(
+                          SelectableText(
                             'Maak het eerste product aan om richting, ontwerp, planning en kwaliteit te volgen.',
                           ),
                         ],
@@ -1452,7 +1456,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              SelectableText(
                 'PRODUCTDOEL',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Theme.of(context).colorScheme.primary,
@@ -1461,7 +1465,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
+              SelectableText(
                 goal?.isNotEmpty == true
                     ? goal!
                     : 'Leg het productdoel vast bij Instellingen.',
@@ -1484,7 +1488,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          SelectableText(
                             'NU',
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
@@ -1494,7 +1498,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                                 ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
+                          SelectableText(
                             currentEpic?['title']?.toString() ??
                                 'Nog geen actieve epic',
                             style: Theme.of(context).textTheme.titleLarge,
@@ -1508,7 +1512,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 ),
                 if (currentEpic != null) ...[
                   const SizedBox(height: 8),
-                  Text(
+                  SelectableText(
                     '${_value(currentEpic['id'])} · $done van ${epicStories.length} stories opgeleverd',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -1538,11 +1542,11 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              SelectableText(
                                 'Software Factory bouwt',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
-                              Text(
+                              SelectableText(
                                 '${_value(currentStory['id'])} · ${currentStory['title']}',
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
@@ -1586,22 +1590,27 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('AANDACHT', style: Theme.of(context).textTheme.labelSmall),
+            SelectableText(
+              'AANDACHT',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
             const SizedBox(height: 6),
-            Text(
+            SelectableText(
               total == 0 ? 'Geen open punten' : '$total open punten',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
             if (total == 0)
-              const Text('Er zijn nu geen blokkades, vragen of open signalen.')
+              const SelectableText(
+                'Er zijn nu geen blokkades, vragen of open signalen.',
+              )
             else ...[
               ...approvalEpics.map(
                 (epic) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.approval_outlined),
-                  title: Text('${epic['title']}'),
-                  subtitle: const Text(
+                  title: SelectableText('${epic['title']}'),
+                  subtitle: const SelectableText(
                     'Epic wacht op jouw goedkeuring voordat de planner stories maakt.',
                   ),
                   trailing: const Chip(label: Text('Wacht op jou')),
@@ -1613,8 +1622,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                     (item) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.error_outline),
-                      title: Text('${item['type']} · ${item['status']}'),
-                      subtitle: Text('${item['explanation']}'),
+                      title: SelectableText(
+                        '${item['type']} · ${item['status']}',
+                      ),
+                      subtitle: SelectableText('${item['explanation']}'),
                     ),
                   ),
               ...openQuestions
@@ -1623,8 +1634,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                     (question) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.question_answer_outlined),
-                      title: Text(_value(question['question'])),
-                      subtitle: const Text('Vraag van een agent'),
+                      title: SelectableText(_value(question['question'])),
+                      subtitle: const SelectableText('Vraag van een agent'),
                     ),
                   ),
               ...openSignals
@@ -1633,8 +1644,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                     (signal) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.radio_button_unchecked),
-                      title: Text(_value(signal['text'])),
-                      subtitle: const Text('Open gebruikerssignaal'),
+                      title: SelectableText(_value(signal['text'])),
+                      subtitle: const SelectableText('Open gebruikerssignaal'),
                     ),
                   ),
             ],
@@ -1657,12 +1668,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                SelectableText(
                   data.product.name,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 SelectableText(data.product.id),
-                Text(
+                SelectableText(
                   'Status: ${data.product.status} · versie ${data.product.version}',
                 ),
               ],
@@ -1708,7 +1719,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   Widget _operation(
     ProductWorkspaceData data,
   ) => _section('Operatie', Icons.monitor_heart_outlined, [
-    Text('Processessies', style: Theme.of(context).textTheme.titleMedium),
+    SelectableText(
+      'Processessies',
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
     const SizedBox(height: 8),
     ...[
       ...data.designSessions.map((session) => ('Ontwerp', session)),
@@ -1727,7 +1741,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ),
     ),
     const Divider(height: 32),
-    Text(
+    SelectableText(
       'Software Factory-dispatch',
       style: Theme.of(context).textTheme.titleMedium,
     ),
@@ -1739,12 +1753,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             ? Icons.error_outline
             : Icons.sync_alt,
       ),
-      title: Text(
+      title: SelectableText(
         data.dispatcherStatus['blocked'] == true
             ? 'Dispatch geblokkeerd'
             : 'Dispatcher gereed',
       ),
-      subtitle: Text(
+      subtitle: SelectableText(
         '${data.dispatcherStatus['blockedReason'] ?? 'Geen blijvende technische blokkade.'}',
       ),
     ),
@@ -1759,10 +1773,14 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SelectableText('Reservering ${attempt['reservationId']}'),
-          Text('Externe status ${attempt['externalStatus'] ?? 'onbekend'}'),
-          Text('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
+          SelectableText(
+            'Externe status ${attempt['externalStatus'] ?? 'onbekend'}',
+          ),
+          SelectableText('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
           if (attempt['lastErrorCode'] != null)
-            Text('${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}'),
+            SelectableText(
+              '${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}',
+            ),
         ],
       ),
     ),
@@ -1798,16 +1816,16 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ],
     ),
     const SizedBox(height: 12),
-    Text(
+    SelectableText(
       'Productbrede backlog',
       style: Theme.of(context).textTheme.titleMedium,
     ),
     if (data.backlog.isEmpty)
-      const Text('De backlog is leeg.')
+      const SelectableText('De backlog is leeg.')
     else
       ..._groupedBacklog(data),
     const Divider(height: 28),
-    Text(
+    SelectableText(
       'Geannuleerd en opgeleverd',
       style: Theme.of(context).textTheme.titleMedium,
     ),
@@ -1822,14 +1840,14 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                   ? Icons.done_all
                   : Icons.cancel_outlined,
             ),
-            title: Text('${story['title']} · ${story['status']}'),
-            subtitle: Text(
+            title: SelectableText('${story['title']} · ${story['status']}'),
+            subtitle: SelectableText(
               '${story['cancellationReason'] ?? story['deliveredCommitSha'] ?? story['summary']}',
             ),
           ),
         ),
     const Divider(height: 28),
-    Text(
+    SelectableText(
       'Werkqueue en sessies',
       style: Theme.of(context).textTheme.titleMedium,
     ),
@@ -1837,8 +1855,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       (item) => ListTile(
         dense: true,
         leading: const Icon(Icons.playlist_add_check),
-        title: Text('${item['type']} · ${item['status']}'),
-        subtitle: Text('${item['explanation']}'),
+        title: SelectableText('${item['type']} · ${item['status']}'),
+        subtitle: SelectableText('${item['explanation']}'),
       ),
     ),
     ...data.planningSessions.map(
@@ -1854,7 +1872,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ),
     ),
     const Divider(height: 28),
-    Text(
+    SelectableText(
       'Software Factory-dispatcher',
       style: Theme.of(context).textTheme.titleMedium,
     ),
@@ -1868,12 +1886,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               ? Icons.error_outline
               : Icons.sync_alt,
         ),
-        title: Text(
+        title: SelectableText(
           data.dispatcherStatus['blocked'] == true
               ? 'Dispatch geblokkeerd'
               : 'Dispatcher gereed',
         ),
-        subtitle: Text(
+        subtitle: SelectableText(
           '${data.dispatcherStatus['blockedReason'] ?? 'Geen blijvende technische blokkade.'}\n'
           'Extern ${data.dispatcherStatus['externalStoryId'] ?? 'geen story'} · ${data.dispatcherStatus['externalStatus'] ?? 'geen status'} · retry ${data.dispatcherStatus['retryAfter'] ?? 'niet gepland'}',
         ),
@@ -1895,10 +1913,14 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           SelectableText('Reservering ${attempt['reservationId']}'),
           SelectableText('Idempotentiesleutel ${attempt['idempotencyKey']}'),
           SelectableText('Pakkethash ${attempt['packageHash']}'),
-          Text('Externe status ${attempt['externalStatus'] ?? 'onbekend'}'),
-          Text('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
+          SelectableText(
+            'Externe status ${attempt['externalStatus'] ?? 'onbekend'}',
+          ),
+          SelectableText('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
           if (attempt['lastErrorCode'] != null)
-            Text('${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}'),
+            SelectableText(
+              '${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}',
+            ),
           if (attempt['deliveredCommitSha'] != null)
             SelectableText('Oplevercommit ${attempt['deliveredCommitSha']}'),
         ],
@@ -1953,28 +1975,35 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       SelectableText(
         'Story ${_value(story['id'])} · versie ${story['version']}',
       ),
-      Text(
+      SelectableText(
         'Type: ${story['type']} · Epic ${_value(story['epicId'])} v${story['epicVersion']}',
       ),
       const SizedBox(height: 8),
-      Text('${story['content']}'),
+      SelectableText('${story['content']}'),
       const SizedBox(height: 8),
-      Text('Acceptatiecriteria', style: Theme.of(context).textTheme.labelLarge),
-      ...(story['acceptanceCriteria'] as List? ?? const []).map(
-        (criterion) => Text('• $criterion'),
+      SelectableText(
+        'Acceptatiecriteria',
+        style: Theme.of(context).textTheme.labelLarge,
       ),
-      if (story['uxDesign'] != null) Text('UX: ${story['uxDesign']}'),
+      ...(story['acceptanceCriteria'] as List? ?? const []).map(
+        (criterion) => SelectableText('• $criterion'),
+      ),
+      if (story['uxDesign'] != null) SelectableText('UX: ${story['uxDesign']}'),
       ..._uxArtifactGallery(
         context,
         (story['uxArtifacts'] as List? ?? const <Object?>[]).cast<Object?>(),
         title: 'UX-modellen bij deze story',
       ),
-      Text(
+      SelectableText(
         'Dependencies: ${(story['dependencies'] as List? ?? const []).map(_value).join(', ')}',
       ),
-      Text('Prioriteit: ${story['priorityReason'] ?? 'Planner-volgorde'}'),
+      SelectableText(
+        'Prioriteit: ${story['priorityReason'] ?? 'Planner-volgorde'}',
+      ),
       if (story['dispatchReservationId'] != null)
-        Text('Wordt verstuurd · reservering ${story['dispatchReservationId']}'),
+        SelectableText(
+          'Wordt verstuurd · reservering ${story['dispatchReservationId']}',
+        ),
       if (story['externalStoryId'] != null)
         SelectableText(
           'Software Factory: ${story['externalStoryId']} · reservering ${story['dispatchReservationStatus']}',
@@ -1983,9 +2012,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         SelectableText('Oplevercommit ${story['deliveredCommitSha']}'),
       if (story['deliveredCommitSha'] != null &&
           story['verificationId'] == null)
-        const Text('Wacht op deployment of kwaliteitscontrole'),
+        const SelectableText('Wacht op deployment of kwaliteitscontrole'),
       if (story['verificationId'] != null)
-        Text(
+        SelectableText(
           'Getest: ${story['verificationPassed'] == true ? 'geslaagd' : 'afgekeurd'} · verificatie ${_value(story['verificationId'])}',
         ),
     ],
@@ -1996,7 +2025,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final reason = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Handmatige herplanning'),
+        title: const SelectableText('Handmatige herplanning'),
         content: TextField(
           controller: controller,
           maxLength: 1000,
@@ -2031,7 +2060,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     if (accepted && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
+          content: SelectableText(
             'Planning is gestart of hervat. De voortgang wordt automatisch bijgewerkt.',
           ),
         ),
@@ -2044,8 +2073,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       final enable = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Dispatching staat uit'),
-          content: const Text(
+          title: const SelectableText('Dispatching staat uit'),
+          content: const SelectableText(
             'Wil je dispatching voor dit product aanzetten en de eerste uitvoerbare story nu naar Software Factory versturen?',
           ),
           actions: [
@@ -2072,7 +2101,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     if (sent && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
+          content: SelectableText(
             'Dispatcher uitgevoerd. De externe story en status zijn bijgewerkt.',
           ),
         ),
@@ -2093,15 +2122,15 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ),
     ),
     if (data.qualitySnapshot == null)
-      const Text('Nog geen werkelijk getest kwaliteitsbeeld.')
+      const SelectableText('Nog geen werkelijk getest kwaliteitsbeeld.')
     else
       Card(
         child: ListTile(
           leading: const Icon(Icons.fact_check_outlined),
-          title: Text(
+          title: SelectableText(
             '${data.qualitySnapshot!['environment']} · ${data.qualitySnapshot!['capturedAt']}',
           ),
-          subtitle: Text(
+          subtitle: SelectableText(
             'Geteste revision ${data.qualitySnapshot!['productRevision']}\n'
             'Open bugs: ${data.qualitySnapshot!['openBugsBySeverity']}\n'
             'Risico’s: ${(data.qualitySnapshot!['risks'] as List? ?? const []).join(', ')}',
@@ -2110,9 +2139,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         ),
       ),
     const Divider(height: 28),
-    Text('Werk en retries', style: Theme.of(context).textTheme.titleMedium),
+    SelectableText(
+      'Werk en retries',
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
     if (data.qualityWorkItems.isEmpty)
-      const Text('Geen kwaliteitswerk in de queue.')
+      const SelectableText('Geen kwaliteitswerk in de queue.')
     else
       ...data.qualityWorkItems.map(
         (item) => ListTile(
@@ -2123,10 +2155,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 ? Icons.warning_amber_outlined
                 : Icons.hourglass_top,
           ),
-          title: Text(
+          title: SelectableText(
             '${item['type']} · ${item['status']}${item['attentionNeeded'] == true ? ' · Aandacht nodig' : ''}',
           ),
-          subtitle: Text(
+          subtitle: SelectableText(
             '${item['blockedReason'] ?? item['result'] ?? 'Gericht testwerk staat klaar.'}\n'
             'Poging ${item['attemptCount']} · retry ${item['retryAfter'] ?? 'niet gepland'}',
           ),
@@ -2143,7 +2175,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         ),
       ),
     const Divider(height: 28),
-    Text('Verificaties', style: Theme.of(context).textTheme.titleMedium),
+    SelectableText(
+      'Verificaties',
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
     ...data.verifications.map(
       (verification) => ExpansionTile(
         title: Text(
@@ -2158,19 +2193,19 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           SelectableText(
             'Verificatie ${_value(verification['id'])} · geteste revision ${verification['testedRevision'] ?? 'niet beschikbaar'}',
           ),
-          Text(
+          SelectableText(
             'Controles: ${(verification['checks'] as List? ?? const []).join(', ')}',
           ),
-          Text(
+          SelectableText(
             'Bewijs: ${(verification['evidence'] as Map?)?['description'] ?? 'Geen publiek bewijs'}',
           ),
           if (verification['blockedReason'] != null)
-            Text('Blokkade: ${verification['blockedReason']}'),
+            SelectableText('Blokkade: ${verification['blockedReason']}'),
         ],
       ),
     ),
     const Divider(height: 28),
-    Text('Bugs', style: Theme.of(context).textTheme.titleMedium),
+    SelectableText('Bugs', style: Theme.of(context).textTheme.titleMedium),
     ...data.bugs.map(
       (bug) => ExpansionTile(
         title: Text('${bug['title']} · ${bug['severity']} · ${bug['status']}'),
@@ -2178,19 +2213,22 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Werkelijk: ${bug['actualBehaviour']}'),
-          Text('Verwacht: ${bug['expectedBehaviour']}'),
-          Text(
+          SelectableText('Werkelijk: ${bug['actualBehaviour']}'),
+          SelectableText('Verwacht: ${bug['expectedBehaviour']}'),
+          SelectableText(
             'Reproduceren: ${(bug['reproductionSteps'] as List? ?? const []).join(' → ')}',
           ),
-          Text(
+          SelectableText(
             'Bewijs: ${(bug['evidence'] as Map?)?['description'] ?? 'Geen publiek bewijs'}',
           ),
         ],
       ),
     ),
     const Divider(height: 28),
-    Text('Processessies', style: Theme.of(context).textTheme.titleMedium),
+    SelectableText(
+      'Processessies',
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
     ...data.qualitySessions.map(
       (session) => _ProcessSessionTile(
         session: session,
@@ -2217,9 +2255,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ],
     ),
     const SizedBox(height: 12),
-    Text('Epics', style: Theme.of(context).textTheme.titleMedium),
+    SelectableText('Epics', style: Theme.of(context).textTheme.titleMedium),
     if (data.epics.isEmpty)
-      const Text('Nog geen epics gepubliceerd.')
+      const SelectableText('Nog geen epics gepubliceerd.')
     else
       ...data.epics.map(
         (epic) => ExpansionTile(
@@ -2240,8 +2278,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 color: Theme.of(context).colorScheme.tertiaryContainer,
                 child: const ListTile(
                   leading: Icon(Icons.manage_search_outlined),
-                  title: Text('Nog niet klaar voor planning'),
-                  subtitle: Text(
+                  title: SelectableText('Nog niet klaar voor planning'),
+                  subtitle: SelectableText(
                     'Productontwerp werkt eerst bronnen, open vragen en UX-modellen uit. Productplanning kan deze epic nog niet claimen.',
                   ),
                 ),
@@ -2253,8 +2291,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 color: Theme.of(context).colorScheme.errorContainer,
                 child: ListTile(
                   leading: const Icon(Icons.edit_note_outlined),
-                  title: const Text('Teruggestuurd voor verdere uitwerking'),
-                  subtitle: Text(
+                  title: const SelectableText(
+                    'Teruggestuurd voor verdere uitwerking',
+                  ),
+                  subtitle: SelectableText(
                     _value(epic['refinementReason']).isEmpty
                         ? 'De ontwerper moet deze epic verder uitwerken.'
                         : _value(epic['refinementReason']),
@@ -2268,23 +2308,32 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 color: Theme.of(context).colorScheme.primaryContainer,
                 child: const ListTile(
                   leading: Icon(Icons.approval_outlined),
-                  title: Text('Wacht op jouw goedkeuring'),
-                  subtitle: Text(
+                  title: SelectableText('Wacht op jouw goedkeuring'),
+                  subtitle: SelectableText(
                     'Controleer vooral of UX, databronnen, toegang en technische haalbaarheid concreet genoeg zijn. Na goedkeuring kan de planner direct stories maken.',
                   ),
                 ),
               ),
             ],
             const SizedBox(height: 8),
-            Text('Probleem', style: Theme.of(context).textTheme.labelLarge),
-            Text('${epic['problem']}'),
+            SelectableText(
+              'Probleem',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            SelectableText('${epic['problem']}'),
             const SizedBox(height: 8),
-            Text('Oplossing', style: Theme.of(context).textTheme.labelLarge),
-            Text('${epic['solution']}'),
+            SelectableText(
+              'Oplossing',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            SelectableText('${epic['solution']}'),
             if (epic['uxDesign'] != null) ...[
               const SizedBox(height: 8),
-              Text('UX-ontwerp', style: Theme.of(context).textTheme.labelLarge),
-              Text('${epic['uxDesign']}'),
+              SelectableText(
+                'UX-ontwerp',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              SelectableText('${epic['uxDesign']}'),
             ],
             ..._uxArtifactGallery(
               context,
@@ -2292,25 +2341,30 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                   .cast<Object?>(),
             ),
             const SizedBox(height: 8),
-            Text('Gereedheid', style: Theme.of(context).textTheme.labelLarge),
-            Text(
+            SelectableText(
+              'Gereedheid',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            SelectableText(
               (epic['readiness'] as Map?)?['readyForPlanning'] == true
                   ? 'Gereed voor Productplanning'
                   : 'Nog niet gereed voor Productplanning',
             ),
             ...((epic['readiness'] as Map?)?['unmetConditions'] as List? ??
                     const [])
-                .map((condition) => Text('• $condition')),
+                .map((condition) => SelectableText('• $condition')),
             ...((epic['readiness'] as Map?)?['openQuestions'] as List? ??
                     const [])
-                .map((question) => Text('Open vraag: $question')),
+                .map((question) => SelectableText('Open vraag: $question')),
             const SizedBox(height: 8),
-            Text(
+            SelectableText(
               'Onderzochte bronnen',
               style: Theme.of(context).textTheme.labelLarge,
             ),
             if ((epic['researchSources'] as List? ?? const []).isEmpty)
-              const Text('Nog geen concrete externe bronnen onderzocht.')
+              const SelectableText(
+                'Nog geen concrete externe bronnen onderzocht.',
+              )
             else
               ...(epic['researchSources'] as List).map((raw) {
                 final source = (raw as Map).cast<String, Object?>();
@@ -2323,7 +2377,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                         ? Icons.block_outlined
                         : Icons.travel_explore_outlined,
                   ),
-                  title: Text('${source['name']} · ${source['status']}'),
+                  title: SelectableText(
+                    '${source['name']} · ${source['status']}',
+                  ),
                   subtitle: SelectableText(
                     '${source['provider']}\n${source['coverage']}\n'
                     'Toegang: ${source['accessMethod']} · Licentie: ${source['license']}\n'
@@ -2332,25 +2388,25 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 );
               }),
             const SizedBox(height: 8),
-            Text(
+            SelectableText(
               'Acceptatiecriteria',
               style: Theme.of(context).textTheme.labelLarge,
             ),
             ...(epic['acceptanceCriteria'] as List? ?? const []).map(
-              (criterion) => Text('• $criterion'),
+              (criterion) => SelectableText('• $criterion'),
             ),
             const SizedBox(height: 8),
-            Text('Behapbaarheid: ${epic['slicabilityRationale']}'),
-            Text(
+            SelectableText('Behapbaarheid: ${epic['slicabilityRationale']}'),
+            SelectableText(
               'Bronnen: ${(epic['directionReferences'] as List? ?? const []).length} richtingsreferentie(s)',
             ),
             const SizedBox(height: 8),
-            Text(
+            SelectableText(
               'Versiehistorie',
               style: Theme.of(context).textTheme.labelLarge,
             ),
             ...(data.epicHistories[_value(epic['id'])] ?? const []).map(
-              (version) => Text(
+              (version) => SelectableText(
                 'v${version['version']} · ${_epicStatusLabel(_value(version['status']))} · ${version['title']}',
               ),
             ),
@@ -2425,9 +2481,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         ),
       ),
     const Divider(height: 28),
-    Text('Processessies', style: Theme.of(context).textTheme.titleMedium),
+    SelectableText(
+      'Processessies',
+      style: Theme.of(context).textTheme.titleMedium,
+    ),
     if (data.designSessions.isEmpty)
-      const Text('Nog geen ontwerpsessies gestart.')
+      const SelectableText('Nog geen ontwerpsessies gestart.')
     else
       ...data.designSessions.map(
         (session) => _ProcessSessionTile(
@@ -2454,15 +2513,15 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       Icons.assignment_outlined,
       [
         if (a == null)
-          const Text('Productopdracht nog niet vastgelegd.')
+          const SelectableText('Productopdracht nog niet vastgelegd.')
         else ...[
-          Text('Doelgroep: ${a['audience']}'),
-          Text('Doel: ${a['goal']}'),
-          Text(
+          SelectableText('Doelgroep: ${a['audience']}'),
+          SelectableText('Doel: ${a['goal']}'),
+          SelectableText(
             'Harde grenzen: ${(a['hardBoundaries'] as List? ?? const []).join(', ')}',
           ),
           SelectableText('Git: ${a['publicGitUrl']}'),
-          Text('Versie ${a['version']}'),
+          SelectableText('Versie ${a['version']}'),
         ],
         Align(
           alignment: Alignment.centerRight,
@@ -2473,16 +2532,21 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           ),
         ),
         const Divider(),
-        Text('Testomgevingen', style: Theme.of(context).textTheme.titleMedium),
+        SelectableText(
+          'Testomgevingen',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 6),
         if (t == null)
-          const Text('Nog niet geconfigureerd.')
+          const SelectableText('Nog niet geconfigureerd.')
         else ...[
-          Text('Acceptatie: ${(t['acceptance'] as Map?)?['baseUrl']}'),
-          Text(
+          SelectableText(
+            'Acceptatie: ${(t['acceptance'] as Map?)?['baseUrl']}',
+          ),
+          SelectableText(
             'Productie: ${(t['production'] as Map?)?['baseUrl'] ?? 'niet ingesteld'}',
           ),
-          Text('Versie ${t['version']}'),
+          SelectableText('Versie ${t['version']}'),
         ],
         Align(
           alignment: Alignment.centerRight,
@@ -2500,13 +2564,13 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     'Signalen',
     Icons.feedback_outlined,
     data.signals.isEmpty
-        ? const [Text('Geen signalen.')]
+        ? const [SelectableText('Geen signalen.')]
         : data.signals
               .map(
                 (s) => ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(_value(s['text'])),
-                  subtitle: Text(
+                  title: SelectableText(_value(s['text'])),
+                  subtitle: SelectableText(
                     '${s['source']} · ${s['category']} · versie ${s['version']}',
                   ),
                   trailing: Wrap(
@@ -2561,7 +2625,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final reason = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(cancel ? 'Epic annuleren' : 'Epic intrekken'),
+        title: SelectableText(cancel ? 'Epic annuleren' : 'Epic intrekken'),
         content: TextField(
           controller: controller,
           maxLength: 1000,
@@ -2628,13 +2692,13 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     'Vragen van agents',
     Icons.question_answer_outlined,
     data.questions.isEmpty
-        ? const [Text('Geen vragen.')]
+        ? const [SelectableText('Geen vragen.')]
         : data.questions.map((q) {
             final source = _stakeholderMessage(data.meetings);
             return ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(_value(q['question'])),
-              subtitle: Text(
+              title: SelectableText(_value(q['question'])),
+              subtitle: SelectableText(
                 '${q['agentRole']} · processessie ${_value(q['processSessionId'])}\n${q['context']}',
               ),
               isThreeLine: true,
@@ -2664,7 +2728,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     'Overleggen',
     Icons.forum_outlined,
     data.meetings.isEmpty
-        ? const [Text('Geen overleggen.')]
+        ? const [SelectableText('Geen overleggen.')]
         : data.meetings
               .map(
                 (m) => Card(
@@ -2702,7 +2766,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                     children: [
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text(
+                        child: SelectableText(
                           'Agenda: ${(m['agenda'] as List? ?? const []).join(', ')}',
                         ),
                       ),
@@ -2716,26 +2780,28 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                                 ? Icons.person_outline
                                 : Icons.smart_toy_outlined,
                           ),
-                          title: Text(
+                          title: SelectableText(
                             '${row['senderRole']}${row['representedAgentRole'] == null ? '' : ' · ${row['representedAgentRole']}'}',
                           ),
-                          subtitle: Text('${row['text']}\n${row['createdAt']}'),
+                          subtitle: SelectableText(
+                            '${row['text']}\n${row['createdAt']}',
+                          ),
                         );
                       }),
                       if (m['minutes'] != null)
                         ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: const Icon(Icons.description_outlined),
-                          title: const Text('Brongetrouwe notulen'),
-                          subtitle: Text('${m['minutes']}'),
+                          title: const SelectableText('Brongetrouwe notulen'),
+                          subtitle: SelectableText('${m['minutes']}'),
                         ),
                       ...(m['outcomes'] as List? ?? const []).map((outcome) {
                         final row = (outcome as Map).cast<String, Object?>();
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: const Icon(Icons.account_tree_outlined),
-                          title: Text('${row['description']}'),
-                          subtitle: Text(
+                          title: SelectableText('${row['description']}'),
+                          subtitle: SelectableText(
                             '${row['commandType']} · ${row['status']}${row['errorCode'] == null ? '' : ' · ${row['errorCode']}'}',
                           ),
                         );
@@ -2759,12 +2825,13 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     'Besluitenregister',
     Icons.gavel_outlined,
     [
-      if (data.decisions.isEmpty) const Text('Geen actuele besluiten.'),
+      if (data.decisions.isEmpty)
+        const SelectableText('Geen actuele besluiten.'),
       ...data.decisions.map(
         (d) => Card(
           child: ListTile(
-            title: Text(_value(d['decision'])),
-            subtitle: Text(
+            title: SelectableText(_value(d['decision'])),
+            subtitle: SelectableText(
               'Geldig vanaf ${d['validFrom']} · versie ${d['version']}',
             ),
             trailing: PopupMenuButton<String>(
@@ -2799,15 +2866,15 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         ),
       ),
       const Divider(),
-      Text(
+      SelectableText(
         'Volledig archief (${data.decisionArchive.length})',
         style: Theme.of(context).textTheme.titleMedium,
       ),
       ...data.decisionArchive.map(
         (d) => ListTile(
           contentPadding: EdgeInsets.zero,
-          title: Text('${d['state']} · ${_value(d['id'])}'),
-          subtitle: Text(
+          title: SelectableText('${d['state']} · ${_value(d['id'])}'),
+          subtitle: SelectableText(
             '${(d['history'] as List? ?? const []).length} versie(s)${d['withdrawalReason'] == null ? '' : ' · ${d['withdrawalReason']}'}',
           ),
         ),
@@ -2826,7 +2893,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   Widget _schedules(
     ProductWorkspaceData data,
   ) => _section('Instellingen · Automatisering', Icons.schedule_outlined, [
-    const Text(
+    const SelectableText(
       'Ieder proces heeft een eigen ritme. Uitgeschakeld betekent alleen dat het niet automatisch start; Nu starten blijft beschikbaar.',
     ),
     const SizedBox(height: 8),
@@ -2835,8 +2902,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: ListTile(
-            title: Text(_value(s['process']).replaceAll('_', ' ')),
-            subtitle: Text(
+            title: SelectableText(_value(s['process']).replaceAll('_', ' ')),
+            subtitle: SelectableText(
               '${_humanPattern((s['pattern'] as Map?)?.cast<String, Object?>())}\n'
               '${s['timezone']} · volgende start ${s['nextRunAt'] ?? 'uitgeschakeld'} · versie ${s['version']}',
             ),
@@ -2865,12 +2932,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ),
     ),
     const Divider(height: 28),
-    Text(
+    SelectableText(
       'Recente automatische starts',
       style: Theme.of(context).textTheme.titleMedium,
     ),
     if (data.scheduleRuns.isEmpty)
-      const Text('Nog geen automatische start geclaimd.')
+      const SelectableText('Nog geen automatische start geclaimd.')
     else
       ...data.scheduleRuns.map(
         (run) => ListTile(
@@ -2881,8 +2948,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 ? Icons.skip_next_outlined
                 : Icons.error_outline,
           ),
-          title: Text('${run['process']} · ${run['status']}'),
-          subtitle: Text(
+          title: SelectableText('${run['process']} · ${run['status']}'),
+          subtitle: SelectableText(
             'Gepland ${run['scheduledFor']} · ${run['resultSummary'] ?? run['errorCode'] ?? 'geclaimd'}',
           ),
         ),
@@ -2923,7 +2990,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 Icon(icon),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
+                  child: SelectableText(
                     title,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
@@ -2980,7 +3047,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Productopdracht'),
+        title: const SelectableText('Productopdracht'),
         content: SizedBox(
           width: 560,
           child: Column(
@@ -3048,7 +3115,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Testomgevingen beheren'),
+        title: const SelectableText('Testomgevingen beheren'),
         content: SizedBox(
           width: 560,
           child: Column(
@@ -3067,7 +3134,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              const SelectableText(
                 'Veilige routes: / en /api/version · revision JSON-pad: commit',
               ),
             ],
@@ -3128,7 +3195,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('${schedule['process']} instellen'),
+          title: SelectableText('${schedule['process']} instellen'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -3214,8 +3281,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Notulenagent starten'),
-        content: const Text(
+        title: const SelectableText('Notulenagent starten'),
+        content: const SelectableText(
           'De notulenagent verwerkt de volledige overlegcontext via Agent Runtime. Het overleg sluit pas nadat notulen, antwoorden, besluiten en de geheugenbatch geldig zijn toegepast.',
         ),
         actions: [
@@ -3251,7 +3318,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(title),
+        title: SelectableText(title),
         content: TextField(
           controller: text,
           minLines: 2,

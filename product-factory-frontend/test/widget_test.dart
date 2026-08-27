@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:product_factory_frontend/authentication.dart';
 import 'package:product_factory_frontend/build_identity.dart';
@@ -10,6 +12,20 @@ import 'package:product_factory_frontend/memory_ai_management.dart';
 import 'package:product_factory_frontend/navigation_location.dart';
 import 'package:product_factory_frontend/product_workspace.dart';
 import 'package:product_factory_frontend/testbed.dart';
+
+Finder appText(String value) => find.byWidgetPredicate(
+  (widget) =>
+      (widget is Text && widget.data == value) ||
+      (widget is SelectableText && widget.data == value),
+  description: 'Text or SelectableText containing exactly "$value"',
+);
+
+Finder appTextContaining(String value) => find.byWidgetPredicate(
+  (widget) =>
+      (widget is Text && (widget.data?.contains(value) ?? false)) ||
+      (widget is SelectableText && (widget.data?.contains(value) ?? false)),
+  description: 'Text or SelectableText containing "$value"',
+);
 
 void main() {
   testWidgets('wacht op sessiestatus voordat inhoud zichtbaar wordt', (
@@ -26,13 +42,13 @@ void main() {
     );
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.text('Nog geen producten'), findsNothing);
+    expect(appText('Nog geen producten'), findsNothing);
 
     session.complete(
       const AuthenticationStatus(authenticated: true, authRequired: false),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Nog geen producten'), findsOneWidget);
+    expect(appText('Nog geen producten'), findsOneWidget);
   });
 
   testWidgets('wisselt Google-login om en kan de eigen sessie uitloggen', (
@@ -59,19 +75,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Log in met het toegestane Google-account om verder te gaan.'),
+      appText('Log in met het toegestane Google-account om verder te gaan.'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Test Google-login'));
+    await tester.tap(appText('Test Google-login'));
     await tester.pumpAndSettle();
     expect(gateway.lastGoogleToken, 'short-lived-google-token');
-    expect(find.text('Nog geen producten'), findsOneWidget);
+    expect(appText('Nog geen producten'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Uitloggen'));
     await tester.pumpAndSettle();
     expect(gateway.logoutCsrf, 'csrf-from-backend');
     expect(federatedSignOutCalled, isTrue);
-    expect(find.text('Test Google-login'), findsOneWidget);
+    expect(appText('Test Google-login'), findsOneWidget);
   });
 
   testWidgets('acceptatiebanner staat boven iedere funderingspagina', (
@@ -91,12 +107,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
-        'Acceptatie — synthetische tijdelijke data — authenticatie uit',
-      ),
+      appText('Acceptatie — synthetische tijdelijke data — authenticatie uit'),
       findsOneWidget,
     );
-    expect(find.text('Nog geen producten'), findsOneWidget);
+    expect(appText('Nog geen producten'), findsOneWidget);
     // Renderfouten worden door de binding als testfout gerapporteerd.
   });
 
@@ -124,12 +138,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
-        'Acceptatie — synthetische tijdelijke data — authenticatie uit',
-      ),
+      appText('Acceptatie — synthetische tijdelijke data — authenticatie uit'),
       findsOneWidget,
     );
-    expect(find.text('Acceptatietesten'), findsOneWidget);
+    expect(appText('Acceptatietesten'), findsOneWidget);
   });
 
   testWidgets('URL opent de juiste pagina en browsernavigatie blijft werken', (
@@ -157,10 +169,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Geprioriteerde backlog'), findsOneWidget);
+    expect(appText('Geprioriteerde backlog'), findsOneWidget);
     expect(find.byType(SelectionArea), findsOneWidget);
 
-    await tester.tap(find.text('Ontwerp'));
+    await tester.tap(appText('Ontwerp'));
     await tester.pumpAndSettle();
     expect(navigation.current.path, '/ontwerp');
     expect(navigation.current.queryParameters['product'], 'hkh-autopilot');
@@ -169,7 +181,67 @@ void main() {
       Uri.parse('/kwaliteit?product=hkh-autopilot'),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Kwaliteit'), findsWidgets);
+    expect(appText('Kwaliteit'), findsWidgets);
+  });
+
+  testWidgets('gewone paginatekst kan met de muis worden geselecteerd', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProductFactoryApp(
+        productGateway: ResearchProductGateway(),
+        authenticationGateway: FakeAuthenticationGateway(
+          sessionResult: Future.value(
+            const AuthenticationStatus(
+              authenticated: true,
+              authRequired: false,
+            ),
+          ),
+        ),
+        versionGateway: FakeVersionGateway(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final selectable = find.byWidgetPredicate(
+      (widget) => widget is SelectableText && widget.data == 'Overzicht',
+    );
+    final editableFinder = find.descendant(
+      of: selectable,
+      matching: find.byType(EditableText),
+    );
+    final editable = tester.widget<EditableText>(editableFinder);
+    final editableRoot = tester.renderObject(editableFinder);
+    late RenderEditable renderEditable;
+    void findRenderEditable(RenderObject child) {
+      if (child is RenderEditable) {
+        renderEditable = child;
+        return;
+      }
+      child.visitChildren(findRenderEditable);
+    }
+
+    editableRoot.visitChildren(findRenderEditable);
+    Offset positionFor(int offset) {
+      final endpoint = renderEditable
+          .getEndpointsForSelection(TextSelection.collapsed(offset: offset))
+          .single;
+      return renderEditable.localToGlobal(endpoint.point) - const Offset(0, 2);
+    }
+
+    final gesture = await tester.startGesture(
+      positionFor(0),
+      kind: ui.PointerDeviceKind.mouse,
+    );
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(positionFor(10));
+    await tester.pump();
+    await gesture.up();
+
+    expect(editable.controller.selection.isCollapsed, isFalse);
+    expect(editable.controller.selection.textInside('Overzicht'), isNotEmpty);
   });
 
   testWidgets('ververst handmatig en automatisch iedere twintig seconden', (
@@ -229,9 +301,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.textContaining('duur 3 min 12 sec'), findsOneWidget);
-    expect(find.textContaining('actief: ja'), findsOneWidget);
-    expect(find.textContaining('Gestart 27-08-2026'), findsNWidgets(2));
+    expect(appTextContaining('duur 3 min 12 sec'), findsOneWidget);
+    expect(appTextContaining('actief: ja'), findsOneWidget);
+    expect(appTextContaining('Gestart 27-08-2026'), findsNWidgets(2));
   });
 
   testWidgets('beheer toont frontend en backendidentiteit op brede schermen', (
@@ -249,17 +321,17 @@ void main() {
       ),
     );
 
-    expect(find.text('Overzicht'), findsAtLeast(1));
-    await tester.tap(find.text('Beheer'));
+    expect(appText('Overzicht'), findsAtLeast(1));
+    await tester.tap(appText('Beheer'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Richting, geheugen en techniek'), findsOneWidget);
-    await tester.tap(find.text('Release-informatie'));
+    expect(appText('Richting, geheugen en techniek'), findsOneWidget);
+    await tester.tap(appText('Release-informatie'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Frontend'), findsOneWidget);
-    expect(find.text('Backend'), findsOneWidget);
-    expect(find.text('0.1.0+0123456789ab'), findsOneWidget);
+    expect(appText('Frontend'), findsOneWidget);
+    expect(appText('Backend'), findsOneWidget);
+    expect(appText('0.1.0+0123456789ab'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -282,7 +354,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Nieuwe versie beschikbaar — vernieuwen'), findsOneWidget);
+    expect(appText('Nieuwe versie beschikbaar — vernieuwen'), findsOneWidget);
   });
 
   testWidgets('Testbed is alleen in acceptatie zichtbaar en kan resetten', (
@@ -302,20 +374,20 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Acceptatietesten'));
+    await tester.tap(appText('Acceptatietesten'));
     await tester.pumpAndSettle();
-    expect(find.text('Schone technische fundering'), findsAtLeast(1));
-    expect(find.text('Dataset: product-stakeholder-v1'), findsOneWidget);
+    expect(appText('Schone technische fundering'), findsAtLeast(1));
+    expect(appText('Dataset: product-stakeholder-v1'), findsOneWidget);
 
-    await tester.tap(find.text('Omgeving resetten'));
+    await tester.tap(appText('Omgeving resetten'));
     await tester.pumpAndSettle();
     expect(
-      find.text(
+      appText(
         'Alle tijdelijke acceptatiewijzigingen verdwijnen. De vaste synthetische data wordt opnieuw geladen.',
       ),
       findsOneWidget,
     );
-    await tester.tap(find.text('Resetten'));
+    await tester.tap(appText('Resetten'));
     await tester.pumpAndSettle();
 
     expect(gateway.resetScenario, 'foundation-clean');
@@ -334,7 +406,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Acceptatietesten'), findsNothing);
+    expect(appText('Acceptatietesten'), findsNothing);
   });
 
   testWidgets('product aanmaken valideert het stabiele ID voor verzending', (
@@ -348,15 +420,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Product aanmaken'));
+    await tester.tap(appText('Product aanmaken'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'HKH Autopilot');
     await tester.enterText(find.byType(TextField).at(1), 'HKH_AUTOPILOT');
-    await tester.tap(find.text('Aanmaken'));
+    await tester.tap(appText('Aanmaken'));
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
+      appText(
         'Gebruik 3–100 kleine letters, cijfers of koppeltekens; begin en eindig zonder koppelteken.',
       ),
       findsOneWidget,
@@ -364,7 +436,7 @@ void main() {
     expect(gateway.createdId, isNull);
 
     await tester.enterText(find.byType(TextField).at(1), 'hkh-autopilot');
-    await tester.tap(find.text('Aanmaken'));
+    await tester.tap(appText('Aanmaken'));
     await tester.pumpAndSettle();
 
     expect(gateway.createdName, 'HKH Autopilot');
@@ -386,14 +458,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Bronnen verbinden · Onderzoek nodig'));
+    await tester.tap(appText('Bronnen verbinden · Onderzoek nodig'));
     await tester.pump();
 
-    expect(find.text('Nog niet klaar voor planning'), findsOneWidget);
-    expect(find.text('UX-modellen'), findsOneWidget);
-    expect(find.text('Onderzochte bronnen'), findsOneWidget);
+    expect(appText('Nog niet klaar voor planning'), findsOneWidget);
+    expect(appText('UX-modellen'), findsOneWidget);
+    expect(appText('Onderzochte bronnen'), findsOneWidget);
     expect(
-      find.textContaining('Noord-Hollands Archief · VALIDATED'),
+      appTextContaining('Noord-Hollands Archief · VALIDATED'),
       findsOneWidget,
     );
 
@@ -427,11 +499,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Planning starten of hervatten'));
+    await tester.tap(appText('Planning starten of hervatten'));
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
+      appText(
         'Planning is gestart of hervat. De voortgang wordt automatisch bijgewerkt.',
       ),
       findsOneWidget,
@@ -456,21 +528,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Bronnen verbinden'), findsOneWidget);
-    expect(find.textContaining('1 story · Onderzoek nodig'), findsOneWidget);
+    expect(appText('Bronnen verbinden'), findsOneWidget);
+    expect(appTextContaining('1 story · Onderzoek nodig'), findsOneWidget);
 
-    expect(find.text('Dispatching aanzetten en versturen'), findsOneWidget);
-    await tester.tap(find.text('Dispatching aanzetten en versturen'));
+    expect(appText('Dispatching aanzetten en versturen'), findsOneWidget);
+    await tester.tap(appText('Dispatching aanzetten en versturen'));
     await tester.pumpAndSettle();
-    expect(find.text('Dispatching staat uit'), findsOneWidget);
-    await tester.tap(find.text('Aanzetten en versturen'));
+    expect(appText('Dispatching staat uit'), findsOneWidget);
+    await tester.tap(appText('Aanzetten en versturen'));
     await tester.pumpAndSettle();
     expect(gateway.dispatchingChanges, 1);
     expect(gateway.dispatchRuns, 1);
 
-    await tester.tap(find.textContaining('Story met UX-model · TODO'));
+    await tester.tap(appTextContaining('Story met UX-model · TODO'));
     await tester.pump();
-    expect(find.text('UX-modellen bij deze story'), findsOneWidget);
+    expect(appText('UX-modellen bij deze story'), findsOneWidget);
     expect(find.byTooltip('Open UX-model en zoom in'), findsOneWidget);
   });
 
@@ -493,12 +565,12 @@ void main() {
     expect(gateway.catalogPrefixes, contains('HKH'));
 
     await tester.enterText(find.byType(TextFormField).last, 'HKH_AUTOPILOT');
-    await tester.tap(find.text('Runtime-catalogus verversen'));
+    await tester.tap(appText('Runtime-catalogus verversen'));
     await tester.pumpAndSettle();
 
     expect(gateway.refreshedPrefix, 'HKH_AUTOPILOT');
     expect(gateway.catalogPrefixes.last, 'HKH_AUTOPILOT');
-    expect(find.text('Agenttoegang · HKH_AUTOPILOT'), findsOneWidget);
+    expect(appText('Agenttoegang · HKH_AUTOPILOT'), findsOneWidget);
   });
 }
 
