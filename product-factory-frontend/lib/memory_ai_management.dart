@@ -1233,6 +1233,12 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       });
       try {
         final gateway = widget.gateway as AgentRuntimeGateway;
+        try {
+          await gateway.refreshModelCatalog(forProvider);
+        } catch (_) {
+          // Vernieuwen is een best-effort synchronisatie met Agent Runtime;
+          // bij een fout tonen we alsnog de laatst bekende gecachte lijst.
+        }
         final fetched = await gateway.modelCatalog(forProvider);
         if (forProvider != provider) return;
         setDialogState(() {
@@ -1369,13 +1375,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
                             : const Icon(Icons.refresh),
                         onPressed: loadingModels
                             ? null
-                            : () async {
-                                try {
-                                  await (widget.gateway as AgentRuntimeGateway)
-                                      .refreshModelCatalog(provider);
-                                } catch (_) {}
-                                await loadModels(setDialogState);
-                              },
+                            : () => loadModels(setDialogState),
                       ),
                     ],
                   ),
