@@ -140,8 +140,8 @@ class RealSoftwareFactoryAdapter(
         val uri = runCatching { URI(baseUrl) }.getOrNull()
         val safeUrl = uri != null && uri.host?.isNotBlank() == true && uri.userInfo == null && uri.query == null && uri.fragment == null &&
             uri.path.trimEnd('/').endsWith("/api/integrations/v2") && uri.path.contains("/v1").not() &&
-            (uri.scheme == "https" || (runtimeEnvironment.equals("local", true) && uri.scheme == "http"))
-        val productionSafe = !runtimeEnvironment.equals("production", true) || baseUrl == PRODUCTION_URL
+            (uri.scheme == "https" || (uri.scheme == "http" && (runtimeEnvironment.equals("local", true) || baseUrl == PRODUCTION_INTERNAL_URL)))
+        val productionSafe = !runtimeEnvironment.equals("production", true) || baseUrl == PRODUCTION_URL || baseUrl == PRODUCTION_INTERNAL_URL
         if (!safeUrl || !productionSafe || token.isBlank()) {
             throw ConfigurationFactoryFailure("INVALID_CONFIGURATION", "De echte Software Factory-v2-configuratie is niet volledig of veilig.")
         }
@@ -149,7 +149,19 @@ class RealSoftwareFactoryAdapter(
 
     private fun encode(value: String) = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
-    companion object { const val PRODUCTION_URL = "https://dashboard.vdzonsoftware.nl/api/integrations/v2" }
+    companion object {
+        const val PRODUCTION_URL = "https://dashboard.vdzonsoftware.nl/api/integrations/v2"
+
+        /**
+         * In-cluster alternatief voor [PRODUCTION_URL]: zelfde backend, rechtstreeks via de
+         * ClusterIP-service in namespace `software-factory` i.p.v. via Cloudflare + de
+         * OpenShift-route + de dashboard-frontend's nginx-proxy (die zijn eigen 1MB
+         * body-limiet had, waar een storypakket met attachments overheen ging). Bewust een
+         * exact gepinde string, geen hostname-patroon: nieuwe interne adressen moeten hier
+         * expliciet worden toegevoegd, niet impliciet worden vertrouwd.
+         */
+        const val PRODUCTION_INTERNAL_URL = "http://softwarefactory-dashboard-backend.software-factory.svc.cluster.local/api/integrations/v2"
+    }
 }
 
 interface MockSoftwareFactoryControl {

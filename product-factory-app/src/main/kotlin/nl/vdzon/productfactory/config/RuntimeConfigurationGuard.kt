@@ -12,6 +12,15 @@ data class RuntimeSettings(
     val authRequired: Boolean,
 ) {
     companion object {
+        /**
+         * In-cluster alternatief voor de publieke `https://agent-runtime.vdzonsoftware.nl`:
+         * rechtstreeks via de ClusterIP-service in namespace `agent-runtime`, zonder de externe
+         * route. Bewust een exact gepinde string (zelfde patroon als
+         * [nl.vdzon.productfactory.dispatcher.RealSoftwareFactoryAdapter.PRODUCTION_INTERNAL_URL]),
+         * geen hostname-patroon.
+         */
+        const val AGENT_RUNTIME_PRODUCTION_INTERNAL_URL = "http://agent-runtime-server.agent-runtime.svc.cluster.local"
+
         private val productionRequired = setOf(
             "PF_DB_URL",
             "PF_DB_USERNAME",
@@ -45,8 +54,10 @@ data class RuntimeSettings(
                 check(values.getValue("PF_PUBLIC_BACKEND_URL").startsWith("https://")) {
                     "De publieke productie-backend-URL moet HTTPS gebruiken."
                 }
-                check(values.getValue("PF_AGENT_RUNTIME_URL").startsWith("https://")) {
-                    "De productie-Agent-Runtime-URL moet HTTPS gebruiken."
+                check(
+                    values.getValue("PF_AGENT_RUNTIME_URL").let { it.startsWith("https://") || it == AGENT_RUNTIME_PRODUCTION_INTERNAL_URL },
+                ) {
+                    "De productie-Agent-Runtime-URL moet HTTPS gebruiken (of het gepinde interne clusteradres zijn)."
                 }
                 check(values["PF_AI_PROVIDER"] != "MOCKED") { "Productie weigert de MOCKED AI-provider." }
             }

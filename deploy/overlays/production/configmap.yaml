@@ -12,7 +12,7 @@ data:
   PF_SCHEDULES_ENABLED: "true"
   PF_AI_PROVIDER: CODEX
   PF_SOFTWARE_FACTORY_MODE: REAL
-  PF_SOFTWARE_FACTORY_URL: https://dashboard.vdzonsoftware.nl/api/integrations/v2
+  PF_SOFTWARE_FACTORY_URL: http://softwarefactory-dashboard-backend.software-factory.svc.cluster.local/api/integrations/v2
   PF_EXTERNAL_MUTATIONS_ALLOWED: "false"
-  PF_AGENT_RUNTIME_URL: https://agent-runtime.vdzonsoftware.nl
+  PF_AGENT_RUNTIME_URL: http://agent-runtime-server.agent-runtime.svc.cluster.local
   PF_AI_RUNTIME_SCHEDULING_ENABLED: "true"

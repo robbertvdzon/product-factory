@@ -15,7 +15,9 @@ class SoftwareFactoryConfigurationGuard(private val environment: Environment) : 
         check(mode in setOf("DISABLED", "MOCKED", "REAL")) { "PF_SOFTWARE_FACTORY_MODE moet DISABLED, MOCKED of REAL zijn." }
         if (runtime == "PRODUCTION") {
             check(mode == "REAL") { "Productie vereist PF_SOFTWARE_FACTORY_MODE=REAL." }
-            check(url == RealSoftwareFactoryAdapter.PRODUCTION_URL) { "Productie vereist exact de veilige Software Factory-v2-URL." }
+            check(url == RealSoftwareFactoryAdapter.PRODUCTION_URL || url == RealSoftwareFactoryAdapter.PRODUCTION_INTERNAL_URL) {
+                "Productie vereist exact de veilige Software Factory-v2-URL (publiek of het gepinde interne clusteradres)."
+            }
             check(token.isNotBlank()) { "Productie vereist PF_SOFTWARE_FACTORY_TOKEN." }
         }
         if (runtime == "ACCEPTANCE") {
