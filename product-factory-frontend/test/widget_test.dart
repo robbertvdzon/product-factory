@@ -306,6 +306,54 @@ void main() {
     expect(appTextContaining('Gestart 27-08-2026'), findsNWidgets(2));
   });
 
+  testWidgets('geblokkeerde planning toont een duidelijke herstelmelding', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = ResearchProductGateway(
+      planningSessions: const [
+        {
+          'id': {'value': 'geblokkeerde-planning'},
+          'status': 'BLOCKED',
+          'startedAt': '2026-08-27T12:12:19Z',
+          'blockedReason': 'Het plan kon nog niet worden opgeslagen.',
+          'errorCode': 'PLANNING_PUBLICATION_CONFLICT',
+          'aiTaskIds': [
+            {'value': 'selectie-taak'},
+            {'value': 'planning-taak'},
+          ],
+        },
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FoundationPage(
+          productGateway: gateway,
+          navigationLocation: FakeNavigationLocation(
+            Uri.parse('/planning?product=hkh-autopilot'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      appTextContaining('Planning kon niet worden afgerond'),
+      findsOneWidget,
+    );
+    expect(appTextContaining('Het AI-plan is wel gemaakt'), findsOneWidget);
+    expect(
+      appTextContaining('Er is niets gedeeltelijk gepubliceerd'),
+      findsOneWidget,
+    );
+    expect(
+      appTextContaining('Foutcode: PLANNING_PUBLICATION_CONFLICT'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('beheer toont frontend en backendidentiteit op brede schermen', (
     tester,
   ) async {

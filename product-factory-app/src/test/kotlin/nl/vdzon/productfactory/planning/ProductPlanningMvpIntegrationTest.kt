@@ -97,6 +97,57 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `nieuwe planning gebruikt geen volgnummers van geannuleerde stories opnieuw`() {
+        val legacyId = UUID.randomUUID().toString()
+        val now = java.time.Instant.now()
+        jdbc.update(
+            """INSERT INTO pf_story(id,product_id,epic_id,epic_version,type,status,current_version,sequence_number,
+                priority_reason,bug_link_confirmed,created_at,updated_at,cancellation_reason)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            legacyId, productId.value, epic.id.value, epic.version, "PRODUCT_STORY", "CANCELLED", 1L, 1L,
+            "Historische positie blijft gereserveerd.", true, now, now, "Stakeholder heeft deze story geannuleerd.",
+        )
+        jdbc.update(
+            """INSERT INTO pf_story_version(story_id,version,title,summary,content,acceptance_criteria_json,ux_design,
+                dependencies_json,source_references_json,created_at,ux_artifacts_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            legacyId, 1L, "Geannuleerde story", "Deze story blijft alleen in de historie zichtbaar.",
+            "Deze historische story is geannuleerd en mag haar eerder gebruikte volgnummer niet vrijgeven voor een nieuwe database-insert.",
+            "[\"Deze story blijft geannuleerd.\"]", null, "[]", "[]", now, "[]",
+        )
+
+        publishPlan()
+
+        val allStories = planningQueries.findStories(StoryFilter(productId))
+        assertThat(allStories.single { it.id.value == legacyId }.sequenceNumber).isEqualTo(1)
+        assertThat(planningQueries.getBacklog(productId).map { it.sequenceNumber }).containsExactly(2, 3)
+    }
+
+    @Test
+    fun `geblokkeerde publicatie hergebruikt een reeds geslaagd AI plan`() {
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planning.runProcessSession(productId)
+        runtime.reset()
+        ai.dispatchPending()
+        completeDispatchedJob(plan())
+        val before = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        jdbc.update(
+            """UPDATE pf_planning_process_session
+                SET status='BLOCKED',error_code='PLANNING_PUBLICATION_CONFLICT',blocked_reason=?
+                WHERE id=?""".trimIndent(),
+            "Het plan is gemaakt, maar kon nog niet worden opgeslagen.", before.id.value,
+        )
+
+        planning.runProcessSession(productId)
+
+        val after = planningQueries.getProcessSession(before.id)
+        assertThat(after.status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(after.aiTaskIds).containsExactlyElementsOf(before.aiTaskIds)
+        assertThat(planningQueries.getBacklog(productId).map { it.title }).containsExactly("Overzicht tonen", "Bewijs openen")
+    }
+
+    @Test
     fun `planner responseschemas geven enum en const altijd een expliciet type`() {
         planning.runProcessSession(productId)
         ai.dispatchPending()

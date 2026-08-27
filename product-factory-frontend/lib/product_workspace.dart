@@ -1859,18 +1859,40 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         subtitle: SelectableText('${item['explanation']}'),
       ),
     ),
-    ...data.planningSessions.map(
-      (session) => _ProcessSessionTile(
+    ...data.planningSessions.map((session) {
+      final blocked = session['status'] == 'BLOCKED';
+      final code = _value(session['errorCode']);
+      final reason = _value(session['blockedReason']);
+      final explanation = switch (code) {
+        'PLANNING_PUBLICATION_CONFLICT' =>
+          'Het AI-plan is wel gemaakt, maar kon nog niet in de backlog worden opgeslagen. Er is niets gedeeltelijk gepubliceerd. Klik op ‘Planning starten of hervatten’ om hetzelfde plan opnieuw te publiceren.',
+        'PLANNING_VERSION_CONFLICT' =>
+          'De epic of backlog veranderde tijdens het plannen. Er is niets gedeeltelijk gepubliceerd. Hervat de planning zodat de actuele versie opnieuw wordt gecontroleerd.',
+        'PLANNING_RESULT_INVALID' =>
+          'Het AI-resultaat voldeed niet aan alle veiligheidscontroles en is daarom niet gepubliceerd. Hervat de planning voor een nieuwe poging.',
+        _ when blocked =>
+          '${reason.isEmpty ? 'De planning kon door een technische fout niet worden afgerond.' : reason} Er is niets gedeeltelijk gepubliceerd. Hervat de planning om het veilig opnieuw te proberen.',
+        _ =>
+          '${session['resultSummary'] ?? session['blockedReason'] ?? 'Planner-AI wordt duurzaam gevolgd.'}',
+      };
+      final tile = _ProcessSessionTile(
         session: session,
         dense: true,
-        icon: session['status'] == 'BLOCKED'
-            ? Icons.error_outline
-            : Icons.schema_outlined,
+        label: blocked ? 'Planning kon niet worden afgerond' : null,
+        icon: blocked ? Icons.error_outline : Icons.schema_outlined,
         details:
-            '${session['resultSummary'] ?? session['blockedReason'] ?? 'Planner-AI wordt duurzaam gevolgd.'}\n'
+            '$explanation${blocked && code.isNotEmpty ? '\nFoutcode: $code' : ''}\n'
             '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
-      ),
-    ),
+      );
+      if (!blocked) return tile;
+      return Card(
+        color: Theme.of(context).colorScheme.errorContainer,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: tile,
+        ),
+      );
+    }),
     const Divider(height: 28),
     SelectableText(
       'Software Factory-dispatcher',
