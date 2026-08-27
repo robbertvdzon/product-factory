@@ -416,6 +416,35 @@ void main() {
     },
   );
 
+  testWidgets('nieuw signaal opent een ruime meerregelige editor', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProductWorkspacePage(
+            gateway: ResearchProductGateway(),
+            section: ProductWorkspaceSection.signals,
+            initialProductId: 'hkh-autopilot',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(appText('Toevoegen'));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(const ValueKey('long-text-dialog-input'));
+    expect(appText('Nieuw signaal'), findsOneWidget);
+    expect(input, findsOneWidget);
+    final size = tester.getSize(input);
+    expect(size.width, greaterThanOrEqualTo(600));
+    expect(size.height, greaterThanOrEqualTo(140));
+  });
+
   testWidgets('beheer toont frontend en backendidentiteit op brede schermen', (
     tester,
   ) async {

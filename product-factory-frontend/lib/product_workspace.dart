@@ -3571,12 +3571,23 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        scrollable: true,
         title: SelectableText(title),
-        content: TextField(
-          controller: text,
-          minLines: 2,
-          maxLines: 8,
-          decoration: InputDecoration(labelText: label),
+        content: SizedBox(
+          width: 640,
+          child: TextField(
+            key: const ValueKey('long-text-dialog-input'),
+            controller: text,
+            autofocus: true,
+            minLines: 6,
+            maxLines: 16,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            decoration: InputDecoration(
+              labelText: label,
+              alignLabelWithHint: true,
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -3590,8 +3601,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         ],
       ),
     );
-    if (ok == true && text.text.trim().isNotEmpty) {
-      await _mutate(() => operation(text.text.trim()));
+    final value = ok == true ? text.text.trim() : '';
+    text.dispose();
+    if (value.isNotEmpty) {
+      await _mutate(() => operation(value));
     }
   }
 
