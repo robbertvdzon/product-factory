@@ -143,6 +143,8 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
 
         val after = planningQueries.getProcessSession(before.id)
         assertThat(after.status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(after.errorCode).isNull()
+        assertThat(after.blockedReason).isNull()
         assertThat(after.aiTaskIds).containsExactlyElementsOf(before.aiTaskIds)
         assertThat(planningQueries.getBacklog(productId).map { it.title }).containsExactly("Overzicht tonen", "Bewijs openen")
     }
