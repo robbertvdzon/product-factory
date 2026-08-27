@@ -75,6 +75,8 @@ abstract interface class AgentRuntimeGateway {
     bool granted,
   );
   Future<void> cancelAiTask(String taskId, String reason);
+  Future<List<Map<String, Object?>>> modelCatalog(String provider);
+  Future<void> refreshModelCatalog(String provider);
 }
 
 class HttpMemoryAiGateway implements MemoryAiGateway, AgentRuntimeGateway {
@@ -246,6 +248,13 @@ class HttpMemoryAiGateway implements MemoryAiGateway, AgentRuntimeGateway {
     '/api/ai/tasks/${Uri.encodeComponent(taskId)}/cancel',
     {'reason': reason},
   );
+  @override
+  Future<List<Map<String, Object?>>> modelCatalog(String provider) => _list(
+    '/api/ai/model-catalog?provider=${Uri.encodeQueryComponent(provider)}',
+  );
+  @override
+  Future<void> refreshModelCatalog(String provider) =>
+      _send('POST', '/api/ai/model-catalog/refresh', {'provider': provider});
 
   String _key(String prefix) =>
       'ui-$prefix-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
@@ -1210,59 +1219,186 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
     var provider = '${setting['provider']}';
     var model = '${setting['model']}';
     var enabled = setting['enabled'] == true;
+    List<String>? models;
+    var loadingModels = false;
+    var loadScheduled = false;
+    var modelsError = false;
+    var useCustomModel = false;
+
+    Future<void> loadModels(void Function(void Function()) setDialogState) async {
+      final forProvider = provider;
+      setDialogState(() {
+        loadingModels = true;
+        modelsError = false;
+      });
+      try {
+        final gateway = widget.gateway as AgentRuntimeGateway;
+        final fetched = await gateway.modelCatalog(forProvider);
+        if (forProvider != provider) return;
+        setDialogState(() {
+          models = fetched.map((entry) => _v(entry['model'])).toList()
+            ..sort();
+          loadingModels = false;
+        });
+      } catch (_) {
+        if (forProvider != provider) return;
+        setDialogState(() {
+          models = null;
+          loadingModels = false;
+          modelsError = true;
+        });
+      }
+    }
+
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: SelectableText('${setting['displayName']} wijzigen'),
-          content: SizedBox(
-            width: 520,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: SelectableText('Geldt voor alle producten.'),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: provider,
-                  decoration: const InputDecoration(labelText: 'Provider'),
-                  items: const ['CODEX', 'CLAUDE', 'MOCKED']
-                      .map(
-                        (value) =>
-                            DropdownMenuItem(value: value, child: Text(value)),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) setDialogState(() => provider = value);
-                  },
-                ),
-                TextFormField(
-                  initialValue: model,
-                  decoration: const InputDecoration(
-                    labelText: 'Model of mockprofiel',
+        builder: (context, setDialogState) {
+          if (models == null &&
+              !modelsError &&
+              !loadScheduled &&
+              !loadingModels) {
+            loadScheduled = true;
+            Future.microtask(() {
+              loadScheduled = false;
+              loadModels(setDialogState);
+            });
+          }
+          final known = models;
+          final dropdownOptions = <String>{
+            ...?known,
+            if (model.isNotEmpty) model,
+          }.toList()..sort();
+          final showDropdown =
+              !useCustomModel && known != null && known.isNotEmpty;
+          return AlertDialog(
+            title: SelectableText('${setting['displayName']} wijzigen'),
+            content: SizedBox(
+              width: 520,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: SelectableText('Geldt voor alle producten.'),
                   ),
-                  onChanged: (value) => model = value,
-                ),
-                SwitchListTile(
-                  value: enabled,
-                  title: const SelectableText('Ingeschakeld'),
-                  onChanged: (value) => setDialogState(() => enabled = value),
-                ),
-              ],
+                  DropdownButtonFormField<String>(
+                    initialValue: provider,
+                    decoration: const InputDecoration(labelText: 'Provider'),
+                    items: const ['CODEX', 'CLAUDE', 'MOCKED']
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null || value == provider) return;
+                      setDialogState(() {
+                        provider = value;
+                        models = null;
+                        modelsError = false;
+                        useCustomModel = false;
+                      });
+                    },
+                  ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: showDropdown
+                            ? DropdownButtonFormField<String>(
+                                initialValue: dropdownOptions.contains(model)
+                                    ? model
+                                    : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'Model of mockprofiel',
+                                ),
+                                items: [
+                                  ...dropdownOptions.map(
+                                    (value) => DropdownMenuItem(
+                                      value: value,
+                                      child: Text(value),
+                                    ),
+                                  ),
+                                  const DropdownMenuItem(
+                                    value: '__custom__',
+                                    child: Text('Aangepast…'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  if (value == '__custom__') {
+                                    setDialogState(() => useCustomModel = true);
+                                  } else {
+                                    setDialogState(() => model = value);
+                                  }
+                                },
+                              )
+                            : TextFormField(
+                                initialValue: model,
+                                decoration: InputDecoration(
+                                  labelText: 'Model of mockprofiel',
+                                  helperText: loadingModels
+                                      ? 'Modellen laden…'
+                                      : modelsError
+                                      ? 'Kon modellen niet ophalen van Agent Runtime.'
+                                      : null,
+                                ),
+                                onChanged: (value) => model = value,
+                              ),
+                      ),
+                      if (useCustomModel && known != null && known.isNotEmpty)
+                        IconButton(
+                          tooltip: 'Kies uit lijst',
+                          icon: const Icon(Icons.list_alt),
+                          onPressed: () =>
+                              setDialogState(() => useCustomModel = false),
+                        ),
+                      IconButton(
+                        tooltip: 'Modellen verversen',
+                        icon: loadingModels
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.refresh),
+                        onPressed: loadingModels
+                            ? null
+                            : () async {
+                                try {
+                                  await (widget.gateway as AgentRuntimeGateway)
+                                      .refreshModelCatalog(provider);
+                                } catch (_) {}
+                                await loadModels(setDialogState);
+                              },
+                      ),
+                    ],
+                  ),
+                  SwitchListTile(
+                    value: enabled,
+                    title: const SelectableText('Ingeschakeld'),
+                    onChanged: (value) => setDialogState(() => enabled = value),
+                  ),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuleren'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Opslaan'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annuleren'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Opslaan'),
+              ),
+            ],
+          );
+        },
       ),
     );
     if (accepted == true) {

@@ -60,6 +60,13 @@ data class RuntimeEnvironmentKey(
     val matchingOnlineWorkers: Int,
     val lastSeenAt: Instant,
 )
+data class RuntimeModelView(
+    val provider: String,
+    val model: String,
+    val available: Boolean,
+    val matchingOnlineWorkers: Int,
+    val lastSeenAt: Instant,
+)
 
 class RuntimeCallException(val code: String, val safeMessage: String, val responseMayHaveBeenLost: Boolean = false) : RuntimeException(safeMessage)
 
@@ -69,6 +76,7 @@ interface AgentRuntimeClient {
     fun getResult(jobId: String): RuntimeJobResult
     fun cancelJob(jobId: String): RuntimeJobView
     fun listEnvironmentKeys(projectPrefix: String): List<RuntimeEnvironmentKey>
+    fun listModels(provider: String?): List<RuntimeModelView>
     fun downloadArtifact(jobId: String, artifactId: String): ByteArray
 }
 
@@ -114,6 +122,12 @@ class HttpAgentRuntimeClient(
         val encoded = URLEncoder.encode(projectPrefix, StandardCharsets.UTF_8)
         val body = client.get().uri(URI.create("/v1/environment-keys?project=$encoded")).retrieve().body(String::class.java) ?: "[]"
         mapper.readerForListOf(RuntimeEnvironmentKey::class.java).readValue(body)
+    }
+
+    override fun listModels(provider: String?): List<RuntimeModelView> = call("RUNTIME_MODEL_CATALOG_FAILED") {
+        val query = provider?.let { "?provider=${URLEncoder.encode(it, StandardCharsets.UTF_8)}" }.orEmpty()
+        val body = client.get().uri(URI.create("/v1/models$query")).retrieve().body(String::class.java) ?: "[]"
+        mapper.readerForListOf(RuntimeModelView::class.java).readValue(body)
     }
 
     override fun downloadArtifact(jobId: String, artifactId: String): ByteArray = call("RUNTIME_ARTIFACT_FAILED") {

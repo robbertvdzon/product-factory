@@ -93,6 +93,14 @@ data class ProductEnvironmentKeyDetails(
     val grantedAgentRoles: Set<String>,
 )
 data class RefreshEnvironmentCatalogCommand(val projectPrefix: String)
+data class ModelCatalogEntry(
+    val provider: AiProvider,
+    val model: String,
+    val available: Boolean,
+    val matchingOnlineWorkers: Int,
+    val lastSeenAt: Instant,
+)
+data class RefreshModelCatalogCommand(val provider: AiProvider)
 data class SetProductEnvironmentKeyCommand(
     val productId: ProductId,
     val name: String,
@@ -116,6 +124,7 @@ interface AiExecutionService {
     fun refreshEnvironmentCatalog(command: RefreshEnvironmentCatalogCommand): List<EnvironmentKeyDetails>
     fun setProductEnvironmentKey(command: SetProductEnvironmentKeyCommand): ProductEnvironmentKeyDetails
     fun setAgentEnvironmentGrant(command: SetAgentEnvironmentGrantCommand): ProductEnvironmentKeyDetails
+    fun refreshModelCatalog(command: RefreshModelCatalogCommand): List<ModelCatalogEntry>
 }
 interface AiExecutionQueryService {
     fun getAiJobConfiguration(jobKey: AiJobKey): AiJobConfigurationDetails
@@ -126,4 +135,5 @@ interface AiExecutionQueryService {
     fun findAiTasks(filter: AiTaskFilter): List<AiTaskDetails>
     fun getEnvironmentCatalog(projectPrefix: String): List<EnvironmentKeyDetails>
     fun getProductEnvironmentKeys(productId: ProductId): List<ProductEnvironmentKeyDetails>
+    fun getModelCatalog(provider: AiProvider): List<ModelCatalogEntry>
 }

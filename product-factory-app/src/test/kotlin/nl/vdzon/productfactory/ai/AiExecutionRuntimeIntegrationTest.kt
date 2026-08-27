@@ -180,6 +180,7 @@ class FakeRuntime : AgentRuntimeClient {
     val requests = mutableListOf<RuntimeCreateJobRequest>()
     val jobs = linkedMapOf<String, RuntimeJobView>()
     val environmentKeys = mutableListOf<RuntimeEnvironmentKey>()
+    val models = mutableListOf<RuntimeModelView>()
     val results = mutableMapOf<String, com.fasterxml.jackson.databind.JsonNode>()
     val resultArtifacts = mutableMapOf<String, List<RuntimeArtifactView>>()
     var loseFirstCreateResponse = false
@@ -203,11 +204,12 @@ class FakeRuntime : AgentRuntimeClient {
     )
     override fun cancelJob(jobId: String): RuntimeJobView = jobs.getValue(jobId).copy(status = "CANCELLED", phase = "CANCELLED").also { jobs[jobId] = it }
     override fun listEnvironmentKeys(projectPrefix: String) = environmentKeys.filter { it.projectPrefix == projectPrefix }
+    override fun listModels(provider: String?) = models.filter { provider == null || it.provider == provider }
     override fun downloadArtifact(jobId: String, artifactId: String) = "bewijs".toByteArray()
 
     fun onlyJob() = jobs.values.single()
     fun distinctIdempotencyKeys() = requests.map { it.idempotencyKey }.distinct()
     fun jobCount() = jobs.size
-    fun reset() { requests.clear(); jobs.clear(); environmentKeys.clear(); results.clear(); resultArtifacts.clear(); loseFirstCreateResponse = false; lost = false }
+    fun reset() { requests.clear(); jobs.clear(); environmentKeys.clear(); models.clear(); results.clear(); resultArtifacts.clear(); loseFirstCreateResponse = false; lost = false }
     private fun idFor(key: String) = UUID.nameUUIDFromBytes(key.toByteArray()).toString()
 }

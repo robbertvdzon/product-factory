@@ -711,6 +711,113 @@ void main() {
     expect(gateway.catalogPrefixes.last, 'HKH_AUTOPILOT');
     expect(appText('Agenttoegang · HKH_AUTOPILOT'), findsOneWidget);
   });
+
+  testWidgets('AI-modeldialoog toont providerafhankelijke modellen', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = FakeAgentRuntimeManagementGateway()
+      ..aiSettingsData = [
+        {
+          'jobKey': 'MEETING.CONVERSE',
+          'displayName': 'Overleg voeren',
+          'provider': 'CODEX',
+          'model': 'gpt-5.6-sol',
+          'enabled': true,
+          'version': 3,
+          'updatedAt': '2026-08-27T00:00:00Z',
+          'updatedBy': {'type': 'SYSTEM', 'id': 'trusted-default'},
+        },
+      ]
+      ..modelsByProvider['CODEX'] = ['gpt-5.6-sol', 'gpt-4.1']
+      ..modelsByProvider['CLAUDE'] = ['claude-opus-5', 'claude-sonnet-5'];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: MemoryAiManagementPanel(gateway: gateway),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('AI-model wijzigen'));
+    await tester.pumpAndSettle();
+    expect(gateway.modelCatalogRequests, contains('CODEX'));
+
+    final dialogDropdowns = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(DropdownButtonFormField<String>),
+    );
+
+    await tester.tap(dialogDropdowns.first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CLAUDE').last);
+    await tester.pumpAndSettle();
+    expect(gateway.modelCatalogRequests, contains('CLAUDE'));
+
+    await tester.tap(dialogDropdowns.last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('claude-opus-5').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(appText('Opslaan'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.lastUpdateProvider, 'CLAUDE');
+    expect(gateway.lastUpdateModel, 'claude-opus-5');
+  });
+
+  testWidgets(
+    'AI-modeldialoog valt terug op vrije tekst als modellen niet geladen kunnen worden',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final settingsGateway = _ThrowingModelCatalogGateway()
+        ..aiSettingsData = [
+          {
+            'jobKey': 'MEETING.CONVERSE',
+            'displayName': 'Overleg voeren',
+            'provider': 'CODEX',
+            'model': 'gpt-5.6-sol',
+            'enabled': true,
+            'version': 3,
+            'updatedAt': '2026-08-27T00:00:00Z',
+            'updatedBy': {'type': 'SYSTEM', 'id': 'trusted-default'},
+          },
+        ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MemoryAiManagementPanel(gateway: settingsGateway),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('AI-model wijzigen'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextFormField), findsWidgets);
+      expect(
+        appTextContaining('Kon modellen niet ophalen'),
+        findsOneWidget,
+      );
+    },
+  );
+}
+
+class _ThrowingModelCatalogGateway extends FakeAgentRuntimeManagementGateway {
+  @override
+  Future<List<Map<String, Object?>>> modelCatalog(String provider) async {
+    throw StateError('Agent Runtime niet bereikbaar');
+  }
 }
 
 class FakeVersionGateway implements VersionGateway {
@@ -1189,11 +1296,44 @@ class FakeAgentRuntimeManagementGateway extends FakeMemoryAiGateway
     implements AgentRuntimeGateway {
   final List<String> catalogPrefixes = [];
   String? refreshedPrefix;
+  List<Map<String, Object?>> aiSettingsData = const [];
+  final Map<String, List<String>> modelsByProvider = {};
+  final List<String> modelCatalogRequests = [];
+  String? refreshedModelProvider;
+  String? lastUpdateProvider;
+  String? lastUpdateModel;
 
   @override
   Future<List<Map<String, Object?>>> products() async => const [
     {'id': 'hkh-autopilot', 'name': 'HKH Autopilot'},
   ];
+
+  @override
+  Future<List<Map<String, Object?>>> aiSettings() async => aiSettingsData;
+
+  @override
+  Future<void> updateAi(
+    Map<String, Object?> setting,
+    String provider,
+    String model,
+    bool enabled,
+  ) async {
+    lastUpdateProvider = provider;
+    lastUpdateModel = model;
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> modelCatalog(String provider) async {
+    modelCatalogRequests.add(provider);
+    return (modelsByProvider[provider] ?? const [])
+        .map((model) => {'provider': provider, 'model': model})
+        .toList();
+  }
+
+  @override
+  Future<void> refreshModelCatalog(String provider) async {
+    refreshedModelProvider = provider;
+  }
 
   @override
   Future<List<Map<String, Object?>>> aiTasks() async => const [];

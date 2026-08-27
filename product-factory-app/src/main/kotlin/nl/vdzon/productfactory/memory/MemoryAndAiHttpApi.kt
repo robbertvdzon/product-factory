@@ -51,6 +51,7 @@ data class UpdateAiSettingsRequest(
 data class MemoryIdResponse(val id: String)
 data class CancelAiTaskRequest(val reason: String)
 data class RefreshEnvironmentCatalogRequest(val projectPrefix: String)
+data class RefreshModelCatalogRequest(val provider: String)
 data class SetProductEnvironmentKeyRequest(val active: Boolean, val expectedVersion: Long, val idempotencyKey: String)
 data class SetAgentEnvironmentGrantRequest(val granted: Boolean, val idempotencyKey: String)
 
@@ -203,6 +204,13 @@ class AgentEnvironmentAccessController(
     @PostMapping("/api/ai/environment-catalog/refresh")
     fun refresh(@RequestBody request: RefreshEnvironmentCatalogRequest) =
         commands.refreshEnvironmentCatalog(RefreshEnvironmentCatalogCommand(request.projectPrefix))
+
+    @GetMapping("/api/ai/model-catalog")
+    fun modelCatalog(@RequestParam provider: String) = queries.getModelCatalog(AiProvider.valueOf(provider))
+
+    @PostMapping("/api/ai/model-catalog/refresh")
+    fun refreshModelCatalog(@RequestBody request: RefreshModelCatalogRequest) =
+        commands.refreshModelCatalog(RefreshModelCatalogCommand(AiProvider.valueOf(request.provider)))
 
     @GetMapping("/api/products/{productId}/agent-environment-keys")
     fun productKeys(@PathVariable productId: String) = queries.getProductEnvironmentKeys(ProductId(productId))

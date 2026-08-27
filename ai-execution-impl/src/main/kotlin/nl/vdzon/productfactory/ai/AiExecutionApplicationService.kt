@@ -111,6 +111,27 @@ class AiExecutionApplicationService(
     }
 
     @Transactional
+    override fun refreshModelCatalog(command: RefreshModelCatalogCommand): List<ModelCatalogEntry> {
+        if (command.provider == AiProvider.MOCKED) return getModelCatalog(command.provider)
+        val now = clock.instant()
+        jdbc.update(
+            "UPDATE pf_ai_model_catalog SET available=FALSE,matching_online_workers=0,refreshed_at=? WHERE provider=?",
+            now, command.provider.name,
+        )
+        runtime.listModels(command.provider.name).forEach { entry ->
+            val updated = jdbc.update(
+                "UPDATE pf_ai_model_catalog SET available=?,matching_online_workers=?,last_seen_at=?,refreshed_at=? WHERE provider=? AND model=?",
+                entry.available, entry.matchingOnlineWorkers, entry.lastSeenAt, now, command.provider.name, entry.model,
+            )
+            if (updated == 0) jdbc.update(
+                "INSERT INTO pf_ai_model_catalog(provider,model,available,matching_online_workers,last_seen_at,refreshed_at) VALUES (?,?,?,?,?,?)",
+                command.provider.name, entry.model, entry.available, entry.matchingOnlineWorkers, entry.lastSeenAt, now,
+            )
+        }
+        return getModelCatalog(command.provider)
+    }
+
+    @Transactional
     override fun setProductEnvironmentKey(command: SetProductEnvironmentKeyCommand): ProductEnvironmentKeyDetails {
         validateActor(command.actor)
         replayEnvironmentCommand(command.idempotencyKey, fingerprint(command))?.let { return productEnvironmentKey(command.productId, command.name) }
@@ -199,6 +220,22 @@ class AiExecutionApplicationService(
                 WHERE c.project_prefix=? GROUP BY c.name,c.project_prefix,c.available,c.matching_online_workers,c.last_seen_at,p.name ORDER BY c.name""".trimIndent(),
             { rs, _ -> EnvironmentKeyDetails(rs.getString(1), rs.getString(2), rs.getBoolean(3), rs.getInt(4), rs.getTimestamp(5).toInstant(), rs.getBoolean(6)) },
             projectPrefix,
+        )
+    }
+
+    @Transactional(readOnly = true)
+    override fun getModelCatalog(provider: AiProvider): List<ModelCatalogEntry> {
+        if (provider == AiProvider.MOCKED) {
+            return settings.getAiJobConfigurations().asSequence()
+                .filter { it.provider == AiProvider.MOCKED }
+                .map { it.model }.distinct().sorted()
+                .map { ModelCatalogEntry(AiProvider.MOCKED, it, true, 0, clock.instant()) }
+                .toList()
+        }
+        return jdbc.query(
+            "SELECT model,available,matching_online_workers,last_seen_at FROM pf_ai_model_catalog WHERE provider=? ORDER BY model",
+            { rs, _ -> ModelCatalogEntry(provider, rs.getString(1), rs.getBoolean(2), rs.getInt(3), rs.getTimestamp(4).toInstant()) },
+            provider.name,
         )
     }
 
