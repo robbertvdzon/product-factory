@@ -279,7 +279,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(session.aiTaskIds).hasSize(4)
 
         jdbc.update(
-            "UPDATE pf_ai_task SET prompt_template_version=1 WHERE id=?",
+            "UPDATE pf_ai_task SET status='SUCCEEDED',prompt_template_version=1 WHERE id=?",
             session.aiTaskIds.last().value,
         )
         planningOrchestrator.resumeReady()
