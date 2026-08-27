@@ -10,6 +10,7 @@ import 'configuration.dart';
 import 'google_login_button.dart';
 import 'frontend_version_monitor.dart';
 import 'memory_ai_management.dart';
+import 'navigation_location.dart';
 import 'testbed.dart';
 import 'product_workspace.dart';
 import 'product_factory_theme.dart';
@@ -32,6 +33,7 @@ class ProductFactoryApp extends StatelessWidget {
     this.testControlGateway,
     this.productGateway,
     this.memoryAiGateway,
+    this.navigationLocation,
   });
 
   final AuthenticationGateway? authenticationGateway;
@@ -42,6 +44,7 @@ class ProductFactoryApp extends StatelessWidget {
   final TestControlGateway? testControlGateway;
   final ProductGateway? productGateway;
   final MemoryAiGateway? memoryAiGateway;
+  final NavigationLocation? navigationLocation;
 
   @override
   Widget build(BuildContext context) {
@@ -49,15 +52,18 @@ class ProductFactoryApp extends StatelessWidget {
       title: 'Product Factory',
       debugShowCheckedModeBanner: false,
       theme: productFactoryTheme(),
-      home: AuthenticationGate(
-        gateway: authenticationGateway ?? HttpAuthenticationGateway(),
-        googleLoginButtonBuilder: googleLoginButtonBuilder,
-        federatedSignOut: federatedSignOut,
-        versionGateway: versionGateway ?? HttpVersionGateway(),
-        frontendVersionSource: frontendVersionSource,
-        testControlGateway: testControlGateway,
-        productGateway: productGateway,
-        memoryAiGateway: memoryAiGateway,
+      home: SelectionArea(
+        child: AuthenticationGate(
+          gateway: authenticationGateway ?? HttpAuthenticationGateway(),
+          googleLoginButtonBuilder: googleLoginButtonBuilder,
+          federatedSignOut: federatedSignOut,
+          versionGateway: versionGateway ?? HttpVersionGateway(),
+          frontendVersionSource: frontendVersionSource,
+          testControlGateway: testControlGateway,
+          productGateway: productGateway,
+          memoryAiGateway: memoryAiGateway,
+          navigationLocation: navigationLocation,
+        ),
       ),
     );
   }
@@ -73,6 +79,7 @@ class AuthenticationGate extends StatefulWidget {
     this.testControlGateway,
     this.productGateway,
     this.memoryAiGateway,
+    this.navigationLocation,
     super.key,
   });
 
@@ -84,6 +91,7 @@ class AuthenticationGate extends StatefulWidget {
   final TestControlGateway? testControlGateway;
   final ProductGateway? productGateway;
   final MemoryAiGateway? memoryAiGateway;
+  final NavigationLocation? navigationLocation;
 
   @override
   State<AuthenticationGate> createState() => _AuthenticationGateState();
@@ -187,6 +195,7 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
         testControlGateway: widget.testControlGateway,
         productGateway: widget.productGateway,
         memoryAiGateway: widget.memoryAiGateway,
+        navigationLocation: widget.navigationLocation,
         runtimeEnvironment: status.environment,
         csrfToken: status.csrfToken,
       );
@@ -291,6 +300,7 @@ class FoundationPage extends StatelessWidget {
     this.csrfToken,
     this.productGateway,
     this.memoryAiGateway,
+    this.navigationLocation,
     super.key,
   });
 
@@ -307,6 +317,7 @@ class FoundationPage extends StatelessWidget {
   final String? csrfToken;
   final ProductGateway? productGateway;
   final MemoryAiGateway? memoryAiGateway;
+  final NavigationLocation? navigationLocation;
 
   @override
   Widget build(BuildContext context) => ApplicationShell(
@@ -323,5 +334,6 @@ class FoundationPage extends StatelessWidget {
     csrfToken: csrfToken,
     productGateway: productGateway,
     memoryAiGateway: memoryAiGateway,
+    navigationLocation: navigationLocation,
   );
 }

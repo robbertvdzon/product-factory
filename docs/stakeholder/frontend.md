@@ -22,6 +22,15 @@ in [UX-referentie](../ux/README.md). Dit document beschrijft gewenst gedrag en p
 - Een commandfout wordt zichtbaar getoond en niet optimistisch als geslaagde wijziging bewaard.
 - Technische sessies, queues en retries staan in een aparte operationele weergave.
 - Productobjecten tonen hun bron, actuele status, versie en relevante koppelingen.
+- Iedere hoofdsectie heeft een stabiele browser-URL; het gekozen product staat als `product`-
+  queryparameter in de URL. Een browserreload, bookmark en voor-/achteruitnavigatie herstellen zo
+  dezelfde sectie en hetzelfde product.
+- De applicatieschil biedt een handmatige gegevensrefresh en vraagt de zichtbare pagina iedere
+  twintig seconden stil opnieuw op. Een inhoudsvergelijking voorkomt een widgetupdate wanneer de
+  publieke gegevens ongewijzigd zijn, zodat selectie, scrollpositie en open interacties behouden
+  blijven.
+- Gewone paginatekst is via één selectieregio kopieerbaar; invoervelden en interactieve controls
+  houden hun normale gedrag.
 - Op bredere schermen gebruikt de applicatieschil de beschikbare ruimte; mobiel bruikbaar betekent
   niet dat de desktopweergave tot een smalle kolom wordt beperkt.
 
@@ -214,6 +223,11 @@ op nog niet verstuurde stories.
 Een epic, story, bug, verificatie, kwaliteitssnapshot, signaal, besluit, meeting of processessie heeft een rustige
 detailpagina. Die toont alleen de velden die bij dat object horen, plus relaties naar bron- en
 vervolgobjecten.
+
+Ontwerp-, planning-, kwaliteits- en operationele proceslijsten tonen voor iedere huidige en oude
+processessie de lokale starttijd. Een actieve status (`RUNNING` of `WAITING_FOR_AI`) wordt expliciet
+als actief gemarkeerd en toont een doorlopende verstreken tijd. Een beëindigde sessie toont ook de
+eindtijd en de vaststaande totale duur.
 
 Iedere lijst met epics, stories of bugs toont `title` als hoofdregel en `summary` als korte regel
 eronder. De frontend gebruikt de opgeslagen waarden en probeert ze niet bij het renderen opnieuw uit

@@ -6,6 +6,8 @@ import 'build_identity.dart';
 import 'configuration.dart';
 import 'frontend_version_monitor.dart';
 import 'memory_ai_management.dart';
+import 'navigation_location.dart';
+import 'page_refresh.dart';
 import 'page_reload.dart';
 import 'product_workspace.dart';
 import 'product_factory_theme.dart';
@@ -27,6 +29,38 @@ enum _Destination {
   acceptance,
 }
 
+_Destination _destinationForPath(String path) => switch (path) {
+  '/ontwerp' => _Destination.design,
+  '/planning' => _Destination.planning,
+  '/kwaliteit' => _Destination.quality,
+  '/signalen' => _Destination.signals,
+  '/overleggen' => _Destination.meetings,
+  '/beheer' => _Destination.management,
+  '/beheer/instellingen' => _Destination.settings,
+  '/beheer/besluiten' => _Destination.decisions,
+  '/beheer/geheugen' => _Destination.memory,
+  '/beheer/operatie' => _Destination.operation,
+  '/beheer/systeem' => _Destination.system,
+  '/acceptatietesten' => _Destination.acceptance,
+  _ => _Destination.overview,
+};
+
+String _pathForDestination(_Destination destination) => switch (destination) {
+  _Destination.overview => '/',
+  _Destination.design => '/ontwerp',
+  _Destination.planning => '/planning',
+  _Destination.quality => '/kwaliteit',
+  _Destination.signals => '/signalen',
+  _Destination.meetings => '/overleggen',
+  _Destination.management => '/beheer',
+  _Destination.settings => '/beheer/instellingen',
+  _Destination.decisions => '/beheer/besluiten',
+  _Destination.memory => '/beheer/geheugen',
+  _Destination.operation => '/beheer/operatie',
+  _Destination.system => '/beheer/systeem',
+  _Destination.acceptance => '/acceptatietesten',
+};
+
 class ApplicationShell extends StatefulWidget {
   const ApplicationShell({
     required this.showAcceptanceBanner,
@@ -41,6 +75,7 @@ class ApplicationShell extends StatefulWidget {
     this.runtimeEnvironment,
     this.productGateway,
     this.memoryAiGateway,
+    this.navigationLocation,
     this.csrfToken,
     super.key,
   });
@@ -57,6 +92,7 @@ class ApplicationShell extends StatefulWidget {
   final String? runtimeEnvironment;
   final ProductGateway? productGateway;
   final MemoryAiGateway? memoryAiGateway;
+  final NavigationLocation? navigationLocation;
   final String? csrfToken;
 
   @override
@@ -65,24 +101,41 @@ class ApplicationShell extends StatefulWidget {
 
 class _ApplicationShellState extends State<ApplicationShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  _Destination _selected = _Destination.overview;
+  late _Destination _selected;
+  String? _selectedProductId;
   bool _updateAvailable = false;
   final VersionUpdateTracker _updateTracker = VersionUpdateTracker();
+  final PageRefreshController _pageRefresh = PageRefreshController();
   Timer? _versionTimer;
+  Timer? _dataRefreshTimer;
+  VoidCallback? _stopLocationListener;
+  late final NavigationLocation _navigationLocation;
 
   @override
   void initState() {
     super.initState();
+    _navigationLocation = widget.navigationLocation ?? NavigationLocation();
+    _applyLocation(_navigationLocation.current, notify: false);
+    _stopLocationListener = _navigationLocation.listen(
+      () => _applyLocation(_navigationLocation.current),
+    );
     unawaited(_checkVersion());
     _versionTimer = Timer.periodic(
       const Duration(minutes: 5),
       (_) => unawaited(_checkVersion()),
+    );
+    _dataRefreshTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _pageRefresh.request(),
     );
   }
 
   @override
   void dispose() {
     _versionTimer?.cancel();
+    _dataRefreshTimer?.cancel();
+    _stopLocationListener?.call();
+    _pageRefresh.dispose();
     super.dispose();
   }
 
@@ -147,39 +200,66 @@ class _ApplicationShellState extends State<ApplicationShell> {
         widget.memoryAiGateway ??
         HttpMemoryAiGateway(csrfToken: widget.csrfToken);
     return switch (_selected) {
-      _Destination.overview => ProductWorkspacePage(gateway: products),
+      _Destination.overview => ProductWorkspacePage(
+        gateway: products,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
+      ),
       _Destination.design => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.design,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
       ),
       _Destination.planning => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.planning,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
       ),
       _Destination.quality => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.quality,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
       ),
       _Destination.signals => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.signals,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
       ),
       _Destination.meetings => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.meetings,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
       ),
       _Destination.management => _ManagementHub(onSelect: _select),
       _Destination.settings => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.settings,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
         trailingContent: MemoryAiManagementPanel(
           gateway: memory,
           view: MemoryAiView.settings,
+          refreshController: _pageRefresh,
         ),
       ),
       _Destination.decisions => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.decisions,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
       ),
       _Destination.memory => ManagementPage(
         versionGateway: widget.versionGateway,
@@ -190,13 +270,18 @@ class _ApplicationShellState extends State<ApplicationShell> {
         subtitle: 'Geheugen per rol controleren en corrigeren.',
         showIdentity: false,
         memoryView: MemoryAiView.memory,
+        refreshController: _pageRefresh,
       ),
       _Destination.operation => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.operation,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        refreshController: _pageRefresh,
         trailingContent: MemoryAiManagementPanel(
           gateway: memory,
           view: MemoryAiView.operation,
+          refreshController: _pageRefresh,
         ),
       ),
       _Destination.system => ManagementPage(
@@ -205,9 +290,11 @@ class _ApplicationShellState extends State<ApplicationShell> {
         runtimeEnvironment: widget.runtimeEnvironment,
         memoryAiGateway: memory,
         showMemory: false,
+        refreshController: _pageRefresh,
       ),
       _Destination.acceptance => AcceptanceTestsPage(
         gateway: widget.testControlGateway ?? HttpTestControlGateway(),
+        refreshController: _pageRefresh,
       ),
     };
   }
@@ -252,6 +339,12 @@ class _ApplicationShellState extends State<ApplicationShell> {
                 label: Text(compact ? 'PF' : 'Product Factory'),
               ),
               const Spacer(),
+              IconButton(
+                onPressed: () => _pageRefresh.request(userInitiated: true),
+                tooltip: 'Gegevens op deze pagina vernieuwen',
+                icon: const Icon(Icons.refresh),
+              ),
+              const SizedBox(width: 4),
               if (desktop)
                 Chip(
                   avatar: const Icon(
@@ -473,8 +566,39 @@ class _ApplicationShellState extends State<ApplicationShell> {
     }.contains(_selected);
   }
 
-  void _select(_Destination destination) =>
-      setState(() => _selected = destination);
+  void _select(_Destination destination) {
+    if (_selected != destination) setState(() => _selected = destination);
+    final location = _locationFor(destination, _selectedProductId);
+    if (_navigationLocation.current != location) {
+      _navigationLocation.push(location);
+    }
+  }
+
+  void _selectProduct(String productId) {
+    if (_selectedProductId == productId) return;
+    setState(() => _selectedProductId = productId);
+    _navigationLocation.replace(_locationFor(_selected, productId));
+  }
+
+  void _applyLocation(Uri location, {bool notify = true}) {
+    final destination = _destinationForPath(location.path);
+    final productId = location.queryParameters['product']?.trim();
+    void apply() {
+      _selected = destination;
+      _selectedProductId = productId?.isEmpty == true ? null : productId;
+    }
+
+    if (notify && mounted) {
+      setState(apply);
+    } else {
+      apply();
+    }
+  }
+
+  Uri _locationFor(_Destination destination, String? productId) => Uri(
+    path: _pathForDestination(destination),
+    queryParameters: productId == null ? null : {'product': productId},
+  );
 
   String _initials(String? email) {
     final local = email?.split('@').first.trim();
@@ -771,6 +895,7 @@ class ManagementPage extends StatefulWidget {
     this.showIdentity = true,
     this.showMemory = true,
     this.memoryView = MemoryAiView.all,
+    this.refreshController,
     super.key,
   });
 
@@ -783,6 +908,7 @@ class ManagementPage extends StatefulWidget {
   final bool showIdentity;
   final bool showMemory;
   final MemoryAiView memoryView;
+  final PageRefreshController? refreshController;
 
   @override
   State<ManagementPage> createState() => _ManagementPageState();
@@ -790,11 +916,29 @@ class ManagementPage extends StatefulWidget {
 
 class _ManagementPageState extends State<ManagementPage> {
   late Future<BuildIdentity> _backend;
+  String? _backendFingerprint;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _backend = widget.versionGateway.backendIdentity();
+    widget.refreshController?.addListener(_refresh);
+    _backend = _loadBackend();
+  }
+
+  @override
+  void didUpdateWidget(covariant ManagementPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshController != widget.refreshController) {
+      oldWidget.refreshController?.removeListener(_refresh);
+      widget.refreshController?.addListener(_refresh);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.refreshController?.removeListener(_refresh);
+    super.dispose();
   }
 
   @override
@@ -861,6 +1005,7 @@ class _ManagementPageState extends State<ManagementPage> {
             MemoryAiManagementPanel(
               gateway: widget.memoryAiGateway,
               view: widget.memoryView,
+              refreshController: widget.refreshController,
             ),
           if (widget.stakeholderEmail != null) ...[
             const SizedBox(height: 16),
@@ -871,9 +1016,40 @@ class _ManagementPageState extends State<ManagementPage> {
     );
   }
 
-  void _retry() => setState(() {
-    _backend = widget.versionGateway.backendIdentity();
-  });
+  Future<BuildIdentity> _loadBackend() async {
+    final identity = await widget.versionGateway.backendIdentity();
+    _backendFingerprint = _identityFingerprint(identity);
+    return identity;
+  }
+
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      final identity = await widget.versionGateway.backendIdentity();
+      if (!mounted) return;
+      final fingerprint = _identityFingerprint(identity);
+      if (fingerprint != _backendFingerprint) {
+        setState(() {
+          _backendFingerprint = fingerprint;
+          _backend = Future.value(identity);
+        });
+      }
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  void _retry() => setState(() => _backend = _loadBackend());
+
+  String _identityFingerprint(BuildIdentity identity) => [
+    identity.applicationVersion,
+    identity.apiVersion,
+    identity.environment,
+    identity.gitRevision,
+    identity.buildTime,
+    identity.buildIdentity,
+  ].join('|');
 }
 
 class _IdentityCard extends StatelessWidget {

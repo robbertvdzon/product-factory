@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'configuration.dart';
 import 'http_client_factory.dart';
+import 'page_refresh.dart';
 
 String _value(Object? value) {
   if (value is String) return value;
@@ -344,6 +345,57 @@ class ProductWorkspaceData {
   final List<Map<String, Object?>> deliveryAttempts;
   final List<Map<String, Object?>> dispatcherSessions;
 }
+
+String _fingerprintProducts(List<ProductSummary> products) => jsonEncode(
+  products
+      .map(
+        (product) => {
+          'id': product.id,
+          'name': product.name,
+          'status': product.status,
+          'dispatchingEnabled': product.dispatchingEnabled,
+          'version': product.version,
+          'epicApprovalMode': product.epicApprovalMode,
+        },
+      )
+      .toList(),
+);
+
+String _fingerprintWorkspace(ProductWorkspaceData data) => jsonEncode({
+  'product': {
+    'id': data.product.id,
+    'name': data.product.name,
+    'status': data.product.status,
+    'dispatchingEnabled': data.product.dispatchingEnabled,
+    'version': data.product.version,
+    'epicApprovalMode': data.product.epicApprovalMode,
+  },
+  'assignment': data.assignment,
+  'testConfiguration': data.testConfiguration,
+  'schedules': data.schedules,
+  'scheduleRuns': data.scheduleRuns,
+  'signals': data.signals,
+  'questions': data.questions,
+  'meetings': data.meetings,
+  'decisions': data.decisions,
+  'decisionArchive': data.decisionArchive,
+  'epics': data.epics,
+  'designSessions': data.designSessions,
+  'epicHistories': data.epicHistories,
+  'stories': data.stories,
+  'backlog': data.backlog,
+  'planningWorkItems': data.planningWorkItems,
+  'planningSessions': data.planningSessions,
+  'qualitySnapshot': data.qualitySnapshot,
+  'qualityHistory': data.qualityHistory,
+  'bugs': data.bugs,
+  'verifications': data.verifications,
+  'qualityWorkItems': data.qualityWorkItems,
+  'qualitySessions': data.qualitySessions,
+  'dispatcherStatus': data.dispatcherStatus,
+  'deliveryAttempts': data.deliveryAttempts,
+  'dispatcherSessions': data.dispatcherSessions,
+});
 
 abstract interface class ProductGateway {
   Future<List<ProductSummary>> products();
@@ -883,16 +935,150 @@ String _epicStatusLabel(String status) => switch (status) {
   _ => status,
 };
 
+const _activeProcessStatuses = {'RUNNING', 'WAITING_FOR_AI'};
+
+DateTime? _parseInstant(Object? value) {
+  final raw = _value(value);
+  return raw.isEmpty ? null : DateTime.tryParse(raw)?.toLocal();
+}
+
+String _dateTimeLabel(DateTime value) =>
+    '${value.day.toString().padLeft(2, '0')}-'
+    '${value.month.toString().padLeft(2, '0')}-'
+    '${value.year} '
+    '${value.hour.toString().padLeft(2, '0')}:'
+    '${value.minute.toString().padLeft(2, '0')}:'
+    '${value.second.toString().padLeft(2, '0')}';
+
+String _durationLabel(Duration value) {
+  final seconds = value.isNegative ? 0 : value.inSeconds;
+  final hours = seconds ~/ 3600;
+  final minutes = (seconds % 3600) ~/ 60;
+  final remainder = seconds % 60;
+  if (hours > 0) return '$hours uur $minutes min $remainder sec';
+  if (minutes > 0) return '$minutes min $remainder sec';
+  return '$remainder sec';
+}
+
+class _ProcessSessionTile extends StatelessWidget {
+  const _ProcessSessionTile({
+    required this.session,
+    required this.icon,
+    this.label,
+    this.details,
+    this.dense = false,
+  });
+
+  final Map<String, Object?> session;
+  final IconData icon;
+  final String? label;
+  final String? details;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    dense: dense,
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(icon),
+    title: Text(
+      '${label == null ? '' : '$label · '}${session['status']} · ${_value(session['id'])}',
+    ),
+    subtitle: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (details?.trim().isNotEmpty == true) Text(details!),
+        _ProcessTiming(session: session),
+      ],
+    ),
+  );
+}
+
+class _ProcessTiming extends StatefulWidget {
+  const _ProcessTiming({required this.session});
+
+  final Map<String, Object?> session;
+
+  @override
+  State<_ProcessTiming> createState() => _ProcessTimingState();
+}
+
+class _ProcessTimingState extends State<_ProcessTiming> {
+  Timer? _timer;
+  DateTime _now = DateTime.now();
+
+  bool get _active =>
+      _activeProcessStatuses.contains(_value(widget.session['status']));
+
+  @override
+  void initState() {
+    super.initState();
+    _configureTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProcessTiming oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_value(oldWidget.session['status']) !=
+            _value(widget.session['status']) ||
+        _value(oldWidget.session['startedAt']) !=
+            _value(widget.session['startedAt'])) {
+      _configureTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _configureTimer() {
+    _timer?.cancel();
+    _now = DateTime.now();
+    if (_active) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _now = DateTime.now());
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final started = _parseInstant(widget.session['startedAt']);
+    final finished = _parseInstant(widget.session['finishedAt']);
+    if (started == null) return const Text('Starttijd niet beschikbaar');
+    final duration = (finished ?? _now).difference(started);
+    if (_active) {
+      return Text(
+        'Gestart ${_dateTimeLabel(started)} · actief: ja · loopt ${_durationLabel(duration)}',
+        style: Theme.of(context).textTheme.bodySmall,
+      );
+    }
+    return Text(
+      'Gestart ${_dateTimeLabel(started)} · '
+      '${finished == null ? 'niet meer actief' : 'geëindigd ${_dateTimeLabel(finished)}'} · '
+      'duur ${_durationLabel(duration)}',
+      style: Theme.of(context).textTheme.bodySmall,
+    );
+  }
+}
+
 class ProductWorkspacePage extends StatefulWidget {
   const ProductWorkspacePage({
     required this.gateway,
     this.section = ProductWorkspaceSection.overview,
     this.trailingContent,
+    this.initialProductId,
+    this.onProductSelected,
+    this.refreshController,
     super.key,
   });
   final ProductGateway gateway;
   final ProductWorkspaceSection section;
   final Widget? trailingContent;
+  final String? initialProductId;
+  final ValueChanged<String>? onProductSelected;
+  final PageRefreshController? refreshController;
   @override
   State<ProductWorkspacePage> createState() => _ProductWorkspacePageState();
 }
@@ -902,46 +1088,81 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   ProductSummary? _selected;
   ProductWorkspaceData? _data;
   bool _busy = true;
-  bool _refreshingPlanning = false;
-  Timer? _planningRefreshTimer;
+  bool _refreshing = false;
+  String? _productsFingerprint;
+  String? _workspaceFingerprint;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
-    _planningRefreshTimer = Timer.periodic(
-      const Duration(seconds: 4),
-      (_) => _refreshPlanningProgress(),
-    );
+    widget.refreshController?.addListener(_onRefreshRequested);
+    _loadProducts(widget.initialProductId);
   }
 
   @override
   void dispose() {
-    _planningRefreshTimer?.cancel();
+    widget.refreshController?.removeListener(_onRefreshRequested);
     super.dispose();
   }
 
-  Future<void> _refreshPlanningProgress() async {
-    final selected = _selected;
-    final data = _data;
-    final active = data?.planningSessions.any(
-      (session) =>
-          const {'RUNNING', 'WAITING_FOR_AI'}.contains(session['status']),
-    );
-    if (widget.section != ProductWorkspaceSection.planning ||
-        selected == null ||
-        active != true ||
-        _busy ||
-        _refreshingPlanning) {
-      return;
+  @override
+  void didUpdateWidget(covariant ProductWorkspacePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshController != widget.refreshController) {
+      oldWidget.refreshController?.removeListener(_onRefreshRequested);
+      widget.refreshController?.addListener(_onRefreshRequested);
     }
-    _refreshingPlanning = true;
+    if (oldWidget.initialProductId != widget.initialProductId &&
+        widget.initialProductId != _selected?.id) {
+      unawaited(_loadProducts(widget.initialProductId));
+    }
+  }
+
+  void _onRefreshRequested() => unawaited(
+    _refreshCurrent(
+      showErrors: widget.refreshController?.userInitiated == true,
+    ),
+  );
+
+  Future<void> _refreshCurrent({bool showErrors = false}) async {
+    final selected = _selected;
+    if (_busy || _refreshing) return;
+    _refreshing = true;
     try {
-      final refreshed = await widget.gateway.workspace(selected);
-      if (mounted) setState(() => _data = refreshed);
+      final products = await widget.gateway.products();
+      final refreshedSelected = selected == null
+          ? null
+          : products.where((product) => product.id == selected.id).firstOrNull;
+      final refreshedData = refreshedSelected == null
+          ? null
+          : await widget.gateway.workspace(refreshedSelected);
+      if (!mounted) return;
+      final productsFingerprint = _fingerprintProducts(products);
+      final workspaceFingerprint = refreshedData == null
+          ? null
+          : _fingerprintWorkspace(refreshedData);
+      if (productsFingerprint != _productsFingerprint ||
+          workspaceFingerprint != _workspaceFingerprint) {
+        setState(() {
+          _products = products;
+          _selected = refreshedSelected;
+          _data = refreshedData;
+          _productsFingerprint = productsFingerprint;
+          _workspaceFingerprint = workspaceFingerprint;
+          _error = null;
+        });
+      }
+    } on ProductFailure catch (error) {
+      if (showErrors && mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (showErrors && mounted) {
+        setState(
+          () => _error = 'Productgegevens konden niet worden vernieuwd.',
+        );
+      }
     } finally {
-      _refreshingPlanning = false;
+      _refreshing = false;
     }
   }
 
@@ -965,7 +1186,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           _products = products;
           _selected = selected;
           _data = data;
+          _productsFingerprint = _fingerprintProducts(products);
+          _workspaceFingerprint = data == null
+              ? null
+              : _fingerprintWorkspace(data);
         });
+        if (selected != null) widget.onProductSelected?.call(selected.id);
       }
     } on ProductFailure catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -1109,6 +1335,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                     vertical: 12,
                   ),
                   child: DropdownButtonFormField<String>(
+                    key: ValueKey(_selected?.id),
                     isExpanded: true,
                     initialValue: _selected?.id,
                     decoration: const InputDecoration(
@@ -1127,7 +1354,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                           ),
                         )
                         .toList(),
-                    onChanged: (id) => _loadProducts(id),
+                    onChanged: (id) {
+                      if (id != null) unawaited(_loadProducts(id));
+                    },
                   ),
                 ),
               ),
@@ -1487,13 +1716,14 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ...data.qualitySessions.map((session) => ('Kwaliteit', session)),
       ...data.dispatcherSessions.map((session) => ('Dispatcher', session)),
     ].map(
-      (entry) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.play_circle_outline),
-        title: Text('${entry.$1} · ${entry.$2['status']}'),
-        subtitle: Text(
-          '${entry.$2['resultSummary'] ?? entry.$2['blockedReason'] ?? _value(entry.$2['id'])}',
-        ),
+      (entry) => _ProcessSessionTile(
+        session: entry.$2,
+        label: entry.$1,
+        icon: _activeProcessStatuses.contains(entry.$2['status'])
+            ? Icons.play_circle_outline
+            : Icons.history,
+        details:
+            '${entry.$2['resultSummary'] ?? entry.$2['blockedReason'] ?? 'Geen resultaatsamenvatting.'}',
       ),
     ),
     const Divider(height: 32),
@@ -1612,18 +1842,15 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ),
     ),
     ...data.planningSessions.map(
-      (session) => ListTile(
+      (session) => _ProcessSessionTile(
+        session: session,
         dense: true,
-        leading: Icon(
-          session['status'] == 'BLOCKED'
-              ? Icons.error_outline
-              : Icons.schema_outlined,
-        ),
-        title: Text('${session['status']} · ${_value(session['id'])}'),
-        subtitle: Text(
-          '${session['resultSummary'] ?? session['blockedReason'] ?? 'Planner-AI wordt duurzaam gevolgd.'}\n'
-          '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
-        ),
+        icon: session['status'] == 'BLOCKED'
+            ? Icons.error_outline
+            : Icons.schema_outlined,
+        details:
+            '${session['resultSummary'] ?? session['blockedReason'] ?? 'Planner-AI wordt duurzaam gevolgd.'}\n'
+            '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
       ),
     ),
     const Divider(height: 28),
@@ -1678,14 +1905,14 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ),
     ),
     ...data.dispatcherSessions.map(
-      (session) => ListTile(
+      (session) => _ProcessSessionTile(
+        session: session,
         dense: true,
-        leading: const Icon(Icons.history),
-        title: Text('${session['status']} · ${_value(session['id'])}'),
-        subtitle: Text(
-          '${session['resultSummary'] ?? session['blockedReason'] ?? 'Dispatchersessie actief.'}\n'
-          '${(session['implementation'] as Map?)?['artifact'] ?? 'software-factory-dispatcher-impl'}',
-        ),
+        icon: Icons.history,
+        label: 'Dispatcher',
+        details:
+            '${session['resultSummary'] ?? session['blockedReason'] ?? 'Dispatchersessie actief.'}\n'
+            '${(session['implementation'] as Map?)?['artifact'] ?? 'software-factory-dispatcher-impl'}',
       ),
     ),
   ]);
@@ -1965,13 +2192,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     const Divider(height: 28),
     Text('Processessies', style: Theme.of(context).textTheme.titleMedium),
     ...data.qualitySessions.map(
-      (session) => ListTile(
-        leading: const Icon(Icons.science_outlined),
-        title: Text('${session['status']} · ${_value(session['id'])}'),
-        subtitle: Text(
-          '${session['resultSummary'] ?? session['blockedReason'] ?? 'Tester-AI wordt duurzaam gevolgd.'}\n'
-          '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
-        ),
+      (session) => _ProcessSessionTile(
+        session: session,
+        icon: Icons.science_outlined,
+        details:
+            '${session['resultSummary'] ?? session['blockedReason'] ?? 'Tester-AI wordt duurzaam gevolgd.'}\n'
+            '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
       ),
     ),
   ]);
@@ -2204,22 +2430,18 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       const Text('Nog geen ontwerpsessies gestart.')
     else
       ...data.designSessions.map(
-        (session) => ListTile(
-          leading: Icon(
-            session['status'] == 'SUCCEEDED'
-                ? Icons.check_circle_outline
-                : session['status'] == 'BLOCKED'
-                ? Icons.error_outline
-                : Icons.hourglass_top,
-          ),
-          title: Text('${session['status']} · ${_value(session['id'])}'),
-          subtitle: Text(
-            '${session['resultSummary'] ?? session['blockedReason'] ?? 'AI-taak wordt duurzaam gevolgd.'}\n'
-            '${(session['implementation'] as Map?)?['artifact'] ?? 'product-design-impl-mvp'} · '
-            '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken\n'
-            'Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
-          ),
-          isThreeLine: true,
+        (session) => _ProcessSessionTile(
+          session: session,
+          icon: session['status'] == 'SUCCEEDED'
+              ? Icons.check_circle_outline
+              : session['status'] == 'BLOCKED'
+              ? Icons.error_outline
+              : Icons.hourglass_top,
+          details:
+              '${session['resultSummary'] ?? session['blockedReason'] ?? 'AI-taak wordt duurzaam gevolgd.'}\n'
+              '${(session['implementation'] as Map?)?['artifact'] ?? 'product-design-impl-mvp'} · '
+              '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken\n'
+              'Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
         ),
       ),
   ]);

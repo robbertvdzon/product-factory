@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'configuration.dart';
 import 'http_client_factory.dart';
+import 'page_refresh.dart';
 
 class TestScenarioSummary {
   const TestScenarioSummary({
@@ -165,8 +166,13 @@ class TestbedFailure implements Exception {
 }
 
 class AcceptanceTestsPage extends StatefulWidget {
-  const AcceptanceTestsPage({required this.gateway, super.key});
+  const AcceptanceTestsPage({
+    required this.gateway,
+    this.refreshController,
+    super.key,
+  });
   final TestControlGateway gateway;
+  final PageRefreshController? refreshController;
 
   @override
   State<AcceptanceTestsPage> createState() => _AcceptanceTestsPageState();
@@ -178,12 +184,30 @@ class _AcceptanceTestsPageState extends State<AcceptanceTestsPage> {
   String? _selectedScenario;
   String? _commandError;
   bool _busy = false;
+  bool _refreshing = false;
+  String? _fingerprint;
 
   @override
   void initState() {
     super.initState();
     _browserSessionId = 'browser-${DateTime.now().microsecondsSinceEpoch}';
-    _snapshot = widget.gateway.load();
+    widget.refreshController?.addListener(_refreshSilently);
+    _snapshot = _loadSnapshot();
+  }
+
+  @override
+  void didUpdateWidget(covariant AcceptanceTestsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshController != widget.refreshController) {
+      oldWidget.refreshController?.removeListener(_refreshSilently);
+      widget.refreshController?.addListener(_refreshSilently);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.refreshController?.removeListener(_refreshSilently);
+    super.dispose();
   }
 
   @override
@@ -339,8 +363,63 @@ class _AcceptanceTestsPageState extends State<AcceptanceTestsPage> {
     }
   }
 
+  Future<TestbedSnapshot> _loadSnapshot() async {
+    final snapshot = await widget.gateway.load();
+    _fingerprint = _snapshotFingerprint(snapshot);
+    return snapshot;
+  }
+
+  Future<void> _refreshSilently() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      final snapshot = await widget.gateway.load();
+      if (!mounted) return;
+      final fingerprint = _snapshotFingerprint(snapshot);
+      if (fingerprint != _fingerprint) {
+        setState(() {
+          _fingerprint = fingerprint;
+          _snapshot = Future.value(snapshot);
+          _commandError = null;
+        });
+      }
+    } on TestbedFailure {
+      if (widget.refreshController?.userInitiated == true && mounted) {
+        setState(
+          () => _commandError =
+              'Product Factory Testbed kon niet worden vernieuwd.',
+        );
+      }
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  String _snapshotFingerprint(TestbedSnapshot snapshot) => jsonEncode({
+    'active': {
+      'key': snapshot.active.scenario.key,
+      'version': snapshot.active.scenario.version,
+      'title': snapshot.active.scenario.title,
+      'description': snapshot.active.scenario.description,
+      'datasetVersion': snapshot.active.datasetVersion,
+      'testbedVersion': snapshot.active.testbedVersion,
+      'currentStep': snapshot.active.currentStep,
+      'lockOwner': snapshot.active.lockOwner,
+    },
+    'scenarios': snapshot.scenarios
+        .map(
+          (scenario) => {
+            'key': scenario.key,
+            'version': scenario.version,
+            'title': scenario.title,
+            'description': scenario.description,
+          },
+        )
+        .toList(),
+  });
+
   void _reload() => setState(() {
-    _snapshot = widget.gateway.load();
+    _snapshot = _loadSnapshot();
   });
 }
 

@@ -7,6 +7,7 @@ import 'package:product_factory_frontend/build_identity.dart';
 import 'package:product_factory_frontend/frontend_version_monitor.dart';
 import 'package:product_factory_frontend/main.dart';
 import 'package:product_factory_frontend/memory_ai_management.dart';
+import 'package:product_factory_frontend/navigation_location.dart';
 import 'package:product_factory_frontend/product_workspace.dart';
 import 'package:product_factory_frontend/testbed.dart';
 
@@ -129,6 +130,108 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Acceptatietesten'), findsOneWidget);
+  });
+
+  testWidgets('URL opent de juiste pagina en browsernavigatie blijft werken', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final navigation = FakeNavigationLocation(
+      Uri.parse('/planning?product=hkh-autopilot'),
+    );
+    await tester.pumpWidget(
+      ProductFactoryApp(
+        productGateway: ResearchProductGateway(),
+        navigationLocation: navigation,
+        authenticationGateway: FakeAuthenticationGateway(
+          sessionResult: Future.value(
+            const AuthenticationStatus(
+              authenticated: true,
+              authRequired: false,
+            ),
+          ),
+        ),
+        versionGateway: FakeVersionGateway(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Geprioriteerde backlog'), findsOneWidget);
+    expect(find.byType(SelectionArea), findsOneWidget);
+
+    await tester.tap(find.text('Ontwerp'));
+    await tester.pumpAndSettle();
+    expect(navigation.current.path, '/ontwerp');
+    expect(navigation.current.queryParameters['product'], 'hkh-autopilot');
+
+    navigation.navigateFromBrowser(
+      Uri.parse('/kwaliteit?product=hkh-autopilot'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Kwaliteit'), findsWidgets);
+  });
+
+  testWidgets('ververst handmatig en automatisch iedere twintig seconden', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = ResearchProductGateway();
+    await tester.pumpWidget(
+      MaterialApp(home: FoundationPage(productGateway: gateway)),
+    );
+    await tester.pumpAndSettle();
+    expect(gateway.workspaceReads, 1);
+
+    await tester.tap(find.byTooltip('Gegevens op deze pagina vernieuwen'));
+    await tester.pump();
+    await tester.pump();
+    expect(gateway.workspaceReads, 2);
+
+    await tester.pump(const Duration(seconds: 20));
+    await tester.pump();
+    expect(gateway.workspaceReads, 3);
+  });
+
+  testWidgets('processessies tonen starttijd duur en actieve toestand', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = ResearchProductGateway(
+      planningSessions: const [
+        {
+          'id': {'value': 'oude-planning'},
+          'status': 'SUCCEEDED',
+          'startedAt': '2026-08-27T08:00:00Z',
+          'finishedAt': '2026-08-27T08:03:12Z',
+          'aiTaskIds': [],
+        },
+        {
+          'id': {'value': 'lopende-planning'},
+          'status': 'WAITING_FOR_AI',
+          'startedAt': '2026-08-27T08:04:00Z',
+          'aiTaskIds': [],
+        },
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FoundationPage(
+          productGateway: gateway,
+          navigationLocation: FakeNavigationLocation(
+            Uri.parse('/planning?product=hkh-autopilot'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.textContaining('duur 3 min 12 sec'), findsOneWidget);
+    expect(find.textContaining('actief: ja'), findsOneWidget);
+    expect(find.textContaining('Gestart 27-08-2026'), findsNWidgets(2));
   });
 
   testWidgets('beheer toont frontend en backendidentiteit op brede schermen', (
@@ -670,9 +773,13 @@ class FakeProductGateway implements ProductGateway {
 }
 
 class ResearchProductGateway extends FakeProductGateway {
+  ResearchProductGateway({this.planningSessions = const []});
+
   bool dispatchingEnabled = false;
   int dispatchingChanges = 0;
   int dispatchRuns = 0;
+  int workspaceReads = 0;
+  final List<Map<String, Object?>> planningSessions;
 
   ProductSummary get product => ProductSummary(
     id: 'hkh-autopilot',
@@ -697,117 +804,146 @@ class ResearchProductGateway extends FakeProductGateway {
   }
 
   @override
-  Future<ProductWorkspaceData> workspace(ProductSummary product) async =>
-      ProductWorkspaceData(
-        product: product,
-        assignment: const {},
-        testConfiguration: null,
-        schedules: const [],
-        signals: const [],
-        questions: const [],
-        meetings: const [],
-        decisions: const [],
-        decisionArchive: const [],
-        epics: const [
-          {
-            'id': {'value': 'epic-1'},
-            'title': 'Bronnen verbinden',
-            'status': 'NEEDS_RESEARCH',
-            'version': 1,
-            'summary': 'Eerst concrete bronnen valideren.',
-            'problem': 'Er zijn nog geen gevalideerde gegevensbronnen.',
-            'solution': 'Onderzoek en verbind publieke collecties.',
-            'uxDesign': 'Zoekscherm met bronverwijzingen.',
-            'uxArtifacts': [
-              {
-                'name': 'zoekscherm.png',
-                'mediaType': 'image/png',
-                'uri': '/api/ai/tasks/task-1/artifacts/main',
-              },
-            ],
-            'readiness': {
-              'readyForPlanning': false,
-              'unmetConditions': ['Valideer minimaal twee bronnen.'],
-              'openQuestions': [],
+  Future<ProductWorkspaceData> workspace(ProductSummary product) async {
+    workspaceReads++;
+    return ProductWorkspaceData(
+      product: product,
+      assignment: const {},
+      testConfiguration: null,
+      schedules: const [],
+      signals: const [],
+      questions: const [],
+      meetings: const [],
+      decisions: const [],
+      decisionArchive: const [],
+      epics: const [
+        {
+          'id': {'value': 'epic-1'},
+          'title': 'Bronnen verbinden',
+          'status': 'NEEDS_RESEARCH',
+          'version': 1,
+          'summary': 'Eerst concrete bronnen valideren.',
+          'problem': 'Er zijn nog geen gevalideerde gegevensbronnen.',
+          'solution': 'Onderzoek en verbind publieke collecties.',
+          'uxDesign': 'Zoekscherm met bronverwijzingen.',
+          'uxArtifacts': [
+            {
+              'name': 'zoekscherm.png',
+              'mediaType': 'image/png',
+              'uri': '/api/ai/tasks/task-1/artifacts/main',
             },
-            'researchSources': [
-              {
-                'name': 'Noord-Hollands Archief',
-                'provider': 'Noord-Hollands Archief',
-                'uri': 'https://example.org/archive',
-                'accessMethod': 'Publieke zoekroute',
-                'license': 'Rechten per object',
-                'coverage': 'Regionale historische records',
-                'status': 'VALIDATED',
-                'validationEvidence': 'Zoekroute geopend en records gevonden.',
-              },
-            ],
-            'acceptanceCriteria': ['Bronnen zijn zichtbaar.'],
-            'slicabilityRationale': 'Eén gebruikersroute.',
-            'directionReferences': [],
+          ],
+          'readiness': {
+            'readyForPlanning': false,
+            'unmetConditions': ['Valideer minimaal twee bronnen.'],
+            'openQuestions': [],
           },
-        ],
-        designSessions: const [],
-        epicHistories: const {'epic-1': []},
-        stories: const [
-          {
-            'id': {'value': 'story-1'},
-            'epicId': {'value': 'epic-1'},
-            'epicVersion': 1,
-            'sequenceNumber': 1,
-            'type': 'PRODUCT_STORY',
-            'title': 'Story met UX-model',
-            'summary': 'Story gebruikt het gevalideerde ontwerp.',
-            'content': 'Bouw de zichtbare gebruikersroute.',
-            'acceptanceCriteria': ['De route volgt het UX-model.'],
-            'uxDesign': 'Volg zoekscherm.png.',
-            'uxArtifacts': [
-              {
-                'name': 'zoekscherm.png',
-                'mediaType': 'image/png',
-                'uri': '/api/ai/tasks/task-1/artifacts/main',
-              },
-            ],
-            'dependencies': [],
-            'priorityReason': 'Eerste zelfstandige waarde.',
-            'status': 'TODO',
-            'version': 1,
-          },
-        ],
-        backlog: const [
-          {
-            'id': {'value': 'story-1'},
-            'epicId': {'value': 'epic-1'},
-            'epicVersion': 1,
-            'sequenceNumber': 1,
-            'type': 'PRODUCT_STORY',
-            'title': 'Story met UX-model',
-            'summary': 'Story gebruikt het gevalideerde ontwerp.',
-            'content': 'Bouw de zichtbare gebruikersroute.',
-            'acceptanceCriteria': ['De route volgt het UX-model.'],
-            'uxDesign': 'Volg zoekscherm.png.',
-            'uxArtifacts': [
-              {
-                'name': 'zoekscherm.png',
-                'mediaType': 'image/png',
-                'uri': '/api/ai/tasks/task-1/artifacts/main',
-              },
-            ],
-            'dependencies': [],
-            'priorityReason': 'Eerste zelfstandige waarde.',
-            'status': 'TODO',
-            'version': 1,
-          },
-        ],
-        planningWorkItems: const [],
-        planningSessions: const [],
-        qualitySnapshot: null,
-        qualityHistory: const [],
-        bugs: const [],
-        verifications: const [],
-        qualityWorkItems: const [],
-        qualitySessions: const [],
-      );
+          'researchSources': [
+            {
+              'name': 'Noord-Hollands Archief',
+              'provider': 'Noord-Hollands Archief',
+              'uri': 'https://example.org/archive',
+              'accessMethod': 'Publieke zoekroute',
+              'license': 'Rechten per object',
+              'coverage': 'Regionale historische records',
+              'status': 'VALIDATED',
+              'validationEvidence': 'Zoekroute geopend en records gevonden.',
+            },
+          ],
+          'acceptanceCriteria': ['Bronnen zijn zichtbaar.'],
+          'slicabilityRationale': 'Eén gebruikersroute.',
+          'directionReferences': [],
+        },
+      ],
+      designSessions: const [],
+      epicHistories: const {'epic-1': []},
+      stories: const [
+        {
+          'id': {'value': 'story-1'},
+          'epicId': {'value': 'epic-1'},
+          'epicVersion': 1,
+          'sequenceNumber': 1,
+          'type': 'PRODUCT_STORY',
+          'title': 'Story met UX-model',
+          'summary': 'Story gebruikt het gevalideerde ontwerp.',
+          'content': 'Bouw de zichtbare gebruikersroute.',
+          'acceptanceCriteria': ['De route volgt het UX-model.'],
+          'uxDesign': 'Volg zoekscherm.png.',
+          'uxArtifacts': [
+            {
+              'name': 'zoekscherm.png',
+              'mediaType': 'image/png',
+              'uri': '/api/ai/tasks/task-1/artifacts/main',
+            },
+          ],
+          'dependencies': [],
+          'priorityReason': 'Eerste zelfstandige waarde.',
+          'status': 'TODO',
+          'version': 1,
+        },
+      ],
+      backlog: const [
+        {
+          'id': {'value': 'story-1'},
+          'epicId': {'value': 'epic-1'},
+          'epicVersion': 1,
+          'sequenceNumber': 1,
+          'type': 'PRODUCT_STORY',
+          'title': 'Story met UX-model',
+          'summary': 'Story gebruikt het gevalideerde ontwerp.',
+          'content': 'Bouw de zichtbare gebruikersroute.',
+          'acceptanceCriteria': ['De route volgt het UX-model.'],
+          'uxDesign': 'Volg zoekscherm.png.',
+          'uxArtifacts': [
+            {
+              'name': 'zoekscherm.png',
+              'mediaType': 'image/png',
+              'uri': '/api/ai/tasks/task-1/artifacts/main',
+            },
+          ],
+          'dependencies': [],
+          'priorityReason': 'Eerste zelfstandige waarde.',
+          'status': 'TODO',
+          'version': 1,
+        },
+      ],
+      planningWorkItems: const [],
+      planningSessions: planningSessions,
+      qualitySnapshot: null,
+      qualityHistory: const [],
+      bugs: const [],
+      verifications: const [],
+      qualityWorkItems: const [],
+      qualitySessions: const [],
+    );
+  }
+}
+
+class FakeNavigationLocation implements NavigationLocation {
+  FakeNavigationLocation(this._current);
+
+  Uri _current;
+  VoidCallback? _listener;
+
+  @override
+  Uri get current => _current;
+
+  @override
+  VoidCallback listen(VoidCallback callback) {
+    _listener = callback;
+    return () => _listener = null;
+  }
+
+  @override
+  void push(Uri location) => _current = location;
+
+  @override
+  void replace(Uri location) => _current = location;
+
+  void navigateFromBrowser(Uri location) {
+    _current = location;
+    _listener?.call();
+  }
 }
 
 class RecordingProductGateway extends FakeProductGateway {

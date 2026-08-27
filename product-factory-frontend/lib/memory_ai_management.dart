@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'configuration.dart';
 import 'http_client_factory.dart';
+import 'page_refresh.dart';
 
 String _v(Object? value) {
   if (value is String) return value;
@@ -299,10 +300,12 @@ class MemoryAiManagementPanel extends StatefulWidget {
   const MemoryAiManagementPanel({
     required this.gateway,
     this.view = MemoryAiView.all,
+    this.refreshController,
     super.key,
   });
   final MemoryAiGateway gateway;
   final MemoryAiView view;
+  final PageRefreshController? refreshController;
   @override
   State<MemoryAiManagementPanel> createState() =>
       _MemoryAiManagementPanelState();
@@ -324,15 +327,39 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
   DateTime? _date;
   String? _error;
   bool _busy = true;
+  bool _refreshing = false;
+  String? _fingerprint;
 
   @override
   void initState() {
     super.initState();
+    widget.refreshController?.addListener(_onRefreshRequested);
     _load();
   }
 
-  Future<void> _load() async {
-    _start();
+  @override
+  void didUpdateWidget(covariant MemoryAiManagementPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshController != widget.refreshController) {
+      oldWidget.refreshController?.removeListener(_onRefreshRequested);
+      widget.refreshController?.addListener(_onRefreshRequested);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.refreshController?.removeListener(_onRefreshRequested);
+    super.dispose();
+  }
+
+  void _onRefreshRequested() {
+    if (!_refreshing) _load(silent: true);
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (_refreshing) return;
+    _refreshing = true;
+    if (!silent) _start();
     try {
       final showMemory =
           widget.view == MemoryAiView.all || widget.view == MemoryAiView.memory;
@@ -381,22 +408,49 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
             ])
           : const <List<Map<String, Object?>>>[];
       if (!mounted) return;
-      setState(() {
-        _products = products;
-        _ai = values[1];
-        _tasks = values.length > 2 ? values[2] : const [];
-        _catalog = runtimeValues.isEmpty ? const [] : runtimeValues[0];
-        _productKeys = runtimeValues.isEmpty ? const [] : runtimeValues[1];
-        _productId = selected;
-        _roles = roles;
-        _role = role;
-        _budget = scoped.$1;
-        _items = scoped.$2;
+      final ai = (values[1] as List).cast<Map<String, Object?>>();
+      final tasks = values.length > 2
+          ? (values[2] as List).cast<Map<String, Object?>>()
+          : <Map<String, Object?>>[];
+      final catalog = runtimeValues.isEmpty
+          ? <Map<String, Object?>>[]
+          : runtimeValues[0];
+      final productKeys = runtimeValues.isEmpty
+          ? <Map<String, Object?>>[]
+          : runtimeValues[1];
+      final fingerprint = jsonEncode({
+        'products': products,
+        'ai': ai,
+        'tasks': tasks,
+        'catalog': catalog,
+        'productKeys': productKeys,
+        'productId': selected,
+        'roles': roles,
+        'role': role,
+        'budget': scoped.$1,
+        'items': scoped.$2,
       });
+      if (fingerprint != _fingerprint) {
+        setState(() {
+          _products = products;
+          _ai = ai;
+          _tasks = tasks;
+          _catalog = catalog;
+          _productKeys = productKeys;
+          _productId = selected;
+          _roles = roles;
+          _role = role;
+          _budget = scoped.$1;
+          _items = scoped.$2;
+          _fingerprint = fingerprint;
+          _error = null;
+        });
+      }
     } catch (error) {
-      _showError(error);
+      if (!silent) _showError(error);
     } finally {
-      _finish();
+      _refreshing = false;
+      if (!silent) _finish();
     }
   }
 
