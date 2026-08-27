@@ -76,6 +76,13 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
 
         runtime.reset()
         ai.dispatchPending()
+        val compactContext = runtime.requests.single().prompt.substringAfter("Compacte bevroren planningscontext:\n")
+        val contextJson = mapper.readTree(compactContext)
+        assertThat(contextJson.has("frozenContext")).isFalse()
+        assertThat(contextJson.has("selection")).isFalse()
+        assertThat(contextJson.path("selectedEpics")).hasSize(1)
+        assertThat(contextJson.path("existingTodoStories")).isEmpty()
+        assertThat(contextJson.path("inProgressStoryReferences")).isEmpty()
         completeDispatchedJob(plan())
         planning.runProcessSession(productId)
 
@@ -83,7 +90,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(backlog.map { it.title }).containsExactly("Overzicht tonen", "Bewijs openen")
         assertThat(backlog.map { it.sequenceNumber }).containsExactly(1, 2)
         assertThat(backlog[1].dependencies).containsExactly(backlog[0].id)
-        assertThat(backlog[0].uxArtifacts.map { it.name }).containsExactly("ux-main.png")
+        assertThat(backlog[0].uxArtifacts.map { it.name }).containsExactly("ux-main-desktop.png")
         assertThat(backlog[1].uxArtifacts).isEmpty()
         assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.ACTIVE)
         assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
@@ -340,6 +347,35 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
                 putArray("directionReferences").addObject().put("type", "PRODUCT_ASSIGNMENT").put("id", productId.value).put("version", 1)
                 put("visibleBehaviorChange", true)
                 put("uxDesign", "Een overzichtskaart opent een rustig bewijsdetail en behoudt een duidelijke terugroute.")
+                putArray("uxArtifactChanges").apply {
+                    listOf(
+                        "ux-main-desktop.png" to "start",
+                        "ux-main-mobile.png" to "start",
+                        "ux-empty-desktop.png" to "empty",
+                        "ux-empty-mobile.png" to "empty",
+                    ).forEach { (name, screenKey) ->
+                        addObject().apply {
+                            put("operation", "ADD"); putNull("existingArtifactName"); put("outputArtifactName", name)
+                            put("screenKey", screenKey); put("reason", "Dit bestand maakt de volledige UX-route controleerbaar.")
+                        }
+                    }
+                }
+                putArray("uxScreens").apply {
+                    addObject().apply {
+                        put("screenKey", "start"); put("state", "INITIAL"); put("purpose", "Toon de ingang naar de actuele productvoortgang.")
+                        putArray("artifacts").apply {
+                            addObject().put("viewport", "DESKTOP").put("artifactName", "ux-main-desktop.png")
+                            addObject().put("viewport", "MOBILE").put("artifactName", "ux-main-mobile.png")
+                        }
+                    }
+                    addObject().apply {
+                        put("screenKey", "empty"); put("state", "EMPTY"); put("purpose", "Toon de toestand zonder beschikbaar bewijs.")
+                        putArray("artifacts").apply {
+                            addObject().put("viewport", "DESKTOP").put("artifactName", "ux-empty-desktop.png")
+                            addObject().put("viewport", "MOBILE").put("artifactName", "ux-empty-mobile.png")
+                        }
+                    }
+                }
                 putArray("acceptanceCriteria").add(CRITERION_OVERVIEW).add(CRITERION_EVIDENCE)
                 put("slicabilityRationale", "Overzicht en bewijsdetail leveren elk zelfstandig gebruikerswaarde en vormen samen het complete pad.")
                 putArray("researchSources")
@@ -372,7 +408,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
                 put("content", "Bouw het scanbare productoverzicht met de actuele gebruikersverbetering, duidelijke status, lege en fouttoestand en een toegankelijke link naar bewijs.")
                 putArray("acceptanceCriteria").add("Het overzicht toont titel, samenvatting en status in hoofd- en lege toestand.")
                 put("uxDesign", "Toon één rustige overzichtskaart met toegankelijke status en bewijsactie.")
-                putArray("uxArtifactNames").add("ux-main.png")
+                putArray("uxArtifactNames").add("ux-main-desktop.png")
                 putArray("dependencies"); putArray("coveredAcceptanceCriteria").add(CRITERION_OVERVIEW)
                 put("priorityReason", "Het overzicht is de ingang voor de hele gebruikersflow.")
             }
@@ -410,10 +446,11 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         val job = runtime.onlyJob()
         runtime.results[job.id] = result
         if (result.path("epic").isObject) {
-            runtime.resultArtifacts[job.id] = listOf(
-                RuntimeArtifactView("ux-main", job.id, "ux-main.png", "image/png", 128, "1".repeat(64), java.time.Instant.now()),
-                RuntimeArtifactView("ux-empty", job.id, "ux-empty.png", "image/png", 128, "2".repeat(64), java.time.Instant.now()),
-            )
+            runtime.resultArtifacts[job.id] = result.path("epic").path("uxArtifactChanges")
+                .mapNotNull { it.path("outputArtifactName").takeIf(JsonNode::isTextual)?.asText() }
+                .mapIndexed { index, name ->
+                    RuntimeArtifactView("ux-$index", job.id, name, "image/png", 128, (index + 1).toString().take(1).repeat(64), java.time.Instant.now())
+                }
         }
         runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
         ai.reconcileActive()

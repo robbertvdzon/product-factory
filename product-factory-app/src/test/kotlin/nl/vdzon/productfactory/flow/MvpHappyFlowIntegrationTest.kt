@@ -1,5 +1,6 @@
 package nl.vdzon.productfactory.flow
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.ai.AiExecutionApplicationService
@@ -129,10 +130,11 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
         val job = runtime.onlyJob()
         runtime.results[job.id] = result
         if (result.path("epic").isObject) {
-            runtime.resultArtifacts[job.id] = listOf(
-                RuntimeArtifactView("ux-main", job.id, "ux-main.png", "image/png", 128, "1".repeat(64), java.time.Instant.now()),
-                RuntimeArtifactView("ux-empty", job.id, "ux-empty.png", "image/png", 128, "2".repeat(64), java.time.Instant.now()),
-            )
+            runtime.resultArtifacts[job.id] = result.path("epic").path("uxArtifactChanges")
+                .mapNotNull { it.path("outputArtifactName").takeIf(JsonNode::isTextual)?.asText() }
+                .mapIndexed { index, name ->
+                    RuntimeArtifactView("ux-$index", job.id, name, "image/png", 128, (index + 1).toString().take(1).repeat(64), java.time.Instant.now())
+                }
         }
         runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
         ai.reconcileActive()
@@ -148,6 +150,33 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
             putArray("directionReferences").addObject().put("type", "PRODUCT_ASSIGNMENT").put("id", productId.value).put("version", 1)
             put("visibleBehaviorChange", true)
             put("uxDesign", "Een rustige overzichtskaart met duidelijke status, actie en toegankelijke focusvolgorde.")
+            putArray("uxArtifactChanges").apply {
+                listOf(
+                    "ux-main-desktop.png" to "start", "ux-main-mobile.png" to "start",
+                    "ux-empty-desktop.png" to "empty", "ux-empty-mobile.png" to "empty",
+                ).forEach { (name, screenKey) ->
+                    addObject().apply {
+                        put("operation", "ADD"); putNull("existingArtifactName"); put("outputArtifactName", name)
+                        put("screenKey", screenKey); put("reason", "Dit bestand maakt de volledige UX-route aantoonbaar.")
+                    }
+                }
+            }
+            putArray("uxScreens").apply {
+                addObject().apply {
+                    put("screenKey", "start"); put("state", "INITIAL"); put("purpose", "Toon het afsprakenoverzicht als ingang van de route.")
+                    putArray("artifacts").apply {
+                        addObject().put("viewport", "DESKTOP").put("artifactName", "ux-main-desktop.png")
+                        addObject().put("viewport", "MOBILE").put("artifactName", "ux-main-mobile.png")
+                    }
+                }
+                addObject().apply {
+                    put("screenKey", "empty"); put("state", "EMPTY"); put("purpose", "Toon begrijpelijk dat er geen afspraak beschikbaar is.")
+                    putArray("artifacts").apply {
+                        addObject().put("viewport", "DESKTOP").put("artifactName", "ux-empty-desktop.png")
+                        addObject().put("viewport", "MOBILE").put("artifactName", "ux-empty-mobile.png")
+                    }
+                }
+            }
             putArray("acceptanceCriteria").add(CRITERION)
             put("slicabilityRationale", "Eén zelfstandige story levert de complete kleine gebruikersroute zonder verborgen vervolgwerk.")
             putArray("researchSources")
@@ -181,7 +210,7 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
             put("content", "Bouw de complete overzichtsroute met afspraakstatus, eerstvolgende actie, toegankelijke bediening en zichtbare laad-, lege en fouttoestand.")
             putArray("acceptanceCriteria").add(CRITERION)
             put("uxDesign", "Rustige kaart, duidelijke koppen en logische toetsenbordfocus.")
-            putArray("uxArtifactNames").add("ux-main.png")
+            putArray("uxArtifactNames").add("ux-main-desktop.png")
             putArray("dependencies")
             putArray("coveredAcceptanceCriteria").add(CRITERION)
             put("priorityReason", "Dit is de kleinste complete gebruikerswaarde.")

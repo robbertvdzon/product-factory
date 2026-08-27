@@ -62,7 +62,8 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         assertThat(epic.status).isEqualTo(EpicStatus.AVAILABLE)
         assertThat(epic.title).isEqualTo("Rustige voortgang")
         assertThat(epic.acceptanceCriteria).hasSize(2)
-        assertThat(epic.uxArtifacts).hasSize(2)
+        assertThat(epic.uxArtifacts).hasSize(4)
+        assertThat(epic.uxScreens.map { it.screenKey }).containsExactly("start", "empty")
         assertThat(epic.readiness.readyForPlanning).isTrue()
         val session = queries.findProcessSessions(ProcessSessionFilter(productId)).first()
         assertThat(session.status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
@@ -215,6 +216,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
                 putArray("unmetConditions")
                 putArray("openQuestions")
             }
+            keepExistingUx(draft, epic)
         }
         completeOnlyJob(refined)
         orchestrator.resumeReady()
@@ -224,6 +226,99 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         assertThat(epic.researchSources).hasSize(2)
         assertThat(epic.readiness.readyForPlanning).isTrue()
         assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+    }
+
+    @Test
+    fun `epicrevisie behoudt ieder bestaand UX artifact expliciet en voegt nieuwe schermvarianten toe`() {
+        design.runProcessSession(productId)
+        completeOnlyJob(validEpic())
+        design.runProcessSession(productId)
+        val current = queries.findEpics(EpicFilter(productId)).single()
+
+        design.requestEpicRefinement(RequestEpicRefinementCommand(
+            current.id, "Voeg een zelfstandig detailsscherm toe zonder bestaande schermen te verliezen.", current.version,
+            STAKEHOLDER, "ux-refine-${current.id.value}",
+        ))
+        val refinementTarget = queries.getEpic(current.id)
+        design.runProcessSession(productId)
+        val revised = validEpic().apply {
+            put("outcome", "REVISE_EPIC")
+            put("epicId", refinementTarget.id.value)
+            put("expectedVersion", refinementTarget.version)
+            val draft = path("epic") as ObjectNode
+            draft.putArray("uxArtifactChanges").apply {
+                refinementTarget.uxScreens.forEach { screen ->
+                    screen.artifacts.forEach { (_, name) ->
+                        addObject().apply {
+                            put("operation", "KEEP")
+                            put("existingArtifactName", name)
+                            putNull("outputArtifactName")
+                            put("screenKey", screen.screenKey)
+                            put("reason", "Dit scherm blijft ongewijzigd onderdeel van de hoofdroute.")
+                        }
+                    }
+                }
+                addObject().apply {
+                    put("operation", "ADD"); putNull("existingArtifactName"); put("outputArtifactName", "ux-detail-desktop.png")
+                    put("screenKey", "detail"); put("reason", "Het nieuwe detailsscherm maakt de aanvullende route compleet.")
+                }
+                addObject().apply {
+                    put("operation", "ADD"); putNull("existingArtifactName"); put("outputArtifactName", "ux-detail-mobile.png")
+                    put("screenKey", "detail"); put("reason", "De mobiele variant maakt het nieuwe detailsscherm responsive compleet.")
+                }
+            }
+            draft.putArray("uxScreens").apply {
+                refinementTarget.uxScreens.forEach { screen ->
+                    addObject().apply {
+                        put("screenKey", screen.screenKey); put("state", screen.state.name); put("purpose", screen.purpose)
+                        putArray("artifacts").apply {
+                            screen.artifacts.forEach { (viewport, name) -> addObject().put("viewport", viewport.name).put("artifactName", name) }
+                        }
+                    }
+                }
+                addObject().apply {
+                    put("screenKey", "detail"); put("state", "DETAIL"); put("purpose", "Toon het gekozen bewijs met een duidelijke terugroute.")
+                    putArray("artifacts").apply {
+                        addObject().put("viewport", "DESKTOP").put("artifactName", "ux-detail-desktop.png")
+                        addObject().put("viewport", "MOBILE").put("artifactName", "ux-detail-mobile.png")
+                    }
+                }
+            }
+        }
+        completeOnlyJob(revised)
+        design.runProcessSession(productId)
+
+        val result = queries.getEpic(current.id)
+        assertThat(result.uxArtifacts.map { it.name }).containsExactly(
+            "ux-main-desktop.png", "ux-main-mobile.png", "ux-empty-desktop.png", "ux-empty-mobile.png",
+            "ux-detail-desktop.png", "ux-detail-mobile.png",
+        )
+        assertThat(result.uxScreens.map { it.screenKey }).containsExactly("start", "empty", "detail")
+    }
+
+    @Test
+    fun `epicrevisie kan bestaande UX artifacts niet stilzwijgend laten verdwijnen`() {
+        design.runProcessSession(productId)
+        completeOnlyJob(validEpic())
+        design.runProcessSession(productId)
+        val original = queries.findEpics(EpicFilter(productId)).single()
+        design.requestEpicRefinement(RequestEpicRefinementCommand(
+            original.id, "Controleer dat alle bestaande UX-schermen behouden blijven.", original.version,
+            STAKEHOLDER, "silent-loss-${original.id.value}",
+        ))
+        val target = queries.getEpic(original.id)
+        design.runProcessSession(productId)
+        val invalidRevision = validEpic().apply {
+            put("outcome", "REVISE_EPIC")
+            put("epicId", target.id.value)
+            put("expectedVersion", target.version)
+        }
+        completeOnlyJob(invalidRevision)
+        design.runProcessSession(productId)
+
+        assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).first().status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(queries.getEpic(original.id).version).isEqualTo(target.version)
+        assertThat(queries.getEpic(original.id).uxArtifacts.map { it.name }).containsExactlyElementsOf(target.uxArtifacts.map { it.name })
     }
 
     private fun validatedSource(uri: String, name: String) = mapper.createObjectNode().apply {
@@ -254,10 +349,11 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         ai.dispatchPending()
         val job = runtime.jobs.values.single { it.status != "SUCCEEDED" }
         runtime.results[job.id] = result
-        runtime.resultArtifacts[job.id] = listOf(
-            RuntimeArtifactView("ux-main", job.id, "ux-main.png", "image/png", 128, "1".repeat(64), java.time.Instant.now()),
-            RuntimeArtifactView("ux-empty", job.id, "ux-empty.png", "image/png", 128, "2".repeat(64), java.time.Instant.now()),
-        )
+        runtime.resultArtifacts[job.id] = result.path("epic").path("uxArtifactChanges")
+            .mapNotNull { it.path("outputArtifactName").takeIf(JsonNode::isTextual)?.asText() }
+            .mapIndexed { index, name ->
+                RuntimeArtifactView("ux-$index", job.id, name, "image/png", 128, (index + 1).toString().take(1).repeat(64), java.time.Instant.now())
+            }
         runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
         ai.reconcileActive()
     }
@@ -272,6 +368,16 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
             putArray("directionReferences").addObject().put("type", "PRODUCT_ASSIGNMENT").put("id", productId.value).put("version", 1)
             put("visibleBehaviorChange", true)
             put("uxDesign", "Eén scanbaar voortgangsblok met titel, samenvatting, status en bewijslink.")
+            putArray("uxArtifactChanges").apply {
+                addUxArtifact("ux-main-desktop.png", "start")
+                addUxArtifact("ux-main-mobile.png", "start")
+                addUxArtifact("ux-empty-desktop.png", "empty")
+                addUxArtifact("ux-empty-mobile.png", "empty")
+            }
+            putArray("uxScreens").apply {
+                addUxScreen("start", "INITIAL", "Toon de actuele verbetering als ingang van de hoofdroute.", "ux-main-desktop.png", "ux-main-mobile.png")
+                addUxScreen("empty", "EMPTY", "Leg begrijpelijk uit dat er nog geen bewijs beschikbaar is.", "ux-empty-desktop.png", "ux-empty-mobile.png")
+            }
             putArray("acceptanceCriteria").add("De Stakeholder ziet de actuele verbetering en status op het productoverzicht.").add("De bewijslink opent de opgeslagen bron zonder technische databasekennis.")
             put("slicabilityRationale", "De verbetering heeft één gebruikersdoel en kan langs overzicht, detail en bewijs in zelfstandige slices worden geleverd.")
             putArray("researchSources")
@@ -284,6 +390,50 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         })
         putArray("processedSignalIds")
         putArray("memoryChanges")
+    }
+
+    private fun com.fasterxml.jackson.databind.node.ArrayNode.addUxArtifact(name: String, screenKey: String) {
+        addObject().apply {
+            put("operation", "ADD"); putNull("existingArtifactName"); put("outputArtifactName", name)
+            put("screenKey", screenKey); put("reason", "Dit bestand maakt het UX-scherm aantoonbaar en compleet.")
+        }
+    }
+
+    private fun com.fasterxml.jackson.databind.node.ArrayNode.addUxScreen(
+        screenKey: String,
+        state: String,
+        purpose: String,
+        desktop: String,
+        mobile: String,
+    ) {
+        addObject().apply {
+            put("screenKey", screenKey); put("state", state); put("purpose", purpose)
+            putArray("artifacts").apply {
+                addObject().put("viewport", "DESKTOP").put("artifactName", desktop)
+                addObject().put("viewport", "MOBILE").put("artifactName", mobile)
+            }
+        }
+    }
+
+    private fun keepExistingUx(draft: ObjectNode, epic: EpicDetails) {
+        draft.putArray("uxArtifactChanges").apply {
+            epic.uxScreens.forEach { screen ->
+                screen.artifacts.values.forEach { name ->
+                    addObject().apply {
+                        put("operation", "KEEP"); put("existingArtifactName", name); putNull("outputArtifactName")
+                        put("screenKey", screen.screenKey); put("reason", "Dit bestaande scherm blijft volledig geldig.")
+                    }
+                }
+            }
+        }
+        draft.set<JsonNode>("uxScreens", mapper.valueToTree(epic.uxScreens.map { screen ->
+            mapOf(
+                "screenKey" to screen.screenKey,
+                "state" to screen.state.name,
+                "purpose" to screen.purpose,
+                "artifacts" to screen.artifacts.map { (viewport, name) -> mapOf("viewport" to viewport.name, "artifactName" to name) },
+            )
+        }))
     }
 
     private fun product(id: String): ProductId {

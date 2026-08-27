@@ -2335,6 +2335,24 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               ),
               SelectableText('${epic['uxDesign']}'),
             ],
+            if ((epic['uxScreens'] as List? ?? const []).isNotEmpty) ...[
+              const SizedBox(height: 8),
+              SelectableText(
+                'Volledige UX-schermset',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              ...(epic['uxScreens'] as List).map((raw) {
+                final screen = (raw as Map).cast<String, Object?>();
+                final variants =
+                    ((screen['artifacts'] as Map?)?.keys ?? const [])
+                        .map((value) => '$value')
+                        .join(', ');
+                return SelectableText(
+                  '• ${screen['screenKey']} · ${screen['state']} · $variants\n'
+                  '  ${screen['purpose']}',
+                );
+              }),
+            ],
             ..._uxArtifactGallery(
               context,
               (epic['uxArtifacts'] as List? ?? const <Object?>[])

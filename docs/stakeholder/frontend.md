@@ -237,7 +237,10 @@ de volledige inhoud samen te vatten.
 Epic-, story- en bugdetails tonen bovenaan de opgeslagen `title` met daaronder de `summary` van
 maximaal twee korte zinnen. Daaronder staat altijd de volledige inhoud. Een epic toont dus ook
 probleem, oplossing, relatie met productdoel of besluiten, eventueel het actuele UX-ontwerp,
-testbare acceptatiecriteria en uitleg over de behapbaarheid. Een story toont zelfstandig alle
+de volledige actuele UX-schermset, testbare acceptatiecriteria en uitleg over de behapbaarheid.
+Productontwerp bewaart per scherm een stabiele sleutel, toestand en desktop-/mobiele variant; een
+revisie kan een bestaand artifact alleen expliciet behouden, vervangen of gemotiveerd verwijderen.
+Een story toont zelfstandig alle
 relevante UX en assets die ook naar Software Factory worden verstuurd. Een verificatie toont
 omgeving, controles, oordeel en bewijs. Een besluit toont normaal
 alleen de geldige tekst; een aparte archiefweergave toont eerdere versies, ingetrokken besluiten en

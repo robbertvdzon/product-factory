@@ -73,8 +73,11 @@ idempotentiesleutel. Geen command geeft vrije schrijftoegang tot storyinhoud of 
 3. **Laat de Planner kiezen.** Vraag een complete selectietaak aan. De sessie wacht zonder thread en
    hervat zonder duplicaat. Applicatiecode claimt iedere gekozen exacte epicversie via
    Productontwerp.
-4. **Laat de Planner volledig plannen.** Gebruik dezelfde rol voor de complete storyset, gericht
-   herstelwerk en de definitieve volgorde van alle bestaande en nieuwe `TODO`-stories.
+4. **Laat de Planner volledig plannen.** Bouw na selectie een nieuwe compacte context met iedere
+   geselecteerde epic exact eenmaal, volledige bestaande `TODO`-stories en alleen korte referenties
+   naar `IN_PROGRESS`-stories. Geef geen volledige `DONE`- of `CANCELLED`-historie en niet opnieuw de
+   selectiecontext mee. Gebruik dezelfde rol voor de complete storyset, gericht herstelwerk en de
+   definitieve volgorde van alle bestaande en nieuwe `TODO`-stories.
 5. **Valideer deterministisch.** Controleer het volledige Storycontract, epic-/bugbronversies,
    volledige epicdekking, UX, acceptatiecriteria, afhankelijkheden, annuleringsmarker, toegestane
    typen/statussen en unieke productbrede volgorde. Alleen `TODO` mag herordend worden.

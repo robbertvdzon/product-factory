@@ -169,6 +169,12 @@ Gewone code controleert minimaal:
 - minimaal twee werkelijk gevalideerde publieke bronnen bij externe data-afhankelijkheid;
 - screenshots voor alle afzonderlijke schermen en visueel verschillende toestanden van de hoofdroute,
   waaronder het initiële invoerscherm en een lege of fouttoestand;
+- een duurzame, volledige `uxScreens`-inventaris met per logisch scherm een stabiele sleutel, doel,
+  toestand en minimaal een desktop- en mobiele variant;
+- dat iedere revisie ieder bestaand UX-artifact exact eenmaal als `KEEP`, `REPLACE` of `REMOVE`
+  beoordeelt en ieder nieuw artifact als `ADD` of `REPLACE`; verwijderen vereist een concrete reden;
+- dat ieder artifact uit de samengestelde actuele set exact eenmaal aan een scherm en viewport is
+  gekoppeld, zodat niets stilzwijgend kan verdwijnen;
 - dat readiness geen onvervulde voorwaarden of open vragen bevat voordat status `AVAILABLE` volgt;
 - dat een externe bron niet alleen bereikbaar is, maar dat API/feed/export, harvesting, opslag en
   indexering concreet genoeg zijn om stories te maken;
@@ -182,8 +188,10 @@ duurzaam als `NEEDS_REFINEMENT` gepubliceerd en begrensd verder ontworpen.
 
 ### Stap 5 — publiceren en input afhandelen
 
-Bij geldige output schrijft Productontwerp de nieuwe epicversie en sessie-uitkomst in één
-transactie. Een herziene versie maakt de vorige beschikbare versie `SUPERSEDED`. Als de epic
+Bij geldige output stelt Productontwerp de actuele UX-set samen uit expliciet behouden en nieuw
+opgeleverde artifacts en schrijft het de nieuwe epicversie, volledige scherminventaris en
+sessie-uitkomst in één transactie. Een herziene versie maakt de vorige beschikbare versie
+`SUPERSEDED`. Als de epic
 intussen door Productplanning is geclaimd, faalt de publicatie gesloten.
 
 Verwerkte gebruikerssignalen worden daarna via de publieke commands van de productmodule aan de

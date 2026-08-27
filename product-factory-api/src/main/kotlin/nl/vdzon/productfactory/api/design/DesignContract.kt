@@ -6,6 +6,15 @@ import java.time.Instant
 enum class EpicStatus { NEEDS_RESEARCH, NEEDS_REFINEMENT, AWAITING_APPROVAL, AVAILABLE, IN_PLANNING, ACTIVE, VERIFYING, COMPLETED, NOT_SUCCESSFUL, SUPERSEDED, WITHDRAWN, CANCELLED }
 enum class EpicVerificationOutcome { PASSED, NOT_SUCCESSFUL, NEEDS_WORK, BLOCKED }
 enum class ResearchSourceStatus { CANDIDATE, VALIDATED, BLOCKED }
+enum class UxScreenState { INITIAL, MAIN, DETAIL, EMPTY, ERROR, OTHER }
+enum class UxViewport { DESKTOP, MOBILE, OTHER }
+
+data class EpicUxScreen(
+    val screenKey: String,
+    val state: UxScreenState,
+    val purpose: String,
+    val artifacts: Map<UxViewport, String>,
+)
 
 data class EpicResearchSource(
     val name: String,
@@ -49,6 +58,7 @@ data class EpicDetails(
     val researchSources: List<EpicResearchSource> = emptyList(),
     val readiness: EpicReadinessDetails = EpicReadinessDetails(false, false, listOf("Gereedheid is nog niet beoordeeld.")),
     val uxArtifacts: List<ArtifactReference> = emptyList(),
+    val uxScreens: List<EpicUxScreen> = emptyList(),
     val refinementReason: String? = null,
 )
 data class ApproveEpicCommand(val epicId: EpicId, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
