@@ -109,6 +109,23 @@ class AuthenticationFlowTest(
     }
 
     @Test
+    fun `een nieuwe login laat een bestaande browsersessie actief`() {
+        val firstLogin = login()
+        val firstSessionCookie = cookie(firstLogin, ProductFactorySessionService.SESSION_COOKIE)
+        val firstCsrfCookie = cookie(firstLogin, ProductFactorySessionService.CSRF_COOKIE)
+
+        login()
+
+        mockMvc.get("/api/auth/session") {
+            cookie(firstSessionCookie, firstCsrfCookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.authenticated") { value(true) }
+            jsonPath("$.stakeholderEmail") { value("stakeholder@example.com") }
+        }
+    }
+
+    @Test
     fun `mutatie met verkeerde origin wordt geweigerd`() {
         mockMvc.post("/api/auth/google") {
             header(HttpHeaders.ORIGIN, "https://attacker.invalid")

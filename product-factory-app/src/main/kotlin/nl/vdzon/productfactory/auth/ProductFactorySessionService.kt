@@ -41,7 +41,6 @@ class ProductFactorySessionService(
         val now = clock.instant()
         val sessionId = randomTokenHex(32)
         val csrfToken = randomTokenUrlSafe(32)
-        repository.revokeActiveForEmail(email, now)
         repository.create(
             AuthenticationSession(
                 sessionId = sessionId,
@@ -108,7 +107,7 @@ class ProductFactorySessionService(
         const val SESSION_COOKIE = "PF_SESSION"
         const val CSRF_COOKIE = "PF_CSRF"
         const val CSRF_HEADER = "X-PF-CSRF"
-        private val SESSION_LIFETIME: Duration = Duration.ofHours(12)
+        private val SESSION_LIFETIME: Duration = Duration.ofDays(30)
     }
 }
 

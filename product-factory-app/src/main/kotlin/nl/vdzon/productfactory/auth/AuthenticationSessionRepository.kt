@@ -53,14 +53,4 @@ class AuthenticationSessionRepository(
             sessionId,
         )
     }
-
-    fun revokeActiveForEmail(email: String, now: Instant) {
-        jdbcTemplate.update(
-            "UPDATE authentication_session SET revoked_at = ? " +
-                "WHERE stakeholder_email = ? AND revoked_at IS NULL AND expires_at > ?",
-            Timestamp.from(now),
-            email,
-            Timestamp.from(now),
-        )
-    }
 }

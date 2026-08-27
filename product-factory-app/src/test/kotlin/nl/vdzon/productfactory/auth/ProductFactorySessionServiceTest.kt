@@ -3,7 +3,6 @@ package nl.vdzon.productfactory.auth
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.verify
 import org.springframework.http.HttpHeaders
 import org.springframework.mock.web.MockHttpServletResponse
 import java.time.Clock
@@ -15,7 +14,7 @@ class ProductFactorySessionServiceTest {
     private val repository = mock(AuthenticationSessionRepository::class.java)
 
     @Test
-    fun `productiecookie is secure httpOnly sameSite en maximaal twaalf uur geldig`() {
+    fun `productiecookie is secure httpOnly sameSite en dertig dagen geldig`() {
         val response = MockHttpServletResponse()
         val service = ProductFactorySessionService(
             repository,
@@ -28,8 +27,7 @@ class ProductFactorySessionServiceTest {
 
         val sessionCookie = response.getHeaders(HttpHeaders.SET_COOKIE).first { it.startsWith("PF_SESSION=") }
         assertThat(sessionCookie)
-            .contains("Secure", "HttpOnly", "SameSite=Lax", "Max-Age=43200")
+            .contains("Secure", "HttpOnly", "SameSite=Lax", "Max-Age=2592000")
         assertThat(status.csrfToken).isNotBlank()
-        verify(repository).revokeActiveForEmail("stakeholder@example.com", now)
     }
 }
