@@ -9,6 +9,7 @@ import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.product.ProductQueryService
 import nl.vdzon.productfactory.api.product.ProductStatus
 import nl.vdzon.productfactory.api.shared.*
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
@@ -40,6 +41,7 @@ class SoftwareFactoryDispatcherMvpService(
     @Value("\${PF_APPLICATION_VERSION:0.1.0-SNAPSHOT}") private val implementationVersion: String,
     @Value("\${PF_GIT_REVISION:unknown}") private val sourceRevision: String,
 ) : SoftwareFactoryDispatcherService, SoftwareFactoryDispatcherQueryService {
+    private val log = LoggerFactory.getLogger(javaClass)
     private val transactions = TransactionTemplate(transactionManager)
     private val adaptersByMode = adapters.associateBy { it.mode }
 
@@ -51,6 +53,9 @@ class SoftwareFactoryDispatcherMvpService(
         } catch (failure: SoftwareFactoryFailure) {
             transactions.executeWithoutResult { blockSession(sessionId, failure.code, safeMessage(failure)) }
         } catch (error: Exception) {
+            // Onverwachte (niet-getypeerde) fout: zonder deze regel is er geen enkel spoor van de
+            // oorzaak, want de sessie zelf bewaart alleen de generieke "DISPATCH_FAILED"-code.
+            log.warn("dispatch_session_failed productId={} sessionId={}", productId.value, sessionId.value, error)
             transactions.executeWithoutResult { blockSession(sessionId, "DISPATCH_FAILED", "Dispatcher kon veilig niet worden voortgezet.") }
         }
     }
@@ -299,16 +304,30 @@ class SoftwareFactoryDispatcherMvpService(
     }
 
     private fun createAttempt(sessionId: ProcessSessionId, reservation: StoryDispatchReservationDetails, packageJson: String): AttemptRow {
-        val id = DeliveryAttemptId(UUID.randomUUID().toString())
         val key = "product-factory:${reservation.story.productId.value}:story:${reservation.story.id.value}:v${reservation.story.version}"
         val hash = sha256(packageJson.toByteArray())
         val now = clock.instant()
-        jdbc.update(
-            """INSERT INTO pf_delivery_attempt(id,product_id,story_id,story_version,reservation_id,idempotency_key,package_hash,package_json,status,
-                attempt_count,local_command_status,last_session_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
-            id.value, reservation.story.productId.value, reservation.story.id.value, reservation.story.version, reservation.reservationId,
-            key, hash, packageJson, "PENDING", 0, "NOT_REQUIRED", sessionId.value, now, now,
-        )
+        // idempotency_key is deterministisch (productId:storyId:version) en UNIQUE: een eerdere
+        // gecancelde poging voor exact dezelfde storyversie laat haar rij staan (audit-historie),
+        // dus een nieuwe INSERT zou altijd op die rij botsen. Hergebruik 'm in dat geval i.p.v. een
+        // nieuwe rij te maken — anders zit een product na één CANCELLED attempt voorgoed vast.
+        val existingCancelled = attemptRows("WHERE idempotency_key=? AND status='CANCELLED'", key).singleOrNull()
+        val id = existingCancelled?.id ?: DeliveryAttemptId(UUID.randomUUID().toString())
+        if (existingCancelled != null) {
+            jdbc.update(
+                """UPDATE pf_delivery_attempt SET story_version=?,reservation_id=?,package_hash=?,package_json=?,status='PENDING',
+                    attempt_count=0,external_story_id=NULL,external_status=NULL,delivered_commit_sha=NULL,retry_after=NULL,
+                    last_error_code=NULL,last_error_message=NULL,local_command_status='NOT_REQUIRED',last_session_id=?,updated_at=? WHERE id=?""".trimIndent(),
+                reservation.story.version, reservation.reservationId, hash, packageJson, sessionId.value, now, id.value,
+            )
+        } else {
+            jdbc.update(
+                """INSERT INTO pf_delivery_attempt(id,product_id,story_id,story_version,reservation_id,idempotency_key,package_hash,package_json,status,
+                    attempt_count,local_command_status,last_session_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+                id.value, reservation.story.productId.value, reservation.story.id.value, reservation.story.version, reservation.reservationId,
+                key, hash, packageJson, "PENDING", 0, "NOT_REQUIRED", sessionId.value, now, now,
+            )
+        }
         return attemptRows("WHERE id=?", id.value).single()
     }
 

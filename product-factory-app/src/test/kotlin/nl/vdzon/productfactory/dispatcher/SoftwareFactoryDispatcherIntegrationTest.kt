@@ -171,6 +171,31 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         assertThat(mock.find(productId.value, "OPEN")).hasSize(1)
     }
 
+    @Test
+    fun `dispatchen na een eerder gecancelde poging voor dezelfde storyversie hergebruikt de rij i-p-v-te botsen`() {
+        // Zet neer wat een operator overhoudt na het handmatig annuleren van een permanent
+        // mislukte (CONTRACT_FAILURE) poging: de aanmaak bij Software Factory is nooit gelukt
+        // (geen externalStoryId), de story bleef TODO en dus ongewijzigd van versie — dezelfde
+        // idempotency_key als een verse poging voor exact deze storyversie zou genereren.
+        val key = "product-factory:${productId.value}:story:${firstStory.value}:v1"
+        val cancelledId = UUID.randomUUID().toString()
+        val now = clock.instant()
+        jdbc.update(
+            """INSERT INTO pf_delivery_attempt(id,product_id,story_id,story_version,reservation_id,idempotency_key,package_hash,package_json,
+                status,attempt_count,local_command_status,created_at,updated_at)
+                VALUES (?,?,?,1,?,?,'deadbeef','{}','CANCELLED',1,'APPLIED',?,?)""".trimIndent(),
+            cancelledId, productId.value, firstStory.value, UUID.randomUUID().toString(), key, now, now,
+        )
+
+        dispatcher.runDispatchSession(productId)
+
+        val attempts = queries.findDeliveryAttempts(DeliveryAttemptFilter(productId))
+        assertThat(attempts).hasSize(1)
+        assertThat(attempts.single().id).isEqualTo(DeliveryAttemptId(cancelledId))
+        assertThat(attempts.single().status).isEqualTo(DeliveryAttemptStatus.ACCEPTED)
+        assertThat(planningQueries.getStory(firstStory).status).isEqualTo(StoryStatus.IN_PROGRESS)
+    }
+
     private fun createUxArtifact(): ArtifactReference {
         val taskId = aiCommands.requestAiTask(RequestAiTaskCommand(
             AiJobKey("PLANNING.SLICE_EPIC"), productId, "planning", null, "PLANNER_MVP", AiProvider.CODEX, "gpt-5.6-sol", 0,
