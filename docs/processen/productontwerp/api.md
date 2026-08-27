@@ -216,11 +216,16 @@ beschikbaar bewijs kan richting geven, maar is geen acceptatiecriterium voor dez
 
 Iedere gepubliceerde epicversie is inhoudelijk onveranderlijk.
 
-Zolang een epic `NEEDS_RESEARCH` of `AVAILABLE` is, mag Productontwerp:
+Zolang een epic `NEEDS_RESEARCH`, `NEEDS_REFINEMENT`, `AWAITING_APPROVAL` of `AVAILABLE` is, mag Productontwerp:
 
 - een nieuwe versie publiceren;
 - de vorige versie `SUPERSEDED` maken;
 - de epic via `withdrawEpic(...)` intrekken met status `WITHDRAWN` en een zichtbare reden.
+
+De Stakeholder en Planner mogen een epic met `requestEpicRefinement(...)` met een verplichte vrije
+tekstreden terugzetten naar `NEEDS_REFINEMENT`. Niet begonnen stories verdwijnen als `CANCELLED` uit
+de backlog; lopende stories krijgen een idempotente annuleringsopdracht voor Software Factory;
+opgeleverde stories blijven historisch staan.
 
 Zodra `claimEpicForPlanning(...)` een exact epic-ID en versienummer heeft gekozen:
 
@@ -249,13 +254,16 @@ langlopende processessie nooit een inmiddels geclaimde epic overschrijven.
 ## Publieke levenscyclus van een epic
 
 ```text
-NEEDS_RESEARCH ──onderzoek, UX en readiness compleet──> AVAILABLE ──claim──> IN_PLANNING ──stories gepubliceerd──> ACTIVE
-    ├──nieuwere versie──> SUPERSEDED                         ├──klaar voor complete beoordeling──> VERIFYING
-    └──intrekken────────> WITHDRAWN                          │                       │
-                                                             │                       ├──geslaagd──────> COMPLETED
-                                                             │                       ├──niet geslaagd──> NOT_SUCCESSFUL
-                                                             │                       └──herstel nodig──> ACTIVE
-                                                             └──annuleren──────────> CANCELLED
+NEEDS_RESEARCH / NEEDS_REFINEMENT
+    ├──gereed + automatische modus────────────────────────> AVAILABLE
+    ├──gereed + handmatige modus──> AWAITING_APPROVAL ────> AVAILABLE
+    └──intrekken───────────────────────────────────────────> WITHDRAWN
+
+AVAILABLE ──claim──> IN_PLANNING ──stories──> ACTIVE ──controle──> VERIFYING
+    ^                         │                    │                    ├──> COMPLETED
+    │                         └──annuleren────────> CANCELLED           ├──> NOT_SUCCESSFUL
+    └──────────────terugsturen met vrije reden─────────────────────────└──> ACTIVE
+                                   └───────────────────────────────> NEEDS_REFINEMENT
 ```
 
 Meerdere epics mogen tegelijkertijd in planning, actief of in verificatie zijn.

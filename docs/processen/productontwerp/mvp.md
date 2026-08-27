@@ -140,7 +140,7 @@ maken, maar om de belangrijkste aantoonbare en behapbare gebruikersverbetering v
 werken. De huidige run publiceert nog niets en keert wachtend terug.
 
 De achtergrondcoördinator leest een afgerond `AiTaskResult` en hervat de sessie automatisch. Een
-onrijp ontwerp wordt als `NEEDS_RESEARCH` bewaard en krijgt binnen dezelfde sessie maximaal drie
+onrijp ontwerp wordt als `NEEDS_REFINEMENT` bewaard en krijgt binnen dezelfde sessie maximaal drie
 begrensde ontwerpiteraties. Daarna blijft de epic zichtbaar onrijp in plaats van planbaar te worden.
 
 De agent retourneert volgens een vast schema:
@@ -167,14 +167,18 @@ Gewone code controleert minimaal:
 - afwezigheid van stories of een vooraf gemaakte backlog;
 - product-ID en geldige richtingsreferenties;
 - minimaal twee werkelijk gevalideerde publieke bronnen bij externe data-afhankelijkheid;
-- minimaal twee afbeeldingsartefacten bij zichtbare UX, waaronder hoofd- en lege of fouttoestand;
+- screenshots voor alle afzonderlijke schermen en visueel verschillende toestanden van de hoofdroute,
+  waaronder het initiële invoerscherm en een lege of fouttoestand;
 - dat readiness geen onvervulde voorwaarden of open vragen bevat voordat status `AVAILABLE` volgt;
-- dat een herziene epic nog `NEEDS_RESEARCH` of `AVAILABLE` is en de verwachte versie heeft.
+- dat een externe bron niet alleen bereikbaar is, maar dat API/feed/export, harvesting, opslag en
+  indexering concreet genoeg zijn om stories te maken;
+- dat een herziene epic nog `NEEDS_RESEARCH`, `NEEDS_REFINEMENT`, `AWAITING_APPROVAL` of `AVAILABLE`
+  is en de verwachte versie heeft.
 
 Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
 AI-uitvoering; de procesmodule maakt daarvoor geen duplicerende taak.
 Een inhoudelijk ongeldig concept wordt niet gepubliceerd. Een geldig maar onrijp concept wordt
-duurzaam als `NEEDS_RESEARCH` gepubliceerd en begrensd verder ontworpen.
+duurzaam als `NEEDS_REFINEMENT` gepubliceerd en begrensd verder ontworpen.
 
 ### Stap 5 — publiceren en input afhandelen
 
@@ -184,7 +188,8 @@ intussen door Productplanning is geclaimd, faalt de publicatie gesloten.
 
 Verwerkte gebruikerssignalen worden daarna via de publieke commands van de productmodule aan de
 gepubliceerde epic gekoppeld. Er gaat geen request naar Productplanning; haar eigen schedule ontdekt
-de `AVAILABLE` epic.
+de `AVAILABLE` epic. Bij producten met handmatige epicgoedkeuring publiceert Productontwerp eerst
+`AWAITING_APPROVAL`; alleen de Stakeholder zet die versie op `AVAILABLE`.
 
 ## Wat bewust niet in de MVP zit
 

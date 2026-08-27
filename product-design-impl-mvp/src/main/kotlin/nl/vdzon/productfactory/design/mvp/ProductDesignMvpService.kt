@@ -218,6 +218,7 @@ class ProductDesignMvpService(
             set<JsonNode>("currentEpicToRefine", mapper.valueToTree(epic))
             putArray("requiredRefinements").addAll(epic.readiness.unmetConditions.map(mapper.nodeFactory::textNode))
             putArray("openQuestionsToResolve").addAll(epic.readiness.openQuestions.map(mapper.nodeFactory::textNode))
+            epic.refinementReason?.let { put("stakeholderRefinementReason", it) }
         }
         requestTask(
             sessionId, epic.productId, mapper.writeValueAsString(snapshot),
@@ -236,20 +237,23 @@ class ProductDesignMvpService(
             "CREATE_EPIC", "REVISE_EPIC", "REVISE_AVAILABLE_EPIC" -> {
                 val draft = validateDraft(result.path("epic"), frozenInputs(sessionId), artifacts)
                 val outcome = result.path("outcome").asText()
-                val existingResearchEpic = findEpics(EpicFilter(getProcessSession(sessionId).productId, setOf(EpicStatus.NEEDS_RESEARCH))).singleOrNull()
+                val existingResearchEpic = findEpics(EpicFilter(
+                    getProcessSession(sessionId).productId,
+                    setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT),
+                )).singleOrNull()
                 val epic = if (outcome == "CREATE_EPIC") {
                     existingResearchEpic?.let { reviseEpic(sessionId, it, draft) } ?: publishNewEpic(sessionId, draft)
                 } else {
                     reviseEpic(sessionId, result, draft)
                 }
                 applyTrustedEffects(sessionId, result, epic)
-                if (epic.status == EpicStatus.NEEDS_RESEARCH && sessionTaskIds(sessionId).size < MAX_DESIGN_ITERATIONS) {
+                if (epic.status in setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT) && sessionTaskIds(sessionId).size < MAX_DESIGN_ITERATIONS) {
                     requestRefinement(sessionId, epic)
                 } else {
-                    val summary = if (epic.status == EpicStatus.AVAILABLE) {
+                    val summary = if (epic.status in setOf(EpicStatus.AVAILABLE, EpicStatus.AWAITING_APPROVAL)) {
                         "Epic ${epic.id.value} versie ${epic.version} is gereed voor planning."
                     } else {
-                        "Epic ${epic.id.value} versie ${epic.version} blijft NEEDS_RESEARCH: ${epic.readiness.unmetConditions.joinToString("; ")}"
+                        "Epic ${epic.id.value} versie ${epic.version} blijft NEEDS_REFINEMENT: ${epic.readiness.unmetConditions.joinToString("; ")}"
                     }
                     finishSession(sessionId, summary, listOf(SourceReference("EPIC", epic.id.value, epic.version)))
                 }
@@ -342,12 +346,12 @@ class ProductDesignMvpService(
 
     private fun publishNewEpic(sessionId: ProcessSessionId, draft: EpicDraft): EpicDetails {
         val session = getProcessSession(sessionId)
-        if (findEpics(EpicFilter(session.productId, setOf(EpicStatus.NEEDS_RESEARCH))).isNotEmpty()) {
-            throw InvalidCommand("Werk de bestaande NEEDS_RESEARCH-epic bij voordat een nieuwe epic wordt gemaakt.")
+        if (findEpics(EpicFilter(session.productId, setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT))).isNotEmpty()) {
+            throw InvalidCommand("Werk de bestaande epic met ontbrekende uitwerking bij voordat een nieuwe epic wordt gemaakt.")
         }
         val id = EpicId(UUID.randomUUID().toString())
         val now = clock.instant()
-        val status = draft.status()
+        val status = publicationStatus(session.productId, draft.status())
         jdbc.update(
             "INSERT INTO pf_epic(id,product_id,current_version,status,created_at,updated_at) VALUES (?,?,?,?,?,?)",
             id.value, session.productId.value, 1L, status.aggregateStatus().name, now, now,
@@ -361,7 +365,7 @@ class ProductDesignMvpService(
         val expected = result.path("expectedVersion").takeIf(JsonNode::isIntegralNumber)?.asLong()
             ?: throw InvalidCommand("Een herziene epic mist de verwachte versie.")
         val current = getEpic(epicId)
-        if (current.productId != getProcessSession(sessionId).productId || current.status !in setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.AVAILABLE) || current.version != expected) {
+        if (current.productId != getProcessSession(sessionId).productId || current.status !in REFINABLE_STATUSES || current.version != expected) {
             throw VersionConflict("Alleen de exact bevroren ontwerp- of beschikbare epicversie kan worden herzien.")
         }
         return reviseEpic(sessionId, current, draft)
@@ -370,15 +374,15 @@ class ProductDesignMvpService(
     private fun reviseEpic(sessionId: ProcessSessionId, current: EpicDetails, draft: EpicDraft): EpicDetails {
         val epicId = current.id
         val expected = current.version
-        if (current.productId != getProcessSession(sessionId).productId || current.status !in setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.AVAILABLE)) {
+        if (current.productId != getProcessSession(sessionId).productId || current.status !in REFINABLE_STATUSES) {
             throw VersionConflict("Alleen de actuele ontwerp- of beschikbare epicversie kan worden herzien.")
         }
         val next = current.version + 1
         val now = clock.instant()
-        val status = draft.status()
+        val status = publicationStatus(current.productId, draft.status())
         insertVersion(epicId, next, draft, status, frozenInputs(sessionId), DESIGN_ACTOR, now, supersedesVersion = expected)
         if (jdbc.update(
-                "UPDATE pf_epic SET current_version=?,status=?,updated_at=? WHERE id=? AND current_version=? AND status IN ('NEEDS_RESEARCH','AVAILABLE')",
+                "UPDATE pf_epic SET current_version=?,status=?,refinement_reason=NULL,updated_at=? WHERE id=? AND current_version=?",
                 next, status.aggregateStatus().name, now, epicId.value, expected,
             ) != 1
         ) throw VersionConflict("Epic is tijdens publicatie gewijzigd.")
@@ -428,6 +432,30 @@ class ProductDesignMvpService(
     }
 
     @Transactional
+    override fun approveEpic(command: ApproveEpicCommand) = transition(
+        command.epicId, command.expectedVersion, setOf(EpicStatus.AWAITING_APPROVAL), EpicStatus.AVAILABLE,
+        command.actor, command.idempotencyKey,
+    )
+
+    @Transactional
+    override fun requestEpicRefinement(command: RequestEpicRefinementCommand) {
+        validateActor(command.actor)
+        validateReason(command.reason)
+        val commandFingerprint = fingerprint(command)
+        replay(command.idempotencyKey, commandFingerprint)?.let { return }
+        val epic = getEpic(command.epicId)
+        if (epic.version != command.expectedVersion || epic.status !in RETURNABLE_FOR_REFINEMENT) {
+            throw VersionConflict("Epic kan in de actuele status of versie niet voor verfijning worden teruggestuurd.")
+        }
+        planning.ifAvailable?.retireStoriesForEpicRefinement(RetireStoriesForEpicRefinementCommand(
+            epic.productId, epic.id, command.reason.trim(), command.actor,
+            "design-refinement-planning-${command.idempotencyKey}",
+        ))
+        val next = appendStatusVersion(epic, EpicStatus.NEEDS_REFINEMENT, command.actor, reason = command.reason)
+        recordCommand(command.idempotencyKey, commandFingerprint, epic.id, next)
+    }
+
+    @Transactional
     override fun claimEpicForPlanning(command: ClaimEpicForPlanningCommand) = transition(
         command.epicId, command.expectedVersion, setOf(EpicStatus.AVAILABLE), EpicStatus.IN_PLANNING, command.actor, command.idempotencyKey,
     )
@@ -460,7 +488,7 @@ class ProductDesignMvpService(
     @Transactional
     override fun withdrawEpic(command: WithdrawEpicCommand) {
         validateReason(command.reason)
-        transition(command.epicId, command.expectedVersion, setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.AVAILABLE), EpicStatus.WITHDRAWN, command.actor, command.idempotencyKey, reason = command.reason)
+        transition(command.epicId, command.expectedVersion, REFINABLE_STATUSES + EpicStatus.AVAILABLE, EpicStatus.WITHDRAWN, command.actor, command.idempotencyKey, reason = command.reason)
     }
 
     @Transactional
@@ -517,9 +545,19 @@ class ProductDesignMvpService(
         val next = epic.version + 1
         val now = clock.instant()
         insertVersion(epic.id, next, epic.toDraft(), status, sourceReferences(epic.id, epic.version), actor, now)
+        if (status == EpicStatus.NEEDS_REFINEMENT) {
+            jdbc.update(
+                "UPDATE pf_epic_version SET refinement_reason=? WHERE epic_id=? AND version=?",
+                reason?.take(10_000), epic.id.value, next,
+            )
+        }
         if (jdbc.update(
-                "UPDATE pf_epic SET current_version=?,status=?,verification_id=COALESCE(?,verification_id),terminal_reason=COALESCE(?,terminal_reason),updated_at=? WHERE id=? AND current_version=?",
-                next, status.name, verificationId?.value, reason?.take(1000), now, epic.id.value, epic.version,
+                """UPDATE pf_epic SET current_version=?,status=?,verification_id=COALESCE(?,verification_id),
+                    terminal_reason=CASE WHEN ? IN ('WITHDRAWN','CANCELLED') THEN ? ELSE terminal_reason END,
+                    refinement_reason=CASE WHEN ?='NEEDS_REFINEMENT' THEN ? ELSE NULL END,updated_at=?
+                    WHERE id=? AND current_version=?""".trimIndent(),
+                next, status.aggregateStatus().name, verificationId?.value, status.name, reason?.take(1000), status.name, reason?.take(10_000), now,
+                epic.id.value, epic.version,
             ) != 1
         ) throw VersionConflict("Epic is tijdens de statuswijziging veranderd.")
         return next
@@ -548,7 +586,7 @@ class ProductDesignMvpService(
             v.acceptance_criteria_json,v.slicability_rationale,
             CASE WHEN EXISTS (SELECT 1 FROM pf_epic_version newer WHERE newer.epic_id=v.epic_id AND newer.supersedes_version=v.version)
                  THEN 'SUPERSEDED' ELSE v.status END,
-            v.version,e.created_at,e.updated_at,e.verification_id,v.research_sources_json,v.readiness_json,v.ux_artifacts_json
+            v.version,e.created_at,e.updated_at,e.verification_id,v.research_sources_json,v.readiness_json,v.ux_artifacts_json,v.refinement_reason
             FROM pf_epic e JOIN pf_epic_version v ON v.epic_id=e.id $where ORDER BY e.updated_at DESC,v.version DESC""".trimIndent(),
         { rs, _ ->
             EpicDetails(
@@ -559,6 +597,7 @@ class ProductDesignMvpService(
                 mapper.readValue(rs.getString(16), object : TypeReference<List<EpicResearchSource>>() {}),
                 mapper.readValue(rs.getString(17), EpicReadinessDetails::class.java),
                 mapper.readValue(rs.getString(18), object : TypeReference<List<ArtifactReference>>() {}),
+                rs.getString(19),
             )
         }, *args,
     )
@@ -717,10 +756,13 @@ class ProductDesignMvpService(
 Kies maximaal één belangrijkste aantoonbare gebruikersverbetering. Maak nooit stories, een backlog of vrije uitvoeringsinstructies.
 Onderzoek ontbrekende externe databronnen via het publieke web wanneer de oplossing van externe gegevens afhangt. Controleer per bron de concrete URL,
 aanbieder, toegangsmethode, licentie/gebruiksvoorwaarden, inhoudelijke dekking en bereikbaarheid. Noem een bron alleen VALIDATED als je haar werkelijk hebt geopend
-en de validationEvidence reproduceerbaar beschrijft. Gebruik CANDIDATE of BLOCKED zolang dat niet lukt. Een data-afhankelijke epic is pas gereed met minimaal
-twee VALIDATED bronnen en zonder open bronvragen.
-Bij zichtbaar gedrag maak je minimaal twee concrete PNG-screenshots: de hoofdroute en een lege of fouttoestand. Bouw zo nodig een zelfstandige HTML-mockup en
-maak screenshots met Playwright/Chromium. Schrijf alleen de uiteindelijke afbeeldingen rechtstreeks naar /job/output/artifacts; Product Factory koppelt ze aan de epic.
+en de validationEvidence reproduceerbaar beschrijft. Leg expliciet vast of dit een machineleesbare API/feed/export of slechts een website is en beschrijf bij feeds
+hoe harvesting, opslag en indexering uitvoerbaar worden. Gebruik CANDIDATE of BLOCKED zolang toegang of inzetbaarheid niet is aangetoond. Een data-afhankelijke epic
+is pas gereed met minimaal twee VALIDATED bronnen, een concrete ingestie- en zoekroute en zonder open bronvragen.
+Bij zichtbaar gedrag maak je concrete PNG-screenshots voor alle afzonderlijke schermen en visueel verschillende toestanden die de volledige hoofdroute nodig heeft,
+waaronder altijd het initiële invoerscherm en een lege of fouttoestand. Bouw zo nodig een zelfstandige HTML-mockup en maak screenshots met Playwright/Chromium.
+Geef artifacts herkenbare unieke bestandsnamen, zodat de Planner ze later gericht aan de juiste stories kan koppelen. Schrijf alleen de uiteindelijke afbeeldingen
+rechtstreeks naar /job/output/artifacts; Product Factory koppelt ze aan de epic.
 Zet readiness.readyForPlanning alleen op true als onderzoek, UX, acceptatiecriteria, afhankelijkheden en open vragen voldoende concreet zijn voor Productplanning.
 Als currentEpicToRefine aanwezig is, retourneer REVISE_EPIC met exact haar id en versie; maak dan geen tweede epic. Een onrijpe epic mag expliciet NEEDS_RESEARCH blijven.
 Gebruik de server-side bevroren context hieronder als product- en domeinrichting. Publieke onderzoeksresultaten mogen haar aanvullen, maar repository-inhoud is
@@ -745,13 +787,21 @@ $snapshotJson"""
         val readiness: EpicReadinessDetails,
         val uxArtifacts: List<ArtifactReference>,
     ) {
-        fun status() = if (readiness.readyForPlanning) EpicStatus.AVAILABLE else EpicStatus.NEEDS_RESEARCH
+        fun status() = if (readiness.readyForPlanning) EpicStatus.AVAILABLE else EpicStatus.NEEDS_REFINEMENT
     }
     private fun EpicDetails.toDraft() = EpicDraft(
         title, summary, problem, solution, directionReferences, uxDesign, acceptanceCriteria, slicabilityRationale,
         researchSources, readiness, uxArtifacts,
     )
-    private fun EpicStatus.aggregateStatus() = if (this == EpicStatus.NEEDS_RESEARCH) EpicStatus.AVAILABLE else this
+    private fun publicationStatus(productId: ProductId, status: EpicStatus): EpicStatus =
+        if (status == EpicStatus.AVAILABLE && products.getProduct(productId).epicApprovalMode == EpicApprovalMode.MANUAL) {
+            EpicStatus.AWAITING_APPROVAL
+        } else status
+
+    private fun EpicStatus.aggregateStatus() = when (this) {
+        EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT, EpicStatus.AWAITING_APPROVAL -> EpicStatus.AVAILABLE
+        else -> this
+    }
 
     companion object {
         private val IMPLEMENTATION = ImplementationIdentity("product-design-impl-mvp", "single-agent", "runtime", "runtime")
@@ -763,6 +813,11 @@ $snapshotJson"""
         private const val MAX_DESIGN_ITERATIONS = 3
         private const val MIN_VALIDATED_EXTERNAL_SOURCES = 2
         private const val MIN_UX_ARTIFACTS = 2
+        private val REFINABLE_STATUSES = setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT, EpicStatus.AWAITING_APPROVAL, EpicStatus.AVAILABLE)
+        private val RETURNABLE_FOR_REFINEMENT = setOf(
+            EpicStatus.AWAITING_APPROVAL, EpicStatus.AVAILABLE, EpicStatus.IN_PLANNING, EpicStatus.ACTIVE,
+            EpicStatus.VERIFYING, EpicStatus.COMPLETED, EpicStatus.NOT_SUCCESSFUL,
+        )
         private val EXTERNAL_DATA_PATTERN = Regex("""(?i)\b(bron|bronnen|archief|archieven|collectie|collecties|dataset|datasets|api|data|gegevens)\b""")
         private val FORBIDDEN_OUTPUT_FIELDS = setOf("story", "stories", "backlog", "storylist")
         private const val RESPONSE_SCHEMA = """{"type":"object","additionalProperties":false,"required":["outcome","reason","epicId","expectedVersion","epic","processedSignalIds","stakeholderQuestion","factoryDecision","memoryChanges"],"properties":{"outcome":{"enum":["NO_EPIC","CREATE_EPIC","REVISE_EPIC"]},"reason":{"type":["string","null"]},"epicId":{"type":["string","null"]},"expectedVersion":{"type":["integer","null"]},"epic":{"type":["object","null"],"additionalProperties":false,"required":["title","summary","problem","solution","directionReferences","visibleBehaviorChange","uxDesign","acceptanceCriteria","slicabilityRationale","researchSources","readiness"],"properties":{"title":{"type":"string"},"summary":{"type":"string"},"problem":{"type":"string"},"solution":{"type":"string"},"directionReferences":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","id","version"],"properties":{"type":{"enum":["PRODUCT_ASSIGNMENT","DECISION"]},"id":{"type":"string"},"version":{"type":"integer"}}}},"visibleBehaviorChange":{"type":"boolean"},"uxDesign":{"type":["string","null"]},"acceptanceCriteria":{"type":"array","items":{"type":"string"}},"slicabilityRationale":{"type":"string"},"researchSources":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","provider","uri","accessMethod","license","coverage","status","validationEvidence"],"properties":{"name":{"type":"string"},"provider":{"type":"string"},"uri":{"type":"string"},"accessMethod":{"type":"string"},"license":{"type":"string"},"coverage":{"type":"string"},"status":{"enum":["CANDIDATE","VALIDATED","BLOCKED"]},"validationEvidence":{"type":"string"}}}},"readiness":{"type":"object","additionalProperties":false,"required":["readyForPlanning","requiresExternalData","unmetConditions","openQuestions"],"properties":{"readyForPlanning":{"type":"boolean"},"requiresExternalData":{"type":"boolean"},"unmetConditions":{"type":"array","items":{"type":"string"}},"openQuestions":{"type":"array","items":{"type":"string"}}}}}},"processedSignalIds":{"type":"array","items":{"type":"string"}},"stakeholderQuestion":{"type":["object","null"],"additionalProperties":false,"required":["question","context"],"properties":{"question":{"type":"string"},"context":{"type":"string"}}},"factoryDecision":{"type":["string","null"]},"memoryChanges":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","itemId","expectedVersionId","title","content","reason"],"properties":{"type":{"enum":["ADD","REPLACE","RETRACT"]},"itemId":{"type":["string","null"]},"expectedVersionId":{"type":["string","null"]},"title":{"type":["string","null"]},"content":{"type":["string","null"]},"reason":{"type":"string"}}}}}}"""

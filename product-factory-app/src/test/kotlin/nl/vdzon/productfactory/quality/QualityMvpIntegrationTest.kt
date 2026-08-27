@@ -90,6 +90,20 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `tester gebruikt UX modellen als richting en niet als pixelperfect contract`() {
+        quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "ux-policy"))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+
+        assertThat(runtime.requests.single().prompt)
+            .contains("UX-screenshots zijn richtinggevend en geen golden masters")
+            .contains("informatiehiërarchie, vereiste toestanden, gebruikersflow, toegankelijkheid en responsive gedrag")
+            .contains("keur niet af op pixelverschillen, exacte kleuren, afstanden of typografie")
+        ai.deleteAllOwnedExecutionData()
+        runtime.reset()
+    }
+
+    @Test
     fun `achterlopende deployment blokkeert zonder afkeuring en retry bewaart historie`() {
         revisions.revision = "b".repeat(40)
         val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "deployment-pending"))

@@ -43,6 +43,14 @@ class DesignController(
     fun claim(@PathVariable epicId: String, @RequestBody request: DesignVersionedRequest, authentication: Authentication?) =
         commands.claimEpicForPlanning(ClaimEpicForPlanningCommand(EpicId(epicId), request.expectedVersion, authentication.actor(), request.idempotencyKey))
 
+    @PostMapping("/epics/{epicId}/approve") @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun approve(@PathVariable epicId: String, @RequestBody request: DesignVersionedRequest, authentication: Authentication?) =
+        commands.approveEpic(ApproveEpicCommand(EpicId(epicId), request.expectedVersion, authentication.actor(), request.idempotencyKey))
+
+    @PostMapping("/epics/{epicId}/request-refinement") @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun requestRefinement(@PathVariable epicId: String, @RequestBody request: EpicReasonRequest, authentication: Authentication?) =
+        commands.requestEpicRefinement(RequestEpicRefinementCommand(EpicId(epicId), request.reason, request.expectedVersion, authentication.actor(), request.idempotencyKey))
+
     @PostMapping("/epics/{epicId}/active") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun active(@PathVariable epicId: String, @RequestBody request: MarkEpicActiveRequest, authentication: Authentication?) =
         commands.markEpicActive(MarkEpicActiveCommand(EpicId(epicId), request.plannedEpicVersion, request.expectedVersion, authentication.actor(), request.idempotencyKey))

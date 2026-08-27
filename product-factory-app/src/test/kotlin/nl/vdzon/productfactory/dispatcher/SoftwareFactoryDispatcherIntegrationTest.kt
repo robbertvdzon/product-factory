@@ -87,6 +87,13 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         assertThat(attachment.fileName).isEqualTo("zoekscherm.png")
         assertThat(Base64.getDecoder().decode(attachment.contentBase64)).isEqualTo("bewijs".toByteArray())
         assertThat(attachment.sha256).hasSize(64)
+        assertThat(mock.description(attempts.single().externalStoryId!!))
+            .contains("# Uit te voeren story — normatieve opdracht")
+            .contains("# Epiccontext — uitsluitend informatief")
+            .contains("Testprobleem.")
+            .contains("Testoplossing.")
+            .contains("richtinggevend")
+            .contains("pixel-perfecte kopie is niet vereist")
         assertThat(planningQueries.getStory(firstStory).status).isEqualTo(StoryStatus.IN_PROGRESS)
         assertThat(planningQueries.getBacklog(productId).map { it.sequenceNumber }).containsExactly(1, 2)
     }
@@ -129,6 +136,24 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         dispatcher.runDispatchSession(productId)
 
         assertThat(planningQueries.getStory(firstStory).status).isEqualTo(StoryStatus.CANCELLED)
+        assertThat(qualityQueries.findQualityWorkItems(productId)).isEmpty()
+    }
+
+    @Test
+    fun `teruggestuurde epic annuleert lopende story ook in Software Factory`() {
+        dispatcher.runDispatchSession(productId)
+        val storyKey = queries.findDeliveryAttempts(DeliveryAttemptFilter(productId)).single().externalStoryId!!
+        jdbc.update(
+            "UPDATE pf_story SET refinement_cancel_requested=TRUE,refinement_cancel_sent=FALSE,cancellation_reason=? WHERE id=?",
+            "De epic mist een concreet invoerscherm.", firstStory.value,
+        )
+
+        dispatcher.runDispatchSession(productId)
+
+        assertThat(mock.get(storyKey)?.status).isEqualTo("CANCELLED")
+        assertThat(planningQueries.getStory(firstStory).status).isEqualTo(StoryStatus.CANCELLED)
+        assertThat(planningQueries.getStory(firstStory).cancellationReason)
+            .isEqualTo("De epic mist een concreet invoerscherm.")
         assertThat(qualityQueries.findQualityWorkItems(productId)).isEmpty()
     }
 
@@ -183,10 +208,11 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         )
         jdbc.update(
             """INSERT INTO pf_story_version(story_id,version,title,summary,content,acceptance_criteria_json,ux_design,dependencies_json,
-                source_references_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+                source_references_json,created_at,ux_artifacts_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
             id.value, 1L, "Story $sequence", "Gebruikers krijgen zelfstandige waarde uit story $sequence.",
             "Bouw een volledige gebruikersflow met zichtbare laad-, lege, succes- en fouttoestand voor deze story.",
             "[\"De gebruiker kan de complete story aantoonbaar gebruiken.\"]", "Rustige toegankelijke interface.", "[]", "[]", now,
+            com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(uxArtifacts),
         )
         return id
     }

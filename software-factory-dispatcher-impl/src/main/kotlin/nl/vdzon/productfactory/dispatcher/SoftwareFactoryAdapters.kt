@@ -47,6 +47,8 @@ data class FactoryWork(
     val updatedAt: String?,
 )
 data class FactoryWorkList(val items: List<FactoryWork>)
+data class FactoryCancelRequest(val reason: String)
+data class FactoryCancelResult(val accepted: Boolean)
 private data class FactoryErrorBody(val code: String = "UNKNOWN", val message: String = "Onbekende Software Factory-fout.", val retryable: Boolean = false)
 
 interface SoftwareFactoryAdapter {
@@ -55,6 +57,7 @@ interface SoftwareFactoryAdapter {
     fun create(idempotencyKey: String, request: FactoryStoryRequest): FactoryCreateResult
     fun get(storyKey: String): FactoryWork?
     fun find(productId: String? = null, status: String? = null, idempotencyKey: String? = null): List<FactoryWork>
+    fun cancel(storyKey: String, reason: String)
 }
 
 sealed class SoftwareFactoryFailure(val code: String, message: String) : RuntimeException(message)
@@ -91,6 +94,13 @@ class RealSoftwareFactoryAdapter(
             idempotencyKey?.let { "idempotencyKey=${encode(it)}" },
         )
         return call("GET", "/stories?${parameters.joinToString("&")}", null, null, FactoryWorkList::class.java).items
+    }
+
+    override fun cancel(storyKey: String, reason: String) {
+        call(
+            "POST", "/stories/${encode(storyKey)}/cancel", null,
+            mapper.writeValueAsString(FactoryCancelRequest(reason)), FactoryCancelResult::class.java,
+        )
     }
 
     private fun <T> call(method: String, path: String, key: String?, json: String?, type: Class<T>): T {
@@ -149,6 +159,7 @@ interface MockSoftwareFactoryControl {
     fun loseNextCreateResponse()
     fun breakNextContract()
     fun attachments(storyKey: String): List<FactoryAttachment>
+    fun description(storyKey: String): String
     fun reset()
 }
 
@@ -198,12 +209,15 @@ class MockSoftwareFactory(private val mapper: ObjectMapper) : SoftwareFactoryAda
     }
 
     override fun cancel(storyKey: String, reason: String) {
-        stories[storyKey]?.apply { status = "CANCELLED"; this.reason = reason; updatedAt = Instant.now() } ?: error("Onbekende mockstory $storyKey")
+        stories[storyKey]?.apply { status = "CANCELLED"; this.reason = reason; updatedAt = Instant.now() }
+            ?: throw ContractFactoryFailure("STORY_NOT_FOUND", "Story $storyKey bestaat niet.")
     }
     override fun failNextCall() { failNext = true }
     override fun loseNextCreateResponse() { loseNext = true }
     override fun breakNextContract() { breakNext = true }
     override fun attachments(storyKey: String): List<FactoryAttachment> = stories[storyKey]?.request?.attachments.orEmpty()
+    override fun description(storyKey: String): String = stories[storyKey]?.request?.description
+        ?: error("Onbekende mockstory $storyKey")
     override fun reset() { stories.clear(); nextNumber = 3000; failNext = false; loseNext = false; breakNext = false }
     private fun maybeFail() { if (failNext) { failNext = false; throw RetryableFactoryFailure("TEMPORARY_FAILURE", "Gesimuleerde tijdelijke storing.") } }
     private fun maybeBreak() { if (breakNext) { breakNext = false; throw ContractFactoryFailure("INVALID_RESPONSE", "Gesimuleerde contractbreuk.") } }

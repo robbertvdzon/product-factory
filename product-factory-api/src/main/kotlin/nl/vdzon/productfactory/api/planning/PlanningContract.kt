@@ -77,6 +77,7 @@ data class MarkStoryAsDevelopedCommand(val storyId: StoryId, val externalStoryId
 data class MarkStoryAsCancelledCommand(val storyId: StoryId, val externalStoryId: String, val reason: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class RecordStoryVerificationCommand(val storyId: StoryId, val verificationId: VerificationId, val passed: Boolean, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class CancelStoriesForEpicCommand(val productId: ProductId, val epicId: EpicId, val epicVersion: Long, val reason: String, val actor: ActorReference, val idempotencyKey: String)
+data class RetireStoriesForEpicRefinementCommand(val productId: ProductId, val epicId: EpicId, val reason: String, val actor: ActorReference, val idempotencyKey: String)
 
 interface ProductPlanningService {
     fun runProcessSession(productId: ProductId)
@@ -91,6 +92,7 @@ interface ProductPlanningService {
     fun markStoryAsCancelled(command: MarkStoryAsCancelledCommand)
     fun recordStoryVerification(command: RecordStoryVerificationCommand)
     fun cancelStoriesForEpic(command: CancelStoriesForEpicCommand)
+    fun retireStoriesForEpicRefinement(command: RetireStoriesForEpicRefinementCommand)
     fun flushPendingEffects()
 }
 

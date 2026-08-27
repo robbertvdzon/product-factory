@@ -174,16 +174,21 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
             put("type", "PRODUCT_STORY")
             put("epicId", epic.id.value)
             put("epicVersion", epic.version)
+            putNull("bugId")
+            putNull("bugVersion")
             put("title", "Toon begrijpelijk afsprakenoverzicht")
             put("summary", "De gebruiker ziet de eerstvolgende afspraak en benodigde actie.")
             put("content", "Bouw de complete overzichtsroute met afspraakstatus, eerstvolgende actie, toegankelijke bediening en zichtbare laad-, lege en fouttoestand.")
             putArray("acceptanceCriteria").add(CRITERION)
             put("uxDesign", "Rustige kaart, duidelijke koppen en logische toetsenbordfocus.")
+            putArray("uxArtifactNames").add("ux-main.png")
             putArray("dependencies")
             putArray("coveredAcceptanceCriteria").add(CRITERION)
             put("priorityReason", "Dit is de kleinste complete gebruikerswaarde.")
         }
         putArray("todoOrder").add("appointments-overview")
+        putArray("refinementRequests")
+        putNull("stakeholderQuestion")
         putArray("memoryChanges")
     }
 

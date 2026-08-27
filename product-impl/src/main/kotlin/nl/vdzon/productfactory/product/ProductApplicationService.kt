@@ -110,6 +110,13 @@ class ProductApplicationService(
         )
     }
 
+    override fun setEpicApprovalMode(command: SetEpicApprovalModeCommand) {
+        mutateProduct(
+            command.productId, command.expectedVersion, command.idempotencyKey, "SET_EPIC_APPROVAL_MODE", command.actor,
+            fingerprint(command), "epic_approval_mode" to command.mode.name,
+        )
+    }
+
     private fun mutateProduct(
         productId: ProductId,
         expectedVersion: Long,
@@ -123,7 +130,7 @@ class ProductApplicationService(
         if (replay(idempotencyKey, commandType, fingerprint) != null) return
         val product = getProduct(productId)
         requireVersion(product.version, expectedVersion, "Product")
-        val allowedColumns = setOf("status", "dispatching_enabled")
+        val allowedColumns = setOf("status", "dispatching_enabled", "epic_approval_mode")
         check(change.first in allowedColumns)
         val now = clock.instant()
         val updated = jdbc.update(
@@ -531,6 +538,7 @@ class ProductApplicationService(
     private fun product(rs: ResultSet) = ProductDetails(
         ProductId(rs.getString("product_id")), rs.getString("name"), ProductStatus.valueOf(rs.getString("status")),
         rs.getBoolean("dispatching_enabled"), instant(rs, "created_at")!!, rs.getLong("version"),
+        EpicApprovalMode.valueOf(rs.getString("epic_approval_mode")),
     )
 
     private fun schedule(rs: ResultSet) = ProcessScheduleDetails(

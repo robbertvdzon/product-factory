@@ -71,6 +71,33 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `product kan iedere rijpe epic eerst door stakeholder laten goedkeuren of terugsturen`() {
+        val product = productQueries.getProduct(productId)
+        products.setEpicApprovalMode(SetEpicApprovalModeCommand(
+            productId, EpicApprovalMode.MANUAL, product.version, STAKEHOLDER, "manual-approval-${productId.value}",
+        ))
+
+        design.runProcessSession(productId)
+        completeOnlyJob(validEpic())
+        design.runProcessSession(productId)
+
+        var epic = queries.findEpics(EpicFilter(productId)).single()
+        assertThat(epic.status).isEqualTo(EpicStatus.AWAITING_APPROVAL)
+
+        design.approveEpic(ApproveEpicCommand(epic.id, epic.version, STAKEHOLDER, "approve-${epic.id.value}"))
+        epic = queries.getEpic(epic.id)
+        assertThat(epic.status).isEqualTo(EpicStatus.AVAILABLE)
+
+        design.requestEpicRefinement(RequestEpicRefinementCommand(
+            epic.id, "Het scherm waarin de gebruiker de eerste vraag stelt ontbreekt.", epic.version,
+            STAKEHOLDER, "refine-${epic.id.value}",
+        ))
+        epic = queries.getEpic(epic.id)
+        assertThat(epic.status).isEqualTo(EpicStatus.NEEDS_REFINEMENT)
+        assertThat(epic.refinementReason).isEqualTo("Het scherm waarin de gebruiker de eerste vraag stelt ontbreekt.")
+    }
+
+    @Test
     fun `ongeldige output publiceert niets en bewuste retry houdt dezelfde bevroren input`() {
         design.runProcessSession(productId)
         completeOnlyJob(validEpic().also { (it.path("epic") as ObjectNode).remove("uxDesign") })
@@ -168,7 +195,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
             .withFailMessage("Ontwerpiteratie blokkeerde: %s / %s", firstIterationSession.errorCode, firstIterationSession.blockedReason)
             .isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
         var epic = queries.findEpics(EpicFilter(productId)).single()
-        assertThat(epic.status).isEqualTo(EpicStatus.NEEDS_RESEARCH)
+        assertThat(epic.status).isEqualTo(EpicStatus.NEEDS_REFINEMENT)
         assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
         assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().aiTaskIds).hasSize(2)
 

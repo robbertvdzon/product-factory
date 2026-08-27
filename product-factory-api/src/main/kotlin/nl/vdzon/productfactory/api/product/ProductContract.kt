@@ -6,6 +6,7 @@ import java.time.Instant
 import java.time.LocalTime
 
 enum class ProductStatus { ACTIVE, INACTIVE }
+enum class EpicApprovalMode { AUTOMATIC, MANUAL }
 enum class UserSignalStatus { OPEN, IN_REVIEW, PROCESSED }
 enum class UserSignalCategory { FEEDBACK, PROBLEM, CONCERN, OPPORTUNITY, QUALITY_CONCERN, QUALITY_PATTERN }
 enum class UserSignalUrgency { LOW, NORMAL, HIGH, URGENT }
@@ -62,6 +63,13 @@ data class SetProductDispatchingCommand(
     val actor: ActorReference,
     val idempotencyKey: String,
 )
+data class SetEpicApprovalModeCommand(
+    val productId: ProductId,
+    val mode: EpicApprovalMode,
+    val expectedVersion: Long,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
 data class WeeklyScheduleRule(val days: Set<DayOfWeek>, val times: Set<LocalTime>)
 data class SchedulePattern(val weeklyRules: List<WeeklyScheduleRule> = emptyList(), val intervalMinutes: Long? = null)
 data class UpdateProcessScheduleCommand(
@@ -82,6 +90,7 @@ data class ProductDetails(
     val dispatchingEnabled: Boolean,
     val createdAt: Instant,
     val version: Long,
+    val epicApprovalMode: EpicApprovalMode = EpicApprovalMode.AUTOMATIC,
 )
 data class ProductAssignmentDetails(
     val productId: ProductId,
@@ -288,6 +297,7 @@ interface ProductCommandService {
     fun configureTestableProduct(command: ConfigureTestableProductCommand)
     fun setProductStatus(command: SetProductStatusCommand)
     fun setProductDispatching(command: SetProductDispatchingCommand)
+    fun setEpicApprovalMode(command: SetEpicApprovalModeCommand)
     fun updateProcessSchedule(command: UpdateProcessScheduleCommand)
     fun submitUserSignal(command: SubmitUserSignalCommand): UserSignalId
     fun markUserSignalInReview(command: MarkUserSignalInReviewCommand)

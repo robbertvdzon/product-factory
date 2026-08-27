@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.api.ai.AiExecutionQueryService
 import nl.vdzon.productfactory.api.dispatcher.*
+import nl.vdzon.productfactory.api.design.ProductDesignQueryService
 import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.product.ProductQueryService
 import nl.vdzon.productfactory.api.product.ProductStatus
@@ -31,6 +32,7 @@ class SoftwareFactoryDispatcherMvpService(
     private val products: ProductQueryService,
     private val planning: ProductPlanningService,
     private val planningQueries: ProductPlanningQueryService,
+    private val designQueries: ProductDesignQueryService,
     private val aiQueries: AiExecutionQueryService,
     adapters: List<SoftwareFactoryAdapter>,
     transactionManager: PlatformTransactionManager,
@@ -85,6 +87,14 @@ class SoftwareFactoryDispatcherMvpService(
     }
 
     private fun reconcileAttempt(sessionId: ProcessSessionId, adapter: SoftwareFactoryAdapter, attempt: AttemptRow): String? {
+        val refinementReason = jdbc.query(
+            "SELECT cancellation_reason FROM pf_story WHERE id=? AND refinement_cancel_requested=TRUE AND refinement_cancel_sent=FALSE",
+            { rs, _ -> rs.getString(1) }, attempt.storyId.value,
+        ).singleOrNull()
+        if (refinementReason != null && attempt.externalStoryId != null) {
+            adapter.cancel(attempt.externalStoryId, refinementReason)
+            jdbc.update("UPDATE pf_story SET refinement_cancel_sent=TRUE,updated_at=? WHERE id=?", clock.instant(), attempt.storyId.value)
+        }
         val found = try {
             attempt.externalStoryId?.let(adapter::get)
                 ?: adapter.find(idempotencyKey = attempt.idempotencyKey).singleOrNull()
@@ -188,7 +198,12 @@ class SoftwareFactoryDispatcherMvpService(
     }
 
     private fun packageStory(story: StoryDetails, repositoryUrl: String): FactoryStoryRequest {
+        val epic = designQueries.getEpicHistory(story.epicId).singleOrNull { it.version == story.epicVersion }
+            ?: throw ContractFactoryFailure("EPIC_CONTEXT_UNAVAILABLE", "De bevroren epiccontext is niet beschikbaar.")
         val description = buildString {
+            appendLine("# Uit te voeren story — normatieve opdracht")
+            appendLine("Implementeer uitsluitend de onderstaande story. De epiccontext verklaart het grotere doel maar vergroot de scope niet.")
+            appendLine()
             appendLine("## Samenvatting")
             appendLine(story.summary.trim())
             appendLine()
@@ -212,8 +227,29 @@ class SoftwareFactoryDispatcherMvpService(
             appendLine("- Epic `${story.epicId.value}` versie ${story.epicVersion}")
             story.bugId?.let { appendLine("- Bug `${it.value}` versie ${story.bugVersion}") }
             appendLine()
-            appendLine("## Technische grens")
-            appendLine("Implementeer uitsluitend deze zelfstandige story in de doelrepository en lever een volledige commit-SHA op.")
+            appendLine("# Epiccontext — uitsluitend informatief")
+            appendLine("## Epic: ${epic.title.trim()}")
+            appendLine(epic.summary.trim())
+            appendLine()
+            appendLine("### Probleem")
+            appendLine(epic.problem.trim())
+            appendLine()
+            appendLine("### Oplossingsrichting")
+            appendLine(epic.solution.trim())
+            appendLine()
+            appendLine("### Epicacceptatiecriteria")
+            epic.acceptanceCriteria.forEach { appendLine("- ${it.trim()}") }
+            appendLine()
+            appendLine("### Onderzochte bronnen")
+            if (epic.researchSources.isEmpty()) appendLine("Geen externe bronnen vereist of vastgelegd.")
+            epic.researchSources.forEach { source ->
+                appendLine("- ${source.name} (${source.status}): ${source.uri}")
+                appendLine("  Dekking: ${source.coverage}")
+            }
+            appendLine()
+            appendLine("# Uitvoerings- en UX-grens")
+            appendLine("Implementeer uitsluitend deze zelfstandige story en lever een volledige commit-SHA op.")
+            appendLine("De meegeleverde UX-modellen zijn richtinggevend: volg hoofdstructuur, informatiehiërarchie, toestanden en gebruikersflow in grote lijnen; een pixel-perfecte kopie is niet vereist.")
         }.trim()
         val attachments = story.uxArtifacts.distinctBy { it.name }.map { artifact ->
             val match = AI_ARTIFACT_URI.matchEntire(artifact.uri)

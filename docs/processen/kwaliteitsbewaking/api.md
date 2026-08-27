@@ -203,6 +203,11 @@ de relevante subset. Storyacceptatiecriteria, bugreproductie en epicacceptatiecr
 gerichte contractinput; `/doc` voegt huidig productgedrag en regressiecontext toe. Ontbrekende
 documentatie is nooit een reden om de test over te slaan.
 
+UX-screenshots zijn richtinggevend en geen pixel-perfect golden-mastercontract. De Tester beoordeelt
+hoofdstructuur, informatiehiërarchie, vereiste toestanden, gebruikersflow, toegankelijkheid en
+responsive gedrag. Exacte kleuren, afstanden, typografie en pixels leiden alleen tot afkeuring als
+een acceptatiecriterium dat uitdrukkelijk vereist.
+
 `/doc` is geen testbewijs. Alleen waargenomen gedrag in de geconfigureerde omgeving en toegestane
 bewijsartifacts tonen wat werkelijk werkt. Een aantoonbare tegenspraak tussen documentatie,
 bevroren contract, code en applicatie wordt expliciet als documentatie- of productafwijking

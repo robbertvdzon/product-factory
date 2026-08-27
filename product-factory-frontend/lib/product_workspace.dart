@@ -268,6 +268,7 @@ class ProductSummary {
     required this.status,
     required this.dispatchingEnabled,
     required this.version,
+    this.epicApprovalMode = 'AUTOMATIC',
   });
   factory ProductSummary.fromJson(Map<String, Object?> json) => ProductSummary(
     id: _value(json['id']),
@@ -275,12 +276,16 @@ class ProductSummary {
     status: _value(json['status']),
     dispatchingEnabled: json['dispatchingEnabled'] == true,
     version: (json['version'] as num?)?.toInt() ?? 0,
+    epicApprovalMode: _value(json['epicApprovalMode']).isEmpty
+        ? 'AUTOMATIC'
+        : _value(json['epicApprovalMode']),
   );
   final String id;
   final String name;
   final String status;
   final bool dispatchingEnabled;
   final int version;
+  final String epicApprovalMode;
 }
 
 class ProductWorkspaceData {
@@ -346,6 +351,7 @@ abstract interface class ProductGateway {
   Future<void> createProduct(String name, String? requestedId);
   Future<void> setStatus(ProductSummary product, String status);
   Future<void> setDispatching(ProductSummary product, bool enabled);
+  Future<void> setEpicApprovalMode(ProductSummary product, String mode);
   Future<void> saveAssignment(String productId, Map<String, Object?> body);
   Future<void> saveTestConfiguration(
     String productId,
@@ -396,6 +402,8 @@ abstract interface class ProductGateway {
   Future<void> runProductDesign(String productId);
   Future<void> withdrawEpic(String epicId, int version, String reason);
   Future<void> cancelEpic(String epicId, int version, String reason);
+  Future<void> approveEpic(String epicId, int version);
+  Future<void> requestEpicRefinement(String epicId, int version, String reason);
   Future<void> runProductPlanning(String productId);
   Future<void> requestManualReplan(String productId, String reason);
   Future<void> reprioritizeEpic(String productId, String epicId, String reason);
@@ -519,6 +527,13 @@ class HttpProductGateway implements ProductGateway {
         'enabled': enabled,
         'expectedVersion': product.version,
         'idempotencyKey': _key('dispatch'),
+      });
+  @override
+  Future<void> setEpicApprovalMode(ProductSummary product, String mode) =>
+      _send('PATCH', '/api/products/${product.id}/epic-approval-mode', {
+        'mode': mode,
+        'expectedVersion': product.version,
+        'idempotencyKey': _key('epic-approval-mode'),
       });
   @override
   Future<void> saveAssignment(String productId, Map<String, Object?> body) =>
@@ -668,6 +683,24 @@ class HttpProductGateway implements ProductGateway {
         'expectedVersion': version,
         'idempotencyKey': _key('epic-cancel'),
       });
+
+  @override
+  Future<void> approveEpic(String epicId, int version) => _send(
+    'POST',
+    '/api/epics/$epicId/approve',
+    {'expectedVersion': version, 'idempotencyKey': _key('epic-approve')},
+  );
+
+  @override
+  Future<void> requestEpicRefinement(
+    String epicId,
+    int version,
+    String reason,
+  ) => _send('POST', '/api/epics/$epicId/request-refinement', {
+    'reason': reason,
+    'expectedVersion': version,
+    'idempotencyKey': _key('epic-refinement'),
+  });
 
   @override
   Future<void> runProductPlanning(String productId) =>
@@ -832,6 +865,22 @@ String _sectionDescription(
     'Product, omgevingen, levering en automatisering op één plek.',
   ProductWorkspaceSection.operation =>
     'Processessies, AI-uitvoering en Software Factory-dispatch.',
+};
+
+String _epicStatusLabel(String status) => switch (status) {
+  'NEEDS_RESEARCH' => 'Onderzoek nodig',
+  'NEEDS_REFINEMENT' => 'Meer uitwerking nodig',
+  'AWAITING_APPROVAL' => 'Wacht op goedkeuring',
+  'AVAILABLE' => 'Klaar voor planning',
+  'IN_PLANNING' => 'Wordt gepland',
+  'ACTIVE' => 'In uitvoering',
+  'VERIFYING' => 'Wordt gecontroleerd',
+  'COMPLETED' => 'Afgerond',
+  'NOT_SUCCESSFUL' => 'Niet geslaagd',
+  'SUPERSEDED' => 'Vervangen',
+  'WITHDRAWN' => 'Ingetrokken',
+  'CANCELLED' => 'Geannuleerd',
+  _ => status,
 };
 
 class ProductWorkspacePage extends StatefulWidget {
@@ -1294,8 +1343,14 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final blockedWork = data.qualityWorkItems.where((item) {
       return const {'BLOCKED', 'FAILED'}.contains(item['status']);
     }).toList();
+    final approvalEpics = data.epics
+        .where((epic) => epic['status'] == 'AWAITING_APPROVAL')
+        .toList();
     final total =
-        openSignals.length + openQuestions.length + blockedWork.length;
+        openSignals.length +
+        openQuestions.length +
+        blockedWork.length +
+        approvalEpics.length;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -1312,6 +1367,17 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             if (total == 0)
               const Text('Er zijn nu geen blokkades, vragen of open signalen.')
             else ...[
+              ...approvalEpics.map(
+                (epic) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.approval_outlined),
+                  title: Text('${epic['title']}'),
+                  subtitle: const Text(
+                    'Epic wacht op jouw goedkeuring voordat de planner stories maakt.',
+                  ),
+                  trailing: const Chip(label: Text('Wacht op jou')),
+                ),
+              ),
               ...blockedWork
                   .take(3)
                   .map(
@@ -1389,6 +1455,16 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             selected: data.product.dispatchingEnabled,
             onSelected: (value) => _mutate(
               () => widget.gateway.setDispatching(data.product, value),
+            ),
+          ),
+          FilterChip(
+            label: const Text('Epics handmatig goedkeuren'),
+            selected: data.product.epicApprovalMode == 'MANUAL',
+            onSelected: (value) => _mutate(
+              () => widget.gateway.setEpicApprovalMode(
+                data.product,
+                value ? 'MANUAL' : 'AUTOMATIC',
+              ),
             ),
           ),
           const Chip(
@@ -1499,63 +1575,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     if (data.backlog.isEmpty)
       const Text('De backlog is leeg.')
     else
-      ...data.backlog.map(
-        (story) => ExpansionTile(
-          leading: CircleAvatar(child: Text('${story['sequenceNumber']}')),
-          title: Text('${story['title']} · ${story['status']}'),
-          subtitle: Text('${story['summary']}'),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SelectableText(
-              'Story ${_value(story['id'])} · versie ${story['version']}',
-            ),
-            Text(
-              'Type: ${story['type']} · Epic ${_value(story['epicId'])} v${story['epicVersion']}',
-            ),
-            const SizedBox(height: 8),
-            Text('${story['content']}'),
-            const SizedBox(height: 8),
-            Text(
-              'Acceptatiecriteria',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            ...(story['acceptanceCriteria'] as List? ?? const []).map(
-              (criterion) => Text('• $criterion'),
-            ),
-            if (story['uxDesign'] != null) Text('UX: ${story['uxDesign']}'),
-            ..._uxArtifactGallery(
-              context,
-              (story['uxArtifacts'] as List? ?? const <Object?>[])
-                  .cast<Object?>(),
-              title: 'UX-modellen bij deze story',
-            ),
-            Text(
-              'Dependencies: ${(story['dependencies'] as List? ?? const []).map(_value).join(', ')}',
-            ),
-            Text(
-              'Prioriteit: ${story['priorityReason'] ?? 'Planner-volgorde'}',
-            ),
-            if (story['dispatchReservationId'] != null)
-              Text(
-                'Wordt verstuurd · reservering ${story['dispatchReservationId']}',
-              ),
-            if (story['externalStoryId'] != null)
-              SelectableText(
-                'Software Factory: ${story['externalStoryId']} · reservering ${story['dispatchReservationStatus']}',
-              ),
-            if (story['deliveredCommitSha'] != null)
-              SelectableText('Oplevercommit ${story['deliveredCommitSha']}'),
-            if (story['deliveredCommitSha'] != null &&
-                story['verificationId'] == null)
-              const Text('Wacht op deployment of kwaliteitscontrole'),
-            if (story['verificationId'] != null)
-              Text(
-                'Getest: ${story['verificationPassed'] == true ? 'geslaagd' : 'afgekeurd'} · verificatie ${_value(story['verificationId'])}',
-              ),
-          ],
-        ),
-      ),
+      ..._groupedBacklog(data),
     const Divider(height: 28),
     Text(
       'Geannuleerd en opgeleverd',
@@ -1669,6 +1689,80 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ),
     ),
   ]);
+
+  List<Widget> _groupedBacklog(ProductWorkspaceData data) {
+    final storiesByEpic = <String, List<Map<String, Object?>>>{};
+    for (final story in data.backlog) {
+      storiesByEpic.putIfAbsent(_value(story['epicId']), () => []).add(story);
+    }
+    return storiesByEpic.entries.map((entry) {
+      final epic = data.epics
+          .cast<Map<String, Object?>>()
+          .where((candidate) => _value(candidate['id']) == entry.key)
+          .firstOrNull;
+      return Card(
+        margin: const EdgeInsets.only(top: 10),
+        child: ExpansionTile(
+          initiallyExpanded: true,
+          leading: const Icon(Icons.view_agenda_outlined),
+          title: Text(epic == null ? 'Epic ${entry.key}' : '${epic['title']}'),
+          subtitle: Text(
+            '${entry.value.length} ${entry.value.length == 1 ? 'story' : 'stories'} · '
+            '${epic == null ? entry.key : _epicStatusLabel(_value(epic['status']))}',
+          ),
+          children: entry.value.map(_planningStoryTile).toList(),
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _planningStoryTile(Map<String, Object?> story) => ExpansionTile(
+    leading: CircleAvatar(child: Text('${story['sequenceNumber']}')),
+    title: Text('${story['title']} · ${story['status']}'),
+    subtitle: Text('${story['summary']}'),
+    childrenPadding: const EdgeInsets.fromLTRB(72, 0, 16, 16),
+    expandedCrossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SelectableText(
+        'Story ${_value(story['id'])} · versie ${story['version']}',
+      ),
+      Text(
+        'Type: ${story['type']} · Epic ${_value(story['epicId'])} v${story['epicVersion']}',
+      ),
+      const SizedBox(height: 8),
+      Text('${story['content']}'),
+      const SizedBox(height: 8),
+      Text('Acceptatiecriteria', style: Theme.of(context).textTheme.labelLarge),
+      ...(story['acceptanceCriteria'] as List? ?? const []).map(
+        (criterion) => Text('• $criterion'),
+      ),
+      if (story['uxDesign'] != null) Text('UX: ${story['uxDesign']}'),
+      ..._uxArtifactGallery(
+        context,
+        (story['uxArtifacts'] as List? ?? const <Object?>[]).cast<Object?>(),
+        title: 'UX-modellen bij deze story',
+      ),
+      Text(
+        'Dependencies: ${(story['dependencies'] as List? ?? const []).map(_value).join(', ')}',
+      ),
+      Text('Prioriteit: ${story['priorityReason'] ?? 'Planner-volgorde'}'),
+      if (story['dispatchReservationId'] != null)
+        Text('Wordt verstuurd · reservering ${story['dispatchReservationId']}'),
+      if (story['externalStoryId'] != null)
+        SelectableText(
+          'Software Factory: ${story['externalStoryId']} · reservering ${story['dispatchReservationStatus']}',
+        ),
+      if (story['deliveredCommitSha'] != null)
+        SelectableText('Oplevercommit ${story['deliveredCommitSha']}'),
+      if (story['deliveredCommitSha'] != null &&
+          story['verificationId'] == null)
+        const Text('Wacht op deployment of kwaliteitscontrole'),
+      if (story['verificationId'] != null)
+        Text(
+          'Getest: ${story['verificationPassed'] == true ? 'geslaagd' : 'afgekeurd'} · verificatie ${_value(story['verificationId'])}',
+        ),
+    ],
+  );
 
   Future<void> _planningReasonAction(String productId) async {
     final controller = TextEditingController();
@@ -1904,7 +1998,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ...data.epics.map(
         (epic) => ExpansionTile(
           leading: const Icon(Icons.view_agenda_outlined),
-          title: Text('${epic['title']} · ${epic['status']}'),
+          title: Text(
+            '${epic['title']} · ${_epicStatusLabel(_value(epic['status']))}',
+          ),
           subtitle: Text('${epic['summary']}'),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           expandedCrossAxisAlignment: CrossAxisAlignment.start,
@@ -1921,6 +2017,34 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                   title: Text('Nog niet klaar voor planning'),
                   subtitle: Text(
                     'Productontwerp werkt eerst bronnen, open vragen en UX-modellen uit. Productplanning kan deze epic nog niet claimen.',
+                  ),
+                ),
+              ),
+            ],
+            if (epic['status'] == 'NEEDS_REFINEMENT') ...[
+              const SizedBox(height: 8),
+              Card(
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: ListTile(
+                  leading: const Icon(Icons.edit_note_outlined),
+                  title: const Text('Teruggestuurd voor verdere uitwerking'),
+                  subtitle: Text(
+                    _value(epic['refinementReason']).isEmpty
+                        ? 'De ontwerper moet deze epic verder uitwerken.'
+                        : _value(epic['refinementReason']),
+                  ),
+                ),
+              ),
+            ],
+            if (epic['status'] == 'AWAITING_APPROVAL') ...[
+              const SizedBox(height: 8),
+              Card(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                child: const ListTile(
+                  leading: Icon(Icons.approval_outlined),
+                  title: Text('Wacht op jouw goedkeuring'),
+                  subtitle: Text(
+                    'Controleer vooral of UX, databronnen, toegang en technische haalbaarheid concreet genoeg zijn. Na goedkeuring kan de planner direct stories maken.',
                   ),
                 ),
               ),
@@ -2001,10 +2125,42 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             ),
             ...(data.epicHistories[_value(epic['id'])] ?? const []).map(
               (version) => Text(
-                'v${version['version']} · ${version['status']} · ${version['title']}',
+                'v${version['version']} · ${_epicStatusLabel(_value(version['status']))} · ${version['title']}',
               ),
             ),
-            if (const {'NEEDS_RESEARCH', 'AVAILABLE'}.contains(epic['status']))
+            const SizedBox(height: 12),
+            if (epic['status'] == 'AWAITING_APPROVAL')
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () => _approveEpic(epic),
+                  icon: const Icon(Icons.check),
+                  label: const Text('Goedkeuren voor planning'),
+                ),
+              ),
+            if (const {
+              'AWAITING_APPROVAL',
+              'AVAILABLE',
+              'IN_PLANNING',
+              'ACTIVE',
+              'VERIFYING',
+              'COMPLETED',
+              'NOT_SUCCESSFUL',
+            }.contains(epic['status']))
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: () => _requestEpicRefinement(epic),
+                  icon: const Icon(Icons.undo_outlined),
+                  label: const Text('Terugsturen voor verdere uitwerking'),
+                ),
+              ),
+            if (const {
+              'NEEDS_RESEARCH',
+              'NEEDS_REFINEMENT',
+              'AWAITING_APPROVAL',
+              'AVAILABLE',
+            }.contains(epic['status']))
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -2216,6 +2372,23 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           : widget.gateway.withdrawEpic(id, version, reason),
     );
   }
+
+  Future<void> _approveEpic(Map<String, Object?> epic) => _mutate(
+    () => widget.gateway.approveEpic(
+      _value(epic['id']),
+      (epic['version'] as num).toInt(),
+    ),
+  );
+
+  Future<void> _requestEpicRefinement(Map<String, Object?> epic) => _textAction(
+    'Epic terugsturen voor verdere uitwerking',
+    'Wat ontbreekt of moet concreter?',
+    (reason) => widget.gateway.requestEpicRefinement(
+      _value(epic['id']),
+      (epic['version'] as num).toInt(),
+      reason,
+    ),
+  );
 
   Future<void> _reprioritizeEpic(Map<String, Object?> epic) async {
     await _textAction(

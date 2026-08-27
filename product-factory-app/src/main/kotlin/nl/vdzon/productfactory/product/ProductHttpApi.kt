@@ -41,6 +41,7 @@ data class AssignmentRequest(val audience: String, val goal: String, val hardBou
 data class TestConfigurationRequest(val acceptance: TestEnvironmentConfiguration, val production: TestEnvironmentConfiguration? = null, val expectedVersion: Long, val idempotencyKey: String)
 data class ProductStatusRequest(val status: ProductStatus, val expectedVersion: Long, val idempotencyKey: String)
 data class DispatchingRequest(val enabled: Boolean, val expectedVersion: Long, val idempotencyKey: String)
+data class EpicApprovalModeRequest(val mode: EpicApprovalMode, val expectedVersion: Long, val idempotencyKey: String)
 data class ScheduleRequest(val enabled: Boolean, val timezone: String, val pattern: SchedulePattern, val expectedVersion: Long, val idempotencyKey: String)
 data class SignalRequest(val category: UserSignalCategory, val urgency: UserSignalUrgency, val source: String, val text: String, val attachments: List<ArtifactReference> = emptyList(), val idempotencyKey: String)
 data class VersionedRequest(val expectedVersion: Long, val idempotencyKey: String)
@@ -88,6 +89,11 @@ class ProductController(
     @PatchMapping("/{productId}/dispatching") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun dispatching(@PathVariable productId: String, @RequestBody request: DispatchingRequest, authentication: Authentication?) = commands.setProductDispatching(
         SetProductDispatchingCommand(ProductId(productId), request.enabled, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),
+    )
+
+    @PatchMapping("/{productId}/epic-approval-mode") @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun epicApprovalMode(@PathVariable productId: String, @RequestBody request: EpicApprovalModeRequest, authentication: Authentication?) = commands.setEpicApprovalMode(
+        SetEpicApprovalModeCommand(ProductId(productId), request.mode, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),
     )
 
     @GetMapping("/{productId}/schedules") fun schedules(@PathVariable productId: String) = queries.getProcessSchedules(ProductId(productId))

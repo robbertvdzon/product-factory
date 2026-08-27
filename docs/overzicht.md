@@ -359,6 +359,8 @@ tegen een oudere deployment afgekeurd.
 Een epic gebruikt:
 
 - `NEEDS_RESEARCH` — ontwerp, concrete bronnen, UX-modellen of open vragen zijn nog niet compleet;
+- `NEEDS_REFINEMENT` — de Planner of Stakeholder heeft met een vrije reden om verdere uitwerking gevraagd;
+- `AWAITING_APPROVAL` — de epic is compleet maar wacht, wanneer dit voor het product is ingesteld, op handmatige goedkeuring;
 - `AVAILABLE` — complete versie die Productplanning mag kiezen;
 - `IN_PLANNING` — exacte versie is gekozen en bevroren;
 - `ACTIVE` — één of meer stories worden uitgevoerd of hersteld;

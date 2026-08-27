@@ -185,7 +185,7 @@ databasetoegang.
 
 Het planningsscherm toont:
 
-- alle open stories op `sequenceNumber`, met de opgeslagen titel en samenvatting;
+- alle open stories per bovenliggende epic en daarbinnen op `sequenceNumber`, met de opgeslagen titel en samenvatting;
 - geannuleerde stories apart van de backlog, met bron en reden;
 - bij een door Software Factory geannuleerde story uitleg dat Product Factory de complete epic na
   het overige werk opnieuw op de feitelijke producttoestand beoordeelt;
@@ -200,11 +200,13 @@ Het planningsscherm toont:
 Er is geen afzonderlijke roadmapentiteit en geen tweede handmatige backlog. De epicstatussen en de
 berekende storylijst zijn de enige bronnen.
 
-Epics staan niet nogmaals als hoofdlijst bij Planning. Het scherm **Ontwerp** gebruikt
+Epics vormen in Planning groepskoppen en staan niet als tweede losse backlog. Het scherm **Ontwerp** gebruikt
 `findEpics(...)` en toont actuele en historische epics per lifecyclestatus, steeds met de opgeslagen
 titel en samenvatting. Op epicdetail kan de
-Stakeholder, wanneer de status dat toestaat, de epic met reden laten herprioriteren, intrekken of
-annuleren. Planning toont bij een handmatige prioriteitsactie de reden en de zichtbare doorwerking
+Stakeholder, wanneer de status dat toestaat, de epic goedkeuren of met een vrije reden terugsturen,
+herprioriteren, intrekken of annuleren. **Overzicht** toont epics die op goedkeuring wachten. Onder
+**Instellingen** kiest de Stakeholder per product automatische of handmatige epicgoedkeuring.
+Planning toont bij een handmatige prioriteitsactie de reden en de zichtbare doorwerking
 op nog niet verstuurde stories.
 
 ## Detailpagina

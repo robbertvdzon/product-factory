@@ -83,6 +83,8 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(backlog.map { it.title }).containsExactly("Overzicht tonen", "Bewijs openen")
         assertThat(backlog.map { it.sequenceNumber }).containsExactly(1, 2)
         assertThat(backlog[1].dependencies).containsExactly(backlog[0].id)
+        assertThat(backlog[0].uxArtifacts.map { it.name }).containsExactly("ux-main.png")
+        assertThat(backlog[1].uxArtifacts).isEmpty()
         assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.ACTIVE)
         assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
     }
@@ -103,6 +105,35 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(planSchema.at("/properties/outcome/type").asText()).isEqualTo("string")
         assertThat(planSchema.at("/properties/stories/items/properties/type/type").asText()).isEqualTo("string")
         assertThat(planSchema.at("/properties/memoryChanges/items/properties/type/type").asText()).isEqualTo("string")
+    }
+
+    @Test
+    fun `planner stuurt epic zonder voldoende ontwerp terug met vrije reden en zonder stories`() {
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planning.runProcessSession(productId)
+        runtime.reset()
+        ai.dispatchPending()
+        completeDispatchedJob(mapper.createObjectNode().apply {
+            put("outcome", "REQUEST_EPIC_REFINEMENT")
+            putArray("stories")
+            putArray("todoOrder")
+            putArray("refinementRequests").addObject().apply {
+                put("epicId", epic.id.value)
+                put("reason", "Het initiële vraagscherm en een concrete harvesting- en indexeringsroute ontbreken.")
+            }
+            putNull("stakeholderQuestion")
+            putArray("memoryChanges")
+        })
+
+        planning.runProcessSession(productId)
+
+        val refined = designQueries.getEpic(epic.id)
+        assertThat(refined.status).isEqualTo(EpicStatus.NEEDS_REFINEMENT)
+        assertThat(refined.refinementReason).contains("initiële vraagscherm").contains("indexeringsroute")
+        assertThat(planningQueries.findStories(StoryFilter(productId))).isEmpty()
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().status)
+            .isEqualTo(ProcessSessionStatus.SUCCEEDED)
     }
 
     @Test
@@ -327,23 +358,29 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         putArray("stories").apply {
             addObject().apply {
                 put("draftKey", "overview"); put("type", "PRODUCT_STORY"); put("epicId", epic.id.value); put("epicVersion", epic.version)
+                putNull("bugId"); putNull("bugVersion")
                 put("title", "Overzicht tonen"); put("summary", "De Stakeholder ziet de actuele verbetering en status.")
                 put("content", "Bouw het scanbare productoverzicht met de actuele gebruikersverbetering, duidelijke status, lege en fouttoestand en een toegankelijke link naar bewijs.")
                 putArray("acceptanceCriteria").add("Het overzicht toont titel, samenvatting en status in hoofd- en lege toestand.")
                 put("uxDesign", "Toon één rustige overzichtskaart met toegankelijke status en bewijsactie.")
+                putArray("uxArtifactNames").add("ux-main.png")
                 putArray("dependencies"); putArray("coveredAcceptanceCriteria").add(CRITERION_OVERVIEW)
                 put("priorityReason", "Het overzicht is de ingang voor de hele gebruikersflow.")
             }
             addObject().apply {
                 put("draftKey", "evidence"); put("type", "PRODUCT_STORY"); put("epicId", epic.id.value); put("epicVersion", epic.version)
+                putNull("bugId"); putNull("bugVersion")
                 put("title", "Bewijs openen"); put("summary", "De Stakeholder opent het opgeslagen bewijs vanuit het overzicht.")
                 put("content", "Bouw het bewijsdetail met bron, laad- en fouttoestand, veilige terugroute en voldoende zelfstandige context voor uitvoering zonder epicquery.")
                 putArray("acceptanceCriteria").add("De bewijsactie opent de juiste opgeslagen bron en toont een veilige fouttoestand.")
+                putNull("uxDesign"); putArray("uxArtifactNames")
                 putArray("dependencies").add("overview"); putArray("coveredAcceptanceCriteria").add(CRITERION_EVIDENCE)
                 put("priorityReason", "Het bewijsdetail volgt nadat de overzichtsingang beschikbaar is.")
             }
         }
         putArray("todoOrder").add("overview").add("evidence")
+        putArray("refinementRequests")
+        putNull("stakeholderQuestion")
         putArray("memoryChanges")
     }
 

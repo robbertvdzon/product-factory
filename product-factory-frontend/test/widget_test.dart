@@ -283,7 +283,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Bronnen verbinden · NEEDS_RESEARCH'));
+    await tester.tap(find.text('Bronnen verbinden · Onderzoek nodig'));
     await tester.pump();
 
     expect(find.text('Nog niet klaar voor planning'), findsOneWidget);
@@ -352,6 +352,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    expect(find.text('Bronnen verbinden'), findsOneWidget);
+    expect(find.textContaining('1 story · Onderzoek nodig'), findsOneWidget);
 
     expect(find.text('Dispatching aanzetten en versturen'), findsOneWidget);
     await tester.tap(find.text('Dispatching aanzetten en versturen'));
@@ -617,6 +620,8 @@ class FakeProductGateway implements ProductGateway {
   @override
   Future<void> setDispatching(ProductSummary product, bool enabled) async {}
   @override
+  Future<void> setEpicApprovalMode(ProductSummary product, String mode) async {}
+  @override
   Future<void> setStatus(ProductSummary product, String status) async {}
   @override
   Future<void> supersedeDecision(
@@ -636,6 +641,14 @@ class FakeProductGateway implements ProductGateway {
   Future<void> withdrawEpic(String epicId, int version, String reason) async {}
   @override
   Future<void> cancelEpic(String epicId, int version, String reason) async {}
+  @override
+  Future<void> approveEpic(String epicId, int version) async {}
+  @override
+  Future<void> requestEpicRefinement(
+    String epicId,
+    int version,
+    String reason,
+  ) async {}
   @override
   Future<void> runProductPlanning(String productId) async {}
   @override
