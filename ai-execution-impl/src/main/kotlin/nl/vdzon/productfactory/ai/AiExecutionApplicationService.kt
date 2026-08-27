@@ -226,13 +226,15 @@ class AiExecutionApplicationService(
         ).take(limit).forEach(::reconcileOne)
     }
 
-    fun downloadArtifact(taskId: AiTaskId, artifactId: String): ByteArray {
+    override fun downloadAiTaskArtifact(taskId: AiTaskId, artifactId: String): ByteArray {
         val task = getAiTask(taskId)
         val result = getAiTaskResult(taskId) ?: throw AggregateNotFound("AI-taak heeft geen resultaat.")
         val artifact = result.artifacts.singleOrNull { it.uri.endsWith("/$artifactId") }
             ?: throw AggregateNotFound("Artifact bestaat niet voor deze AI-taak.")
         return runtime.downloadArtifact(task.runtimeJobId ?: throw AggregateNotFound("Runtimecorrelatie ontbreekt."), artifact.uri.substringAfterLast('/'))
     }
+
+    fun downloadArtifact(taskId: AiTaskId, artifactId: String): ByteArray = downloadAiTaskArtifact(taskId, artifactId)
 
     @Transactional
     fun deleteAllOwnedExecutionData() {

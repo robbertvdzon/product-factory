@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.dispatcher
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import nl.vdzon.productfactory.api.ai.AiExecutionQueryService
 import nl.vdzon.productfactory.api.dispatcher.*
 import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.product.ProductQueryService
@@ -18,6 +19,7 @@ import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.util.Base64
 import java.util.HexFormat
 import java.util.UUID
 
@@ -29,6 +31,7 @@ class SoftwareFactoryDispatcherMvpService(
     private val products: ProductQueryService,
     private val planning: ProductPlanningService,
     private val planningQueries: ProductPlanningQueryService,
+    private val aiQueries: AiExecutionQueryService,
     adapters: List<SoftwareFactoryAdapter>,
     transactionManager: PlatformTransactionManager,
     @Value("\${PF_SOFTWARE_FACTORY_MODE:DISABLED}") private val configuredMode: String,
@@ -212,9 +215,26 @@ class SoftwareFactoryDispatcherMvpService(
             appendLine("## Technische grens")
             appendLine("Implementeer uitsluitend deze zelfstandige story in de doelrepository en lever een volledige commit-SHA op.")
         }.trim()
+        val attachments = story.uxArtifacts.distinctBy { it.name }.map { artifact ->
+            val match = AI_ARTIFACT_URI.matchEntire(artifact.uri)
+                ?: throw ContractFactoryFailure("INVALID_UX_ARTIFACT", "UX-artifact ${artifact.name} heeft geen geldige duurzame verwijzing.")
+            val bytes = runCatching {
+                aiQueries.downloadAiTaskArtifact(AiTaskId(match.groupValues[1]), match.groupValues[2])
+            }.getOrElse {
+                throw ContractFactoryFailure("UX_ARTIFACT_UNAVAILABLE", "UX-artifact ${artifact.name} kon niet worden geladen.")
+            }
+            FactoryAttachment(
+                id = match.groupValues[2],
+                fileName = artifact.name,
+                mediaType = artifact.mediaType,
+                sizeBytes = bytes.size.toLong(),
+                sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
+                contentBase64 = Base64.getEncoder().encodeToString(bytes),
+            )
+        }
         return FactoryStoryRequest(
             story.productId.value, story.id.value, story.version, story.type.name, repositoryUrl,
-            story.title.trim(), description, emptyList(),
+            story.title.trim(), description, attachments,
         )
     }
 
@@ -416,6 +436,7 @@ class SoftwareFactoryDispatcherMvpService(
 
     companion object {
         private const val ARTIFACT = "software-factory-dispatcher-impl"
+        private val AI_ARTIFACT_URI = Regex("/api/ai/tasks/([^/]+)/artifacts/([^/]+)")
         private const val VARIANT = "v2-idempotent"
         private val PROCESS_ACTOR = ActorReference(ActorType.SYSTEM, "software-factory-dispatcher")
         private val FULL_SHA = Regex("[a-fA-F0-9]{40}|[a-fA-F0-9]{64}")

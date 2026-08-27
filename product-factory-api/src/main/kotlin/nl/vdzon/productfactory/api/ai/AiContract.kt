@@ -122,6 +122,7 @@ interface AiExecutionQueryService {
     fun getAiJobConfigurations(): List<AiJobConfigurationDetails>
     fun getAiTask(taskId: AiTaskId): AiTaskDetails
     fun getAiTaskResult(taskId: AiTaskId): AiTaskResultDetails?
+    fun downloadAiTaskArtifact(taskId: AiTaskId, artifactId: String): ByteArray
     fun findAiTasks(filter: AiTaskFilter): List<AiTaskDetails>
     fun getEnvironmentCatalog(projectPrefix: String): List<EnvironmentKeyDetails>
     fun getProductEnvironmentKeys(productId: ProductId): List<ProductEnvironmentKeyDetails>

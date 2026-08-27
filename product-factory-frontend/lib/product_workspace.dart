@@ -108,6 +108,84 @@ class _ZoomableUxArtifactDialogState extends State<_ZoomableUxArtifactDialog> {
   );
 }
 
+List<Widget> _uxArtifactGallery(
+  BuildContext context,
+  List<Object?> rawArtifacts, {
+  String title = 'UX-modellen',
+}) {
+  if (rawArtifacts.isEmpty) return const [];
+  return [
+    const SizedBox(height: 12),
+    Text(title, style: Theme.of(context).textTheme.labelLarge),
+    const SizedBox(height: 6),
+    Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: rawArtifacts.map((raw) {
+        final artifact = (raw as Map).cast<String, Object?>();
+        return SizedBox(
+          width: 380,
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Tooltip(
+                  message: 'Open UX-model en zoom in',
+                  child: InkWell(
+                    onTap: () => _openUxArtifact(context, artifact),
+                    child: Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        Image.network(
+                          _backendResourceUrl(artifact['uri']),
+                          height: 240,
+                          width: double.infinity,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const SizedBox(
+                                height: 160,
+                                child: Center(
+                                  child: Text(
+                                    'UX-afbeelding kon niet worden geladen.',
+                                  ),
+                                ),
+                              ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(7),
+                              child: Icon(
+                                Icons.open_in_full,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: SelectableText(_value(artifact['name'])),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    ),
+  ];
+}
+
 final RegExp _productIdPattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,98}[a-z0-9]$');
 
 String? _productIdError(String value) {
@@ -1403,12 +1481,13 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           label: const Text('Planning starten of hervatten'),
         ),
         FilledButton.icon(
-          onPressed: data.product.dispatchingEnabled
-              ? () =>
-                    _mutate(() => widget.gateway.runDispatcher(data.product.id))
-              : null,
+          onPressed: () => _dispatchNow(data),
           icon: const Icon(Icons.send_outlined),
-          label: const Text('Nu versturen of bijwerken'),
+          label: Text(
+            data.product.dispatchingEnabled
+                ? 'Nu versturen of bijwerken'
+                : 'Dispatching aanzetten en versturen',
+          ),
         ),
       ],
     ),
@@ -1445,6 +1524,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               (criterion) => Text('• $criterion'),
             ),
             if (story['uxDesign'] != null) Text('UX: ${story['uxDesign']}'),
+            ..._uxArtifactGallery(
+              context,
+              (story['uxArtifacts'] as List? ?? const <Object?>[])
+                  .cast<Object?>(),
+              title: 'UX-modellen bij deze story',
+            ),
             Text(
               'Dependencies: ${(story['dependencies'] as List? ?? const []).map(_value).join(', ')}',
             ),
@@ -1633,6 +1718,47 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     }
   }
 
+  Future<void> _dispatchNow(ProductWorkspaceData data) async {
+    if (!data.product.dispatchingEnabled) {
+      final enable = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Dispatching staat uit'),
+          content: const Text(
+            'Wil je dispatching voor dit product aanzetten en de eerste uitvoerbare story nu naar Software Factory versturen?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuleren'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.send_outlined),
+              label: const Text('Aanzetten en versturen'),
+            ),
+          ],
+        ),
+      );
+      if (enable != true) return;
+    }
+    final sent = await _mutate(() async {
+      if (!data.product.dispatchingEnabled) {
+        await widget.gateway.setDispatching(data.product, true);
+      }
+      await widget.gateway.runDispatcher(data.product.id);
+    });
+    if (sent && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Dispatcher uitgevoerd. De externe story en status zijn bijgewerkt.',
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _quality(
     ProductWorkspaceData data,
   ) => _section('Kwaliteitsbewaking', Icons.verified_outlined, [
@@ -1810,83 +1936,11 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               Text('UX-ontwerp', style: Theme.of(context).textTheme.labelLarge),
               Text('${epic['uxDesign']}'),
             ],
-            if ((epic['uxArtifacts'] as List? ?? const []).isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                'UX-modellen',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: (epic['uxArtifacts'] as List? ?? const []).map((raw) {
-                  final artifact = (raw as Map).cast<String, Object?>();
-                  return SizedBox(
-                    width: 380,
-                    child: Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Tooltip(
-                            message: 'Open UX-model en zoom in',
-                            child: InkWell(
-                              onTap: () => _openUxArtifact(context, artifact),
-                              child: Stack(
-                                alignment: Alignment.topRight,
-                                children: [
-                                  Image.network(
-                                    _backendResourceUrl(artifact['uri']),
-                                    height: 240,
-                                    width: double.infinity,
-                                    fit: BoxFit.contain,
-                                    errorBuilder:
-                                        (
-                                          context,
-                                          error,
-                                          stackTrace,
-                                        ) => const SizedBox(
-                                          height: 160,
-                                          child: Center(
-                                            child: Text(
-                                              'UX-afbeelding kon niet worden geladen.',
-                                            ),
-                                          ),
-                                        ),
-                                  ),
-                                  const Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: Colors.black54,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Padding(
-                                        padding: EdgeInsets.all(7),
-                                        child: Icon(
-                                          Icons.open_in_full,
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: SelectableText(_value(artifact['name'])),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
+            ..._uxArtifactGallery(
+              context,
+              (epic['uxArtifacts'] as List? ?? const <Object?>[])
+                  .cast<Object?>(),
+            ),
             const SizedBox(height: 8),
             Text('Gereedheid', style: Theme.of(context).textTheme.labelLarge),
             Text(

@@ -42,6 +42,7 @@ data class StoryDetails(
     val dispatchReservationStatus: DispatchReservationStatus? = null,
     val verificationId: VerificationId? = null,
     val verificationPassed: Boolean? = null,
+    val uxArtifacts: List<ArtifactReference> = emptyList(),
 )
 data class PlanningWorkItemDetails(
     val id: PlanningWorkItemId,

@@ -80,7 +80,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: FoundationPage(
           showAcceptanceBanner: true,
           productGateway: FakeProductGateway(),
@@ -274,7 +274,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1200, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: ProductWorkspacePage(
           gateway: ResearchProductGateway(),
           section: ProductWorkspaceSection.design,
@@ -313,7 +313,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1200, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: Scaffold(
           body: ProductWorkspacePage(
             gateway: ResearchProductGateway(),
@@ -333,6 +333,39 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('planning kan dispatching aanzetten en toont story UX-modellen', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = ResearchProductGateway();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProductWorkspacePage(
+            gateway: gateway,
+            section: ProductWorkspaceSection.planning,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dispatching aanzetten en versturen'), findsOneWidget);
+    await tester.tap(find.text('Dispatching aanzetten en versturen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dispatching staat uit'), findsOneWidget);
+    await tester.tap(find.text('Aanzetten en versturen'));
+    await tester.pumpAndSettle();
+    expect(gateway.dispatchingChanges, 1);
+    expect(gateway.dispatchRuns, 1);
+
+    await tester.tap(find.textContaining('Story met UX-model · TODO'));
+    await tester.pump();
+    expect(find.text('UX-modellen bij deze story'), findsOneWidget);
+    expect(find.byTooltip('Open UX-model en zoom in'), findsOneWidget);
   });
 
   testWidgets('Runtime-catalogus gebruikt de gekozen projectprefix', (
@@ -624,18 +657,31 @@ class FakeProductGateway implements ProductGateway {
 }
 
 class ResearchProductGateway extends FakeProductGateway {
-  const ResearchProductGateway();
+  bool dispatchingEnabled = false;
+  int dispatchingChanges = 0;
+  int dispatchRuns = 0;
 
-  static const product = ProductSummary(
+  ProductSummary get product => ProductSummary(
     id: 'hkh-autopilot',
     name: 'HKH Autopilot',
     status: 'ACTIVE',
-    dispatchingEnabled: false,
-    version: 1,
+    dispatchingEnabled: dispatchingEnabled,
+    version: dispatchingEnabled ? 2 : 1,
   );
 
   @override
-  Future<List<ProductSummary>> products() async => const [product];
+  Future<List<ProductSummary>> products() async => [product];
+
+  @override
+  Future<void> setDispatching(ProductSummary product, bool enabled) async {
+    dispatchingChanges++;
+    dispatchingEnabled = enabled;
+  }
+
+  @override
+  Future<void> runDispatcher(String productId) async {
+    dispatchRuns++;
+  }
 
   @override
   Future<ProductWorkspaceData> workspace(ProductSummary product) async =>
@@ -690,8 +736,56 @@ class ResearchProductGateway extends FakeProductGateway {
         ],
         designSessions: const [],
         epicHistories: const {'epic-1': []},
-        stories: const [],
-        backlog: const [],
+        stories: const [
+          {
+            'id': {'value': 'story-1'},
+            'epicId': {'value': 'epic-1'},
+            'epicVersion': 1,
+            'sequenceNumber': 1,
+            'type': 'PRODUCT_STORY',
+            'title': 'Story met UX-model',
+            'summary': 'Story gebruikt het gevalideerde ontwerp.',
+            'content': 'Bouw de zichtbare gebruikersroute.',
+            'acceptanceCriteria': ['De route volgt het UX-model.'],
+            'uxDesign': 'Volg zoekscherm.png.',
+            'uxArtifacts': [
+              {
+                'name': 'zoekscherm.png',
+                'mediaType': 'image/png',
+                'uri': '/api/ai/tasks/task-1/artifacts/main',
+              },
+            ],
+            'dependencies': [],
+            'priorityReason': 'Eerste zelfstandige waarde.',
+            'status': 'TODO',
+            'version': 1,
+          },
+        ],
+        backlog: const [
+          {
+            'id': {'value': 'story-1'},
+            'epicId': {'value': 'epic-1'},
+            'epicVersion': 1,
+            'sequenceNumber': 1,
+            'type': 'PRODUCT_STORY',
+            'title': 'Story met UX-model',
+            'summary': 'Story gebruikt het gevalideerde ontwerp.',
+            'content': 'Bouw de zichtbare gebruikersroute.',
+            'acceptanceCriteria': ['De route volgt het UX-model.'],
+            'uxDesign': 'Volg zoekscherm.png.',
+            'uxArtifacts': [
+              {
+                'name': 'zoekscherm.png',
+                'mediaType': 'image/png',
+                'uri': '/api/ai/tasks/task-1/artifacts/main',
+              },
+            ],
+            'dependencies': [],
+            'priorityReason': 'Eerste zelfstandige waarde.',
+            'status': 'TODO',
+            'version': 1,
+          },
+        ],
         planningWorkItems: const [],
         planningSessions: const [],
         qualitySnapshot: null,

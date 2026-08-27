@@ -148,6 +148,7 @@ interface MockSoftwareFactoryControl {
     fun failNextCall()
     fun loseNextCreateResponse()
     fun breakNextContract()
+    fun attachments(storyKey: String): List<FactoryAttachment>
     fun reset()
 }
 
@@ -202,6 +203,7 @@ class MockSoftwareFactory(private val mapper: ObjectMapper) : SoftwareFactoryAda
     override fun failNextCall() { failNext = true }
     override fun loseNextCreateResponse() { loseNext = true }
     override fun breakNextContract() { breakNext = true }
+    override fun attachments(storyKey: String): List<FactoryAttachment> = stories[storyKey]?.request?.attachments.orEmpty()
     override fun reset() { stories.clear(); nextNumber = 3000; failNext = false; loseNext = false; breakNext = false }
     private fun maybeFail() { if (failNext) { failNext = false; throw RetryableFactoryFailure("TEMPORARY_FAILURE", "Gesimuleerde tijdelijke storing.") } }
     private fun maybeBreak() { if (breakNext) { breakNext = false; throw ContractFactoryFailure("INVALID_RESPONSE", "Gesimuleerde contractbreuk.") } }

@@ -160,6 +160,9 @@ De mapping volgt deze regels:
   op te vragen.
 - Tekst, Markdown, JSON, SVG en andere tekstassets worden in `description` opgenomen. Alleen
   binaire bestanden staan in `attachments` en gebruiken voor dit JSON-transport Base64.
+- De UX-artifacts van de bevroren epicversie zijn onderdeel van iedere bijbehorende
+  `StoryDetails`, worden in het uitgeklapte storydetail getoond en gaan als binaire attachments mee
+  naar Software Factory. Daardoor kan de uitvoerende agent de beelden daadwerkelijk openen.
 - Ieder binair attachment bevat een stabiel ID, originele bestandsnaam, MIME-type, werkelijke
   bytegrootte en SHA-256. ID's en bestandsnamen zijn binnen het pakket uniek; bestandsnamen bevatten
   geen padsegmenten. Product Factory berekent de metadata uit de opgeslagen bytes.

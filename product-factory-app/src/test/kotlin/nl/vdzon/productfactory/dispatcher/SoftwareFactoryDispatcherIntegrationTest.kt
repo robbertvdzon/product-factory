@@ -1,5 +1,10 @@
 package nl.vdzon.productfactory.dispatcher
 
+import nl.vdzon.productfactory.ai.AiExecutionApplicationService
+import nl.vdzon.productfactory.ai.AiExecutionRuntimeIntegrationTest
+import nl.vdzon.productfactory.ai.FakeRuntime
+import nl.vdzon.productfactory.ai.RuntimeArtifactView
+import nl.vdzon.productfactory.api.ai.*
 import nl.vdzon.productfactory.api.dispatcher.*
 import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.product.*
@@ -13,13 +18,18 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.util.Base64
 import java.util.UUID
 
 @SpringBootTest(properties = ["PF_AUTH_REQUIRED=false", "PF_SOFTWARE_FACTORY_MODE=MOCKED"])
 @ActiveProfiles("test")
+@Import(AiExecutionRuntimeIntegrationTest.RuntimeTestConfiguration::class)
 class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
     private val productCommands: ProductCommandService,
     private val dispatcher: SoftwareFactoryDispatcherService,
@@ -30,6 +40,10 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
     private val qualityQueries: QualityQueryService,
     private val dispatcherImpl: SoftwareFactoryDispatcherMvpService,
     private val mock: MockSoftwareFactory,
+    private val aiCommands: AiExecutionService,
+    private val aiQueries: AiExecutionQueryService,
+    private val aiImpl: AiExecutionApplicationService,
+    private val runtime: FakeRuntime,
     private val jdbc: JdbcTemplate,
     private val clock: Clock,
 ) {
@@ -42,6 +56,7 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         dispatcherImpl.deleteAllOwnedData()
         planningImpl.deleteAllOwnedData()
         mock.reset()
+        runtime.reset()
         productId = ProductId("dispatcher-${UUID.randomUUID().toString().take(8)}")
         productCommands.createProduct(CreateProductCommand(productId, "Dispatcher test", actor = STAKEHOLDER, idempotencyKey = "create-${productId.value}"))
         productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
@@ -49,7 +64,7 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
             "https://github.com/robbertvdzon/hkh-autopilot.git", 0, STAKEHOLDER, "assignment-${productId.value}",
         ))
         productCommands.setProductDispatching(SetProductDispatchingCommand(productId, true, 1, STAKEHOLDER, "dispatching-${productId.value}"))
-        firstStory = insertStory(1)
+        firstStory = insertStory(1, listOf(createUxArtifact()))
         insertStory(2)
     }
 
@@ -68,6 +83,10 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         assertThat(attempts.single().status).isEqualTo(DeliveryAttemptStatus.ACCEPTED)
         assertThat(attempts.single().externalStoryId).startsWith("SF-")
         assertThat(mock.find(productId.value, "OPEN")).hasSize(1)
+        val attachment = mock.attachments(attempts.single().externalStoryId!!).single()
+        assertThat(attachment.fileName).isEqualTo("zoekscherm.png")
+        assertThat(Base64.getDecoder().decode(attachment.contentBase64)).isEqualTo("bewijs".toByteArray())
+        assertThat(attachment.sha256).hasSize(64)
         assertThat(planningQueries.getStory(firstStory).status).isEqualTo(StoryStatus.IN_PROGRESS)
         assertThat(planningQueries.getBacklog(productId).map { it.sequenceNumber }).containsExactly(1, 2)
     }
@@ -127,10 +146,36 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         assertThat(mock.find(productId.value, "OPEN")).hasSize(1)
     }
 
-    private fun insertStory(sequence: Long): StoryId {
+    private fun createUxArtifact(): ArtifactReference {
+        val taskId = aiCommands.requestAiTask(RequestAiTaskCommand(
+            AiJobKey("PLANNING.SLICE_EPIC"), productId, "planning", null, "PLANNER_MVP", AiProvider.CODEX, "gpt-5.6-sol", 0,
+            1, "Maak een UX-model.", """{"type":"object"}""", executionTimeout = Duration.ofMinutes(5), idempotencyKey = "ux-${productId.value}",
+        ))
+        aiImpl.dispatchPending()
+        val job = runtime.onlyJob()
+        runtime.resultArtifacts[job.id] = listOf(
+            RuntimeArtifactView("ux-artifact", job.id, "zoekscherm.png", "image/png", 6, "0".repeat(64), Instant.now()),
+        )
+        runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
+        aiImpl.reconcileActive()
+        return aiQueries.getAiTaskResult(taskId)!!.artifacts.single()
+    }
+
+    private fun insertStory(sequence: Long, uxArtifacts: List<ArtifactReference> = emptyList()): StoryId {
         val id = StoryId(UUID.randomUUID().toString())
         val epicId = UUID.randomUUID().toString()
         val now = clock.instant()
+        jdbc.update(
+            "INSERT INTO pf_epic(id,product_id,current_version,status,created_at,updated_at) VALUES (?,?,1,'ACTIVE',?,?)",
+            epicId, productId.value, now, now,
+        )
+        jdbc.update(
+            """INSERT INTO pf_epic_version(epic_id,version,title,summary,problem,solution,direction_references_json,ux_design,
+                acceptance_criteria_json,slicability_rationale,source_references_json,status,actor_type,actor_id,created_at,ux_artifacts_json)
+                VALUES (?,1,?,?,?,?,?,?,?,?,?,'ACTIVE','PROCESS','dispatcher-test',?,?)""".trimIndent(),
+            epicId, "Epic $sequence", "Zelfstandig testepic.", "Testprobleem.", "Testoplossing.", "[]", "UX-ontwerp.",
+            "[\"De route werkt.\"]", "Zelfstandig te bouwen.", "[]", now, com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(uxArtifacts),
+        )
         jdbc.update(
             """INSERT INTO pf_story(id,product_id,epic_id,epic_version,type,status,current_version,sequence_number,priority_reason,
                 bug_link_confirmed,created_at,updated_at) VALUES (?,?,?,?,?,'TODO',1,?,?,FALSE,?,?)""".trimIndent(),

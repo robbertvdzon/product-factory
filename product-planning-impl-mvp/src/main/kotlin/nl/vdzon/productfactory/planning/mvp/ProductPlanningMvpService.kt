@@ -626,8 +626,9 @@ class ProductPlanningMvpService(
     private fun storyRows(where: String = "", vararg args: Any): List<StoryDetails> = jdbc.query(
         """SELECT s.id,s.product_id,s.epic_id,s.epic_version,s.sequence_number,s.type,v.title,v.summary,v.content,v.acceptance_criteria_json,
             v.ux_design,v.dependencies_json,s.status,s.delivered_commit_sha,s.cancellation_reason,s.current_version,s.created_at,s.updated_at,
-            s.priority_reason,s.bug_id,s.bug_version,s.external_story_id,r.id,r.status,s.verification_id,s.verification_passed
+            s.priority_reason,s.bug_id,s.bug_version,s.external_story_id,r.id,r.status,s.verification_id,s.verification_passed,ev.ux_artifacts_json
             FROM pf_story s JOIN pf_story_version v ON v.story_id=s.id AND v.version=s.current_version
+            LEFT JOIN pf_epic_version ev ON ev.epic_id=s.epic_id AND ev.version=s.epic_version
             LEFT JOIN pf_story_dispatch_reservation r ON r.story_id=s.id AND r.status IN ('RESERVED','DISPATCHED')
             $where ORDER BY s.sequence_number""".trimIndent(),
         { rs, _ -> StoryDetails(
@@ -636,6 +637,7 @@ class ProductPlanningMvpService(
             StoryStatus.valueOf(rs.getString(13)), rs.getString(14), rs.getString(15), rs.getLong(16), rs.getTimestamp(17).toInstant(), rs.getTimestamp(18).toInstant(),
             rs.getString(19), rs.getString(20)?.let(::BugId), rs.getObject(21)?.let { rs.getLong(21) }, rs.getString(22), rs.getString(23),
             rs.getString(24)?.let(DispatchReservationStatus::valueOf), rs.getString(25)?.let(::VerificationId), rs.getObject(26)?.let { rs.getBoolean(26) },
+            rs.getString(27)?.let { readJson(it) } ?: emptyList(),
         ) }, *args,
     )
 
