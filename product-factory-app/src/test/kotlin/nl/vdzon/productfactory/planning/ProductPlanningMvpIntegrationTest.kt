@@ -105,10 +105,15 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(planSchema.at("/properties/outcome/type").asText()).isEqualTo("string")
         assertThat(planSchema.at("/properties/stories/items/properties/type/type").asText()).isEqualTo("string")
         assertThat(planSchema.at("/properties/memoryChanges/items/properties/type/type").asText()).isEqualTo("string")
+        assertThat(planSchema.at("/properties/refinementRequests/items/properties/reason/minLength").asInt()).isEqualTo(10)
+        assertThat(planSchema.at("/properties/refinementRequests/items/properties/reason/maxLength").asInt()).isEqualTo(10_000)
     }
 
     @Test
     fun `planner stuurt epic zonder voldoende ontwerp terug met vrije reden en zonder stories`() {
+        val refinementReason = "Het initiële vraagscherm en een concrete harvesting- en indexeringsroute ontbreken. " +
+            "De ontbrekende ontwerp- en broninformatie moet concreet en uitvoerbaar worden vastgelegd. ".repeat(13).trim()
+        assertThat(refinementReason.length).isBetween(1_001, 10_000)
         planning.runProcessSession(productId)
         completeOnlyJob(selection())
         planning.runProcessSession(productId)
@@ -120,7 +125,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
             putArray("todoOrder")
             putArray("refinementRequests").addObject().apply {
                 put("epicId", epic.id.value)
-                put("reason", "Het initiële vraagscherm en een concrete harvesting- en indexeringsroute ontbreken.")
+                put("reason", refinementReason)
             }
             putNull("stakeholderQuestion")
             putArray("memoryChanges")
@@ -130,7 +135,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
 
         val refined = designQueries.getEpic(epic.id)
         assertThat(refined.status).isEqualTo(EpicStatus.NEEDS_REFINEMENT)
-        assertThat(refined.refinementReason).contains("initiële vraagscherm").contains("indexeringsroute")
+        assertThat(refined.refinementReason).isEqualTo(refinementReason)
         assertThat(planningQueries.findStories(StoryFilter(productId))).isEmpty()
         assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().status)
             .isEqualTo(ProcessSessionStatus.SUCCEEDED)
@@ -287,6 +292,9 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
 
     @Test
     fun `geannuleerde dependency blijft onvervuld en maakt gericht herplanningswerk`() {
+        val cancellationReason = "Externe levering is geannuleerd. " +
+            "De volledige reden blijft beschikbaar voor vervolgplanning en controle. ".repeat(16).trim()
+        assertThat(cancellationReason.length).isBetween(1_001, 10_000)
         publishPlan()
         val reservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-dependency"))!!
         planning.markStoryAsDispatched(MarkStoryAsDispatchedCommand(
@@ -295,13 +303,14 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         val inProgress = planningQueries.getStory(reservation.story.id)
 
         planning.markStoryAsCancelled(MarkStoryAsCancelledCommand(
-            inProgress.id, "SF-dependency", "Externe levering is geannuleerd.", inProgress.version, PROCESS, "cancel-dependency",
+            inProgress.id, "SF-dependency", cancellationReason, inProgress.version, PROCESS, "cancel-dependency",
         ))
 
         val stories = planningQueries.findStories(StoryFilter(productId))
         val cancelled = stories.single { it.id == inProgress.id }
         val dependent = stories.single { it.id != inProgress.id }
         assertThat(cancelled.status).isEqualTo(StoryStatus.CANCELLED)
+        assertThat(cancelled.cancellationReason).isEqualTo(cancellationReason)
         assertThat(dependent.status).isEqualTo(StoryStatus.TODO)
         assertThat(dependent.dependencies).contains(cancelled.id)
         assertThat(planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-blocked"))).isNull()

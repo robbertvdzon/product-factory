@@ -440,7 +440,7 @@ class ProductDesignMvpService(
     @Transactional
     override fun requestEpicRefinement(command: RequestEpicRefinementCommand) {
         validateActor(command.actor)
-        validateReason(command.reason)
+        validateReason(command.reason, MAX_REFINEMENT_REASON_LENGTH)
         val commandFingerprint = fingerprint(command)
         replay(command.idempotencyKey, commandFingerprint)?.let { return }
         val epic = getEpic(command.epicId)
@@ -737,8 +737,8 @@ class ProductDesignMvpService(
             throw InvalidCommand("Actor mag deze epicovergang niet uitvoeren.")
         }
     }
-    private fun validateReason(reason: String) {
-        if (reason.isBlank() || reason.length > 1000) throw InvalidCommand("Een begrensde reden is verplicht.")
+    private fun validateReason(reason: String, maxLength: Int = MAX_TERMINAL_REASON_LENGTH) {
+        if (reason.isBlank() || reason.length > maxLength) throw InvalidCommand("Een begrensde reden is verplicht.")
     }
     private fun fingerprint(value: Any) = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsBytes(value)))
     private fun safeCode(error: Throwable) = when (error) {
@@ -813,6 +813,8 @@ $snapshotJson"""
         private const val MAX_DESIGN_ITERATIONS = 3
         private const val MIN_VALIDATED_EXTERNAL_SOURCES = 2
         private const val MIN_UX_ARTIFACTS = 2
+        private const val MAX_TERMINAL_REASON_LENGTH = 1_000
+        private const val MAX_REFINEMENT_REASON_LENGTH = 10_000
         private val REFINABLE_STATUSES = setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT, EpicStatus.AWAITING_APPROVAL, EpicStatus.AVAILABLE)
         private val RETURNABLE_FOR_REFINEMENT = setOf(
             EpicStatus.AWAITING_APPROVAL, EpicStatus.AVAILABLE, EpicStatus.IN_PLANNING, EpicStatus.ACTIVE,

@@ -264,7 +264,7 @@ class ProductPlanningMvpService(
                 val epicId = EpicId(requiredText(request, "epicId", 1, 80))
                 val selectedEpic = selected.single { it.id == epicId }
                 design.requestEpicRefinement(RequestEpicRefinementCommand(
-                    epicId, requiredText(request, "reason", 10, 10_000), selectedEpic.expectedStateVersion,
+                    epicId, requiredText(request, "reason", 10, MAX_REASON_LENGTH), selectedEpic.expectedStateVersion,
                     PROCESS_ACTOR, "planning-refine-${session.id.value}-${epicId.value}",
                 ))
             }
@@ -565,6 +565,7 @@ class ProductPlanningMvpService(
     @Transactional
     override fun markStoryAsCancelled(command: MarkStoryAsCancelledCommand) {
         validateProcessActor(command.actor)
+        validateReason(command.reason)
         replayFast(command.idempotencyKey, command)?.let { return }
         val story = getStory(command.storyId)
         if (story.status != StoryStatus.IN_PROGRESS || story.version != command.expectedVersion || story.externalStoryId != command.externalStoryId) throw VersionConflict("Storyannulering is niet actueel.")
@@ -597,12 +598,13 @@ class ProductPlanningMvpService(
     @Transactional
     override fun cancelStoriesForEpic(command: CancelStoriesForEpicCommand) {
         validateActor(command.actor)
+        validateReason(command.reason)
         replayFast(command.idempotencyKey, command)?.let { return }
         val now = clock.instant()
         val existing = markerCount(command.epicId)
         if (existing == 0L) jdbc.update(
             "INSERT INTO pf_epic_cancellation_marker(epic_id,epic_version,product_id,reason,actor_type,actor_id,created_at) VALUES (?,?,?,?,?,?,?)",
-            command.epicId.value, command.epicVersion, command.productId.value, command.reason.take(1000), command.actor.type.name, command.actor.id, now,
+            command.epicId.value, command.epicVersion, command.productId.value, command.reason.trim(), command.actor.type.name, command.actor.id, now,
         )
         findStories(StoryFilter(command.productId, command.epicId, setOf(StoryStatus.TODO))).forEach { story ->
             val reserved = reservationForStory(story.id)
@@ -617,7 +619,7 @@ class ProductPlanningMvpService(
     @Transactional
     override fun retireStoriesForEpicRefinement(command: RetireStoriesForEpicRefinementCommand) {
         validateActor(command.actor)
-        if (command.reason.isBlank() || command.reason.length > 10_000) throw InvalidCommand("Een begrensde reden voor epicverfijning is verplicht.")
+        validateReason(command.reason)
         replayFast(command.idempotencyKey, command)?.let { return }
         findStories(StoryFilter(command.productId, command.epicId)).forEach { story ->
             when (story.status) {
@@ -628,7 +630,7 @@ class ProductPlanningMvpService(
                 }
                 StoryStatus.IN_PROGRESS -> jdbc.update(
                     "UPDATE pf_story SET refinement_cancel_requested=TRUE,refinement_cancel_sent=FALSE,cancellation_reason=?,updated_at=? WHERE id=?",
-                    command.reason.take(1000), clock.instant(), story.id.value,
+                    command.reason.trim(), clock.instant(), story.id.value,
                 )
                 StoryStatus.DONE, StoryStatus.CANCELLED -> Unit
             }
@@ -655,7 +657,7 @@ class ProductPlanningMvpService(
                     cancellation_reason=COALESCE(?,cancellation_reason),refinement_cancel_requested=CASE WHEN ?='CANCELLED' THEN FALSE ELSE refinement_cancel_requested END,
                     refinement_cancel_sent=CASE WHEN ?='CANCELLED' THEN FALSE ELSE refinement_cancel_sent END,
                     updated_at=? WHERE id=? AND current_version=?""".trimIndent(),
-                status.name, next, externalStoryId, deliveredSha, cancellationReason?.take(1000), status.name, status.name, clock.instant(), story.id.value, story.version,
+                status.name, next, externalStoryId, deliveredSha, cancellationReason?.trim(), status.name, status.name, clock.instant(), story.id.value, story.version,
             ) != 1
         ) throw VersionConflict("Story is tijdens de overgang gewijzigd.")
         return next
@@ -812,6 +814,7 @@ class ProductPlanningMvpService(
     private fun blockSession(id: ProcessSessionId, code: String, message: String) { jdbc.update("UPDATE pf_planning_process_session SET status='BLOCKED',blocked_reason=?,error_code=?,call_claimed_until=NULL,updated_at=? WHERE id=?", message.take(1000), code.take(160), clock.instant(), id.value); claimedWorkItems(id).forEach { jdbc.update("UPDATE pf_planning_work_item SET status='BLOCKED',error_code=?,updated_at=?,version=version+1 WHERE id=? AND status='IN_PROGRESS'", code, clock.instant(), it.value) } }
     private fun validateActor(actor: ActorReference) { if (actor.id.isBlank() || actor.type !in setOf(ActorType.STAKEHOLDER, ActorType.PROCESS, ActorType.SYSTEM, ActorType.FACTORY)) throw InvalidCommand("Actor mag geen planningsopdracht geven.") }
     private fun validateProcessActor(actor: ActorReference) { if (actor.id.isBlank() || actor.type !in setOf(ActorType.PROCESS, ActorType.SYSTEM)) throw InvalidCommand("Alleen vertrouwde procescode mag storylevering wijzigen.") }
+    private fun validateReason(reason: String) { if (reason.isBlank() || reason.length > MAX_REASON_LENGTH) throw InvalidCommand("Een begrensde reden is verplicht.") }
     private fun requiredText(node: JsonNode, field: String, min: Int, max: Int): String = node.path(field).takeIf(JsonNode::isTextual)?.asText()?.trim().orEmpty().also { if (it.length !in min..max) throw InvalidCommand("Planningsveld $field ontbreekt of is onbegrensd.") }
     private fun fingerprint(value: Any) = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsBytes(value)))
     private fun safeCode(error: Throwable) = when (error) { is VersionConflict -> "PLANNING_VERSION_CONFLICT"; is InvalidCommand -> "PLANNING_RESULT_INVALID"; else -> "PLANNING_SESSION_FAILED" }
@@ -838,12 +841,13 @@ class ProductPlanningMvpService(
         private val SELECT_JOB = AiJobKey("PLANNING.SELECT_WORK")
         private val PLAN_JOB = AiJobKey("PLANNING.SLICE_EPIC")
         private const val SELECT_PROMPT_VERSION = 1L
-        internal const val PLAN_PROMPT_VERSION = 3L
+        internal const val PLAN_PROMPT_VERSION = 4L
         internal const val MAX_AUTOMATIC_AI_ATTEMPTS = 3
+        private const val MAX_REASON_LENGTH = 10_000
         private val CALL_CLAIM = Duration.ofMinutes(5)
         private val SHA = Regex("[0-9a-fA-F]{40}")
         private val FAR_FUTURE = Instant.parse("9999-12-31T23:59:59Z")
         private const val SELECTION_SCHEMA = """{"type":"object","additionalProperties":false,"required":["outcome","reason","epicSelections"],"properties":{"outcome":{"type":"string","enum":["NO_WORK","PLAN"]},"reason":{"type":"string"},"epicSelections":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["epicId","expectedVersion"],"properties":{"epicId":{"type":"string"},"expectedVersion":{"type":"integer"}}}}}}"""
-        private const val PLAN_SCHEMA = """{"type":"object","additionalProperties":false,"required":["outcome","stories","todoOrder","refinementRequests","stakeholderQuestion","memoryChanges"],"properties":{"outcome":{"type":"string","enum":["PUBLISH_PLAN","REQUEST_EPIC_REFINEMENT"]},"stories":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["draftKey","type","epicId","epicVersion","bugId","bugVersion","title","summary","content","acceptanceCriteria","uxDesign","uxArtifactNames","dependencies","coveredAcceptanceCriteria","priorityReason"],"properties":{"draftKey":{"type":"string"},"type":{"type":"string","enum":["PRODUCT_STORY","BUGFIX"]},"epicId":{"type":"string"},"epicVersion":{"type":"integer"},"bugId":{"type":["string","null"]},"bugVersion":{"type":["integer","null"]},"title":{"type":"string"},"summary":{"type":"string"},"content":{"type":"string"},"acceptanceCriteria":{"type":"array","items":{"type":"string"}},"uxDesign":{"type":["string","null"]},"uxArtifactNames":{"type":"array","items":{"type":"string"}},"dependencies":{"type":"array","items":{"type":"string"}},"coveredAcceptanceCriteria":{"type":"array","items":{"type":"string"}},"priorityReason":{"type":"string"}}}},"todoOrder":{"type":"array","items":{"type":"string"}},"refinementRequests":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["epicId","reason"],"properties":{"epicId":{"type":"string"},"reason":{"type":"string"}}}},"stakeholderQuestion":{"type":["object","null"],"additionalProperties":false,"required":["question","context"],"properties":{"question":{"type":"string"},"context":{"type":"string"}}},"memoryChanges":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","title","content","reason"],"properties":{"type":{"type":"string","const":"ADD"},"title":{"type":"string"},"content":{"type":"string"},"reason":{"type":"string"}}}}}}"""
+        private const val PLAN_SCHEMA = """{"type":"object","additionalProperties":false,"required":["outcome","stories","todoOrder","refinementRequests","stakeholderQuestion","memoryChanges"],"properties":{"outcome":{"type":"string","enum":["PUBLISH_PLAN","REQUEST_EPIC_REFINEMENT"]},"stories":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["draftKey","type","epicId","epicVersion","bugId","bugVersion","title","summary","content","acceptanceCriteria","uxDesign","uxArtifactNames","dependencies","coveredAcceptanceCriteria","priorityReason"],"properties":{"draftKey":{"type":"string"},"type":{"type":"string","enum":["PRODUCT_STORY","BUGFIX"]},"epicId":{"type":"string"},"epicVersion":{"type":"integer"},"bugId":{"type":["string","null"]},"bugVersion":{"type":["integer","null"]},"title":{"type":"string"},"summary":{"type":"string"},"content":{"type":"string"},"acceptanceCriteria":{"type":"array","items":{"type":"string"}},"uxDesign":{"type":["string","null"]},"uxArtifactNames":{"type":"array","items":{"type":"string"}},"dependencies":{"type":"array","items":{"type":"string"}},"coveredAcceptanceCriteria":{"type":"array","items":{"type":"string"}},"priorityReason":{"type":"string"}}}},"todoOrder":{"type":"array","items":{"type":"string"}},"refinementRequests":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["epicId","reason"],"properties":{"epicId":{"type":"string"},"reason":{"type":"string","minLength":10,"maxLength":10000}}}},"stakeholderQuestion":{"type":["object","null"],"additionalProperties":false,"required":["question","context"],"properties":{"question":{"type":"string"},"context":{"type":"string"}}},"memoryChanges":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","title","content","reason"],"properties":{"type":{"type":"string","const":"ADD"},"title":{"type":"string"},"content":{"type":"string"},"reason":{"type":"string"}}}}}}"""
     }
 }
