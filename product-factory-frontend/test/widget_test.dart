@@ -354,6 +354,68 @@ void main() {
     );
   });
 
+  testWidgets(
+    'productopdracht gebruikt een paginabrede editor met losse harde grenzen',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final gateway = ResearchProductGateway(
+        assignment: const {
+          'audience': 'Historisch geïnteresseerden',
+          'goal': 'Historische bronnen toegankelijk maken.',
+          'hardBoundaries': ['Eerste grens', 'Tweede grens'],
+          'publicGitUrl': 'https://github.com/example/product.git',
+          'version': 3,
+        },
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ProductWorkspacePage(
+              gateway: gateway,
+              section: ProductWorkspaceSection.settings,
+              initialProductId: 'hkh-autopilot',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(appText('Opdracht bewerken'));
+      await tester.pump();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(appText('Productopdracht bewerken'), findsOneWidget);
+      expect(find.byKey(const ValueKey('hard-boundary-0')), findsOneWidget);
+      expect(find.byKey(const ValueKey('hard-boundary-1')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('hard-boundary-0')),
+        'Eerste grens\nmet een tweede regel',
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('add-hard-boundary')),
+      );
+      await tester.tap(find.byKey(const ValueKey('add-hard-boundary')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('hard-boundary-2')),
+        'Derde grens',
+      );
+      await tester.ensureVisible(find.byKey(const ValueKey('save-assignment')));
+      await tester.tap(find.byKey(const ValueKey('save-assignment')));
+      await tester.pumpAndSettle();
+
+      expect(gateway.savedAssignment?['expectedVersion'], 3);
+      expect(gateway.savedAssignment?['hardBoundaries'], [
+        'Eerste grens\nmet een tweede regel',
+        'Tweede grens',
+        'Derde grens',
+      ]);
+      expect(appText('Productopdracht en testomgevingen'), findsOneWidget);
+    },
+  );
+
   testWidgets('beheer toont frontend en backendidentiteit op brede schermen', (
     tester,
   ) async {
@@ -893,13 +955,18 @@ class FakeProductGateway implements ProductGateway {
 }
 
 class ResearchProductGateway extends FakeProductGateway {
-  ResearchProductGateway({this.planningSessions = const []});
+  ResearchProductGateway({
+    this.planningSessions = const [],
+    Map<String, Object?> assignment = const {},
+  }) : assignment = Map<String, Object?>.from(assignment);
 
   bool dispatchingEnabled = false;
   int dispatchingChanges = 0;
   int dispatchRuns = 0;
   int workspaceReads = 0;
   final List<Map<String, Object?>> planningSessions;
+  Map<String, Object?> assignment;
+  Map<String, Object?>? savedAssignment;
 
   ProductSummary get product => ProductSummary(
     id: 'hkh-autopilot',
@@ -924,11 +991,23 @@ class ResearchProductGateway extends FakeProductGateway {
   }
 
   @override
+  Future<void> saveAssignment(
+    String productId,
+    Map<String, Object?> body,
+  ) async {
+    savedAssignment = Map<String, Object?>.from(body);
+    assignment = {
+      ...body,
+      'version': ((body['expectedVersion'] as num?)?.toInt() ?? 0) + 1,
+    }..remove('expectedVersion');
+  }
+
+  @override
   Future<ProductWorkspaceData> workspace(ProductSummary product) async {
     workspaceReads++;
     return ProductWorkspaceData(
       product: product,
-      assignment: const {},
+      assignment: assignment,
       testConfiguration: null,
       schedules: const [],
       signals: const [],

@@ -1065,6 +1065,232 @@ class _ProcessTimingState extends State<_ProcessTiming> {
   }
 }
 
+class _AssignmentEditor extends StatefulWidget {
+  const _AssignmentEditor({
+    required this.assignment,
+    required this.onCancel,
+    required this.onSave,
+    super.key,
+  });
+
+  final Map<String, Object?>? assignment;
+  final VoidCallback onCancel;
+  final Future<bool> Function(Map<String, Object?> values) onSave;
+
+  @override
+  State<_AssignmentEditor> createState() => _AssignmentEditorState();
+}
+
+class _AssignmentEditorState extends State<_AssignmentEditor> {
+  late final TextEditingController _audience;
+  late final TextEditingController _goal;
+  late final TextEditingController _git;
+  late final List<TextEditingController> _boundaries;
+  bool _saving = false;
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    final assignment = widget.assignment;
+    _audience = TextEditingController(text: _value(assignment?['audience']));
+    _goal = TextEditingController(text: _value(assignment?['goal']));
+    _git = TextEditingController(text: _value(assignment?['publicGitUrl']));
+    _boundaries = (assignment?['hardBoundaries'] as List? ?? const [])
+        .map((boundary) => TextEditingController(text: boundary.toString()))
+        .toList();
+    if (_boundaries.isEmpty) _boundaries.add(TextEditingController());
+  }
+
+  @override
+  void dispose() {
+    _audience.dispose();
+    _goal.dispose();
+    _git.dispose();
+    for (final boundary in _boundaries) {
+      boundary.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addBoundary() {
+    setState(() {
+      _boundaries.add(TextEditingController());
+      _validationError = null;
+    });
+  }
+
+  void _removeBoundary(int index) {
+    if (_boundaries.length == 1) return;
+    final removed = _boundaries.removeAt(index);
+    removed.dispose();
+    setState(() => _validationError = null);
+  }
+
+  Future<void> _save() async {
+    final boundaries = _boundaries
+        .map((controller) => controller.text.trim())
+        .where((boundary) => boundary.isNotEmpty)
+        .toList();
+    if (_audience.text.trim().isEmpty ||
+        _goal.text.trim().isEmpty ||
+        _git.text.trim().isEmpty ||
+        boundaries.isEmpty) {
+      setState(
+        () => _validationError =
+            'Vul doelgroep, productdoel, minimaal één harde grens en de Git-URL in.',
+      );
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _validationError = null;
+    });
+    final saved = await widget.onSave({
+      'audience': _audience.text.trim(),
+      'goal': _goal.text.trim(),
+      'hardBoundaries': boundaries,
+      'publicGitUrl': _git.text.trim(),
+    });
+    if (!saved && mounted) setState(() => _saving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const SelectableText(
+        'Werk de productopdracht hier op volledige paginabreedte bij. Iedere harde grens is één zelfstandig item en mag meerdere regels tekst bevatten.',
+      ),
+      const SizedBox(height: 20),
+      TextField(
+        key: const ValueKey('assignment-audience'),
+        controller: _audience,
+        decoration: const InputDecoration(labelText: 'Doelgroep'),
+      ),
+      const SizedBox(height: 16),
+      TextField(
+        key: const ValueKey('assignment-goal'),
+        controller: _goal,
+        minLines: 4,
+        maxLines: 12,
+        keyboardType: TextInputType.multiline,
+        decoration: const InputDecoration(labelText: 'Productdoel'),
+      ),
+      const SizedBox(height: 24),
+      Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 16,
+        runSpacing: 8,
+        children: [
+          SelectableText(
+            'Harde grenzen',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('add-hard-boundary'),
+            onPressed: _saving ? null : _addBoundary,
+            icon: const Icon(Icons.add),
+            label: const Text('Grens toevoegen'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 6),
+      const SelectableText(
+        'Gebruik een nieuwe grens voor een afzonderlijke, niet-onderhandelbare regel. Regeleinden binnen een grens blijven behouden.',
+      ),
+      const SizedBox(height: 12),
+      for (var index = 0; index < _boundaries.length; index++) ...[
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 16),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(
+                      'Grens ${index + 1}',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                  IconButton(
+                    key: ValueKey('remove-hard-boundary-$index'),
+                    tooltip: 'Grens ${index + 1} verwijderen',
+                    onPressed: _saving || _boundaries.length == 1
+                        ? null
+                        : () => _removeBoundary(index),
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+                ],
+              ),
+              TextField(
+                key: ValueKey('hard-boundary-$index'),
+                controller: _boundaries[index],
+                minLines: 2,
+                maxLines: 8,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
+                decoration: const InputDecoration(
+                  labelText: 'Niet-onderhandelbare regel',
+                  alignLabelWithHint: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+      const SizedBox(height: 8),
+      TextField(
+        key: const ValueKey('assignment-git-url'),
+        controller: _git,
+        decoration: const InputDecoration(labelText: 'Publieke Git-URL'),
+      ),
+      if (_validationError != null) ...[
+        const SizedBox(height: 12),
+        SelectableText(
+          _validationError!,
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+      ],
+      const SizedBox(height: 20),
+      Align(
+        alignment: Alignment.centerRight,
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            TextButton(
+              onPressed: _saving ? null : widget.onCancel,
+              child: const Text('Annuleren'),
+            ),
+            FilledButton.icon(
+              key: const ValueKey('save-assignment'),
+              onPressed: _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(_saving ? 'Opslaan…' : 'Opslaan'),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
 class ProductWorkspacePage extends StatefulWidget {
   const ProductWorkspacePage({
     required this.gateway,
@@ -1091,6 +1317,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   ProductWorkspaceData? _data;
   bool _busy = true;
   bool _refreshing = false;
+  bool _editingAssignment = false;
   String? _productsFingerprint;
   String? _workspaceFingerprint;
   String? _error;
@@ -2548,54 +2775,89 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   Widget _assignment(ProductWorkspaceData data) {
     final a = data.assignment;
     final t = data.testConfiguration;
+    final hardBoundaries = (a?['hardBoundaries'] as List? ?? const [])
+        .map((boundary) => boundary.toString())
+        .toList();
     return _section(
-      'Productopdracht en testomgevingen',
+      _editingAssignment
+          ? 'Productopdracht bewerken'
+          : 'Productopdracht en testomgevingen',
       Icons.assignment_outlined,
       [
-        if (a == null)
+        if (_editingAssignment)
+          _AssignmentEditor(
+            key: ValueKey('assignment-editor-${data.product.id}'),
+            assignment: a,
+            onCancel: () => setState(() => _editingAssignment = false),
+            onSave: (values) => _saveAssignment(data, values),
+          )
+        else if (a == null)
           const SelectableText('Productopdracht nog niet vastgelegd.')
         else ...[
           SelectableText('Doelgroep: ${a['audience']}'),
           SelectableText('Doel: ${a['goal']}'),
-          SelectableText(
-            'Harde grenzen: ${(a['hardBoundaries'] as List? ?? const []).join(', ')}',
+          const SizedBox(height: 8),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            title: SelectableText(
+              '${hardBoundaries.length} harde ${hardBoundaries.length == 1 ? 'grens' : 'grenzen'}',
+            ),
+            children: [
+              for (var index = 0; index < hardBoundaries.length; index++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        child: SelectableText('${index + 1}.'),
+                      ),
+                      Expanded(child: SelectableText(hardBoundaries[index])),
+                    ],
+                  ),
+                ),
+            ],
           ),
           SelectableText('Git: ${a['publicGitUrl']}'),
           SelectableText('Versie ${a['version']}'),
         ],
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => _editAssignment(data),
-            icon: const Icon(Icons.edit),
-            label: const Text('Opdracht bewerken'),
+        if (!_editingAssignment) ...[
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _editingAssignment = true),
+              icon: const Icon(Icons.edit),
+              label: const Text('Opdracht bewerken'),
+            ),
           ),
-        ),
-        const Divider(),
-        SelectableText(
-          'Testomgevingen',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 6),
-        if (t == null)
-          const SelectableText('Nog niet geconfigureerd.')
-        else ...[
+          const Divider(),
           SelectableText(
-            'Acceptatie: ${(t['acceptance'] as Map?)?['baseUrl']}',
+            'Testomgevingen',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          SelectableText(
-            'Productie: ${(t['production'] as Map?)?['baseUrl'] ?? 'niet ingesteld'}',
+          const SizedBox(height: 6),
+          if (t == null)
+            const SelectableText('Nog niet geconfigureerd.')
+          else ...[
+            SelectableText(
+              'Acceptatie: ${(t['acceptance'] as Map?)?['baseUrl']}',
+            ),
+            SelectableText(
+              'Productie: ${(t['production'] as Map?)?['baseUrl'] ?? 'niet ingesteld'}',
+            ),
+            SelectableText('Versie ${t['version']}'),
+          ],
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _editTestConfiguration(data),
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('Omgevingen beheren'),
+            ),
           ),
-          SelectableText('Versie ${t['version']}'),
         ],
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => _editTestConfiguration(data),
-            icon: const Icon(Icons.settings_outlined),
-            label: const Text('Omgevingen beheren'),
-          ),
-        ),
       ],
     );
   }
@@ -3076,70 +3338,21 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     }
   }
 
-  Future<void> _editAssignment(ProductWorkspaceData data) async {
+  Future<bool> _saveAssignment(
+    ProductWorkspaceData data,
+    Map<String, Object?> values,
+  ) async {
     final a = data.assignment;
-    final audience = TextEditingController(text: _value(a?['audience']));
-    final goal = TextEditingController(text: _value(a?['goal']));
-    final boundaries = TextEditingController(
-      text: (a?['hardBoundaries'] as List? ?? const []).join('\n'),
+    final saved = await _mutate(
+      () => widget.gateway.saveAssignment(data.product.id, {
+        ...values,
+        'expectedVersion': (a?['version'] as num?)?.toInt() ?? 0,
+      }),
     );
-    final git = TextEditingController(text: _value(a?['publicGitUrl']));
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const SelectableText('Productopdracht'),
-        content: SizedBox(
-          width: 560,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: audience,
-                decoration: const InputDecoration(labelText: 'Doelgroep'),
-              ),
-              TextField(
-                controller: goal,
-                decoration: const InputDecoration(labelText: 'Productdoel'),
-              ),
-              TextField(
-                controller: boundaries,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Harde grenzen (één per regel)',
-                ),
-              ),
-              TextField(
-                controller: git,
-                decoration: const InputDecoration(
-                  labelText: 'Publieke Git-URL',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuleren'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Opslaan'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await _mutate(
-        () => widget.gateway.saveAssignment(data.product.id, {
-          'audience': audience.text,
-          'goal': goal.text,
-          'hardBoundaries': boundaries.text.split('\n'),
-          'publicGitUrl': git.text,
-          'expectedVersion': (a?['version'] as num?)?.toInt() ?? 0,
-        }),
-      );
+    if (saved && mounted) {
+      setState(() => _editingAssignment = false);
     }
+    return saved;
   }
 
   Future<void> _editTestConfiguration(ProductWorkspaceData data) async {
