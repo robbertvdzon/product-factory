@@ -49,7 +49,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(14)
+        assertThat(result.migrationsExecuted).isEqualTo(15)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -81,6 +81,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("13")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("14")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("15")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -149,7 +151,7 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("14")
+                    assertThat(rows.getString(1)).isEqualTo("15")
                 }
             }
         }
@@ -164,7 +166,7 @@ class PostgresMigrationSmokeTest {
         assertThat(old.targetSchemaVersion.toString()).isEqualTo("8")
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(6)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(7)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_quality_process_session").use { rows ->
@@ -191,7 +193,7 @@ class PostgresMigrationSmokeTest {
         Flyway.configure().dataSource(url, postgres.username, postgres.password).target("9").load().migrate()
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(5)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(6)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_dispatcher_process_session").use { rows ->
@@ -215,7 +217,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(4)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(5)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_schedule_run").use { rows ->
@@ -243,7 +245,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(3)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(4)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery(
@@ -284,7 +286,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(2)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(3)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery(
@@ -342,7 +344,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(1)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(2)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT epic_approval_mode FROM pf_product WHERE product_id='approval-product'").use { rows ->
