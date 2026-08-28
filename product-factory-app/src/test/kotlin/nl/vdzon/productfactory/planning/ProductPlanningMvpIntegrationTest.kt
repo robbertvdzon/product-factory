@@ -248,7 +248,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         ai.dispatchPending()
         val invalid = plan().also {
             val stories = it.path("stories")
-            (stories[1] as ObjectNode).putArray("coveredAcceptanceCriteria")
+            (stories[1] as ObjectNode).putArray("coveredAcceptanceCriteriaIndexes")
         }
         completeDispatchedJob(invalid)
         planning.runProcessSession(productId)
@@ -256,6 +256,19 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         assertThat(planningQueries.findStories(StoryFilter(productId))).isEmpty()
         assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.IN_PLANNING)
         assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.BLOCKED)
+
+        // Retry na een inhoudelijk afgekeurd antwoord moet een verse AI-poging doen i.p.v.
+        // hetzelfde afgekeurde antwoord opnieuw te verwerken (dat zou deterministisch weer
+        // exact dezelfde blokkade opleveren, zonder ooit een geldig plan te kunnen krijgen).
+        planning.runProcessSession(productId)
+        runtime.reset()
+        ai.dispatchPending()
+        completeDispatchedJob(plan())
+        planning.runProcessSession(productId)
+
+        assertThat(planningQueries.findStories(StoryFilter(productId))).hasSize(2)
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.ACTIVE)
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
     }
 
     @Test
@@ -462,7 +475,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
                 putArray("acceptanceCriteria").add("Het overzicht toont titel, samenvatting en status in hoofd- en lege toestand.")
                 put("uxDesign", "Toon één rustige overzichtskaart met toegankelijke status en bewijsactie.")
                 putArray("uxArtifactNames").add("ux-main-desktop.png")
-                putArray("dependencies"); putArray("coveredAcceptanceCriteria").add(CRITERION_OVERVIEW)
+                putArray("dependencies"); putArray("coveredAcceptanceCriteriaIndexes").add(0)
                 put("priorityReason", "Het overzicht is de ingang voor de hele gebruikersflow.")
             }
             addObject().apply {
@@ -472,7 +485,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
                 put("content", "Bouw het bewijsdetail met bron, laad- en fouttoestand, veilige terugroute en voldoende zelfstandige context voor uitvoering zonder epicquery.")
                 putArray("acceptanceCriteria").add("De bewijsactie opent de juiste opgeslagen bron en toont een veilige fouttoestand.")
                 putNull("uxDesign"); putArray("uxArtifactNames")
-                putArray("dependencies").add("overview"); putArray("coveredAcceptanceCriteria").add(CRITERION_EVIDENCE)
+                putArray("dependencies").add("overview"); putArray("coveredAcceptanceCriteriaIndexes").add(1)
                 put("priorityReason", "Het bewijsdetail volgt nadat de overzichtsingang beschikbaar is.")
             }
         }

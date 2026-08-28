@@ -212,7 +212,7 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
             put("uxDesign", "Rustige kaart, duidelijke koppen en logische toetsenbordfocus.")
             putArray("uxArtifactNames").add("ux-main-desktop.png")
             putArray("dependencies")
-            putArray("coveredAcceptanceCriteria").add(CRITERION)
+            putArray("coveredAcceptanceCriteriaIndexes").add(0)
             put("priorityReason", "Dit is de kleinste complete gebruikerswaarde.")
         }
         putArray("todoOrder").add("appointments-overview")
