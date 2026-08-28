@@ -92,12 +92,15 @@ class SoftwareFactoryDispatcherMvpService(
     }
 
     private fun reconcileAttempt(sessionId: ProcessSessionId, adapter: SoftwareFactoryAdapter, attempt: AttemptRow): String? {
-        val refinementReason = jdbc.query(
-            "SELECT cancellation_reason FROM pf_story WHERE id=? AND refinement_cancel_requested=TRUE AND refinement_cancel_sent=FALSE",
-            { rs, _ -> rs.getString(1) }, attempt.storyId.value,
-        ).singleOrNull()
-        if (refinementReason != null && attempt.externalStoryId != null) {
-            adapter.cancel(attempt.externalStoryId, refinementReason)
+        val refinementCancelPending = (jdbc.queryForObject(
+            "SELECT COUNT(*) FROM pf_story WHERE id=? AND refinement_cancel_requested=TRUE AND refinement_cancel_sent=FALSE",
+            Long::class.java, attempt.storyId.value,
+        ) ?: 0) > 0
+        if (refinementCancelPending && attempt.externalStoryId != null) {
+            // Vast, kort bericht i.p.v. de (vrije-tekst) refinementreden: die kan de contractlimiet
+            // van Software Factory's annuleringsreden (max. 1000 tekens) overschrijden. De volledige
+            // reden blijft intern bewaard op de story zelf (cancellation_reason).
+            adapter.cancel(attempt.externalStoryId, EPIC_REFINEMENT_CANCEL_REASON)
             jdbc.update("UPDATE pf_story SET refinement_cancel_sent=TRUE,updated_at=? WHERE id=?", clock.instant(), attempt.storyId.value)
         }
         val found = try {
@@ -188,9 +191,14 @@ class SoftwareFactoryDispatcherMvpService(
             ExternalStoryStatus.CANCELLED -> {
                 if (story.status == StoryStatus.IN_PROGRESS) {
                     updateLocalCommand(attempt.id, LocalCommandStatus.PENDING)
+                    // Een al lokaal vastgelegde reden (bv. via epic-refinement) weegt zwaarder dan wat
+                    // Software Factory teruggeeft: naar Software Factory gaat een vast, kort bericht
+                    // (contractlimiet), maar de eigen historie van de story mag de echte reden behouden.
+                    val cancelReason = story.cancellationReason?.takeIf(String::isNotBlank)
+                        ?: work.cancelReason ?: "Software Factory annuleerde het werk."
                     planning.markStoryAsCancelled(
                         MarkStoryAsCancelledCommand(
-                            story.id, work.storyKey, work.cancelReason ?: "Software Factory annuleerde het werk.", story.version,
+                            story.id, work.storyKey, cancelReason, story.version,
                             PROCESS_ACTOR, "dispatcher-cancelled-${attempt.id.value}",
                         ),
                     )
@@ -496,5 +504,6 @@ class SoftwareFactoryDispatcherMvpService(
         private val PROCESS_ACTOR = ActorReference(ActorType.SYSTEM, "software-factory-dispatcher")
         private val FULL_SHA = Regex("[a-fA-F0-9]{40}|[a-fA-F0-9]{64}")
         private val EXTERNAL_STATUSES = setOf("OPEN", "DONE", "CANCELLED")
+        private const val EPIC_REFINEMENT_CANCEL_REASON = "Geannuleerd omdat de bijbehorende epic is teruggestuurd naar de ontwerper voor verdere uitwerking."
     }
 }
