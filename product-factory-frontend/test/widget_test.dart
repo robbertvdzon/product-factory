@@ -991,6 +991,12 @@ class FakeProductGateway implements ProductGateway {
     String answer,
   ) async {}
   @override
+  Future<void> answerQuestionDirectly(
+    String questionId,
+    int version,
+    String answer,
+  ) async {}
+  @override
   Future<void> closeMeeting(
     String meetingId,
     int version,

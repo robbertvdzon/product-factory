@@ -31,6 +31,8 @@ data class UpdateProductAssignmentCommand(
     val expectedVersion: Long,
     val actor: ActorReference,
     val idempotencyKey: String,
+    val aiSupplier: String? = null,
+    val aiModel: String? = null,
 )
 data class TestEnvironmentConfiguration(
     val name: String,
@@ -99,6 +101,8 @@ data class ProductAssignmentDetails(
     val hardBoundaries: List<String>,
     val publicGitUrl: String,
     val version: Long,
+    val aiSupplier: String? = null,
+    val aiModel: String? = null,
 )
 data class TestableProductDetails(
     val productId: ProductId,
@@ -205,6 +209,13 @@ data class RecordStakeholderAnswerCommand(
     val actor: ActorReference,
     val idempotencyKey: String,
 )
+data class AnswerStakeholderQuestionDirectlyCommand(
+    val questionId: StakeholderQuestionId,
+    val answer: String,
+    val expectedVersion: Long,
+    val actor: ActorReference,
+    val idempotencyKey: String,
+)
 data class WithdrawStakeholderQuestionCommand(
     val questionId: StakeholderQuestionId,
     val reason: String,
@@ -305,6 +316,7 @@ interface ProductCommandService {
     fun linkSignalToEpic(command: LinkSignalToEpicCommand)
     fun askStakeholder(command: AskStakeholderCommand): StakeholderQuestionId
     fun recordStakeholderAnswer(command: RecordStakeholderAnswerCommand)
+    fun answerStakeholderQuestionDirectly(command: AnswerStakeholderQuestionDirectlyCommand)
     fun withdrawStakeholderQuestion(command: WithdrawStakeholderQuestionCommand)
     fun startMeeting(command: StartMeetingCommand): MeetingId
     fun recordMeetingMessage(command: RecordMeetingMessageCommand)

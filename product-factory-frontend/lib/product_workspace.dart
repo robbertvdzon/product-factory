@@ -432,6 +432,11 @@ abstract interface class ProductGateway {
     String messageId,
     String answer,
   );
+  Future<void> answerQuestionDirectly(
+    String questionId,
+    int version,
+    String answer,
+  );
   Future<void> createDecision(String productId, String decision);
   Future<void> reviseDecision(
     String productId,
@@ -673,6 +678,16 @@ class HttpProductGateway implements ProductGateway {
     'answer': answer,
     'expectedVersion': version,
     'idempotencyKey': _key('answer'),
+  });
+  @override
+  Future<void> answerQuestionDirectly(
+    String questionId,
+    int version,
+    String answer,
+  ) => _send('POST', '/api/products/questions/$questionId/answer-directly', {
+    'answer': answer,
+    'expectedVersion': version,
+    'idempotencyKey': _key('answer-directly'),
   });
   @override
   Future<void> createDecision(String productId, String decision) => _send(
@@ -1065,6 +1080,24 @@ class _ProcessTimingState extends State<_ProcessTiming> {
   }
 }
 
+/// Bekende Software Factory-modellen per supplier — bewust hier gedupliceerd,
+/// zelfde patroon als Software Factory's eigen `dashboard-frontend/lib/ai_catalog.dart`
+/// naast zijn `AiRouting.kt`. Nieuwe modelversie? Ook hier toevoegen.
+const Map<String, List<String>> _softwareFactoryModelsBySupplier = {
+  'claude': [
+    'claude-opus-5',
+    'claude-opus-4-8',
+    'claude-opus-4-7',
+    'claude-opus-4-6',
+    'claude-opus-4-5',
+    'claude-sonnet-5',
+    'claude-sonnet-4-6',
+    'claude-haiku-4-5',
+  ],
+  'copilot': ['claude-opus-4.5', 'claude-sonnet-4.5', 'claude-haiku-4.5', 'gpt-4.1'],
+  'openai': ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+};
+
 class _AssignmentEditor extends StatefulWidget {
   const _AssignmentEditor({
     required this.assignment,
@@ -1088,6 +1121,8 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
   late final List<TextEditingController> _boundaries;
   bool _saving = false;
   String? _validationError;
+  String? _aiSupplier;
+  String? _aiModel;
 
   @override
   void initState() {
@@ -1100,6 +1135,8 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
         .map((boundary) => TextEditingController(text: boundary.toString()))
         .toList();
     if (_boundaries.isEmpty) _boundaries.add(TextEditingController());
+    _aiSupplier = assignment?['aiSupplier'] as String?;
+    _aiModel = assignment?['aiModel'] as String?;
   }
 
   @override
@@ -1151,6 +1188,8 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
       'goal': _goal.text.trim(),
       'hardBoundaries': boundaries,
       'publicGitUrl': _git.text.trim(),
+      'aiSupplier': _aiSupplier,
+      'aiModel': _aiModel,
     });
     if (!saved && mounted) setState(() => _saving = false);
   }
@@ -1254,6 +1293,42 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
         key: const ValueKey('assignment-git-url'),
         controller: _git,
         decoration: const InputDecoration(labelText: 'Publieke Git-URL'),
+      ),
+      const SizedBox(height: 24),
+      SelectableText(
+        'AI voor Software Factory',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      const SizedBox(height: 6),
+      const SelectableText(
+        'Standaard laat Software Factory zelf de supplier/model kiezen (Claude, Opus 5). Kies hier expliciet een andere combinatie voor dit product.',
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String?>(
+        key: const ValueKey('assignment-ai-supplier'),
+        initialValue: _aiSupplier,
+        decoration: const InputDecoration(labelText: 'AI-supplier'),
+        items: [
+          const DropdownMenuItem(value: null, child: Text('Standaard van Software Factory')),
+          for (final supplier in _softwareFactoryModelsBySupplier.keys)
+            DropdownMenuItem(value: supplier, child: Text(supplier)),
+        ],
+        onChanged: (value) => setState(() {
+          _aiSupplier = value;
+          _aiModel = null;
+        }),
+      ),
+      const SizedBox(height: 16),
+      DropdownButtonFormField<String?>(
+        key: const ValueKey('assignment-ai-model'),
+        initialValue: _aiModel,
+        decoration: const InputDecoration(labelText: 'AI-model'),
+        items: [
+          const DropdownMenuItem(value: null, child: Text('Standaard van Software Factory')),
+          for (final model in _softwareFactoryModelsBySupplier[_aiSupplier] ?? const <String>[])
+            DropdownMenuItem(value: model, child: Text(model)),
+        ],
+        onChanged: _aiSupplier == null ? null : (value) => setState(() => _aiModel = value),
       ),
       if (_validationError != null) ...[
         const SizedBox(height: 12),
@@ -3006,6 +3081,20 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               isThreeLine: true,
               trailing: Wrap(
                 children: [
+                  if (q['status'] == 'OPEN')
+                    IconButton(
+                      tooltip: 'Direct beantwoorden',
+                      onPressed: () => _textAction(
+                        'Vraag direct beantwoorden',
+                        'Antwoord',
+                        (answer) => widget.gateway.answerQuestionDirectly(
+                          _value(q['id']),
+                          (q['version'] as num).toInt(),
+                          answer,
+                        ),
+                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
                   if (q['status'] == 'OPEN' && source != null)
                     IconButton(
                       tooltip: 'Beantwoorden met laatste Stakeholderbericht',

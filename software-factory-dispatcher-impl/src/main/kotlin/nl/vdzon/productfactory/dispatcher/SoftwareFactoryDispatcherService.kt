@@ -84,7 +84,7 @@ class SoftwareFactoryDispatcherMvpService(
             ReserveNextStoryForDispatchCommand(productId, PROCESS_ACTOR, "dispatcher-reserve-${sessionId.value}"),
         ) ?: return "Geen uitvoerbare story beschikbaar; succesvolle no-op."
         val assignment = products.getProductAssignment(productId)
-        val request = packageStory(reservation.story, assignment.publicGitUrl)
+        val request = packageStory(reservation.story, assignment.publicGitUrl, assignment.aiSupplier, assignment.aiModel)
         val packageJson = mapper.writeValueAsString(request)
         val attempt = transactions.execute { createAttempt(sessionId, reservation, packageJson) }
             ?: error("Deliveryattempt kon niet worden vastgelegd.")
@@ -202,7 +202,7 @@ class SoftwareFactoryDispatcherMvpService(
         }
     }
 
-    private fun packageStory(story: StoryDetails, repositoryUrl: String): FactoryStoryRequest {
+    private fun packageStory(story: StoryDetails, repositoryUrl: String, aiSupplier: String?, aiModel: String?): FactoryStoryRequest {
         val epic = designQueries.getEpicHistory(story.epicId).singleOrNull { it.version == story.epicVersion }
             ?: throw ContractFactoryFailure("EPIC_CONTEXT_UNAVAILABLE", "De bevroren epiccontext is niet beschikbaar.")
         val description = buildString {
@@ -275,7 +275,7 @@ class SoftwareFactoryDispatcherMvpService(
         }
         return FactoryStoryRequest(
             story.productId.value, story.id.value, story.version, story.type.name, repositoryUrl,
-            story.title.trim(), description, attachments,
+            story.title.trim(), description, attachments, aiSupplier, aiModel,
         )
     }
 

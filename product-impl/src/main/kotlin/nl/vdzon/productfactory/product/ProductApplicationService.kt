@@ -66,12 +66,14 @@ class ProductApplicationService(
         val goal = requiredText(command.goal, "Productdoel")
         val boundaries = normalizedTextList(command.hardBoundaries, "Harde grenzen")
         val gitUrl = validatePublicGitUrl(command.publicGitUrl)
+        val aiSupplier = command.aiSupplier?.trim()?.ifBlank { null }
+        val aiModel = command.aiModel?.trim()?.ifBlank { null }
         val now = clock.instant()
         jdbc.update(
-            """INSERT INTO pf_product_assignment(product_id,version,audience,goal,hard_boundaries_json,public_git_url,created_at,actor_type,actor_id)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
+            """INSERT INTO pf_product_assignment(product_id,version,audience,goal,hard_boundaries_json,public_git_url,created_at,actor_type,actor_id,ai_supplier,ai_model)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
             command.productId.value, nextVersion, audience, goal, json(boundaries), gitUrl, now,
-            command.actor.type.name, command.actor.id,
+            command.actor.type.name, command.actor.id, aiSupplier, aiModel,
         )
         remember(command.idempotencyKey, "UPDATE_PRODUCT_ASSIGNMENT", command.productId.value, fingerprint, null, command.actor, now)
     }
@@ -286,6 +288,25 @@ class ProductApplicationService(
         remember(command.idempotencyKey, "RECORD_STAKEHOLDER_ANSWER", command.questionId.value, fingerprint, null, command.actor, now)
     }
 
+    override fun answerStakeholderQuestionDirectly(command: AnswerStakeholderQuestionDirectlyCommand) {
+        validateActor(command.actor)
+        val fingerprint = fingerprint(command)
+        if (replay(command.idempotencyKey, "ANSWER_STAKEHOLDER_QUESTION_DIRECTLY", fingerprint) != null) return
+        val question = getStakeholderQuestion(command.questionId)
+        requireVersion(question.version, command.expectedVersion, "Stakeholdervraag")
+        if (question.status != StakeholderQuestionStatus.OPEN) throw InvalidCommand("Alleen een open vraag kan worden beantwoord.")
+        val answer = requiredText(command.answer, "Antwoord")
+        val now = clock.instant()
+        val updated = jdbc.update(
+            """UPDATE pf_stakeholder_question SET status=?,answer=?,answered_at=?,updated_by_type=?,updated_by_id=?,version=version+1
+               WHERE question_id=? AND version=?""",
+            StakeholderQuestionStatus.ANSWERED.name, answer, now, command.actor.type.name, command.actor.id,
+            command.questionId.value, command.expectedVersion,
+        )
+        if (updated != 1) throw VersionConflict("Stakeholdervraag is intussen gewijzigd.")
+        remember(command.idempotencyKey, "ANSWER_STAKEHOLDER_QUESTION_DIRECTLY", command.questionId.value, fingerprint, null, command.actor, now)
+    }
+
     override fun withdrawStakeholderQuestion(command: WithdrawStakeholderQuestionCommand) {
         validateActor(command.actor)
         val fingerprint = fingerprint(command)
@@ -398,7 +419,7 @@ class ProductApplicationService(
                 "SELECT * FROM pf_product_assignment WHERE product_id=? ORDER BY version DESC LIMIT 1",
                 { rs, _ -> ProductAssignmentDetails(
                     productId, rs.getString("audience"), rs.getString("goal"), readStringList(rs.getString("hard_boundaries_json")),
-                    rs.getString("public_git_url"), rs.getLong("version"),
+                    rs.getString("public_git_url"), rs.getLong("version"), rs.getString("ai_supplier"), rs.getString("ai_model"),
                 ) }, productId.value,
             )!!
         } catch (_: EmptyResultDataAccessException) {

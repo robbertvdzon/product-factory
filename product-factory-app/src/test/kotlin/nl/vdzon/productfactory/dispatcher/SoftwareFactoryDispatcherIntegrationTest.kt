@@ -99,6 +99,30 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `zonder ingestelde AI-voorkeur blijft supplier en model leeg in de verstuurde story`() {
+        dispatcher.runDispatchSession(productId)
+
+        val storyKey = queries.findDeliveryAttempts(DeliveryAttemptFilter(productId)).single().externalStoryId!!
+        assertThat(mock.aiSupplier(storyKey)).isNull()
+        assertThat(mock.aiModel(storyKey)).isNull()
+    }
+
+    @Test
+    fun `ingestelde AI-supplier en -model op de productopdracht komen terug in de verstuurde story`() {
+        productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
+            productId, "Gebruikers", "Lever precies één zelfstandige story", listOf("Geen credentials"),
+            "https://github.com/robbertvdzon/hkh-autopilot.git", 1, STAKEHOLDER, "assignment-ai-${productId.value}",
+            aiSupplier = "copilot", aiModel = "claude-sonnet-4.5",
+        ))
+
+        dispatcher.runDispatchSession(productId)
+
+        val storyKey = queries.findDeliveryAttempts(DeliveryAttemptFilter(productId)).single().externalStoryId!!
+        assertThat(mock.aiSupplier(storyKey)).isEqualTo("copilot")
+        assertThat(mock.aiModel(storyKey)).isEqualTo("claude-sonnet-4.5")
+    }
+
+    @Test
     fun `verloren create response wordt via dezelfde idempotentiesleutel zonder duplicaat hersteld`() {
         mock.loseNextCreateResponse()
         dispatcher.runDispatchSession(productId)

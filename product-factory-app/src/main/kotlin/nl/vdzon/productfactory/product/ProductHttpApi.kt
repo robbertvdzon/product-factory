@@ -37,7 +37,7 @@ private fun Authentication?.stakeholderActor(): ActorReference {
 }
 
 data class CreateProductRequest(val requestedId: String? = null, val name: String, val status: ProductStatus = ProductStatus.ACTIVE, val idempotencyKey: String)
-data class AssignmentRequest(val audience: String, val goal: String, val hardBoundaries: List<String>, val publicGitUrl: String, val expectedVersion: Long, val idempotencyKey: String)
+data class AssignmentRequest(val audience: String, val goal: String, val hardBoundaries: List<String>, val publicGitUrl: String, val expectedVersion: Long, val idempotencyKey: String, val aiSupplier: String? = null, val aiModel: String? = null)
 data class TestConfigurationRequest(val acceptance: TestEnvironmentConfiguration, val production: TestEnvironmentConfiguration? = null, val expectedVersion: Long, val idempotencyKey: String)
 data class ProductStatusRequest(val status: ProductStatus, val expectedVersion: Long, val idempotencyKey: String)
 data class DispatchingRequest(val enabled: Boolean, val expectedVersion: Long, val idempotencyKey: String)
@@ -51,6 +51,7 @@ data class MeetingRequest(val reason: String, val agenda: List<String> = emptyLi
 data class MeetingMessageRequest(val text: String, val expectedVersion: Long, val idempotencyKey: String, val targetAgentRole: String? = null)
 data class CloseMeetingRequest(val expectedVersion: Long, val idempotencyKey: String, val minutes: String? = null, val outcomes: List<MeetingOutcomeDetails> = emptyList())
 data class AnswerQuestionRequest(val meetingId: String, val messageId: String, val answer: String, val expectedVersion: Long, val idempotencyKey: String)
+data class AnswerQuestionDirectlyRequest(val answer: String, val expectedVersion: Long, val idempotencyKey: String)
 data class WithdrawQuestionRequest(val reason: String, val expectedVersion: Long, val idempotencyKey: String)
 
 @RestController
@@ -72,7 +73,10 @@ class ProductController(
     @GetMapping("/{productId}/assignment") fun assignment(@PathVariable productId: String) = queries.getProductAssignment(ProductId(productId))
     @PutMapping("/{productId}/assignment") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun assignment(@PathVariable productId: String, @RequestBody request: AssignmentRequest, authentication: Authentication?) = commands.updateProductAssignment(
-        UpdateProductAssignmentCommand(ProductId(productId), request.audience, request.goal, request.hardBoundaries, request.publicGitUrl, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),
+        UpdateProductAssignmentCommand(
+            ProductId(productId), request.audience, request.goal, request.hardBoundaries, request.publicGitUrl, request.expectedVersion,
+            authentication.stakeholderActor(), request.idempotencyKey, request.aiSupplier, request.aiModel,
+        ),
     )
 
     @GetMapping("/{productId}/test-configuration") fun testConfiguration(@PathVariable productId: String) = queries.getTestableProduct(ProductId(productId))
@@ -123,6 +127,8 @@ class ProductController(
     @GetMapping("/{productId}/questions") fun questions(@PathVariable productId: String) = queries.findStakeholderQuestions(StakeholderQuestionFilter(ProductId(productId)))
     @PostMapping("/questions/{questionId}/answer") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun answer(@PathVariable questionId: String, @RequestBody request: AnswerQuestionRequest, authentication: Authentication?) = commands.recordStakeholderAnswer(RecordStakeholderAnswerCommand(StakeholderQuestionId(questionId), MeetingId(request.meetingId), request.messageId, request.answer, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
+    @PostMapping("/questions/{questionId}/answer-directly") @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun answerDirectly(@PathVariable questionId: String, @RequestBody request: AnswerQuestionDirectlyRequest, authentication: Authentication?) = commands.answerStakeholderQuestionDirectly(AnswerStakeholderQuestionDirectlyCommand(StakeholderQuestionId(questionId), request.answer, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
     @PostMapping("/questions/{questionId}/withdraw") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun withdraw(@PathVariable questionId: String, @RequestBody request: WithdrawQuestionRequest, authentication: Authentication?) = commands.withdrawStakeholderQuestion(WithdrawStakeholderQuestionCommand(StakeholderQuestionId(questionId), request.reason, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
 

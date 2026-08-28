@@ -125,6 +125,35 @@ class ProductAndDecisionIntegrationTest(
     }
 
     @Test
+    fun `stakeholdervraag direct beantwoorden bewaakt status en versie zonder overleg`() {
+        val id = createProduct("product-direct-answer")
+        val question = products.askStakeholder(
+            AskStakeholderCommand(id, "PLANNER", "Welk scenario?", "Context", ProcessSessionId("session-1"), actor = PROCESS, idempotencyKey = "direct-question-1"),
+        )
+
+        assertThatThrownBy {
+            products.answerStakeholderQuestionDirectly(
+                AnswerStakeholderQuestionDirectlyCommand(question, "Scenario A", 2, STAKEHOLDER, "direct-answer-conflict"),
+            )
+        }.isInstanceOf(VersionConflict::class.java)
+
+        products.answerStakeholderQuestionDirectly(
+            AnswerStakeholderQuestionDirectlyCommand(question, "Scenario A", 1, STAKEHOLDER, "direct-answer-1"),
+        )
+        val answered = productQueries.getStakeholderQuestion(question)
+        assertThat(answered.status).isEqualTo(StakeholderQuestionStatus.ANSWERED)
+        assertThat(answered.answer).isEqualTo("Scenario A")
+        assertThat(answered.meetingId).isNull()
+        assertThat(answered.answerMessageId).isNull()
+
+        assertThatThrownBy {
+            products.answerStakeholderQuestionDirectly(
+                AnswerStakeholderQuestionDirectlyCommand(question, "Scenario B", 2, STAKEHOLDER, "direct-answer-2"),
+            )
+        }.isInstanceOf(InvalidCommand::class.java)
+    }
+
+    @Test
     fun `besluiten bewaren halfopen historie en onderscheiden intrekken van vervangen`() {
         val id = createProduct("product-decisions")
         val first = decisions.createDecision(CreateDecisionCommand(id, "Eerste keuze", DecisionOrigin.STAKEHOLDER, STAKEHOLDER, "decision-1"))

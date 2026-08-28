@@ -32,6 +32,8 @@ data class FactoryStoryRequest(
     val title: String,
     val description: String,
     val attachments: List<FactoryAttachment> = emptyList(),
+    val aiSupplier: String? = null,
+    val aiModel: String? = null,
 )
 
 data class FactoryConnectionStatus(val connected: Boolean, val factoryVersion: String?, val apiVersion: String)
@@ -172,6 +174,8 @@ interface MockSoftwareFactoryControl {
     fun breakNextContract()
     fun attachments(storyKey: String): List<FactoryAttachment>
     fun description(storyKey: String): String
+    fun aiSupplier(storyKey: String): String?
+    fun aiModel(storyKey: String): String?
     fun reset()
 }
 
@@ -230,6 +234,8 @@ class MockSoftwareFactory(private val mapper: ObjectMapper) : SoftwareFactoryAda
     override fun attachments(storyKey: String): List<FactoryAttachment> = stories[storyKey]?.request?.attachments.orEmpty()
     override fun description(storyKey: String): String = stories[storyKey]?.request?.description
         ?: error("Onbekende mockstory $storyKey")
+    override fun aiSupplier(storyKey: String): String? = stories[storyKey]?.request?.aiSupplier
+    override fun aiModel(storyKey: String): String? = stories[storyKey]?.request?.aiModel
     override fun reset() { stories.clear(); nextNumber = 3000; failNext = false; loseNext = false; breakNext = false }
     private fun maybeFail() { if (failNext) { failNext = false; throw RetryableFactoryFailure("TEMPORARY_FAILURE", "Gesimuleerde tijdelijke storing.") } }
     private fun maybeBreak() { if (breakNext) { breakNext = false; throw ContractFactoryFailure("INVALID_RESPONSE", "Gesimuleerde contractbreuk.") } }
