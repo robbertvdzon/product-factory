@@ -155,6 +155,37 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `een NO_EPIC-reden ruim boven de mensmaat maar binnen de AI-marge eindigt succesvol`() {
+        // Reproduceert een echte productiesessie: de agent schrijft voor NO_EPIC een uitgebreide
+        // onderbouwing (waargenomen 1200-1350 tekens), ruim boven de oude harde grens van 1000 —
+        // niets in de prompt begrensde dat veld, dus elke retry botste opnieuw en de sessie bleef
+        // permanent BLOCKED. 1300 tekens moet nu gewoon slagen.
+        val longReason = "Dit signaal is al volledig verwerkt in de actieve epic. ".repeat(23).trim()
+        assertThat(longReason.length).isGreaterThan(1000)
+
+        design.runProcessSession(productId)
+        completeOnlyJob(mapper.createObjectNode().put("outcome", "NO_EPIC").put("reason", longReason))
+        design.runProcessSession(productId)
+
+        val session = queries.findProcessSessions(ProcessSessionFilter(productId)).first()
+        assertThat(session.status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(session.resultSummary).contains(longReason.take(100))
+    }
+
+    @Test
+    fun `een absurd lange NO_EPIC-reden blijft geblokkeerd`() {
+        val absurdlyLongReason = "x".repeat(1_801)
+
+        design.runProcessSession(productId)
+        completeOnlyJob(mapper.createObjectNode().put("outcome", "NO_EPIC").put("reason", absurdlyLongReason))
+        design.runProcessSession(productId)
+
+        val session = queries.findProcessSessions(ProcessSessionFilter(productId)).first()
+        assertThat(session.status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(session.errorCode).isEqualTo("DESIGN_INPUT_INVALID")
+    }
+
+    @Test
     fun `verschillende producten hebben onafhankelijke wachtende sessies`() {
         val other = product("other-${UUID.randomUUID().toString().take(8)}")
         design.runProcessSession(productId)

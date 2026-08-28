@@ -231,7 +231,7 @@ class ProductDesignMvpService(
         rejectStoryOutput(result)
         when (result.path("outcome").asText()) {
             "NO_EPIC" -> {
-                val reason = requiredText(result, "reason", 10, 1000)
+                val reason = requiredText(result, "reason", 10, MAX_NO_EPIC_REASON_LENGTH)
                 finishSession(sessionId, "Geen epic: $reason", emptyList())
             }
             "CREATE_EPIC", "REVISE_EPIC", "REVISE_AVAILABLE_EPIC" -> {
@@ -962,6 +962,16 @@ $snapshotJson"""
         private const val MAX_UX_SCREENS = 50
         private const val MAX_TERMINAL_REASON_LENGTH = 1_000
         private const val MAX_REFINEMENT_REASON_LENGTH = 10_000
+
+        /**
+         * Ruimer dan [MAX_TERMINAL_REASON_LENGTH] (dat is voor door mensen getypte reden-velden):
+         * de AI-agent schrijft voor een NO_EPIC-uitkomst een uitgebreide onderbouwing (waargenomen
+         * 1200-1350 tekens in de praktijk) — niets in de prompt begrensde dat veld, dus elke poging
+         * botste op de oude limiet van 1000 en blokkeerde de ontwerpsessie permanent (herhaalde
+         * retries produceerden telkens weer een te lange, verder prima onderbouwde reden). Blijft
+         * ruim onder de 2000 tekens van pf_design_process_session.result_summary.
+         */
+        private const val MAX_NO_EPIC_REASON_LENGTH = 1_800
         private val REFINABLE_STATUSES = setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT, EpicStatus.AWAITING_APPROVAL, EpicStatus.AVAILABLE)
         private val RETURNABLE_FOR_REFINEMENT = setOf(
             EpicStatus.AWAITING_APPROVAL, EpicStatus.AVAILABLE, EpicStatus.IN_PLANNING, EpicStatus.ACTIVE,
