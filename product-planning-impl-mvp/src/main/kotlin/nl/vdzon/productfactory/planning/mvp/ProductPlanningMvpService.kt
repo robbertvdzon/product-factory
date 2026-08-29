@@ -598,14 +598,35 @@ class ProductPlanningMvpService(
         if (story.status != StoryStatus.IN_PROGRESS || story.version != command.expectedVersion || story.externalStoryId != command.externalStoryId) throw VersionConflict("Storyoplevering is niet actueel.")
         val next = appendStoryState(story, StoryStatus.DONE, deliveredSha = command.deliveredCommitSha)
         val bugId = story.bugId
-        if (story.type == StoryType.BUGFIX && bugId != null) queueQualityEffect(
-            "planning-retest-${story.id.value}-$next", "RETEST_BUGFIX",
-            mapOf("productId" to story.productId.value, "bugId" to bugId.value, "storyId" to story.id.value, "storyVersion" to next),
-        ) else queueQualityEffect(
-            "planning-verify-story-${story.id.value}-$next", "VERIFY_STORY",
-            mapOf("productId" to story.productId.value, "storyId" to story.id.value, "storyVersion" to next),
-        )
+        if (story.type == StoryType.BUGFIX && bugId != null) {
+            queueQualityEffect(
+                "planning-retest-${story.id.value}-$next", "RETEST_BUGFIX",
+                mapOf("productId" to story.productId.value, "bugId" to bugId.value, "storyId" to story.id.value, "storyVersion" to next),
+            )
+        } else if (epicFeatureStoriesAllDelivered(story.epicId)) {
+            // Pas alle opgeleverde stories van de epic in één keer aanbieden voor verificatie zodra
+            // de laatste binnen is: los per story verifiëren race't tegen de doelomgeving, die bij
+            // snel opeenvolgende opleveringen allang voorbij een oudere vereiste commit is
+            // gedeployed voordat die story geverifieerd werd — dat blokkeert voorgoed.
+            queueVerificationForDeliveredStories(story.epicId, story.productId)
+        }
         recordCommand(command.idempotencyKey, fingerprint(command), next.toString())
+    }
+
+    private fun epicFeatureStoriesAllDelivered(epicId: EpicId): Boolean {
+        val stories = findStories(StoryFilter(epicId = epicId)).filter { it.type == StoryType.PRODUCT_STORY }
+        return stories.isNotEmpty() && stories.all { it.status in setOf(StoryStatus.DONE, StoryStatus.CANCELLED) }
+    }
+
+    private fun queueVerificationForDeliveredStories(epicId: EpicId, productId: ProductId) {
+        findStories(StoryFilter(epicId = epicId))
+            .filter { it.type == StoryType.PRODUCT_STORY && it.status == StoryStatus.DONE }
+            .forEach { story ->
+                queueQualityEffect(
+                    "planning-verify-story-${story.id.value}-${story.version}", "VERIFY_STORY",
+                    mapOf("productId" to productId.value, "storyId" to story.id.value, "storyVersion" to story.version),
+                )
+            }
     }
 
     @Transactional

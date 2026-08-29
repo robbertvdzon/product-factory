@@ -222,6 +222,31 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `verificatie wordt pas aangeboden zodra alle epicstories zijn opgeleverd`() {
+        publishPlan()
+        val first = planningQueries.getBacklog(productId).first()
+
+        val firstReservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-first"))!!
+        planning.markStoryAsDispatched(MarkStoryAsDispatchedCommand(firstReservation.reservationId, "SF-1", firstReservation.story.version, PROCESS, "dispatched-first"))
+        val dispatchedFirst = planningQueries.getStory(first.id)
+        planning.markStoryAsDeveloped(MarkStoryAsDevelopedCommand(dispatchedFirst.id, "SF-1", "a".repeat(40), dispatchedFirst.version, PROCESS, "developed-first"))
+
+        assertThat(pendingVerifyStoryEffects()).isEmpty()
+
+        val secondReservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-second"))!!
+        planning.markStoryAsDispatched(MarkStoryAsDispatchedCommand(secondReservation.reservationId, "SF-2", secondReservation.story.version, PROCESS, "dispatched-second"))
+        val dispatchedSecond = planningQueries.getStory(secondReservation.story.id)
+        planning.markStoryAsDeveloped(MarkStoryAsDevelopedCommand(dispatchedSecond.id, "SF-2", "b".repeat(40), dispatchedSecond.version, PROCESS, "developed-second"))
+
+        assertThat(pendingVerifyStoryEffects()).containsExactlyInAnyOrder(dispatchedFirst.id.value, dispatchedSecond.id.value)
+    }
+
+    private fun pendingVerifyStoryEffects(): List<String> = jdbc.query(
+        "SELECT payload_json FROM pf_planning_quality_effect WHERE effect_type='VERIFY_STORY'",
+        { rs, _ -> mapper.readTree(rs.getString(1)).get("storyId").asText() },
+    )
+
+    @Test
     fun `epicannulering en lokale reservering worden race safe herbevestigd`() {
         publishPlan()
         val reservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-cancel"))!!
