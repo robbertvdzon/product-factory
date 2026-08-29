@@ -465,6 +465,16 @@ class ProductPlanningMvpService(
 
     private fun retryBlocked(session: ProcessSessionDetails) {
         val runtime = sessionRuntime(session.id)
+        // blockSession zet geclaimd werk terug naar BLOCKED (zodat het zichtbaar is als vastgelopen).
+        // Een retry moet ditzelfde werk weer als IN_PROGRESS behandelen, anders ziet bv.
+        // hasClaimedBugWork() het niet meer als geclaimd en wijst publishPlan een verder
+        // inhoudelijk correcte bugfix-story alsnog af ("heeft geen exact geclaimd bugwerk").
+        claimedWorkItems(session.id).forEach { item ->
+            jdbc.update(
+                "UPDATE pf_planning_work_item SET status='IN_PROGRESS',error_code=NULL,updated_at=? WHERE id=? AND claimed_by_session_id=? AND status='BLOCKED'",
+                clock.instant(), item.value, session.id.value,
+            )
+        }
         // Bij PLANNING_RESULT_INVALID is de AI-taak zelf geslaagd, maar wees de inhoud van dat
         // antwoord af (bv. de dekkingscontrole). Diezelfde cachedresponse opnieuw verwerken via
         // resumeWaiting levert dan deterministisch precies dezelfde afwijzing op — een oneindige
