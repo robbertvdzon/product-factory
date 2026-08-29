@@ -183,6 +183,19 @@ class AuthenticationFlowTest(
         }
     }
 
+    @Test
+    fun `debug-session zonder geconfigureerd token wordt geweigerd`() {
+        mockMvc.post("/api/auth/debug-session") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(AuthenticationController.DEBUG_TOKEN_HEADER, "whatever")
+            contentType = MediaType.APPLICATION_JSON
+            content = "{}"
+        }.andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("LOGIN_REJECTED") }
+        }
+    }
+
     private fun login() = mockMvc.post("/api/auth/google") {
         header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
         contentType = MediaType.APPLICATION_JSON

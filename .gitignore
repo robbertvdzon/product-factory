@@ -18,3 +18,5 @@ work/
 *.log
 *.dump
 *.sha256
+
+.claude/settings.local.json

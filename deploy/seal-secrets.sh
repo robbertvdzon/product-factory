@@ -16,6 +16,7 @@ REQUIRED_KEYS=(
   PF_SESSION_SIGNING_SECRET
   PF_AGENT_RUNTIME_TOKEN
   PF_SOFTWARE_FACTORY_TOKEN
+  PF_DEBUG_TOKEN
 )
 
 command -v kubeseal >/dev/null 2>&1 || { echo "Error: kubeseal ontbreekt in PATH." >&2; exit 1; }

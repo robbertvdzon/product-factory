@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 
 @RestController
 @RequestMapping("/api/auth")
@@ -21,6 +23,8 @@ class AuthenticationController(
     @Value("\${PF_AUTH_REQUIRED:false}") private val authRequired: Boolean,
     @Value("\${PF_ENVIRONMENT:local}") private val environment: String,
     @Value("\${PF_GOOGLE_CLIENT_ID:}") private val googleClientId: String,
+    @Value("\${PF_STAKEHOLDER_EMAILS:}") private val stakeholderEmailsRaw: String,
+    @Value("\${PF_DEBUG_TOKEN:}") private val debugToken: String,
     private val verifierProvider: ObjectProvider<GoogleIdentityVerifier>,
     private val sessionServiceProvider: ObjectProvider<ProductFactorySessionService>,
     meterRegistry: MeterRegistry,
@@ -28,6 +32,12 @@ class AuthenticationController(
     private val rejectedLogins = Counter.builder("product_factory_authentication_failures")
         .description("Aantal geweigerde loginpogingen")
         .register(meterRegistry)
+    private val stakeholderEmails = stakeholderEmailsRaw
+        .split(',', ';')
+        .map { it.trim().lowercase() }
+        .filter { it.isNotEmpty() }
+        .toSet()
+
     @PostMapping("/google")
     fun googleLogin(
         @RequestBody body: GoogleLoginRequest,
@@ -38,6 +48,36 @@ class AuthenticationController(
         val sessionService = sessionServiceProvider.getIfAvailable() ?: throw LoginRejected("Login is niet beschikbaar.")
         return withRuntimeConfiguration(sessionService.create(verifier.verify(body.idToken).email, response))
     }
+
+    /**
+     * Ongebruikelijke extra ingang naast de normale Google-login: een vast, apart geheim
+     * (PF_DEBUG_TOKEN) waarmee een tooling-agent (geen mens) een echte sessie kan bootstrappen
+     * zonder OAuth-redirect. Staat standaard uit (lege PF_DEBUG_TOKEN = endpoint geweigerd) en
+     * mint alleen een sessie voor een e-mailadres dat al op de stakeholder-allowlist staat.
+     */
+    @PostMapping("/debug-session")
+    fun debugSession(
+        @RequestBody body: DebugSessionRequest,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+    ): AuthenticationStatus {
+        if (!authRequired) throw LoginRejected("Authenticatie is in deze omgeving uitgeschakeld.")
+        if (debugToken.isBlank()) throw LoginRejected("Debug-login is niet geconfigureerd.")
+        val provided = request.getHeader(DEBUG_TOKEN_HEADER)
+        if (provided.isNullOrBlank() || !constantTimeEquals(provided, debugToken)) {
+            throw LoginRejected("Debug-login is geweigerd.")
+        }
+        val email = (body.email?.trim()?.lowercase() ?: stakeholderEmails.firstOrNull())
+            ?: throw LoginRejected("Geen toegestaan e-mailadres geconfigureerd.")
+        if (email !in stakeholderEmails) throw LoginRejected("E-mailadres niet toegestaan.")
+        val sessionService = sessionServiceProvider.getIfAvailable() ?: throw LoginRejected("Login is niet beschikbaar.")
+        return withRuntimeConfiguration(sessionService.create(email, response))
+    }
+
+    private fun constantTimeEquals(left: String, right: String): Boolean = MessageDigest.isEqual(
+        left.toByteArray(StandardCharsets.UTF_8),
+        right.toByteArray(StandardCharsets.UTF_8),
+    )
 
     @GetMapping("/session")
     fun session(request: HttpServletRequest): AuthenticationStatus {
@@ -72,4 +112,8 @@ class AuthenticationController(
         environment = environment,
         googleClientId = googleClientId.takeIf { authRequired && it.isNotBlank() },
     )
+
+    companion object {
+        const val DEBUG_TOKEN_HEADER = "X-PF-Debug-Token"
+    }
 }

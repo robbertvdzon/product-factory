@@ -54,6 +54,7 @@ class ProductFactorySecurityConfiguration(
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                             "/api/auth/google",
+                            "/api/auth/debug-session",
                             "/api/auth/logout",
                             "/api/auth/session",
                             "/api/foundation",

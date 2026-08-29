@@ -4,6 +4,10 @@ data class GoogleLoginRequest(
     val idToken: String,
 )
 
+data class DebugSessionRequest(
+    val email: String? = null,
+)
+
 data class AuthenticationStatus(
     val authenticated: Boolean,
     val authRequired: Boolean,
