@@ -628,7 +628,10 @@ class QualityMvpService(
         QualityWorkItemType.RETEST_BUGFIX -> mapOf("request" to readRequest<RequestBugfixRetestCommand>(item), "bug" to getBug(readRequest<RequestBugfixRetestCommand>(item).bugId), "story" to planningQueries.getStory(StoryId(item.source.id)))
         QualityWorkItemType.VERIFY_EPIC -> mapOf(
             "epic" to designQueries.getEpic(EpicId(item.source.id)),
-            "stories" to planningQueries.findStories(StoryFilter(item.productId, epicId = EpicId(item.source.id))),
+            // Geannuleerde stories zijn losgelaten scope en horen niet bij het te testen gedrag; ze
+            // meesturen kostte alleen promptruimte (bij een epic met veel geschiedenis eerder al
+            // gezien: 16 van de 25 stories CANCELLED, genoeg om de 200k-tekenlimiet te overschrijden).
+            "stories" to planningQueries.findStories(StoryFilter(item.productId, epicId = EpicId(item.source.id), statuses = setOf(StoryStatus.DONE))),
             "openBugs" to findBugs(BugFilter(item.productId, EpicId(item.source.id), setOf(BugStatus.OPEN))),
         )
         QualityWorkItemType.INVESTIGATE_USER_SIGNAL -> products.getUserSignal(UserSignalId(item.source.id))
