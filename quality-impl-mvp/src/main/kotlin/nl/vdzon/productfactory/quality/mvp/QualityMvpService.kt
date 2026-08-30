@@ -233,7 +233,7 @@ class QualityMvpService(
 
         eligible.forEach { item ->
             val node = results.getValue(item.id.value)
-            val outcome = parseOutcome(item, node.path("outcome").asText())
+            val outcome = parseOutcome(node.path("outcome").asText())
             val checks = stringList(node, "checks", 1)
             val evidence = evidence(node.path("evidence"))
             val blockedReason = node.path("blockedReason").takeIf(JsonNode::isTextual)?.asText()?.trim()?.takeIf(String::isNotBlank)
@@ -661,15 +661,12 @@ class QualityMvpService(
         }
     }
 
-    private fun parseOutcome(item: QualityWorkItemDetails, value: String): VerificationOutcome {
-        val outcome = runCatching { VerificationOutcome.valueOf(value) }.getOrElse { throw InvalidCommand("Ongeldige verificatie-uitkomst.") }
-        val allowed = when (item.type) {
-            QualityWorkItemType.VERIFY_EPIC -> setOf(VerificationOutcome.PASSED, VerificationOutcome.NEEDS_WORK, VerificationOutcome.BLOCKED, VerificationOutcome.NOT_SUCCESSFUL)
-            else -> setOf(VerificationOutcome.PASSED, VerificationOutcome.FAILED, VerificationOutcome.BLOCKED)
-        }
-        if (outcome !in allowed) throw InvalidCommand("Uitkomst is niet toegestaan voor dit kwaliteitswerk.")
-        return outcome
-    }
+    // Downstream behandelt voor VERIFY_STORY/RETEST_BUGFIX alles behalve PASSED/BLOCKED gelijk
+    // (niet-geslaagd), dus elke VerificationOutcome-waarde is geldig ongeacht workitemtype.
+    // Ze eerder per type uitsluiten liet de tester regelmatig vastlopen zodra hij (terecht) een
+    // genuanceerdere uitkomst dan het botte FAILED koos.
+    private fun parseOutcome(value: String): VerificationOutcome =
+        runCatching { VerificationOutcome.valueOf(value) }.getOrElse { throw InvalidCommand("Ongeldige verificatie-uitkomst.") }
 
     private fun blockWorkItem(id: QualityWorkItemId, code: String, reason: String) {
         val item = workItemRows("WHERE id=?", id.value).single()
