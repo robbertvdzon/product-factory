@@ -104,25 +104,18 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `achterlopende deployment blokkeert zonder afkeuring en retry bewaart historie`() {
+    fun `achterlopende deployment blokkeert niet meer maar de tester test gewoon wat er draait`() {
         revisions.revision = "b".repeat(40)
-        val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "deployment-pending"))
-        quality.runProcessSession(productId)
+        val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "deployment-lagging"))
+        completeSession(result(work, "NEEDS_WORK"))
 
-        var item = qualityQueries.findQualityWorkItems(productId).single()
-        assertThat(item.status).isEqualTo(WorkItemStatus.BLOCKED)
-        assertThat(item.errorCode).isEqualTo("DEPLOYMENT_PENDING")
-        assertThat(item.retryAfter).isBetween(clock.instant().plusSeconds(15 * 60 - 1), clock.instant().plusSeconds(15 * 60 + 1))
-        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
-        assertThat(qualityQueries.getCurrentQuality(productId)).isNull()
-
-        quality.retryQualityWorkItem(work)
-        revisions.revision = SHA
-        runtime.reset()
-        completeSession(result(work, "PASSED"))
-        item = qualityQueries.findQualityWorkItems(productId).single()
-        assertThat(item.attemptCount).isEqualTo(2)
-        assertThat(item.attempts.map { it.status }).containsExactly(WorkItemStatus.BLOCKED, WorkItemStatus.DONE)
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(item.status).isEqualTo(WorkItemStatus.DONE)
+        assertThat(item.attemptCount).isEqualTo(1)
+        val verification = qualityQueries.findVerifications(VerificationFilter(productId)).single()
+        assertThat(verification.outcome).isEqualTo(VerificationOutcome.NEEDS_WORK)
+        assertThat(verification.testedRevision).isEqualTo("b".repeat(40))
+        assertThat(verification.requiredCommitSha).isEqualTo(SHA)
     }
 
     @Test

@@ -127,12 +127,14 @@ class QualityMvpService(
                 return@forEach
             }
             deployed[item.targetEnvironment] = revision
-            val required = requiredCommit(item)
-            if (required != null && !revision.equals(required, ignoreCase = true)) {
-                blockWorkItem(item.id, "DEPLOYMENT_PENDING", "Wacht op deployment van oplevercommit $required.")
-            } else {
-                eligible += item
-            }
+            // Geen exacte-commit-wachtcheck meer: die eiste dat de doelomgeving letterlijk de
+            // opleveringscommit draait, wat structureel breekt zodra iets anders (een volgende
+            // story, een secret-only fix, een docs-only wijziging) de omgeving intussen verder
+            // bracht zonder ooit die exacte commit te tonen. De tester test nu gewoon wat er
+            // daadwerkelijk draait en rapporteert eerlijk NEEDS_WORK/FAILED als dat nog niet de
+            // verwachte wijziging bevat — een bruikbare uitkomst in plaats van een permanente,
+            // alleen handmatig op te lossen blokkade.
+            eligible += item
         }
         if (eligible.isEmpty()) {
             finishSession(sessionId, "Alle kwaliteitsopdrachten wachten veilig op hun testvoorwaarde.", emptyList())
