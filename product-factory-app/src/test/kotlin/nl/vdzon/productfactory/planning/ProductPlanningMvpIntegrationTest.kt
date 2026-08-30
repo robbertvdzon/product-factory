@@ -249,6 +249,58 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     )
 
     @Test
+    fun `bugfixstory levert net als een gewone story pas verificatie op zodra de hele epic klaar is`() {
+        publishPlan()
+        val bugfixId = StoryId(UUID.randomUUID().toString())
+        insertTodoBugfixStory(bugfixId)
+
+        val firstReservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-first"))!!
+        planning.markStoryAsDispatched(MarkStoryAsDispatchedCommand(firstReservation.reservationId, "SF-1", firstReservation.story.version, PROCESS, "dispatched-first"))
+        val dispatchedFirst = planningQueries.getStory(firstReservation.story.id)
+        planning.markStoryAsDeveloped(MarkStoryAsDevelopedCommand(dispatchedFirst.id, "SF-1", "a".repeat(40), dispatchedFirst.version, PROCESS, "developed-first"))
+
+        val secondReservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-second"))!!
+        planning.markStoryAsDispatched(MarkStoryAsDispatchedCommand(secondReservation.reservationId, "SF-2", secondReservation.story.version, PROCESS, "dispatched-second"))
+        val dispatchedSecond = planningQueries.getStory(secondReservation.story.id)
+        planning.markStoryAsDeveloped(MarkStoryAsDevelopedCommand(dispatchedSecond.id, "SF-2", "b".repeat(40), dispatchedSecond.version, PROCESS, "developed-second"))
+
+        // Beide gewone stories zijn klaar, maar de bugfixstory nog niet: nog geen epicverificatie.
+        assertThat(pendingVerifyEpicEffects()).isEmpty()
+        assertThat(jdbc.query("SELECT effect_type FROM pf_planning_quality_effect", { rs, _ -> rs.getString(1) })).doesNotContain("RETEST_BUGFIX")
+
+        val bugfixReservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-bugfix"))!!
+        assertThat(bugfixReservation.story.id).isEqualTo(bugfixId)
+        planning.markStoryAsDispatched(MarkStoryAsDispatchedCommand(bugfixReservation.reservationId, "SF-3", bugfixReservation.story.version, PROCESS, "dispatched-bugfix"))
+        val dispatchedBugfix = planningQueries.getStory(bugfixId)
+        planning.markStoryAsDeveloped(MarkStoryAsDevelopedCommand(dispatchedBugfix.id, "SF-3", "c".repeat(40), dispatchedBugfix.version, PROCESS, "developed-bugfix"))
+
+        // Nu alles klaar is (inclusief de bugfixstory), volgt in één keer de epicverificatie —
+        // geen losse retest van de bugfixstory zelf.
+        assertThat(pendingVerifyEpicEffects()).containsExactly(epic.id.value)
+        assertThat(jdbc.query("SELECT effect_type FROM pf_planning_quality_effect", { rs, _ -> rs.getString(1) })).doesNotContain("RETEST_BUGFIX")
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.VERIFYING)
+    }
+
+    private fun insertTodoBugfixStory(id: StoryId) {
+        val now = java.time.Instant.now()
+        val sequence = (jdbc.queryForObject("SELECT COALESCE(MAX(sequence_number),0)+1 FROM pf_story WHERE product_id=?", Long::class.java, productId.value) ?: 1L)
+        jdbc.update(
+            """INSERT INTO pf_story(id,product_id,epic_id,epic_version,type,status,current_version,sequence_number,
+                priority_reason,bug_link_confirmed,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            id.value, productId.value, epic.id.value, epic.version, "BUGFIX", "TODO", 1L, sequence,
+            "Gericht bugbewijs.", true, now, now,
+        )
+        jdbc.update(
+            """INSERT INTO pf_story_version(story_id,version,title,summary,content,acceptance_criteria_json,ux_design,
+                dependencies_json,source_references_json,created_at,ux_artifacts_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            id.value, 1L, "Bewijsroute herstellen", "De Stakeholder gebruikt de herstelde bewijsroute.",
+            "Herstel de gemelde regressie en behoud de bestaande acceptatiecriteria.",
+            "[\"De bewijsroute werkt weer zoals bedoeld.\"]", null, "[]", "[]", now, "[]",
+        )
+    }
+
+    @Test
     fun `epicannulering en lokale reservering worden race safe herbevestigd`() {
         publishPlan()
         val reservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-cancel"))!!

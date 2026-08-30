@@ -251,6 +251,38 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().outcome).isEqualTo(VerificationOutcome.NOT_SUCCESSFUL)
     }
 
+    @Test
+    fun `epiccontrole lost eerder gemelde bug op via resolvedBugIds`() {
+        val bugId = BugId(UUID.randomUUID().toString())
+        insertBug(bugId)
+        jdbc.update("UPDATE pf_epic SET status='VERIFYING' WHERE id=?", epicId.value)
+        jdbc.update("UPDATE pf_epic_version SET status='VERIFYING' WHERE epic_id=? AND version=1", epicId.value)
+        val epic = designQueries.getEpic(epicId)
+        val work = quality.requestEpicVerification(RequestEpicVerificationCommand(productId, epic.id, epic.version, "acceptance", 80, "resolve-bug"))
+        completeSession(result(work, "PASSED").apply {
+            (path("results")[0] as ObjectNode).putArray("resolvedBugIds").add(bugId.value)
+        })
+
+        assertThat(qualityQueries.getBug(bugId).status).isEqualTo(BugStatus.RESOLVED)
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.COMPLETED)
+    }
+
+    private fun insertBug(id: BugId) {
+        val now = clock.instant()
+        jdbc.update(
+            "INSERT INTO pf_bug(id,product_id,epic_id,status,current_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+            id.value, productId.value, epicId.value, "OPEN", 1L, now, now,
+        )
+        jdbc.update(
+            """INSERT INTO pf_bug_version(bug_id,version,title,summary,actual_behaviour,expected_behaviour,reproduction_steps_json,environment,
+               evidence_json,impact,severity,source_signal_ids_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            id.value, 1L, "Bewijsroute faalt", "De bewijsactie eindigt in een fout.", "Foutmelding zonder bewijsdetail.",
+            "Toont het opgeslagen bewijsdetail.", mapper.writeValueAsString(listOf("Open het overzicht.", "Activeer de bewijsactie.")),
+            "acceptance", mapper.writeValueAsString(proof("Browserobservatie toont de fout.")), "Bewijs is niet controleerbaar.", "P1",
+            mapper.writeValueAsString(emptyList<String>()), now,
+        )
+    }
+
     private fun completeSession(result: ObjectNode) {
         quality.runProcessSession(productId)
         ai.dispatchPending()
