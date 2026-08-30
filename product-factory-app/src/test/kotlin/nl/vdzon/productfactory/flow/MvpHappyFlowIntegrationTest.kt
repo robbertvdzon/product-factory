@@ -101,15 +101,13 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
         dispatcher.runDispatchSession(productId)
         assertThat(planningQueries.getStory(story.id).status).isEqualTo(StoryStatus.DONE)
 
-        val storyWork = qualityQueries.findQualityWorkItems(productId).single()
-        completeQuality(storyWork)
         planning.flushPendingEffects()
         runtime.reset()
         val epicWork = qualityQueries.findQualityWorkItems(productId).single { it.type == QualityWorkItemType.VERIFY_EPIC }
         completeQuality(epicWork)
 
         assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.COMPLETED)
-        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).hasSize(2)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).hasSize(1)
         assertThat(qualityQueries.getCurrentQuality(productId)?.productRevision).isEqualTo(SHA)
         assertThat(dispatcherQueries.findDeliveryAttempts(DeliveryAttemptFilter(productId)).single().status).isEqualTo(DeliveryAttemptStatus.COMPLETED)
     }

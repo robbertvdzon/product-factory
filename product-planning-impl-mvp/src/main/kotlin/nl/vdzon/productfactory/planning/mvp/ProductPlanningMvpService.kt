@@ -614,11 +614,10 @@ class ProductPlanningMvpService(
                 mapOf("productId" to story.productId.value, "bugId" to bugId.value, "storyId" to story.id.value, "storyVersion" to next),
             )
         } else if (epicFeatureStoriesAllDelivered(story.epicId)) {
-            // Pas alle opgeleverde stories van de epic in één keer aanbieden voor verificatie zodra
-            // de laatste binnen is: los per story verifiëren race't tegen de doelomgeving, die bij
-            // snel opeenvolgende opleveringen allang voorbij een oudere vereiste commit is
-            // gedeployed voordat die story geverifieerd werd — dat blokkeert voorgoed.
-            queueVerificationForDeliveredStories(story.epicId, story.productId)
+            // Losse per-story verificatie is overbodig: Software Factory test elke story al zelf
+            // voordat hij als opgeleverd geldt. Zodra alle product-stories van de epic binnen zijn,
+            // bieden we de hele epic in één keer ter verificatie aan.
+            maybeQueueEpicVerification(story.epicId)
         }
         recordCommand(command.idempotencyKey, fingerprint(command), next.toString())
     }
@@ -628,15 +627,17 @@ class ProductPlanningMvpService(
         return stories.isNotEmpty() && stories.all { it.status in setOf(StoryStatus.DONE, StoryStatus.CANCELLED) }
     }
 
-    private fun queueVerificationForDeliveredStories(epicId: EpicId, productId: ProductId) {
-        findStories(StoryFilter(epicId = epicId))
-            .filter { it.type == StoryType.PRODUCT_STORY && it.status == StoryStatus.DONE }
-            .forEach { story ->
-                queueQualityEffect(
-                    "planning-verify-story-${story.id.value}-${story.version}", "VERIFY_STORY",
-                    mapOf("productId" to productId.value, "storyId" to story.id.value, "storyVersion" to story.version),
-                )
-            }
+    private fun maybeQueueEpicVerification(epicId: EpicId) {
+        if (!epicReady(epicId)) return
+        val epic = designQueries.getEpic(epicId)
+        if (epic.status == EpicStatus.ACTIVE) design.markEpicReadyForVerification(MarkEpicReadyForVerificationCommand(
+            epic.id, epic.version, PROCESS_ACTOR, "planning-ready-${epic.id.value}-${epic.version}",
+        ))
+        val ready = designQueries.getEpic(epic.id)
+        queueQualityEffect(
+            "planning-verify-epic-${ready.id.value}-${ready.version}", "VERIFY_EPIC",
+            mapOf("productId" to ready.productId.value, "epicId" to ready.id.value, "epicVersion" to ready.version),
+        )
     }
 
     @Transactional
@@ -658,17 +659,7 @@ class ProductPlanningMvpService(
         val story = getStory(command.storyId)
         if (story.status != StoryStatus.DONE || story.version != command.expectedVersion) throw VersionConflict("Storyverificatie is niet actueel.")
         jdbc.update("UPDATE pf_story SET verification_id=?,verification_passed=?,updated_at=? WHERE id=?", command.verificationId.value, command.passed, clock.instant(), story.id.value)
-        if (command.passed && epicReady(story.epicId)) {
-            val epic = designQueries.getEpic(story.epicId)
-            if (epic.status == EpicStatus.ACTIVE) design.markEpicReadyForVerification(MarkEpicReadyForVerificationCommand(
-                epic.id, epic.version, PROCESS_ACTOR, "planning-ready-${epic.id.value}-${epic.version}",
-            ))
-            val ready = designQueries.getEpic(epic.id)
-            queueQualityEffect(
-                "planning-verify-epic-${ready.id.value}-${ready.version}", "VERIFY_EPIC",
-                mapOf("productId" to ready.productId.value, "epicId" to ready.id.value, "epicVersion" to ready.version),
-            )
-        }
+        if (command.passed) maybeQueueEpicVerification(story.epicId)
         recordCommand(command.idempotencyKey, fingerprint(command), story.id.value)
     }
 
@@ -854,7 +845,10 @@ class ProductPlanningMvpService(
     private fun markerCount(epicId: EpicId) = jdbc.queryForObject("SELECT COUNT(*) FROM pf_epic_cancellation_marker WHERE epic_id=?", Long::class.java, epicId.value) ?: 0
     private fun epicReady(epicId: EpicId): Boolean {
         val stories = findStories(StoryFilter(epicId = epicId))
-        return stories.isNotEmpty() && stories.all { it.status in setOf(StoryStatus.DONE, StoryStatus.CANCELLED) && (it.status == StoryStatus.CANCELLED || it.verificationPassed == true) }
+        return stories.isNotEmpty() && stories.all {
+            it.status == StoryStatus.CANCELLED ||
+                (it.status == StoryStatus.DONE && (it.type == StoryType.PRODUCT_STORY || it.verificationPassed == true))
+        }
     }
     private fun storyVersion(id: StoryId, version: Long): StoryVersion = jdbc.query(
         "SELECT title,summary,content,acceptance_criteria_json,ux_design,dependencies_json,source_references_json,ux_artifacts_json FROM pf_story_version WHERE story_id=? AND version=?",

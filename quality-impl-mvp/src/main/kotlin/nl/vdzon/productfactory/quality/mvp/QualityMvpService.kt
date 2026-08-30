@@ -337,16 +337,7 @@ class QualityMvpService(
             QualityWorkItemType.RETEST_BUGFIX -> {
                 val request: RequestBugfixRetestCommand = readRequest(item)
                 val bug = getBug(request.bugId)
-                if (outcome == VerificationOutcome.PASSED) {
-                    resolveBug(bug, verificationId, evidence(result.path("evidence")))
-                    bug.sourceStoryId?.let { sourceStoryId ->
-                        val sourceStory = planningQueries.getStory(sourceStoryId)
-                        requestStoryVerification(RequestStoryVerificationCommand(
-                            bug.productId, sourceStory.id, sourceStory.version, item.targetEnvironment, 70,
-                            "quality-reverify-source-${bug.id.value}-${verificationId.value}",
-                        ))
-                    }
-                }
+                if (outcome == VerificationOutcome.PASSED) resolveBug(bug, verificationId, evidence(result.path("evidence")))
                 else addBugEvidence(bug, evidence(result.path("evidence")), verificationId)
                 planning.recordStoryVerification(RecordStoryVerificationCommand(
                     request.storyId, verificationId, outcome == VerificationOutcome.PASSED, request.storyVersion,

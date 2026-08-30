@@ -222,7 +222,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `verificatie wordt pas aangeboden zodra alle epicstories zijn opgeleverd`() {
+    fun `epic wordt pas ter verificatie aangeboden zodra alle epicstories zijn opgeleverd, niet per story`() {
         publishPlan()
         val first = planningQueries.getBacklog(productId).first()
 
@@ -231,19 +231,21 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         val dispatchedFirst = planningQueries.getStory(first.id)
         planning.markStoryAsDeveloped(MarkStoryAsDevelopedCommand(dispatchedFirst.id, "SF-1", "a".repeat(40), dispatchedFirst.version, PROCESS, "developed-first"))
 
-        assertThat(pendingVerifyStoryEffects()).isEmpty()
+        assertThat(pendingVerifyEpicEffects()).isEmpty()
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.ACTIVE)
 
         val secondReservation = planning.reserveNextStoryForDispatch(ReserveNextStoryForDispatchCommand(productId, PROCESS, "reserve-second"))!!
         planning.markStoryAsDispatched(MarkStoryAsDispatchedCommand(secondReservation.reservationId, "SF-2", secondReservation.story.version, PROCESS, "dispatched-second"))
         val dispatchedSecond = planningQueries.getStory(secondReservation.story.id)
         planning.markStoryAsDeveloped(MarkStoryAsDevelopedCommand(dispatchedSecond.id, "SF-2", "b".repeat(40), dispatchedSecond.version, PROCESS, "developed-second"))
 
-        assertThat(pendingVerifyStoryEffects()).containsExactlyInAnyOrder(dispatchedFirst.id.value, dispatchedSecond.id.value)
+        assertThat(pendingVerifyEpicEffects()).containsExactly(epic.id.value)
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.VERIFYING)
     }
 
-    private fun pendingVerifyStoryEffects(): List<String> = jdbc.query(
-        "SELECT payload_json FROM pf_planning_quality_effect WHERE effect_type='VERIFY_STORY'",
-        { rs, _ -> mapper.readTree(rs.getString(1)).get("storyId").asText() },
+    private fun pendingVerifyEpicEffects(): List<String> = jdbc.query(
+        "SELECT payload_json FROM pf_planning_quality_effect WHERE effect_type='VERIFY_EPIC'",
+        { rs, _ -> mapper.readTree(rs.getString(1)).get("epicId").asText() },
     )
 
     @Test
