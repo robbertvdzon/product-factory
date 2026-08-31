@@ -149,6 +149,24 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `epic passed met resterende dekkingsgaten completeert de epic en plant het gat correct`() {
+        jdbc.update("UPDATE pf_epic SET status='VERIFYING' WHERE id=?", epicId.value)
+        jdbc.update("UPDATE pf_epic_version SET status='VERIFYING' WHERE epic_id=? AND version=1", epicId.value)
+        val epic = designQueries.getEpic(epicId)
+        val work = quality.requestEpicVerification(RequestEpicVerificationCommand(productId, epic.id, epic.version, "acceptance", 80, "verify-epic-passed-gap"))
+        completeSession(result(work, "PASSED").apply {
+            (path("results")[0] as ObjectNode).putArray("missingCoverage").add("Randgeval met een lege bronlijst is niet apart live geforceerd.")
+        })
+
+        // recordEpicVerification verhoogt de epicversie altijd met 1, ook bij PASSED — de
+        // gapplanning moet daar correct tegen verwijzen, anders faalt de hele sessie op een
+        // versiemismatch terwijl de epic zelf wél geslaagd is.
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.COMPLETED)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.DONE)
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().type).isEqualTo(PlanningWorkItemType.PLAN_EPIC_GAP)
+    }
+
+    @Test
     fun `afgekeurde bugfix houdt dezelfde bug open en maakt een volgende gewone poging`() {
         val first = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 80, "find-bug"))
         completeSession(result(first, "FAILED").apply {

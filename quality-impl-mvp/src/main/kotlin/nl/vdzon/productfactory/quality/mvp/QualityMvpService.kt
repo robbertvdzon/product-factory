@@ -360,8 +360,11 @@ class QualityMvpService(
                     epic.id, verificationId, mapped, requiredText(result, "explanation", 10, 2000), epic.version,
                     PROCESS_ACTOR, "quality-epic-${verificationId.value}",
                 ))
+                // recordEpicVerification hierboven verhoogt de epicversie altijd met exact 1, ongeacht
+                // de doelstatus (ook bij PASSED met resterende dekkingsgaten) — dus de gapaanvraag
+                // moet altijd tegen die nieuwe versie verwijzen, niet alleen bij NEEDS_WORK.
                 if (gaps.isNotEmpty()) planning.requestEpicGapPlanning(RequestEpicGapPlanningCommand(
-                    item.productId, epic.id, epic.version + if (mapped == EpicVerificationOutcome.NEEDS_WORK) 1 else 0,
+                    item.productId, epic.id, epic.version + 1,
                     verificationId, gaps, PROCESS_ACTOR, "quality-gap-${verificationId.value}",
                 ))
                 stringList(result, "resolvedBugIds", 0).forEach { bugId ->
