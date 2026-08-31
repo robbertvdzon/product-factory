@@ -905,7 +905,9 @@ Ieder logisch scherm heeft in uxScreens een stabiele screenKey, toestand, doel e
 en maak concrete PNG-screenshots met Playwright/Chromium. Geef artifacts herkenbare unieke bestandsnamen, zodat de Planner ze later gericht aan stories kan koppelen.
 Bij een revisie beoordeel je ieder bestaand UX-artifact exact eenmaal in uxArtifactChanges: KEEP behoudt het huidige bestand, REPLACE vervangt het door een nieuw bestand,
 REMOVE verwijdert het bewust met een concrete reden en ADD voegt een nieuw bestand toe. Niets mag stilzwijgend verdwijnen. Schrijf alleen nieuwe of vervangende afbeeldingen
-naar /job/output/artifacts; schrijf behouden bestanden niet opnieuw. uxScreens beschrijft daarna altijd de volledige samengestelde eindset, niet alleen de wijzigingen.
+naar /job/output/artifacts; schrijf behouden bestanden niet opnieuw. uxArtifactChanges moet exact overeenkomen met wat je daadwerkelijk naar /job/output/artifacts schrijft:
+elk geschreven bestand (dus ook de aparte MOBILE-variant van elk scherm) staat met precies één ADD of REPLACE in uxArtifactChanges, zonder uitzondering. uxScreens beschrijft
+daarna altijd de volledige samengestelde eindset, niet alleen de wijzigingen.
 Zet readiness.readyForPlanning alleen op true als onderzoek, UX, acceptatiecriteria, afhankelijkheden en open vragen voldoende concreet zijn voor Productplanning.
 Als currentEpicToRefine aanwezig is, of de bevroren epics al een actuele NEEDS_RESEARCH- of NEEDS_REFINEMENT-epic bevatten, retourneer REVISE_EPIC met exact haar id
 en versie; maak dan geen tweede epic. Beoordeel daarbij ook alle bestaande UX-artifacts. Een onrijpe epic mag expliciet NEEDS_RESEARCH blijven.
