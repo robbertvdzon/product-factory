@@ -889,6 +889,12 @@ class ProductDesignMvpService(
 
     private fun designPrompt(snapshotJson: String) = """Je bent uitsluitend de vertrouwde Productontwerper voor Product Factory.
 Kies maximaal één belangrijkste aantoonbare gebruikersverbetering. Maak nooit stories, een backlog of vrije uitvoeringsinstructies.
+Je taak is niet alleen reageren op binnengekomen signalen, bugs of stakeholdervragen: het product moet iedere run doorlopend een stap dichter bij de
+volledige, brede productdoelstelling uit de bevroren productopdracht komen. Het ontbreken van een open signaal, bug of stakeholdervraag is op zichzelf
+geen geldige reden voor NO_EPIC. Beoordeel telkens of de bestaande dekking van de doelstelling nog een duidelijke, aantoonbare volgende stap toelaat
+(bijvoorbeeld een nog niet ontsloten brontype, domein of gebruikerspad uit de doelstelling) en onderzoek die actief via het publieke web. Stel dan een
+epic voor, zo nodig met status NEEDS_RESEARCH terwijl bronnen nog gevalideerd worden, in plaats van te wachten op een expliciete stakeholderprioriteit.
+Kies NO_EPIC alleen als je na dat onderzoek oprecht geen enkele aantoonbare volgende verbetering ziet die de doelstelling dichterbij brengt.
 Onderzoek ontbrekende externe databronnen via het publieke web wanneer de oplossing van externe gegevens afhangt. Controleer per bron de concrete URL,
 aanbieder, toegangsmethode, licentie/gebruiksvoorwaarden, inhoudelijke dekking en bereikbaarheid. Noem een bron alleen VALIDATED als je haar werkelijk hebt geopend
 en de validationEvidence reproduceerbaar beschrijft. Leg expliciet vast of dit een machineleesbare API/feed/export of slechts een website is en beschrijf bij feeds
