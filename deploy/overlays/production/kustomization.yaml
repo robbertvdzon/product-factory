@@ -10,9 +10,9 @@ resources:
 patches:
 - path: backend-secret-patch.yaml
 images:
-- digest: sha256:bb48136e3efa88facb117a0d90430a658375ae0c130e48c4bc278de7d7d9ba5c
+- digest: sha256:1d2dee5ad3319d21c981df64b204ae90104685cb0bad96756798b04376294ea8
   name: ghcr.io/robbertvdzon/product-factory-backend
   newName: ghcr.io/robbertvdzon/product-factory-backend
-- digest: sha256:3edf0d5926652ea690b588363ac972f52fba5e6b5c973a2b3af4847353ab63d8
+- digest: sha256:7123577a21713f79d58ece0fb00ecde32e5e5f5fcbcff03506cacb349beb76d5
   name: ghcr.io/robbertvdzon/product-factory-frontend
   newName: ghcr.io/robbertvdzon/product-factory-frontend
