@@ -107,7 +107,10 @@ class ProductDesignMvpService(
         val signals = products.findUserSignals(UserSignalFilter(productId, statuses = setOf(UserSignalStatus.OPEN, UserSignalStatus.IN_REVIEW)))
         val questions = products.findStakeholderQuestions(StakeholderQuestionFilter(productId, ROLE.value))
         val existingEpics = findEpics(EpicFilter(productId))
-        val stories = planningQueries.ifAvailable?.findStories(StoryFilter(productId)).orEmpty()
+        // Geannuleerde stories zijn losgelaten scope; ze meesturen leverde bij een epic met veel
+        // geschiedenis genoeg promptruimte op om de 200k-tekenlimiet te overschrijden (zelfde
+        // patroon eerder al gefixt in de Tester-context voor VERIFY_EPIC).
+        val stories = planningQueries.ifAvailable?.findStories(StoryFilter(productId, statuses = setOf(StoryStatus.TODO, StoryStatus.IN_PROGRESS, StoryStatus.DONE))).orEmpty()
         val bugs = qualityQueries.ifAvailable?.findBugs(BugFilter(productId)).orEmpty()
         val qualitySnapshot = qualityQueries.ifAvailable?.getCurrentQuality(productId)
         val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant())
