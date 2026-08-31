@@ -359,10 +359,13 @@ class QualityMvpService(
                     epic.id, verificationId, mapped, requiredText(result, "explanation", 10, 2000), epic.version,
                     PROCESS_ACTOR, "quality-epic-${verificationId.value}",
                 ))
-                // recordEpicVerification hierboven verhoogt de epicversie altijd met exact 1, ongeacht
-                // de doelstatus (ook bij PASSED met resterende dekkingsgaten) — dus de gapaanvraag
-                // moet altijd tegen die nieuwe versie verwijzen, niet alleen bij NEEDS_WORK.
-                if (gaps.isNotEmpty()) planning.requestEpicGapPlanning(RequestEpicGapPlanningCommand(
+                // Alleen bij NEEDS_WORK eindigt de epic ACTIVE (dus planbaar) — bij PASSED/NOT_SUCCESSFUL/
+                // BLOCKED wordt de epic COMPLETED, NOT_SUCCESSFUL of blijft VERIFYING, en geen van die
+                // statussen is planbaar voor gericht epicwerk. Een gapaanvraag daar levert een voor altijd
+                // vastgelopen planningsitem op (target-epic wordt nooit meer plannable). Restpunten bij een
+                // geslaagde epic zijn geen blokkade: de Ontwerper beoordeelt doorlopend zelf de volgende stap.
+                // recordEpicVerification hierboven verhoogt de epicversie altijd met exact 1.
+                if (gaps.isNotEmpty() && mapped == EpicVerificationOutcome.NEEDS_WORK) planning.requestEpicGapPlanning(RequestEpicGapPlanningCommand(
                     item.productId, epic.id, epic.version + 1,
                     verificationId, gaps, PROCESS_ACTOR, "quality-gap-${verificationId.value}",
                 ))

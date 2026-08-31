@@ -149,7 +149,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `epic passed met resterende dekkingsgaten completeert de epic en plant het gat correct`() {
+    fun `epic passed met resterende dekkingsgaten completeert de epic zonder onplanbaar gatverzoek`() {
         jdbc.update("UPDATE pf_epic SET status='VERIFYING' WHERE id=?", epicId.value)
         jdbc.update("UPDATE pf_epic_version SET status='VERIFYING' WHERE epic_id=? AND version=1", epicId.value)
         val epic = designQueries.getEpic(epicId)
@@ -158,12 +158,13 @@ class QualityMvpIntegrationTest @Autowired constructor(
             (path("results")[0] as ObjectNode).putArray("missingCoverage").add("Randgeval met een lege bronlijst is niet apart live geforceerd.")
         })
 
-        // recordEpicVerification verhoogt de epicversie altijd met 1, ook bij PASSED — de
-        // gapplanning moet daar correct tegen verwijzen, anders faalt de hele sessie op een
-        // versiemismatch terwijl de epic zelf wél geslaagd is.
+        // recordEpicVerification verhoogt de epicversie altijd met 1, ook bij PASSED — dat mag de
+        // sessie niet meer laten falen op een versiemismatch (regressie op de eerdere bugfix).
+        // Een PASSED epic wordt COMPLETED en is nooit meer planbaar, dus een restgat daar mag geen
+        // PLAN_EPIC_GAP-item opleveren: dat zou voor altijd vastlopen (regressie op de bugfix hierna).
         assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.COMPLETED)
         assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.DONE)
-        assertThat(planningQueries.findPlanningWorkItems(productId).single().type).isEqualTo(PlanningWorkItemType.PLAN_EPIC_GAP)
+        assertThat(planningQueries.findPlanningWorkItems(productId)).isEmpty()
     }
 
     @Test
