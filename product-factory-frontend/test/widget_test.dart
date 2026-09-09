@@ -830,6 +830,80 @@ void main() {
       );
     },
   );
+
+  testWidgets('AI-taakdetail toont veilige events usage en exacte uitvoering', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = FakeAgentRuntimeManagementGateway()
+      ..aiTasksData = [
+        {
+          'id': 'task-1',
+          'jobKey': 'MEETING.CONVERSE',
+          'status': 'SUCCEEDED',
+          'productId': 'hkh-autopilot',
+          'agentRole': 'MEETING_AGENT',
+          'runtimeJobId': 'runtime-1',
+          'runtimePhase': 'COMPLETED',
+          'runtimeAttemptCount': 1,
+          'safeProgress': 'Voltooid',
+          'execution': {'vendorId': 'mock', 'model': 'mock', 'mode': 'MOCK'},
+        },
+      ]
+      ..taskEventsData = [
+        {
+          'sequence': 4,
+          'type': 'JOB_FINISHED',
+          'progressPercent': 100,
+          'safeMessage': 'Job completed safely.',
+          'occurredAt': '2026-09-09T20:00:00Z',
+        },
+      ]
+      ..taskUsageData = {
+        'attemptCount': 1,
+        'quality': 'MOCK',
+        'inputTokens': null,
+        'cachedInputTokens': null,
+        'outputTokens': null,
+        'reasoningTokens': null,
+        'costs': <Object?>[],
+      };
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: MemoryAiManagementPanel(
+              gateway: gateway,
+              view: MemoryAiView.operation,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final taskTile = find.ancestor(
+      of: appText('MEETING.CONVERSE · SUCCEEDED'),
+      matching: find.byType(ListTile),
+    );
+    await tester.ensureVisible(taskTile);
+    await tester.tapAt(tester.getTopRight(taskTile) + const Offset(-12, 24));
+    await tester.pumpAndSettle();
+
+    expect(appTextContaining('mock / mock / MOCK'), findsWidgets);
+    await tester.drag(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(SingleChildScrollView),
+      ),
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+    expect(appTextContaining('Job completed safely.'), findsOneWidget);
+    expect(appTextContaining('usagekwaliteit: MOCK'), findsOneWidget);
+    expect(appTextContaining('geen private chain-of-thought'), findsOneWidget);
+  });
 }
 
 class _ThrowingModelCatalogGateway extends FakeAgentRuntimeManagementGateway {
@@ -1324,6 +1398,9 @@ class FakeAgentRuntimeManagementGateway extends FakeMemoryAiGateway
   String? refreshedPrefix;
   List<Map<String, Object?>> aiSettingsData = const [];
   List<Map<String, Object?>> executionOptions = const [];
+  List<Map<String, Object?>> aiTasksData = const [];
+  List<Map<String, Object?>> taskEventsData = const [];
+  Map<String, Object?>? taskUsageData;
   int executionCatalogRequests = 0;
   bool refreshedExecutionCatalog = false;
   String? lastUpdateVendorId;
@@ -1363,7 +1440,15 @@ class FakeAgentRuntimeManagementGateway extends FakeMemoryAiGateway
   }
 
   @override
-  Future<List<Map<String, Object?>>> aiTasks() async => const [];
+  Future<List<Map<String, Object?>>> aiTasks() async => aiTasksData;
+
+  @override
+  Future<List<Map<String, Object?>>> aiTaskEvents(String taskId) async =>
+      taskEventsData;
+
+  @override
+  Future<Map<String, Object?>?> aiTaskUsage(String taskId) async =>
+      taskUsageData;
 
   @override
   Future<List<Map<String, Object?>>> environmentCatalog(

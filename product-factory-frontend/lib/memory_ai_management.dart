@@ -60,6 +60,8 @@ abstract interface class MemoryAiGateway {
 
 abstract interface class AgentRuntimeGateway {
   Future<List<Map<String, Object?>>> aiTasks();
+  Future<List<Map<String, Object?>>> aiTaskEvents(String taskId);
+  Future<Map<String, Object?>?> aiTaskUsage(String taskId);
   Future<List<Map<String, Object?>>> environmentCatalog(String projectPrefix);
   Future<List<Map<String, Object?>>> productEnvironmentKeys(String productId);
   Future<void> refreshEnvironmentCatalog(String projectPrefix);
@@ -202,6 +204,12 @@ class HttpMemoryAiGateway implements MemoryAiGateway, AgentRuntimeGateway {
   @override
   Future<List<Map<String, Object?>>> aiTasks() => _list('/api/ai/tasks');
   @override
+  Future<List<Map<String, Object?>>> aiTaskEvents(String taskId) =>
+      _list('/api/ai/tasks/${Uri.encodeComponent(taskId)}/events');
+  @override
+  Future<Map<String, Object?>?> aiTaskUsage(String taskId) =>
+      _optionalMap('/api/ai/tasks/${Uri.encodeComponent(taskId)}/usage');
+  @override
   Future<List<Map<String, Object?>>> environmentCatalog(
     String projectPrefix,
   ) => _list(
@@ -270,6 +278,11 @@ class HttpMemoryAiGateway implements MemoryAiGateway, AgentRuntimeGateway {
           .toList();
   Future<Map<String, Object?>> _map(String path) async =>
       ((_decode(await _client.get(_uri(path)))) as Map).cast<String, Object?>();
+  Future<Map<String, Object?>?> _optionalMap(String path) async {
+    final value = _decode(await _client.get(_uri(path)));
+    return value == null ? null : (value as Map).cast<String, Object?>();
+  }
+
   Future<void> _send(
     String method,
     String path,
@@ -954,6 +967,8 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       'FAILED',
       'CANCELLED',
     }.contains(status);
+    final execution =
+        (task['execution'] as Map?)?.cast<String, Object?>() ?? const {};
     return Card(
       child: ListTile(
         leading: Icon(
@@ -968,9 +983,11 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
         title: SelectableText('${_v(task['jobKey'])} · $status'),
         subtitle: SelectableText(
           'Product ${_v(task['productId']).isEmpty ? '—' : _v(task['productId'])} · rol ${task['agentRole']}\n'
+          '${execution['vendorId'] ?? '—'} / ${execution['model'] ?? '—'} / ${execution['mode'] ?? '—'}\n'
           'Runtime ${task['runtimeJobId'] ?? 'nog niet ingediend'} · fase ${task['runtimePhase'] ?? 'outbox'} · attemptprojectie ${task['runtimeAttemptCount']}\n'
           '${task['safeProgress'] ?? task['errorCode'] ?? 'Geen aanvullende veilige voortgang'}',
         ),
+        onTap: () => _showTaskDetails(task),
         trailing: terminal
             ? null
             : IconButton(
@@ -980,6 +997,81 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
               ),
       ),
     );
+  }
+
+  Future<void> _showTaskDetails(Map<String, Object?> task) async {
+    final runtime = widget.gateway as AgentRuntimeGateway;
+    final taskId = _v(task['id']);
+    try {
+      final values = await Future.wait<Object?>([
+        runtime.aiTaskEvents(taskId),
+        runtime.aiTaskUsage(taskId),
+      ]);
+      if (!mounted) return;
+      final events = (values[0] as List).cast<Map<String, Object?>>();
+      final usage = values[1] as Map<String, Object?>?;
+      final execution =
+          (task['execution'] as Map?)?.cast<String, Object?>() ?? const {};
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: SelectableText('${_v(task['jobKey'])} · ${task['status']}'),
+          content: SizedBox(
+            width: 760,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SelectableText(
+                    '${execution['vendorId']} / ${execution['model']} / ${execution['mode']}\n'
+                    'Runtime-job: ${task['runtimeJobId'] ?? 'nog niet ingediend'}\n'
+                    'Runtime-attempts: ${usage?['attemptCount'] ?? task['runtimeAttemptCount']} · usagekwaliteit: ${usage?['quality'] ?? 'nog niet beschikbaar'}',
+                  ),
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    usage == null
+                        ? 'Usage en kostensnapshot zijn nog niet beschikbaar.'
+                        : 'Tokens: input ${usage['inputTokens'] ?? '—'}, cache ${usage['cachedInputTokens'] ?? '—'}, output ${usage['outputTokens'] ?? '—'}, reasoning ${usage['reasoningTokens'] ?? '—'}\nKosten: ${jsonEncode(usage['costs'] ?? const [])}',
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Veilige events',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  if (events.isEmpty)
+                    const SelectableText('Nog geen veilige events ontvangen.'),
+                  ...events.map(
+                    (event) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: SelectableText(
+                        '#${event['sequence']} · ${event['type']} · ${event['progressPercent'] ?? '—'}%',
+                      ),
+                      subtitle: SelectableText(
+                        '${event['safeMessage'] ?? 'Geen openbare samenvatting'}\n${event['occurredAt']}',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const SelectableText(
+                    'Alleen veilige voortgang en reasoning-samenvattingen worden getoond; geen private chain-of-thought. Technische attempts en cross-consumerkosten staan in de Runtime-monitor.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Sluiten'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      _showError(error);
+    }
   }
 
   Future<void> _refreshCatalog() async {

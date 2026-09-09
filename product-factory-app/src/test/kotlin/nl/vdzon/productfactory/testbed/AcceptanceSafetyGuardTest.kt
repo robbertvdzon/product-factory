@@ -36,7 +36,6 @@ class AcceptanceSafetyGuardTest {
         .withProperty("PF_ENVIRONMENT", "acceptance")
         .withProperty("PF_AUTH_REQUIRED", "false")
         .withProperty("PF_SCHEDULES_ENABLED", "false")
-        .withProperty("PF_AI_PROVIDER", "MOCKED")
         .withProperty("PF_AGENT_RUNTIME_API_VERSION", "v2")
         .withProperty("PF_AI_VENDOR_ID", "mock")
         .withProperty("PF_AI_MODEL", "mock")

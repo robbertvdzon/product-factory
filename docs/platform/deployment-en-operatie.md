@@ -98,6 +98,12 @@ Productie bevat minimaal:
 - het door Sealed Secrets geleverde secret;
 - de databasebackup-CronJob.
 
+De base bevat daarnaast een afzonderlijke `product-factory-ai-artifacts`-PVC. De backend mount die
+op `PF_AI_ARTIFACT_STORAGE_PATH=/var/lib/product-factory-ai-artifacts`. Dit is Product Factory-
+domeinopslag en nooit de interne Agent Runtime-objectmap. Artifactdownloads en Runtime-kopieën
+streamen met een begrensde buffer en ondersteunen hervatting via Range, zodat de heaplimiet niet
+meegroeit met een bestand.
+
 Acceptatie bevat geen duurzame PostgreSQL-deployment. De backend gebruikt daar de in-memory
 database en Testbedconfiguratie. Routes en visuele omgevingsidentiteit zijn duidelijk van productie
 te onderscheiden.
@@ -118,6 +124,13 @@ Backend, frontend en database krijgen passende controles met verschillende betek
 Containers hebben realistische CPU- en geheugenrequests en begrensde limieten. De backend
 ondersteunt graceful shutdown en krijgt voldoende termination grace time om lopende HTTP-requests
 af te ronden. Een rollout start pas nieuw verkeer naar een pod nadat readiness groen is.
+
+Voor de Agent Runtime-v2-omschakeling rolt acceptatie eerst met
+`PF_AGENT_RUNTIME_API_VERSION=v2` en `mock/mock/MOCK`. Productie blijft één release op de v1-
+rollbackflag, schakelt na het acceptatiebewijs naar `v2` met
+`openai/gpt-5.6-sol/SUBSCRIPTION`, en gebruikt exact dezelfde immutable images. Rollback zet alleen
+de flag of het vorige image terug; additieve databasevelden, v2-jobs en artifacts worden niet
+verwijderd.
 
 De PostgreSQL-workload gebruikt bij een enkel `ReadWriteOnce`-volume een strategie die voorkomt dat
 twee pods gelijktijdig dezelfde data openen.

@@ -24,7 +24,7 @@ bestuurbaar blijven.
 | Product Factory-modules | echte Maven-implementaties met hun interne Modulith-structuur | één echte appbuild met gekozen implementaties | één echte appbuild met gekozen implementaties |
 | database | nieuwe in-memory database per test of testsuite | in-memory database, opnieuw te vullen via reset | duurzame ondersteunde productiedatabase |
 | AI-uitvoering | echte Product Factory-façade/outbox tegen een actuele Runtime-stub of testserver | echte façade tegen Agent Runtime-acceptatie | echte façade tegen Agent Runtime-productie |
-| AI-provider | Runtime `MOCKED` met voorbereide antwoorden | Runtime `MOCKED` met voorbereide antwoorden | gedeelde Runtime-worker met `CODEX` of `CLAUDE` in Docker |
+| AI-uitvoering | Runtime `mock/mock/MOCK` met gerichte v2-fixtures | Runtime `mock/mock/MOCK` met gerichte v2-fixtures | Runtime-worker met de expliciet gekozen vendor/model/mode; standaard `openai/gpt-5.6-sol/SUBSCRIPTION` |
 | Software Factory | `MockSoftwareFactory` uit Testbed | `MockSoftwareFactory` uit Testbed | echte Software Factory |
 | Git | lokale tijdelijke testrepository | publieke repository read-only via HTTPS, zonder token | publieke repository read-only via HTTPS, zonder token |
 | productomgeving | gecontroleerde lokale testsite indien nodig | synthetische testproductomgeving, nooit echte productie | geconfigureerde acceptatie en veilige productie-informatie |
@@ -39,7 +39,7 @@ Git-hosts. Interne calls naar Testbed en de eigen Product Factory-services blijv
 
 Bij het opstarten geldt een fail-closed controle. Met `environment = ACCEPTANCE`:
 
-- moeten alle `AiJobConfiguration`s provider `MOCKED` gebruiken;
+- moeten alle `AiJobConfiguration`s exact `mock/mock/MOCK` en `PF_AGENT_RUNTIME_API_VERSION=v2` gebruiken;
 - moet `PF_AGENT_RUNTIME_URL` exact naar Agent Runtime-acceptatie wijzen;
 - mag de Runtime-credential geen worker-, admin- of productiecredential zijn;
 - moet `PF_SOFTWARE_FACTORY_MODE=MOCKED` uitsluitend `MockSoftwareFactory` selecteren en mogen de
@@ -123,9 +123,9 @@ normale UI-actie.
 Factory-call met HTTP 503 beantwoorden. Blijvende vrije scripts of willekeurige code zijn niet
 toegestaan.
 
-## Server-side Mock AI-uitvoering in Agent Runtime
+## Server-side mockuitvoering in Agent Runtime
 
-Bij provider `MOCKED` maakt de Product Factory-façade een lokale correlatie/outbox en exact één
+Bij uitvoering `mock/mock/MOCK` maakt de Product Factory-façade een lokale correlatie/outbox en exact één
 externe Runtime-job. De Agent Runtime-server handelt die job vóór de workergrens af. Product Factory
 maakt geen eigen queueattempt, `AiWorkerSession`, lease, heartbeat of Dockercontainer.
 Productprocessen gebruiken exact hetzelfde `requestAiTask(...)`-contract en verwerken het resultaat
@@ -141,13 +141,13 @@ DELETE /api/test-control/ai/mock-responses/{responseId}
 DELETE /api/test-control/ai/mock-responses
 ```
 
-De tester kan hiermee vóór een processessie een antwoord klaarzetten en de resterende antwoorden
-bekijken of wissen. Product Factory vertaalt lokale `jobKey`, product-ID, scenario en stap naar een
-opaque Runtime-testcorrelatie; deze domeinvelden horen niet in het productiejobcontract. Exacte
-matches gaan voor algemene matches en gelijke matches volgen FIFO.
+De tester kan hiermee voor een reeds gereserveerde lokale AI-taak een antwoord klaarzetten en de
+resterende antwoorden bekijken of wissen. Product Factory gebruikt de bevroren Runtime-
+idempotency key van die concrete taak; scenario, versie en stap blijven fixturemetadata en horen
+niet in het productiejobcontract.
 Het bevat `SUCCEEDED` met syntactisch geldige JSON en optionele artifacts, of `FAILED` met foutcode
-en veilige melding. Bij gebruik valideert AI-uitvoering een succesvol antwoord opnieuw tegen het
-responseschema van de concrete taak. Ontbreekt een match, dan faalt de taak expliciet met
+en veilige melding. Vóór verzending valideert AI-uitvoering een succesvol antwoord tegen het
+responseschema en de artifactdeclaraties van de concrete taak. Ontbreekt een match, dan faalt de taak expliciet met
 `NO_MOCK_RESPONSE_CONFIGURED`; er bestaat geen stil succesvolle standaardrespons.
 
 Ondersteunde productgerichte AI-situaties bevatten minimaal:
@@ -253,7 +253,7 @@ De basisdataset bevat minimaal:
   notulen en doorwerking;
 - versieerbaar geheugen voor meerdere agentrollen;
 - een actieve rolcatalogus en aan een overleg gekoppelde geheugenwijzigingen voor meerdere rollen;
-- alle `AiJobConfiguration`s op provider `MOCKED` en voorbereide mockantwoorden voor de vaste
+- alle `AiJobConfiguration`s op `mock/mock/MOCK` en voorbereide mockantwoorden voor de vaste
   beginscenario's;
 - voorbeeldhistorie voor `ProcessSession`, `AiTask`, attempts en `DeliveryAttempt`.
 
@@ -277,7 +277,7 @@ testservice.
 
 Publieke productrepositories mogen in acceptatie echt worden gelezen via HTTPS. Daarvoor is geen
 token nodig en er wordt ook geen token geconfigureerd. De procesmodule mag de bedoelde commit-SHA
-vastzetten en in de `AiTask` bewaren. Runtime `MOCKED` checkt de repository niet uit; de
+vastzetten en in de `AiTask` bewaren. Runtime `mock/mock/MOCK` checkt de repository niet uit; de
 voorbereide fixture staat voor het modelresultaat. De echte Runtime-worker voert in productie clone,
 fetch, detached checkout, log en bestandlezing zelf uit in de tijdelijke taakcontainer. Commit,
 push, tag, merge en pull-requestacties zijn niet beschikbaar.

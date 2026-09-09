@@ -110,6 +110,5 @@ class RuntimeConfigurationGuard(
         "PF_AI_VENDOR_ID",
         "PF_AI_MODEL",
         "PF_AI_EXECUTION_MODE",
-        "PF_AI_PROVIDER",
     ).mapNotNull { key -> getProperty(key)?.let { key to it } }.toMap()
 }

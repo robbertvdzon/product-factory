@@ -9,7 +9,6 @@ data:
   PF_PUBLIC_FRONTEND_URL: https://product-factory-acceptance.vdzonsoftware.nl
   PF_PUBLIC_BACKEND_URL: https://product-factory-api-acceptance.vdzonsoftware.nl
   PF_SCHEDULES_ENABLED: "false"
-  PF_AI_PROVIDER: MOCKED
   PF_AI_VENDOR_ID: mock
   PF_AI_MODEL: mock
   PF_AI_EXECUTION_MODE: MOCK

@@ -22,7 +22,6 @@ class RuntimeSettingsTest {
         "PF_AI_VENDOR_ID" to "openai",
         "PF_AI_MODEL" to "gpt-5.6-sol",
         "PF_AI_EXECUTION_MODE" to "SUBSCRIPTION",
-        "PF_AI_PROVIDER" to "CODEX",
     )
 
     @Test
