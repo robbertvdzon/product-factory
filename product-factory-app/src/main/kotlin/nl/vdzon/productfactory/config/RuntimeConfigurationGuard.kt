@@ -10,6 +10,7 @@ enum class RuntimeEnvironment { LOCAL, ACCEPTANCE, PRODUCTION }
 data class RuntimeSettings(
     val environment: RuntimeEnvironment,
     val authRequired: Boolean,
+    val agentRuntimeApiVersion: String,
 ) {
     companion object {
         /**
@@ -40,6 +41,8 @@ data class RuntimeSettings(
             }.getOrElse { throw IllegalStateException("PF_ENVIRONMENT moet local, acceptance of production zijn.") }
             val authRequired = values["PF_AUTH_REQUIRED"].orEmpty().ifBlank { "false" }.toBooleanStrictOrNull()
                 ?: throw IllegalStateException("PF_AUTH_REQUIRED moet true of false zijn.")
+            val agentRuntimeApiVersion = values["PF_AGENT_RUNTIME_API_VERSION"].orEmpty().ifBlank { "v1" }
+            check(agentRuntimeApiVersion in setOf("v1", "v2")) { "PF_AGENT_RUNTIME_API_VERSION moet v1 of v2 zijn." }
 
             if (environment == RuntimeEnvironment.PRODUCTION) {
                 val missing = productionRequired.filter { values[it].isNullOrBlank() }.sorted()
@@ -59,7 +62,10 @@ data class RuntimeSettings(
                 ) {
                     "De productie-Agent-Runtime-URL moet HTTPS gebruiken (of het gepinde interne clusteradres zijn)."
                 }
-                check(values["PF_AI_PROVIDER"] != "MOCKED") { "Productie weigert de MOCKED AI-provider." }
+                check(values["PF_AI_VENDOR_ID"] == "openai" && values["PF_AI_MODEL"] == "gpt-5.6-sol" && values["PF_AI_EXECUTION_MODE"] == "SUBSCRIPTION") {
+                    "Productie vereist exact openai/gpt-5.6-sol/SUBSCRIPTION als standaarduitvoering."
+                }
+                check(values["PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN"].isNullOrBlank()) { "Productie weigert een Runtime-test-controlcredential." }
             }
             if (environment == RuntimeEnvironment.ACCEPTANCE) {
                 check(!authRequired) { "Acceptatie moet authenticatie expliciet uitgeschakeld houden." }
@@ -67,8 +73,12 @@ data class RuntimeSettings(
                     "Acceptatie mag alleen de Agent Runtime-acceptatieomgeving gebruiken."
                 }
                 check(!values["PF_AGENT_RUNTIME_TOKEN"].isNullOrBlank()) { "Acceptatie vereist een gescopete Runtime-consumentcredential." }
+                check(agentRuntimeApiVersion == "v2") { "Acceptatie vereist Agent Runtime v2." }
+                check(values["PF_AI_VENDOR_ID"] == "mock" && values["PF_AI_MODEL"] == "mock" && values["PF_AI_EXECUTION_MODE"] == "MOCK") {
+                    "Acceptatie vereist exact mock/mock/MOCK."
+                }
             }
-            return RuntimeSettings(environment, authRequired)
+            return RuntimeSettings(environment, authRequired, agentRuntimeApiVersion)
         }
     }
 }
@@ -96,6 +106,10 @@ class RuntimeConfigurationGuard(
         "PF_AGENT_RUNTIME_URL",
         "PF_AGENT_RUNTIME_TOKEN",
         "PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN",
+        "PF_AGENT_RUNTIME_API_VERSION",
+        "PF_AI_VENDOR_ID",
+        "PF_AI_MODEL",
+        "PF_AI_EXECUTION_MODE",
         "PF_AI_PROVIDER",
     ).mapNotNull { key -> getProperty(key)?.let { key to it } }.toMap()
 }

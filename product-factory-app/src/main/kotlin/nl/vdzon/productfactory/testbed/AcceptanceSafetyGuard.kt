@@ -17,7 +17,10 @@ class AcceptanceSafetyGuard(
         requireValue("PF_ENVIRONMENT", "acceptance")
         requireValue("PF_AUTH_REQUIRED", "false")
         requireValue("PF_SCHEDULES_ENABLED", "false")
-        requireValue("PF_AI_PROVIDER", "MOCKED")
+        requireValue("PF_AGENT_RUNTIME_API_VERSION", "v2")
+        requireValue("PF_AI_VENDOR_ID", "mock")
+        requireValue("PF_AI_MODEL", "mock")
+        requireValue("PF_AI_EXECUTION_MODE", "MOCK")
         requireValue("PF_SOFTWARE_FACTORY_MODE", "MOCKED")
         requireValue("PF_EXTERNAL_MUTATIONS_ALLOWED", "false")
         check(environment.getProperty("PF_SOFTWARE_FACTORY_TOKEN").isNullOrBlank()) {
@@ -29,7 +32,8 @@ class AcceptanceSafetyGuard(
         val consumerToken = environment.getProperty("PF_AGENT_RUNTIME_TOKEN")
         check(!consumerToken.isNullOrBlank()) { "Acceptatie vereist een gescopete Runtime-consumentcredential." }
         val testControlToken = environment.getProperty("PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN")
-        check(testControlToken.isNullOrBlank() || testControlToken != consumerToken) {
+        check(!testControlToken.isNullOrBlank()) { "Acceptatie vereist een gescopete Runtime-test-controlcredential." }
+        check(testControlToken != consumerToken) {
             "De Runtime-test-controlcredential moet afzonderlijk gescoped zijn."
         }
         check(environment.getProperty("PF_AGENT_WORKER_TOKEN").isNullOrBlank()) { "Acceptatie weigert een workercredential." }
@@ -46,7 +50,10 @@ class AcceptanceSafetyGuard(
             "PF_ENVIRONMENT" to "",
             "PF_AUTH_REQUIRED" to "",
             "PF_SCHEDULES_ENABLED" to "false",
-            "PF_AI_PROVIDER" to "MOCKED",
+            "PF_AGENT_RUNTIME_API_VERSION" to "",
+            "PF_AI_VENDOR_ID" to "",
+            "PF_AI_MODEL" to "",
+            "PF_AI_EXECUTION_MODE" to "",
             "PF_SOFTWARE_FACTORY_MODE" to "MOCKED",
             "PF_EXTERNAL_MUTATIONS_ALLOWED" to "false",
             "PF_AGENT_RUNTIME_URL" to "",

@@ -8,6 +8,7 @@ import nl.vdzon.productfactory.api.shared.ActorType
 import nl.vdzon.productfactory.api.testbed.AcceptanceFixtureContext
 import nl.vdzon.productfactory.api.testbed.AcceptanceFixtureContributor
 import org.springframework.context.annotation.Profile
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 
 @Component
@@ -32,5 +33,19 @@ class AcceptanceAiSettingsFixtureContributor(
 
     companion object {
         private val SYSTEM = ActorReference(ActorType.SYSTEM, "acceptance-ai-settings-fixture")
+    }
+}
+
+@Component
+@Profile("acceptance")
+class AcceptanceRuntimeMockFixtureContributor(
+    private val runtime: AgentRuntimeTestControlClient,
+    @Value("\${PF_TESTBED_RUNTIME_FIXTURE_RESET_ENABLED:true}") private val resetEnabled: Boolean,
+) : AcceptanceFixtureContributor {
+    override val key = "agent-runtime-mock-fixtures"
+    override val order = 49
+
+    override fun reset(context: AcceptanceFixtureContext) {
+        if (resetEnabled) runtime.clear()
     }
 }

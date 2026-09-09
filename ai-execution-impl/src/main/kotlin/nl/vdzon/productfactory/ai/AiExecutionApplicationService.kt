@@ -11,7 +11,10 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
+import java.io.ByteArrayInputStream
 import java.security.MessageDigest
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.util.Base64
@@ -25,15 +28,51 @@ class AiExecutionApplicationService(
     private val clock: Clock,
     private val settings: AiSettingsApplicationService,
     private val runtime: AgentRuntimeClient,
+    private val artifactStore: AiArtifactStore,
+    private val schemaValidator: AiJsonSchemaValidator,
+    private val transactions: TransactionTemplate,
     @Value("\${PF_ENVIRONMENT:local}") environment: String,
+    @Value("\${PF_AGENT_RUNTIME_API_VERSION:v1}") apiVersion: String,
 ) : AiExecutionService, AiExecutionQueryService {
     private val environment = environment.lowercase()
+    private val apiVersion = apiVersion.lowercase().also {
+        require(it in setOf("v1", "v2")) { "PF_AGENT_RUNTIME_API_VERSION moet v1 of v2 zijn." }
+    }
+    private val coordinatorId = "pf-${UUID.randomUUID()}"
 
     @Transactional
     override fun updateAiJobConfiguration(command: UpdateAiJobConfigurationCommand) = settings.updateAiJobConfiguration(command)
 
     override fun getAiJobConfiguration(jobKey: AiJobKey) = settings.getAiJobConfiguration(jobKey)
     override fun getAiJobConfigurations() = settings.getAiJobConfigurations()
+
+    @Transactional
+    override fun retainAiArtifacts(command: RetainAiArtifactsCommand) {
+        if (!DOMAIN_TYPE.matches(command.domainType) || command.domainId.isBlank() || command.domainId.length > 160 || command.domainVersion < 1) {
+            throw InvalidCommand("Ongeldige domeinreferentie voor AI-artifacts.")
+        }
+        command.references.forEach { reference ->
+            val match = LOCAL_ARTIFACT_URI.matchEntire(reference.uri)
+                ?: throw InvalidCommand("Alleen duurzame Product Factory-artifacts kunnen worden gepubliceerd.")
+            val artifactId = match.groupValues[2]
+            val count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM pf_ai_artifact WHERE id=? AND task_id=? AND logical_name=? AND mime_type=? AND artifact_status='READY'",
+                Long::class.java, artifactId, match.groupValues[1], reference.name, reference.mediaType,
+            ) ?: 0
+            if (count == 0L && taskApiVersion(match.groupValues[1]) == "v1") return@forEach
+            if (count != 1L) throw InvalidCommand("Gepubliceerd AI-artifact is niet duurzaam of wijkt af van het manifest.")
+            val exists = jdbc.queryForObject(
+                """SELECT COUNT(*) FROM pf_ai_artifact_domain_reference
+                    WHERE artifact_id=? AND domain_type=? AND domain_id=? AND domain_version=? AND reference_name=?""".trimIndent(),
+                Long::class.java, artifactId, command.domainType, command.domainId, command.domainVersion, reference.name,
+            ) ?: 0
+            if (exists == 0L) jdbc.update(
+                """INSERT INTO pf_ai_artifact_domain_reference(artifact_id,domain_type,domain_id,domain_version,reference_name,created_at)
+                    VALUES (?,?,?,?,?,?)""".trimIndent(),
+                artifactId, command.domainType, command.domainId, command.domainVersion, reference.name, clock.instant(),
+            )
+        }
+    }
 
     @Transactional
     override fun requestAiTask(command: RequestAiTaskCommand): AiTaskId {
@@ -76,8 +115,15 @@ class AiExecutionApplicationService(
             persistInput(id, index + 1, attachment.name, attachment.filename, attachment.mediaType, attachment.role, attachment.content, now)
         }
         jdbc.update(
+            """INSERT INTO pf_ai_task_specification(task_id,instruction,response_schema,repository_url,repository_commit_sha,environment_keys_json,output_artifacts_json,execution_timeout_seconds,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            id, V2_INSTRUCTION, command.responseSchema, command.repository?.publicGitUrl, command.repository?.commitSha,
+            mapper.writeValueAsString(environmentKeys), mapper.writeValueAsString(command.outputArtifacts), command.executionTimeout.seconds.toInt(), now,
+        )
+        jdbc.update(
             "INSERT INTO pf_ai_runtime_outbox(task_id,runtime_idempotency_key,frozen_request_json,api_version,request_fingerprint,dispatch_state,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
-            id, runtimeIdempotencyKey, mapper.writeValueAsString(runtimeRequest), "v1", fingerprint, "REQUEST_FROZEN", now, now,
+            id, runtimeIdempotencyKey, if (apiVersion == "v1") mapper.writeValueAsString(runtimeRequest) else null, apiVersion, fingerprint,
+            if (apiVersion == "v1") "REQUEST_FROZEN" else "PENDING_UPLOAD", now, now,
         )
         return AiTaskId(id)
     }
@@ -90,7 +136,8 @@ class AiExecutionApplicationService(
         val now = clock.instant()
         jdbc.update("UPDATE pf_ai_task SET cancel_requested=TRUE,cancel_reason=?,updated_at=? WHERE id=?", reason.trim(), now, taskId.value)
         task.runtimeJobId?.let { runtimeId ->
-            runCatching { runtime.cancelJob(runtimeId) }.onSuccess { applyRuntimeStatus(taskId.value, it) }
+            runCatching { if (taskApiVersion(taskId.value) == "v2") runtime.cancelV2Job(runtimeId) else runtime.cancelJob(runtimeId) }
+                .onSuccess { applyRuntimeStatus(taskId.value, it) }
         }
     }
 
@@ -102,7 +149,8 @@ class AiExecutionApplicationService(
             "UPDATE pf_environment_key_catalog SET available=FALSE,matching_online_workers=0,refreshed_at=? WHERE project_prefix=?",
             now, command.projectPrefix,
         )
-        runtime.listEnvironmentKeys(command.projectPrefix).forEach { key ->
+        val runtimeKeys = if (apiVersion == "v2") runtime.listV2EnvironmentKeys(command.projectPrefix) else runtime.listEnvironmentKeys(command.projectPrefix)
+        runtimeKeys.forEach { key ->
             val updated = jdbc.update(
                 "UPDATE pf_environment_key_catalog SET project_prefix=?,available=?,matching_online_workers=?,last_seen_at=?,refreshed_at=? WHERE name=?",
                 key.projectPrefix, key.available, key.matchingOnlineWorkers, key.lastSeenAt, now, key.name,
@@ -119,6 +167,22 @@ class AiExecutionApplicationService(
     override fun refreshExecutionCatalog(command: RefreshExecutionCatalogCommand): List<ExecutionCatalogEntry> {
         if (command.taskType != "STRUCTURED_GENERATION") throw InvalidCommand("Onbekend Runtime-tasktype.")
         val now = clock.instant()
+        if (apiVersion == "v2") {
+            jdbc.update("UPDATE pf_ai_model_catalog SET available=FALSE,matching_online_workers=0,refreshed_at=?", now)
+            runtime.listV2ExecutionOptions(command.taskType).forEach { entry ->
+                val selection = entry.execution
+                val updated = jdbc.update(
+                    "UPDATE pf_ai_model_catalog SET available=?,matching_online_workers=?,last_seen_at=?,refreshed_at=? WHERE vendor_id=? AND model=? AND execution_mode=?",
+                    entry.available, entry.matchingOnlineWorkers, entry.lastSeenAt, now, selection.vendorId, selection.model, selection.mode,
+                )
+                if (updated == 0) jdbc.update(
+                    "INSERT INTO pf_ai_model_catalog(provider,vendor_id,model,execution_mode,available,matching_online_workers,last_seen_at,refreshed_at) VALUES (?,?,?,?,?,?,?,?)",
+                    legacyProvider(AiExecutionSelection(selection.vendorId, selection.model, AiExecutionMode.valueOf(selection.mode))), selection.vendorId, selection.model,
+                    selection.mode, entry.available, entry.matchingOnlineWorkers, entry.lastSeenAt, now,
+                )
+            }
+            return getExecutionCatalog(command.taskType)
+        }
         val selections = settings.getAiJobConfigurations().map { it.execution }.distinct()
         selections.filter { it.mode != AiExecutionMode.MOCK }.forEach { selection ->
             val provider = legacyProvider(selection)
@@ -296,20 +360,36 @@ class AiExecutionApplicationService(
 
     fun reconcileActive(limit: Int = 100) {
         jdbc.query(
-            "SELECT id FROM pf_ai_task WHERE runtime_job_id IS NOT NULL AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED') ORDER BY updated_at",
+            """SELECT t.id FROM pf_ai_task t WHERE t.runtime_job_id IS NOT NULL AND
+                (t.status NOT IN ('SUCCEEDED','FAILED','CANCELLED') OR
+                 (t.status='SUCCEEDED' AND NOT EXISTS (SELECT 1 FROM pf_ai_task_result r WHERE r.task_id=t.id)))
+                ORDER BY t.updated_at""".trimIndent(),
             { rs, _ -> rs.getString(1) },
         ).take(limit).forEach(::reconcileOne)
     }
 
-    override fun downloadAiTaskArtifact(taskId: AiTaskId, artifactId: String): ByteArray {
+    override fun openAiTaskArtifact(taskId: AiTaskId, artifactId: String, offset: Long): AiArtifactContent {
         val task = getAiTask(taskId)
         val result = getAiTaskResult(taskId) ?: throw AggregateNotFound("AI-taak heeft geen resultaat.")
         val artifact = result.artifacts.singleOrNull { it.uri.endsWith("/$artifactId") }
             ?: throw AggregateNotFound("Artifact bestaat niet voor deze AI-taak.")
-        return runtime.downloadArtifact(task.runtimeJobId ?: throw AggregateNotFound("Runtimecorrelatie ontbreekt."), artifact.uri.substringAfterLast('/'))
+        if (taskApiVersion(taskId.value) == "v2") {
+            return jdbc.query(
+                "SELECT filename,mime_type,size_bytes,sha256,storage_key FROM pf_ai_artifact WHERE id=? AND task_id=? AND artifact_status='READY'",
+                { rs, _ ->
+                    val size = rs.getLong("size_bytes")
+                    if (offset !in 0 until size) throw InvalidCommand("Artifactoffset valt buiten het bestand.")
+                    AiArtifactContent(
+                        rs.getString("filename"), rs.getString("mime_type"), size, rs.getString("sha256"), offset,
+                        artifactStore.open(rs.getString("storage_key"), offset),
+                    )
+                }, artifactId, taskId.value,
+            ).singleOrNull() ?: throw AggregateNotFound("Duurzaam artifact bestaat niet voor deze AI-taak.")
+        }
+        if (offset != 0L) throw InvalidCommand("Range-download is alleen beschikbaar voor duurzame artifacts.")
+        val content = runtime.downloadArtifact(task.runtimeJobId ?: throw AggregateNotFound("Runtimecorrelatie ontbreekt."), artifactId)
+        return AiArtifactContent(artifact.name, artifact.mediaType, content.size.toLong(), null, 0, ByteArrayInputStream(content))
     }
-
-    fun downloadArtifact(taskId: AiTaskId, artifactId: String): ByteArray = downloadAiTaskArtifact(taskId, artifactId)
 
     @Transactional
     fun deleteAllOwnedExecutionData() {
@@ -321,6 +401,7 @@ class AiExecutionApplicationService(
         jdbc.update("DELETE FROM pf_ai_runtime_event")
         jdbc.update("DELETE FROM pf_ai_runtime_event_cursor")
         jdbc.update("DELETE FROM pf_ai_runtime_upload")
+        jdbc.update("DELETE FROM pf_ai_task_specification")
         jdbc.update("DELETE FROM pf_ai_task_input")
         jdbc.update("DELETE FROM pf_ai_task_result")
         jdbc.update("DELETE FROM pf_ai_runtime_outbox")
@@ -332,35 +413,162 @@ class AiExecutionApplicationService(
     }
 
     private fun dispatchOne(taskId: String, retryDelaySeconds: Long) {
-        val json = jdbc.queryForObject("SELECT frozen_request_json FROM pf_ai_runtime_outbox WHERE task_id=?", String::class.java, taskId) ?: return
-        val request = mapper.readValue(json, RuntimeCreateJobRequest::class.java)
+        val now = clock.instant()
+        val claimed = jdbc.update(
+            """UPDATE pf_ai_runtime_outbox SET claimed_by=?,claimed_until=?,updated_at=?
+                WHERE task_id=? AND dispatched_at IS NULL AND (claimed_until IS NULL OR claimed_until<? OR claimed_by=?)""".trimIndent(),
+            coordinatorId, now.plusSeconds(DISPATCH_CLAIM_SECONDS), now, taskId, now, coordinatorId,
+        )
+        if (claimed == 0) return
         try {
-            val view = runtime.createJob(request)
-            val now = clock.instant()
-            jdbc.update("UPDATE pf_ai_task SET runtime_job_id=?,updated_at=? WHERE id=? AND (runtime_job_id IS NULL OR runtime_job_id=?)", view.id, now, taskId, view.id)
-            jdbc.update("UPDATE pf_ai_runtime_outbox SET dispatched_at=?,last_error_code=NULL,last_error_message=NULL,retry_after=NULL,updated_at=? WHERE task_id=?", now, now, taskId)
-            applyRuntimeStatus(taskId, view)
+            if (isCancelledBeforeCreate(taskId)) {
+                cancelBeforeCreate(taskId)
+                return
+            }
+            when (taskApiVersion(taskId)) {
+                "v2" -> dispatchV2(taskId)
+                else -> dispatchV1(taskId)
+            }
         } catch (error: RuntimeCallException) {
-            val now = clock.instant()
+            if (taskApiVersion(taskId) == "v2" && error.code == "INPUT_OBJECT_NOT_READY") {
+                releaseFrozenV2Request(taskId)
+            }
+            val failedAt = clock.instant()
             jdbc.update(
                 "UPDATE pf_ai_runtime_outbox SET last_error_code=?,last_error_message=?,retry_after=?,updated_at=? WHERE task_id=?",
-                error.code, error.safeMessage.take(1000), now.plusSeconds(retryDelaySeconds), now, taskId,
+                error.code, error.safeMessage.take(1000), failedAt.plusSeconds(retryDelaySeconds), failedAt, taskId,
             )
             if (!error.responseMayHaveBeenLost && error.code !in RETRYABLE_CODES) failBeforeSubmission(taskId, error)
+        } finally {
+            jdbc.update(
+                "UPDATE pf_ai_runtime_outbox SET claimed_by=NULL,claimed_until=NULL WHERE task_id=? AND claimed_by=?",
+                taskId, coordinatorId,
+            )
         }
+    }
+
+    private fun dispatchV1(taskId: String) {
+        val json = frozenRequest(taskId) ?: throw RuntimeCallException("RUNTIME_REQUEST_MISSING", "De bevroren v1-aanvraag ontbreekt.")
+        acceptRuntimeJob(taskId, runtime.createJob(mapper.readValue(json, RuntimeCreateJobRequest::class.java)))
+    }
+
+    private fun dispatchV2(taskId: String) {
+        val frozen = frozenRequest(taskId)
+        val request = if (frozen != null) {
+            mapper.readValue(frozen, RuntimeV2CreateJobRequest::class.java)
+        } else {
+            val inputs = inputRows(taskId)
+            if (inputs.isEmpty()) throw RuntimeCallException("RUNTIME_INPUT_MISSING", "De opgeslagen Runtime-invoer ontbreekt.")
+            val objectIds = inputs.associate { input -> input.sequence to uploadInput(taskId, input) }
+            val built = buildV2Request(taskId, inputs, objectIds)
+            val json = mapper.writeValueAsString(built)
+            jdbc.update(
+                "UPDATE pf_ai_runtime_outbox SET frozen_request_json=?,dispatch_state='REQUEST_FROZEN',updated_at=? WHERE task_id=? AND frozen_request_json IS NULL",
+                json, clock.instant(), taskId,
+            )
+            mapper.readValue(frozenRequest(taskId) ?: json, RuntimeV2CreateJobRequest::class.java)
+        }
+        acceptRuntimeJob(taskId, runtime.createV2Job(request))
+        jdbc.update("UPDATE pf_ai_task_input SET content_bytes=NULL,content_cleared_at=? WHERE task_id=?", clock.instant(), taskId)
+    }
+
+    private fun uploadInput(taskId: String, input: InputRow): String {
+        var upload = uploadRow(taskId, input.sequence)
+        if (upload?.state == "READY" && upload.objectId != null) return upload.objectId
+        if (upload == null || upload.uploadId == null || upload.expiresAt?.isBefore(clock.instant()) != false) {
+            val created = runtime.createUpload(RuntimeCreateUploadRequest(input.filename, input.mimeType, input.sizeBytes, input.sha256))
+            val updated = jdbc.update(
+                """UPDATE pf_ai_runtime_upload SET upload_id=?,object_id=?,upload_url=?,chunk_size_bytes=?,confirmed_offset=?,upload_state='UPLOADING',expires_at=?,updated_at=?
+                    WHERE task_id=? AND input_sequence=?""".trimIndent(),
+                created.uploadId, created.objectId, created.uploadUrl, created.chunkSizeBytes.toInt(), created.offset, created.expiresAt,
+                clock.instant(), taskId, input.sequence,
+            )
+            if (updated == 0) jdbc.update(
+                """INSERT INTO pf_ai_runtime_upload(task_id,input_sequence,upload_id,object_id,upload_url,chunk_size_bytes,confirmed_offset,upload_state,expires_at,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?,'UPLOADING',?,?,?)""".trimIndent(),
+                taskId, input.sequence, created.uploadId, created.objectId, created.uploadUrl, created.chunkSizeBytes.toInt(), created.offset,
+                created.expiresAt, clock.instant(), clock.instant(),
+            )
+            upload = uploadRow(taskId, input.sequence)
+        }
+        val active = upload ?: throw RuntimeCallException("RUNTIME_UPLOAD_STATE_MISSING", "De lokale uploadcorrelatie ontbreekt.")
+        val content = input.content ?: throw RuntimeCallException("RUNTIME_INPUT_CONTENT_MISSING", "De lokale invoerbytes zijn niet meer beschikbaar.")
+        val uploadUrl = active.uploadUrl ?: throw RuntimeCallException("RUNTIME_UPLOAD_URL_MISSING", "De upload-URL ontbreekt.")
+        var offset = runtime.getUploadOffset(uploadUrl)
+        if (offset !in 0..content.size.toLong()) throw RuntimeCallException("RUNTIME_UPLOAD_OFFSET_INVALID", "Agent Runtime gaf een ongeldige uploadoffset terug.")
+        val chunkSize = (active.chunkSizeBytes ?: DEFAULT_UPLOAD_CHUNK).coerceIn(1, MAX_UPLOAD_CHUNK)
+        while (offset < content.size) {
+            val end = minOf(content.size, offset.toInt() + chunkSize)
+            val next = runtime.patchUpload(uploadUrl, offset, content.copyOfRange(offset.toInt(), end))
+            if (next <= offset || next > content.size) throw RuntimeCallException("RUNTIME_UPLOAD_OFFSET_INVALID", "Agent Runtime bevestigde een ongeldige uploadoffset.")
+            offset = next
+            jdbc.update(
+                "UPDATE pf_ai_runtime_upload SET confirmed_offset=?,updated_at=? WHERE task_id=? AND input_sequence=?",
+                offset, clock.instant(), taskId, input.sequence,
+            )
+            renewDispatchClaim(taskId)
+        }
+        val ready = runtime.completeUpload(active.uploadId ?: throw RuntimeCallException("RUNTIME_UPLOAD_ID_MISSING", "Het upload-ID ontbreekt."))
+        if (ready.state != "READY" || ready.objectId != active.objectId || ready.sizeBytes != input.sizeBytes || ready.sha256 != input.sha256 || ready.mimeType != input.mimeType) {
+            throw RuntimeCallException("RUNTIME_UPLOAD_VERIFICATION_FAILED", "Agent Runtime bevestigde het inputobject niet correct.")
+        }
+        jdbc.update(
+            "UPDATE pf_ai_runtime_upload SET object_id=?,confirmed_offset=?,upload_state='READY',updated_at=? WHERE task_id=? AND input_sequence=?",
+            ready.objectId, ready.sizeBytes, clock.instant(), taskId, input.sequence,
+        )
+        return ready.objectId
+    }
+
+    private fun buildV2Request(taskId: String, inputs: List<InputRow>, objectIds: Map<Int, String>): RuntimeV2CreateJobRequest {
+        val task = getAiTask(AiTaskId(taskId))
+        val specification = taskSpecification(taskId)
+        val idempotencyKey = jdbc.queryForObject(
+            "SELECT runtime_idempotency_key FROM pf_ai_runtime_outbox WHERE task_id=?", String::class.java, taskId,
+        ) ?: throw RuntimeCallException("RUNTIME_IDEMPOTENCY_MISSING", "De Runtime-idempotentiesleutel ontbreekt.")
+        return RuntimeV2CreateJobRequest(
+            idempotencyKey = idempotencyKey,
+            execution = RuntimeV2Execution(task.execution.vendorId, task.execution.model, task.execution.mode.name),
+            input = RuntimeV2JobInput(specification.instruction, inputs.map { input ->
+                RuntimeV2InputObjectRef(objectIds.getValue(input.sequence), input.name, input.role)
+            }),
+            output = RuntimeV2Output(mapper.readTree(specification.responseSchema), specification.outputArtifacts.map {
+                RuntimeV2ArtifactDeclaration(it.name, it.required, it.mimeTypes, it.maxBytes)
+            }),
+            repositorySnapshot = specification.repositoryUrl?.let { RuntimeRepositorySnapshot(it, specification.repositoryCommitSha!!) },
+            environmentKeys = specification.environmentKeys,
+            executionTimeoutSeconds = specification.executionTimeoutSeconds,
+        )
+    }
+
+    private fun acceptRuntimeJob(taskId: String, view: RuntimeJobView) {
+        val acceptedAt = clock.instant()
+        jdbc.update("UPDATE pf_ai_task SET runtime_job_id=?,updated_at=? WHERE id=? AND (runtime_job_id IS NULL OR runtime_job_id=?)", view.id, acceptedAt, taskId, view.id)
+        jdbc.update(
+            "UPDATE pf_ai_runtime_outbox SET dispatched_at=?,dispatch_state='DISPATCHED',last_error_code=NULL,last_error_message=NULL,retry_after=NULL,updated_at=? WHERE task_id=?",
+            acceptedAt, acceptedAt, taskId,
+        )
+        applyRuntimeStatus(taskId, view)
     }
 
     private fun reconcileOne(taskId: String) {
         val task = getAiTask(AiTaskId(taskId))
         val runtimeId = task.runtimeJobId ?: return
         try {
-            if (task.cancelReason != null) runtime.cancelJob(runtimeId)
-            val view = runtime.getJob(runtimeId)
+            val v2 = taskApiVersion(taskId) == "v2"
+            if (task.cancelReason != null) if (v2) runtime.cancelV2Job(runtimeId) else runtime.cancelJob(runtimeId)
+            val view = if (v2) runtime.getV2Job(runtimeId) else runtime.getJob(runtimeId)
             applyRuntimeStatus(taskId, view)
-            if (view.status == "SUCCEEDED") storeRuntimeResult(taskId, runtime.getResult(runtimeId))
-            if (view.status == "FAILED" || view.status == "CANCELLED") storeTerminalFailure(taskId, view)
-        } catch (_: RuntimeCallException) {
-            // Durable projection remains unchanged; the next reconciliation retries safely.
+            if (v2) storeRuntimeEvents(taskId, runtimeId)
+            if (view.status == "SUCCEEDED") {
+                if (v2) storeRuntimeV2Result(taskId, task, runtime.getV2Result(runtimeId)) else storeRuntimeResult(taskId, runtime.getResult(runtimeId))
+            }
+            if (view.status == "FAILED" || view.status == "CANCELLED") {
+                if (v2) storeRuntimeAttempts(taskId, task, runtimeId, runtime.getV2Attempts(runtimeId))
+                storeTerminalFailure(taskId, view)
+            }
+        } catch (error: RuntimeCallException) {
+            if (error.code in LOCAL_RESULT_FATAL_CODES) failResultProjection(taskId, error)
+            // Transient projection failures remain eligible for the next restart-safe reconciliation.
         }
     }
 
@@ -385,6 +593,183 @@ class AiExecutionApplicationService(
         )
     }
 
+    private fun storeRuntimeV2Result(taskId: String, task: AiTaskDetails, result: RuntimeV2JobResult) {
+        val exists = jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_task_result WHERE task_id=?", Long::class.java, taskId) ?: 0
+        if (exists > 0) return
+        val specification = taskSpecification(taskId)
+        if (!schemaValidator.isValid(specification.responseSchema, result.result)) {
+            throw RuntimeCallException("RUNTIME_RESULT_SCHEMA_INVALID", "Agent Runtime gaf een resultaat buiten het bevroren responseschema terug.")
+        }
+        val declarations = specification.outputArtifacts.associateBy { it.name }
+        val duplicateName = result.artifacts.groupingBy { it.name }.eachCount().entries.firstOrNull { it.value > 1 }
+        if (duplicateName != null) throw RuntimeCallException("RUNTIME_ARTIFACT_CONTRACT_INVALID", "Agent Runtime gaf een artifactnaam meer dan eenmaal terug.")
+        val unknown = result.artifacts.firstOrNull { artifact ->
+            val declaration = declarations[artifact.name]
+            declaration == null || artifact.mimeType !in declaration.mimeTypes || artifact.sizeBytes > declaration.maxBytes || artifact.state != "READY" ||
+                !SHA256.matches(artifact.sha256)
+        }
+        if (unknown != null) throw RuntimeCallException("RUNTIME_ARTIFACT_CONTRACT_INVALID", "Agent Runtime gaf een artifact buiten het bevroren outputcontract terug.")
+        val missing = declarations.values.firstOrNull { it.required && result.artifacts.none { artifact -> artifact.name == it.name } }
+        if (missing != null) throw RuntimeCallException("RUNTIME_REQUIRED_ARTIFACT_MISSING", "Agent Runtime gaf een verplicht artifact niet terug.")
+        val artifacts = result.artifacts.map { artifact ->
+            val localId = copyRuntimeV2Artifact(taskId, result.jobId, artifact)
+            ArtifactReference(artifact.name, artifact.mimeType, "/api/ai/tasks/$taskId/artifacts/$localId")
+        }
+        transactions.executeWithoutResult {
+            val alreadyStored = jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_task_result WHERE task_id=?", Long::class.java, taskId) ?: 0
+            if (alreadyStored == 0L) {
+                jdbc.update(
+                    "INSERT INTO pf_ai_task_result(task_id,status,response_json,artifacts_json,completed_at) VALUES (?,?,?,?,?)",
+                    taskId, AiTaskResultStatus.SUCCEEDED.name, mapper.writeValueAsString(result.result), mapper.writeValueAsString(artifacts), result.completedAt,
+                )
+                storeUsage(taskId, task, result.jobId, result.usageSummary)
+            }
+        }
+    }
+
+    private fun copyRuntimeV2Artifact(taskId: String, runtimeJobId: String, artifact: RuntimeV2ArtifactView): String {
+        var row = artifactRow(taskId, artifact.name)
+        if (row == null) {
+            val id = UUID.randomUUID().toString()
+            val storageKey = "$taskId/$id"
+            val now = clock.instant()
+            jdbc.update(
+                """INSERT INTO pf_ai_artifact(id,task_id,runtime_job_id,runtime_object_id,logical_name,filename,mime_type,size_bytes,sha256,storage_key,artifact_status,created_at,retention_until)
+                    VALUES (?,?,?,?,?,?,?,?,?,?, 'COPYING',?,?)""".trimIndent(),
+                id, taskId, runtimeJobId, artifact.objectId, artifact.name, artifact.filename, artifact.mimeType,
+                artifact.sizeBytes, artifact.sha256, storageKey, now, now.plusSeconds(TEMPORARY_ARTIFACT_RETENTION_SECONDS),
+            )
+            row = ArtifactRow(id, storageKey, "COPYING", artifact.objectId, artifact.sizeBytes, artifact.sha256)
+        }
+        if (row.runtimeObjectId != artifact.objectId || row.sizeBytes != artifact.sizeBytes || row.sha256 != artifact.sha256) {
+            throw RuntimeCallException("RUNTIME_ARTIFACT_CHANGED", "Agent Runtime wijzigde een eerder waargenomen artifact.")
+        }
+        if (row.status == "READY") return row.id
+        if (row.status == "FAILED") {
+            jdbc.update("UPDATE pf_ai_artifact SET artifact_status='COPYING' WHERE id=? AND artifact_status='FAILED'", row.id)
+        }
+        try {
+            var offset = artifactStore.partialSize(row.storageKey)
+            if (offset > artifact.sizeBytes) {
+                artifactStore.delete(row.storageKey)
+                offset = 0
+            }
+            artifactStore.append(row.storageKey).use { output ->
+                val copied = runtime.copyV2Artifact(artifact.downloadUrl, offset, artifact.sizeBytes, output)
+                if (!copied.complete || copied.confirmedBytes != artifact.sizeBytes) {
+                    throw RuntimeCallException("RUNTIME_ARTIFACT_INCOMPLETE", "De duurzame artifactkopie is nog niet compleet.", true)
+                }
+            }
+            artifactStore.verifyAndPromote(row.storageKey, artifact.sizeBytes, artifact.sha256)
+            jdbc.update(
+                "UPDATE pf_ai_artifact SET artifact_status='READY',ready_at=? WHERE id=? AND artifact_status='COPYING'",
+                clock.instant(), row.id,
+            )
+            return row.id
+        } catch (error: RuntimeCallException) {
+            throw error
+        } catch (_: Exception) {
+            jdbc.update("UPDATE pf_ai_artifact SET artifact_status='FAILED' WHERE id=?", row.id)
+            throw RuntimeCallException("RUNTIME_ARTIFACT_COPY_FAILED", "Het Runtime-artifact kon niet duurzaam worden overgenomen.", true)
+        }
+    }
+
+    private fun artifactRow(taskId: String, logicalName: String): ArtifactRow? = jdbc.query(
+        "SELECT id,storage_key,artifact_status,runtime_object_id,size_bytes,sha256 FROM pf_ai_artifact WHERE task_id=? AND logical_name=?",
+        { rs, _ -> ArtifactRow(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getLong(5), rs.getString(6)) },
+        taskId, logicalName,
+    ).singleOrNull()
+
+    private fun storeRuntimeEvents(taskId: String, runtimeJobId: String) {
+        val after = jdbc.query(
+            "SELECT last_sequence FROM pf_ai_runtime_event_cursor WHERE task_id=?", { rs, _ -> rs.getLong(1) }, taskId,
+        ).singleOrNull() ?: 0L
+        val page = runtime.getV2Events(runtimeJobId, after)
+        var last = after
+        page.items.sortedBy { it.sequence }.forEach { event ->
+            val safeText = when (event.logKind) {
+                "REASONING_SUMMARY" -> event.logText
+                "TOOL_CALL", "TOOL_OUTPUT" -> event.message
+                null -> event.message
+                else -> null
+            }?.take(MAX_EVENT_TEXT)
+            val exists = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM pf_ai_runtime_event WHERE runtime_job_id=? AND event_sequence=?",
+                Long::class.java, runtimeJobId, event.sequence,
+            ) ?: 0
+            if (exists == 0L) jdbc.update(
+                """INSERT INTO pf_ai_runtime_event(task_id,runtime_job_id,event_sequence,event_type,safe_message,progress_percent,occurred_at,stored_at)
+                    VALUES (?,?,?,?,?,?,?,?)""".trimIndent(),
+                taskId, runtimeJobId, event.sequence, event.type, safeText, event.progressPercent, event.createdAt, clock.instant(),
+            )
+            last = maxOf(last, event.sequence)
+        }
+        val updated = jdbc.update(
+            "UPDATE pf_ai_runtime_event_cursor SET last_sequence=?,updated_at=? WHERE task_id=?",
+            last, clock.instant(), taskId,
+        )
+        if (updated == 0) jdbc.update(
+            "INSERT INTO pf_ai_runtime_event_cursor(task_id,runtime_job_id,last_sequence,updated_at) VALUES (?,?,?,?)",
+            taskId, runtimeJobId, last, clock.instant(),
+        )
+    }
+
+    private fun storeUsage(taskId: String, task: AiTaskDetails, runtimeJobId: String, summary: RuntimeUsageSummary) {
+        val metrics = summary.metrics.associate { it.metric to it.quantity }
+        val usageJson = mapper.writeValueAsString(mapOf(
+            "inputTokens" to metrics["INPUT_TOKENS"]?.toLongOrNull(),
+            "cachedInputTokens" to metrics["CACHED_INPUT_TOKENS"]?.toLongOrNull(),
+            "outputTokens" to metrics["OUTPUT_TOKENS"]?.toLongOrNull(),
+            "reasoningTokens" to metrics["REASONING_TOKENS"]?.toLongOrNull(),
+            "metrics" to summary.metrics,
+        ))
+        val updated = jdbc.update(
+            """UPDATE pf_ai_runtime_usage SET attempt_count=?,usage_quality=?,usage_json=?,cost_json=?,captured_at=? WHERE task_id=?""".trimIndent(),
+            summary.attemptCount, summary.usageQuality, usageJson, mapper.writeValueAsString(summary.costs), clock.instant(), taskId,
+        )
+        if (updated == 0) jdbc.update(
+            """INSERT INTO pf_ai_runtime_usage(task_id,runtime_job_id,task_type,vendor_id,model,execution_mode,attempt_count,usage_quality,usage_json,cost_json,captured_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            taskId, runtimeJobId, "STRUCTURED_GENERATION", task.execution.vendorId, task.execution.model, task.execution.mode.name,
+            summary.attemptCount, summary.usageQuality, usageJson, mapper.writeValueAsString(summary.costs), clock.instant(),
+        )
+    }
+
+    private fun storeRuntimeAttempts(taskId: String, task: AiTaskDetails, runtimeJobId: String, attempts: List<RuntimeAttemptView>) {
+        attempts.forEach { attempt ->
+            val updated = jdbc.update(
+                """UPDATE pf_ai_runtime_attempt_usage SET attempt_number=?,status=?,usage_quality=?,usage_json=?,cost_json=?,captured_at=?
+                    WHERE task_id=? AND runtime_attempt_id=?""".trimIndent(),
+                attempt.number, attempt.status, attempt.usageQuality, mapper.writeValueAsString(attempt.usageSummary.metrics),
+                mapper.writeValueAsString(attempt.usageSummary.costs), clock.instant(), taskId, attempt.id,
+            )
+            if (updated == 0) jdbc.update(
+                """INSERT INTO pf_ai_runtime_attempt_usage(task_id,runtime_attempt_id,attempt_number,status,usage_quality,usage_json,cost_json,captured_at)
+                    VALUES (?,?,?,?,?,?,?,?)""".trimIndent(),
+                taskId, attempt.id, attempt.number, attempt.status, attempt.usageQuality, mapper.writeValueAsString(attempt.usageSummary.metrics),
+                mapper.writeValueAsString(attempt.usageSummary.costs), clock.instant(),
+            )
+        }
+        if (attempts.isNotEmpty()) storeUsage(taskId, task, runtimeJobId, aggregateUsage(attempts))
+    }
+
+    private fun aggregateUsage(attempts: List<RuntimeAttemptView>): RuntimeUsageSummary {
+        val metrics = attempts.flatMap { it.usageSummary.metrics }.groupBy { it.metric to it.unit }.map { (key, values) ->
+            RuntimeUsageMetric(key.first, values.mapNotNull { runCatching { BigDecimal(it.quantity) }.getOrNull() }.fold(BigDecimal.ZERO, BigDecimal::add).stripTrailingZeros().toPlainString(), key.second)
+        }
+        val costs = attempts.flatMap { it.usageSummary.costs }.groupBy { Triple(it.kind, it.status, it.currency) }.map { (key, values) ->
+            RuntimeCostValue(key.first, key.second, values.mapNotNull { runCatching { BigDecimal(it.amount) }.getOrNull() }.fold(BigDecimal.ZERO, BigDecimal::add).toPlainString(), key.third)
+        }
+        val qualities = attempts.map { it.usageQuality }.toSet()
+        val quality = when {
+            qualities == setOf("MOCK") -> "MOCK"
+            qualities == setOf("COMPLETE") -> "COMPLETE"
+            qualities == setOf("UNAVAILABLE") -> "UNAVAILABLE"
+            else -> "PARTIAL"
+        }
+        return RuntimeUsageSummary(attempts.size, quality, metrics, costs)
+    }
+
     private fun storeTerminalFailure(taskId: String, view: RuntimeJobView) {
         val exists = jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_task_result WHERE task_id=?", Long::class.java, taskId) ?: 0
         if (exists > 0) return
@@ -403,6 +788,168 @@ class AiExecutionApplicationService(
             taskId, AiTaskResultStatus.FAILED.name, "[]", error.code, error.safeMessage, now,
         )
     }
+
+    private fun failResultProjection(taskId: String, error: RuntimeCallException) {
+        val now = clock.instant()
+        jdbc.update("UPDATE pf_ai_task SET status='FAILED',error_code=?,safe_error_message=?,updated_at=? WHERE id=?", error.code, error.safeMessage, now, taskId)
+        val exists = jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_task_result WHERE task_id=?", Long::class.java, taskId) ?: 0
+        if (exists == 0L) jdbc.update(
+            "INSERT INTO pf_ai_task_result(task_id,status,artifacts_json,error_code,safe_message,completed_at) VALUES (?,?,?,?,?,?)",
+            taskId, AiTaskResultStatus.FAILED.name, "[]", error.code, error.safeMessage, now,
+        )
+    }
+
+    fun validateFixtureResult(taskId: AiTaskId, result: JsonNode) {
+        getAiTask(taskId)
+        if (!schemaValidator.isValid(taskSpecification(taskId.value).responseSchema, result)) {
+            throw InvalidCommand("Mockresultaat voldoet niet aan het bevroren jobschema.")
+        }
+    }
+
+    fun cleanupExecutionContent() {
+        val now = clock.instant()
+        jdbc.query(
+            """SELECT a.id,a.storage_key FROM pf_ai_artifact a
+                WHERE a.artifact_status IN ('READY','FAILED') AND a.retention_until IS NOT NULL AND a.retention_until<=?
+                  AND NOT EXISTS (SELECT 1 FROM pf_ai_artifact_domain_reference r WHERE r.artifact_id=a.id AND r.released_at IS NULL)""".trimIndent(),
+            { rs, _ -> rs.getString(1) to rs.getString(2) }, now,
+        ).forEach { (id, storageKey) ->
+            if (jdbc.update("UPDATE pf_ai_artifact SET artifact_status='DELETING' WHERE id=? AND artifact_status IN ('READY','FAILED')", id) == 1) {
+                runCatching { artifactStore.delete(storageKey) }
+                    .onSuccess { jdbc.update("UPDATE pf_ai_artifact SET artifact_status='DELETED',deleted_at=? WHERE id=?", clock.instant(), id) }
+                    .onFailure { jdbc.update("UPDATE pf_ai_artifact SET artifact_status='FAILED' WHERE id=?", id) }
+            }
+        }
+        jdbc.update(
+            """DELETE FROM pf_ai_runtime_upload u WHERE u.updated_at<? AND EXISTS (
+                SELECT 1 FROM pf_ai_runtime_outbox o WHERE o.task_id=u.task_id AND (o.dispatched_at IS NOT NULL OR o.dispatch_state='CANCELLED'))""".trimIndent(),
+            now.minusSeconds(UPLOAD_CORRELATION_RETENTION_SECONDS),
+        )
+    }
+
+    fun prepareFixture(taskId: AiTaskId, result: JsonNode?, outputSequence: List<String>, artifactNames: Set<String>): String {
+        val task = getAiTask(taskId)
+        if (task.execution != AiExecutionSelection("mock", "mock", AiExecutionMode.MOCK)) {
+            throw InvalidCommand("Alleen een expliciete mock/mock/MOCK-taak mag een acceptatiefixture krijgen.")
+        }
+        if (result != null) validateFixtureResult(taskId, result)
+        if (outputSequence.isNotEmpty()) {
+            val finalResult = runCatching { mapper.readTree(outputSequence.last()) }.getOrNull()
+                ?: throw InvalidCommand("De laatste mockoutput moet geldige JSON zijn.")
+            validateFixtureResult(taskId, finalResult)
+        }
+        val declared = taskSpecification(taskId.value).outputArtifacts.map { it.name }.toSet()
+        if (!declared.containsAll(artifactNames)) throw InvalidCommand("Mockartifact is niet in het bevroren taakcontract gedeclareerd.")
+        return jdbc.queryForObject(
+            "SELECT runtime_idempotency_key FROM pf_ai_runtime_outbox WHERE task_id=? AND dispatched_at IS NULL",
+            String::class.java, taskId.value,
+        ) ?: throw InvalidCommand("De AI-taak kan geen nieuwe mockfixture meer ontvangen.")
+    }
+
+    private fun frozenRequest(taskId: String): String? = jdbc.query(
+        "SELECT frozen_request_json FROM pf_ai_runtime_outbox WHERE task_id=?", { rs, _ -> rs.getString(1) }, taskId,
+    ).singleOrNull()
+
+    private fun taskApiVersion(taskId: String): String = jdbc.queryForObject(
+        "SELECT api_version FROM pf_ai_runtime_outbox WHERE task_id=?", String::class.java, taskId,
+    ) ?: "v1"
+
+    private fun isCancelledBeforeCreate(taskId: String): Boolean = jdbc.queryForObject(
+        "SELECT COUNT(*) FROM pf_ai_task WHERE id=? AND runtime_job_id IS NULL AND cancel_requested=TRUE", Long::class.java, taskId,
+    ) == 1L
+
+    private fun renewDispatchClaim(taskId: String) {
+        val now = clock.instant()
+        jdbc.update(
+            "UPDATE pf_ai_runtime_outbox SET claimed_until=?,updated_at=? WHERE task_id=? AND claimed_by=? AND dispatched_at IS NULL",
+            now.plusSeconds(DISPATCH_CLAIM_SECONDS), now, taskId, coordinatorId,
+        )
+    }
+
+    private fun releaseFrozenV2Request(taskId: String) {
+        jdbc.query(
+            "SELECT upload_id FROM pf_ai_runtime_upload WHERE task_id=? AND upload_id IS NOT NULL",
+            { rs, _ -> rs.getString(1) }, taskId,
+        ).forEach { uploadId -> runCatching { runtime.deleteUpload(uploadId) } }
+        val now = clock.instant()
+        jdbc.update(
+            "UPDATE pf_ai_runtime_upload SET upload_state='EXPIRED',expires_at=?,updated_at=? WHERE task_id=?",
+            now, now, taskId,
+        )
+        jdbc.update(
+            "UPDATE pf_ai_runtime_outbox SET frozen_request_json=NULL,dispatch_state='PENDING_UPLOAD',updated_at=? WHERE task_id=? AND dispatched_at IS NULL",
+            now, taskId,
+        )
+    }
+
+    private fun cancelBeforeCreate(taskId: String) {
+        jdbc.query(
+            "SELECT upload_id FROM pf_ai_runtime_upload WHERE task_id=? AND upload_id IS NOT NULL",
+            { rs, _ -> rs.getString(1) }, taskId,
+        ).forEach { uploadId -> runCatching { runtime.deleteUpload(uploadId) } }
+        val now = clock.instant()
+        jdbc.update("UPDATE pf_ai_runtime_outbox SET dispatch_state='CANCELLED',dispatched_at=?,updated_at=? WHERE task_id=?", now, now, taskId)
+        jdbc.update("UPDATE pf_ai_task SET status='CANCELLED',updated_at=? WHERE id=?", now, taskId)
+        storeTerminalFailure(taskId, RuntimeJobView("", "CANCELLED", "CANCELLED", 0, null, null, "CANCELLED", "Taak vóór indiening geannuleerd.", now, now))
+    }
+
+    private fun inputRows(taskId: String): List<InputRow> = jdbc.query(
+        "SELECT input_sequence,logical_name,filename,mime_type,input_role,content_bytes,size_bytes,sha256 FROM pf_ai_task_input WHERE task_id=? ORDER BY input_sequence",
+        { rs, _ -> InputRow(rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getBytes(6), rs.getLong(7), rs.getString(8)) },
+        taskId,
+    )
+
+    private fun uploadRow(taskId: String, sequence: Int): UploadRow? = jdbc.query(
+        "SELECT upload_id,object_id,upload_url,chunk_size_bytes,upload_state,expires_at FROM pf_ai_runtime_upload WHERE task_id=? AND input_sequence=?",
+        { rs, _ -> UploadRow(rs.getString(1), rs.getString(2), rs.getString(3), rs.getObject(4)?.let { rs.getInt(4) }, rs.getString(5), rs.getTimestamp(6)?.toInstant()) },
+        taskId, sequence,
+    ).singleOrNull()
+
+    private fun taskSpecification(taskId: String): TaskSpecification = jdbc.query(
+        """SELECT instruction,response_schema,repository_url,repository_commit_sha,environment_keys_json,output_artifacts_json,execution_timeout_seconds
+            FROM pf_ai_task_specification WHERE task_id=?""".trimIndent(),
+        { rs, _ -> TaskSpecification(
+            rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
+            mapper.readValue(rs.getString(5), object : TypeReference<List<String>>() {}),
+            mapper.readValue(rs.getString(6), object : TypeReference<List<AiOutputArtifactDeclaration>>() {}), rs.getInt(7),
+        ) }, taskId,
+    ).singleOrNull() ?: throw RuntimeCallException("RUNTIME_SPECIFICATION_MISSING", "De bevroren Runtime-specificatie ontbreekt.")
+
+    private data class InputRow(
+        val sequence: Int,
+        val name: String,
+        val filename: String,
+        val mimeType: String,
+        val role: String,
+        val content: ByteArray?,
+        val sizeBytes: Long,
+        val sha256: String,
+    )
+    private data class UploadRow(
+        val uploadId: String?,
+        val objectId: String?,
+        val uploadUrl: String?,
+        val chunkSizeBytes: Int?,
+        val state: String,
+        val expiresAt: Instant?,
+    )
+    private data class TaskSpecification(
+        val instruction: String,
+        val responseSchema: String,
+        val repositoryUrl: String?,
+        val repositoryCommitSha: String?,
+        val environmentKeys: List<String>,
+        val outputArtifacts: List<AiOutputArtifactDeclaration>,
+        val executionTimeoutSeconds: Int,
+    )
+    private data class ArtifactRow(
+        val id: String,
+        val storageKey: String,
+        val status: String,
+        val runtimeObjectId: String,
+        val sizeBytes: Long,
+        val sha256: String,
+    )
 
     private fun validateTask(command: RequestAiTaskCommand) {
         if (command.idempotencyKey.isBlank() || command.idempotencyKey.length > 150) throw InvalidCommand("Ongeldige AI-taak-idempotentiesleutel.")
@@ -550,11 +1097,29 @@ class AiExecutionApplicationService(
     private fun fingerprint(value: Any) = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsBytes(value)))
 
     companion object {
+        private const val V2_INSTRUCTION = "Lees de volledige opdracht uit invoerobject prompt, behandel alle andere invoerobjecten volgens hun rol en retourneer uitsluitend JSON volgens het responseschema."
+        private const val DEFAULT_UPLOAD_CHUNK = 256 * 1024
+        private const val MAX_UPLOAD_CHUNK = 4 * 1024 * 1024
+        private const val DISPATCH_CLAIM_SECONDS = 300L
+        private const val MAX_EVENT_TEXT = 2_000
+        private const val TEMPORARY_ARTIFACT_RETENTION_SECONDS = 7 * 24 * 60 * 60L
+        private const val UPLOAD_CORRELATION_RETENTION_SECONDS = 7 * 24 * 60 * 60L
         private val TERMINAL_STATUSES = setOf(AiTaskStatus.SUCCEEDED, AiTaskStatus.FAILED, AiTaskStatus.CANCELLED)
-        private val RETRYABLE_CODES = setOf("RUNTIME_NOT_CONFIGURED", "RUNTIME_SUBMISSION_FAILED", "RUNTIME_EMPTY_RESPONSE")
+        private val RETRYABLE_CODES = setOf(
+            "RUNTIME_NOT_CONFIGURED", "RUNTIME_SUBMISSION_FAILED", "RUNTIME_EMPTY_RESPONSE",
+            "RUNTIME_UPLOAD_CREATE_FAILED", "RUNTIME_UPLOAD_HEAD_FAILED", "RUNTIME_UPLOAD_PATCH_FAILED",
+            "RUNTIME_UPLOAD_COMPLETE_FAILED", "OBJECT_STORE_LOW_SPACE", "INPUT_OBJECT_NOT_READY",
+        )
+        private val LOCAL_RESULT_FATAL_CODES = setOf(
+            "RUNTIME_RESULT_SCHEMA_INVALID", "RUNTIME_ARTIFACT_CONTRACT_INVALID", "RUNTIME_REQUIRED_ARTIFACT_MISSING",
+            "RUNTIME_ARTIFACT_CHANGED", "RUNTIME_ARTIFACT_TOO_LARGE", "RUNTIME_ARTIFACT_OFFSET_INVALID", "RUNTIME_URL_REJECTED",
+        )
         private val SHA = Regex("[0-9a-fA-F]{40}")
+        private val SHA256 = Regex("[0-9a-f]{64}")
+        private val DOMAIN_TYPE = Regex("[A-Z][A-Z0-9_]{0,79}")
+        private val LOCAL_ARTIFACT_URI = Regex("/api/ai/tasks/([A-Za-z0-9-]{1,80})/artifacts/([A-Za-z0-9-]{1,80})")
         private val FILENAME = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,254}")
-        private val LOGICAL_NAME = Regex("[A-Za-z][A-Za-z0-9._-]{0,119}")
+        private val LOGICAL_NAME = Regex("[a-z][a-z0-9-]{0,99}")
         private val PROJECT_PREFIX = Regex("[A-Z][A-Z0-9_]*")
         private val ALLOWED_MEDIA_TYPES = setOf("image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain", "text/markdown", "application/json")
         private val ALLOWED_OUTPUT_MEDIA_TYPES = setOf("image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain", "text/markdown", "application/json")
@@ -582,5 +1147,10 @@ class AgentRuntimeCoordinator(
     @Scheduled(fixedDelayString = "\${PF_AI_RUNTIME_RECONCILE_DELAY_MS:2000}")
     fun reconcile() {
         if (enabled) service.reconcileActive()
+    }
+
+    @Scheduled(fixedDelayString = "\${PF_AI_RUNTIME_CLEANUP_DELAY_MS:3600000}")
+    fun cleanup() {
+        if (enabled) service.cleanupExecutionContent()
     }
 }

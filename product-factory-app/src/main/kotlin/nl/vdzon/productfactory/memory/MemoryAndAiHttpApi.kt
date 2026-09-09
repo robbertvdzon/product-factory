@@ -6,10 +6,13 @@ import nl.vdzon.productfactory.api.product.ProductQueryService
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.auth.ResolvedSession
 import org.springframework.http.HttpStatus
+import org.springframework.http.HttpHeaders
+import org.springframework.http.ContentDisposition
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -163,7 +166,6 @@ class AiSettingsController(
 class AiTaskController(
     private val commands: AiExecutionService,
     private val queries: AiExecutionQueryService,
-    private val implementation: nl.vdzon.productfactory.ai.AiExecutionApplicationService,
 ) {
     @GetMapping
     fun all(
@@ -189,14 +191,52 @@ class AiTaskController(
     fun cancel(@PathVariable taskId: String, @RequestBody request: CancelAiTaskRequest) = commands.cancelAiTask(AiTaskId(taskId), request.reason)
 
     @GetMapping("/{taskId}/artifacts/{artifactId}")
-    fun artifact(@PathVariable taskId: String, @PathVariable artifactId: String): ResponseEntity<ByteArray> {
-        val id = AiTaskId(taskId)
-        val mediaType = queries.getAiTaskResult(id)?.artifacts
-            ?.singleOrNull { it.uri.substringAfterLast('/') == artifactId }
-            ?.mediaType
-            ?.let { runCatching { MediaType.parseMediaType(it) }.getOrNull() }
-            ?: MediaType.APPLICATION_OCTET_STREAM
-        return ResponseEntity.ok().contentType(mediaType).body(implementation.downloadArtifact(id, artifactId))
+    fun artifact(
+        @PathVariable taskId: String,
+        @PathVariable artifactId: String,
+        @RequestHeader(HttpHeaders.RANGE, required = false) rangeHeader: String?,
+    ): ResponseEntity<StreamingResponseBody> {
+        val requested = parseRange(rangeHeader)
+        val content = queries.openAiTaskArtifact(AiTaskId(taskId), artifactId, requested?.first ?: 0)
+        val end = requested?.last?.coerceAtMost(content.sizeBytes - 1) ?: content.sizeBytes - 1
+        if (end < content.offset) {
+            content.inputStream.close()
+            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE).build()
+        }
+        val responseLength = end - content.offset + 1
+        val body = StreamingResponseBody { output ->
+            content.inputStream.use { input ->
+                val buffer = ByteArray(64 * 1024)
+                var remaining = responseLength
+                while (remaining > 0) {
+                    val read = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                    if (read < 0) break
+                    output.write(buffer, 0, read)
+                    remaining -= read
+                }
+            }
+        }
+        val status = if (requested == null) HttpStatus.OK else HttpStatus.PARTIAL_CONTENT
+        return ResponseEntity.status(status)
+            .contentType(runCatching { MediaType.parseMediaType(content.mediaType) }.getOrDefault(MediaType.APPLICATION_OCTET_STREAM))
+            .contentLength(responseLength)
+            .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(content.filename).build().toString())
+            .apply {
+                content.sha256?.let { header(HttpHeaders.ETAG, "\"sha256-$it\"") }
+                if (requested != null) header(HttpHeaders.CONTENT_RANGE, "bytes ${content.offset}-$end/${content.sizeBytes}")
+            }
+            .body(body)
+    }
+
+    private fun parseRange(value: String?): LongRange? {
+        if (value == null) return null
+        val match = Regex("bytes=(\\d+)-(\\d*)").matchEntire(value)
+            ?: throw InvalidCommand("Alleen één byte-range wordt ondersteund.")
+        val start = match.groupValues[1].toLongOrNull() ?: throw InvalidCommand("Ongeldige byte-range.")
+        val end = match.groupValues[2].takeIf(String::isNotBlank)?.toLongOrNull() ?: Long.MAX_VALUE
+        if (start < 0 || end < start) throw InvalidCommand("Ongeldige byte-range.")
+        return start..end
     }
 }
 

@@ -18,6 +18,10 @@ class RuntimeSettingsTest {
         "PF_PUBLIC_BACKEND_URL" to "https://product-factory-api.example.invalid",
         "PF_AGENT_RUNTIME_URL" to agentRuntimeUrl,
         "PF_AGENT_RUNTIME_TOKEN" to "consumer-token",
+        "PF_AGENT_RUNTIME_API_VERSION" to "v1",
+        "PF_AI_VENDOR_ID" to "openai",
+        "PF_AI_MODEL" to "gpt-5.6-sol",
+        "PF_AI_EXECUTION_MODE" to "SUBSCRIPTION",
         "PF_AI_PROVIDER" to "CODEX",
     )
 
@@ -50,5 +54,17 @@ class RuntimeSettingsTest {
         assertThatThrownBy {
             RuntimeSettings.validate(completeProductionValues("http://agent-runtime.example.invalid"))
         }.hasMessage("De productie-Agent-Runtime-URL moet HTTPS gebruiken (of het gepinde interne clusteradres zijn).")
+    }
+
+    @Test
+    fun `productie weigert mockuitvoering en test-controlcredentials`() {
+        val mock = completeProductionValues(RuntimeSettings.AGENT_RUNTIME_PRODUCTION_INTERNAL_URL) + mapOf(
+            "PF_AI_VENDOR_ID" to "mock", "PF_AI_MODEL" to "mock", "PF_AI_EXECUTION_MODE" to "MOCK",
+        )
+        assertThatThrownBy { RuntimeSettings.validate(mock) }.hasMessageContaining("openai/gpt-5.6-sol/SUBSCRIPTION")
+
+        val testControl = completeProductionValues(RuntimeSettings.AGENT_RUNTIME_PRODUCTION_INTERNAL_URL) +
+            ("PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN" to "forbidden")
+        assertThatThrownBy { RuntimeSettings.validate(testControl) }.hasMessageContaining("test-controlcredential")
     }
 }

@@ -10,6 +10,10 @@ data:
   PF_PUBLIC_BACKEND_URL: https://product-factory-api-acceptance.vdzonsoftware.nl
   PF_SCHEDULES_ENABLED: "false"
   PF_AI_PROVIDER: MOCKED
+  PF_AI_VENDOR_ID: mock
+  PF_AI_MODEL: mock
+  PF_AI_EXECUTION_MODE: MOCK
+  PF_AGENT_RUNTIME_API_VERSION: v2
   PF_SOFTWARE_FACTORY_MODE: MOCKED
   PF_EXTERNAL_MUTATIONS_ALLOWED: "false"
   PF_AGENT_RUNTIME_URL: https://agent-runtime-acceptance.vdzonsoftware.nl

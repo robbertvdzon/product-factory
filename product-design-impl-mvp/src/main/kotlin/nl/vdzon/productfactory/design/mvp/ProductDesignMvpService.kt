@@ -261,6 +261,7 @@ class ProductDesignMvpService(
                 } else {
                     reviseEpic(sessionId, explicitRevision!!, draft)
                 }
+                ai.retainAiArtifacts(RetainAiArtifactsCommand(epic.uxArtifacts, "EPIC", epic.id.value, epic.version))
                 applyTrustedEffects(sessionId, result, epic)
                 if (epic.status in setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT) && sessionTaskIds(sessionId).size < MAX_DESIGN_ITERATIONS) {
                     requestRefinement(sessionId, epic)
@@ -903,10 +904,11 @@ hoe harvesting, opslag en indexering uitvoerbaar worden. Gebruik CANDIDATE of BL
 is pas gereed met minimaal twee VALIDATED bronnen, een concrete ingestie- en zoekroute en zonder open bronvragen.
 Bij zichtbaar gedrag lever je na iedere run één volledige, actuele UX-schermset voor de hele hoofdroute, waaronder altijd het initiële scherm en een lege of fouttoestand.
 Ieder logisch scherm heeft in uxScreens een stabiele screenKey, toestand, doel en minimaal een DESKTOP- en MOBILE-variant. Bouw zo nodig een zelfstandige HTML-mockup
-en maak concrete PNG-screenshots met Playwright/Chromium. Geef artifacts herkenbare unieke bestandsnamen, zodat de Planner ze later gericht aan stories kan koppelen.
+en maak concrete PNG-screenshots met Playwright/Chromium. Gebruik uitsluitend vooraf gedeclareerde logische slots ux-01 tot en met ux-50, zonder extensie;
+de Planner koppelt later op exact die logische naam.
 Bij een revisie beoordeel je ieder bestaand UX-artifact exact eenmaal in uxArtifactChanges: KEEP behoudt het huidige bestand, REPLACE vervangt het door een nieuw bestand,
 REMOVE verwijdert het bewust met een concrete reden en ADD voegt een nieuw bestand toe. Niets mag stilzwijgend verdwijnen. Schrijf alleen nieuwe of vervangende afbeeldingen
-naar /job/output/artifacts; schrijf behouden bestanden niet opnieuw. uxArtifactChanges moet exact overeenkomen met wat je daadwerkelijk naar /job/output/artifacts schrijft:
+naar het gelijknamige pad /job/output/artifacts/ux-NN; schrijf behouden bestanden niet opnieuw. uxArtifactChanges moet exact overeenkomen met wat je daadwerkelijk schrijft:
 elk geschreven bestand (dus ook de aparte MOBILE-variant van elk scherm) staat met precies één ADD of REPLACE in uxArtifactChanges, zonder uitzondering. uxScreens beschrijft
 daarna altijd de volledige samengestelde eindset, niet alleen de wijzigingen.
 Zet readiness.readyForPlanning alleen op true als onderzoek, UX, acceptatiecriteria, afhankelijkheden en open vragen voldoende concreet zijn voor Productplanning.
@@ -969,7 +971,7 @@ $snapshotJson"""
         private val ROLE = AgentRoleKey("PRODUCT_DESIGNER_MVP")
         private val JOB_KEY = AiJobKey("PRODUCT_DESIGN.CREATE_EPIC")
         private val DESIGN_ACTOR = ActorReference(ActorType.PROCESS, "product-design-mvp")
-        private const val PROMPT_TEMPLATE_VERSION = 3L
+        private const val PROMPT_TEMPLATE_VERSION = 4L
         private val CALL_CLAIM = Duration.ofMinutes(5)
         private const val MAX_DESIGN_ITERATIONS = 3
         private const val MIN_VALIDATED_EXTERNAL_SOURCES = 2

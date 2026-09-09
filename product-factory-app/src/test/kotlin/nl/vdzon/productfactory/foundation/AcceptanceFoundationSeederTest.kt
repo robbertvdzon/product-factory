@@ -23,6 +23,12 @@ import org.springframework.test.web.servlet.post
         "PF_AGENT_WORKER_TOKEN=",
         "PF_AGENT_RUNTIME_URL=https://agent-runtime-acceptance.vdzonsoftware.nl",
         "PF_AGENT_RUNTIME_TOKEN=test-consumer-token",
+        "PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN=test-control-token",
+        "PF_AGENT_RUNTIME_API_VERSION=v2",
+        "PF_AI_VENDOR_ID=mock",
+        "PF_AI_MODEL=mock",
+        "PF_AI_EXECUTION_MODE=MOCK",
+        "PF_TESTBED_RUNTIME_FIXTURE_RESET_ENABLED=false",
     ],
 )
 @AutoConfigureMockMvc

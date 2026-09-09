@@ -3,6 +3,7 @@ package nl.vdzon.productfactory.api.ai
 import nl.vdzon.productfactory.api.shared.*
 import java.time.Duration
 import java.time.Instant
+import java.io.InputStream
 
 @JvmInline value class AiJobKey(val value: String)
 enum class AiExecutionMode { SUBSCRIPTION, API, MOCK }
@@ -129,6 +130,14 @@ data class AiTaskUsageDetails(
     val costs: List<AiCostDetails>,
     val capturedAt: Instant,
 )
+data class AiArtifactContent(
+    val filename: String,
+    val mediaType: String,
+    val sizeBytes: Long,
+    val sha256: String?,
+    val offset: Long,
+    val inputStream: InputStream,
+)
 data class SetProductEnvironmentKeyCommand(
     val productId: ProductId,
     val name: String,
@@ -145,6 +154,12 @@ data class SetAgentEnvironmentGrantCommand(
     val actor: ActorReference,
     val idempotencyKey: String,
 )
+data class RetainAiArtifactsCommand(
+    val references: List<ArtifactReference>,
+    val domainType: String,
+    val domainId: String,
+    val domainVersion: Long,
+)
 interface AiExecutionService {
     fun updateAiJobConfiguration(command: UpdateAiJobConfigurationCommand): AiJobConfigurationDetails
     fun requestAiTask(command: RequestAiTaskCommand): AiTaskId
@@ -153,13 +168,14 @@ interface AiExecutionService {
     fun setProductEnvironmentKey(command: SetProductEnvironmentKeyCommand): ProductEnvironmentKeyDetails
     fun setAgentEnvironmentGrant(command: SetAgentEnvironmentGrantCommand): ProductEnvironmentKeyDetails
     fun refreshExecutionCatalog(command: RefreshExecutionCatalogCommand): List<ExecutionCatalogEntry>
+    fun retainAiArtifacts(command: RetainAiArtifactsCommand)
 }
 interface AiExecutionQueryService {
     fun getAiJobConfiguration(jobKey: AiJobKey): AiJobConfigurationDetails
     fun getAiJobConfigurations(): List<AiJobConfigurationDetails>
     fun getAiTask(taskId: AiTaskId): AiTaskDetails
     fun getAiTaskResult(taskId: AiTaskId): AiTaskResultDetails?
-    fun downloadAiTaskArtifact(taskId: AiTaskId, artifactId: String): ByteArray
+    fun openAiTaskArtifact(taskId: AiTaskId, artifactId: String, offset: Long = 0): AiArtifactContent
     fun findAiTasks(filter: AiTaskFilter): List<AiTaskDetails>
     fun getAiTaskEvents(taskId: AiTaskId): List<AiTaskEventDetails>
     fun getAiTaskUsage(taskId: AiTaskId): AiTaskUsageDetails?

@@ -11,6 +11,10 @@ data:
   PF_DB_USERNAME: productfactory_v2
   PF_SCHEDULES_ENABLED: "true"
   PF_AI_PROVIDER: CODEX
+  PF_AI_VENDOR_ID: openai
+  PF_AI_MODEL: gpt-5.6-sol
+  PF_AI_EXECUTION_MODE: SUBSCRIPTION
+  PF_AGENT_RUNTIME_API_VERSION: v1
   PF_SOFTWARE_FACTORY_MODE: REAL
   PF_SOFTWARE_FACTORY_URL: http://softwarefactory-dashboard-backend.software-factory.svc.cluster.local/api/integrations/v2
   PF_EXTERNAL_MUTATIONS_ALLOWED: "false"

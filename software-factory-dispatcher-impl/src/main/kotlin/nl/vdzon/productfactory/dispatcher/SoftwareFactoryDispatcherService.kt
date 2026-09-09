@@ -268,7 +268,7 @@ class SoftwareFactoryDispatcherMvpService(
             val match = AI_ARTIFACT_URI.matchEntire(artifact.uri)
                 ?: throw ContractFactoryFailure("INVALID_UX_ARTIFACT", "UX-artifact ${artifact.name} heeft geen geldige duurzame verwijzing.")
             val bytes = runCatching {
-                aiQueries.downloadAiTaskArtifact(AiTaskId(match.groupValues[1]), match.groupValues[2])
+                aiQueries.openAiTaskArtifact(AiTaskId(match.groupValues[1]), match.groupValues[2]).inputStream.use { it.readBytes() }
             }.getOrElse {
                 throw ContractFactoryFailure("UX_ARTIFACT_UNAVAILABLE", "UX-artifact ${artifact.name} kon niet worden geladen.")
             }

@@ -31,6 +31,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: product-factory-config
+          env:
+            - name: PF_AI_ARTIFACT_STORAGE_PATH
+              value: /var/lib/product-factory-ai-artifacts
           ports:
             - name: http
               containerPort: 8080
@@ -66,10 +69,15 @@ spec:
           volumeMounts:
             - name: temporary-files
               mountPath: /tmp
+            - name: ai-artifacts
+              mountPath: /var/lib/product-factory-ai-artifacts
       volumes:
         - name: temporary-files
           emptyDir:
             sizeLimit: 128Mi
+        - name: ai-artifacts
+          persistentVolumeClaim:
+            claimName: product-factory-ai-artifacts
 ---
 apiVersion: v1
 kind: Service
