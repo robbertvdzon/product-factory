@@ -41,7 +41,9 @@ class AcceptanceProductAdvisorIdentityResetContributor(
 
     override fun reset(context: AcceptanceFixtureContext) {
         jdbc.update("DELETE FROM pf_user_global_role")
-        jdbc.update("DELETE FROM pf_user_account")
+        // Identiteiten zijn duurzaam en mogen blijven bestaan. De overige resetcontributors wissen
+        // sessies, rollen, lidmaatschappen en advisor-data; zo kan een gelijktijdig afgeronde
+        // schedulertransactie nooit met een user-FK botsen tijdens een Testbedreset.
     }
 }
 

@@ -840,10 +840,10 @@ class AiExecutionApplicationService(
         }
         val declared = taskSpecification(taskId.value).outputArtifacts.map { it.name }.toSet()
         if (!declared.containsAll(artifactNames)) throw InvalidCommand("Mockartifact is niet in het bevroren taakcontract gedeclareerd.")
-        return jdbc.queryForObject(
+        return jdbc.query(
             "SELECT runtime_idempotency_key FROM pf_ai_runtime_outbox WHERE task_id=? AND dispatched_at IS NULL",
-            String::class.java, taskId.value,
-        ) ?: throw InvalidCommand("De AI-taak kan geen nieuwe mockfixture meer ontvangen.")
+            { rs, _ -> rs.getString(1) }, taskId.value,
+        ).singleOrNull() ?: throw InvalidCommand("De AI-taak kan geen nieuwe mockfixture meer ontvangen.")
     }
 
     private fun frozenRequest(taskId: String): String? = jdbc.query(
