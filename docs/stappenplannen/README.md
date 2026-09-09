@@ -53,6 +53,12 @@ MVP-eisen en worden niet in code of productieseed hardgecodeerd.
 
 De stappen 1 tot en met 9 zijn uitgevoerd. Het technische MVP is afgesloten met automatische
 schedules, de volledige keten, negentien vaste Testbedscenario's en een normatief bewijsrecord.
+
+## Geplande uitbreiding na het MVP
+
+| Stap | Plan | Resultaat |
+|---|---|---|
+| 10 | [Product Advisor en Product Requests](10-product-advisor-en-productrequests.md) | Een product owner kan met `PRODUCT_ADVISOR` overleggen en een bevestigd verzoek als hotfix, bugfix of dubbel goedgekeurde epic laten uitvoeren. |
 Stap 10 is een post-MVP-migratieplan en begint pas wanneer de daarin genoemde additive Agent
 Runtime-voorwaarden beschikbaar zijn.
 
