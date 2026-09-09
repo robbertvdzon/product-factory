@@ -8,6 +8,7 @@ import java.time.Instant
 data class AuthenticationSession(
     val sessionId: String,
     val stakeholderEmail: String,
+    val userId: String,
     val csrfTokenHash: String,
     val createdAt: Instant,
     val expiresAt: Instant,
@@ -20,10 +21,11 @@ class AuthenticationSessionRepository(
     fun create(session: AuthenticationSession) {
         jdbcTemplate.update(
             "INSERT INTO authentication_session " +
-                "(session_id, stakeholder_email, csrf_token_hash, created_at, expires_at, revoked_at) " +
-                "VALUES (?, ?, ?, ?, ?, NULL)",
+                "(session_id, stakeholder_email, user_id, csrf_token_hash, created_at, expires_at, revoked_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, NULL)",
             session.sessionId,
             session.stakeholderEmail,
+            session.userId,
             session.csrfTokenHash,
             Timestamp.from(session.createdAt),
             Timestamp.from(session.expiresAt),
@@ -31,12 +33,13 @@ class AuthenticationSessionRepository(
     }
 
     fun findActive(sessionId: String, now: Instant): AuthenticationSession? = jdbcTemplate.query(
-        "SELECT session_id, stakeholder_email, csrf_token_hash, created_at, expires_at " +
+        "SELECT session_id, stakeholder_email, user_id, csrf_token_hash, created_at, expires_at " +
             "FROM authentication_session WHERE session_id = ? AND revoked_at IS NULL AND expires_at > ?",
         { resultSet, _ ->
             AuthenticationSession(
                 sessionId = resultSet.getString("session_id"),
                 stakeholderEmail = resultSet.getString("stakeholder_email"),
+                userId = resultSet.getString("user_id"),
                 csrfTokenHash = resultSet.getString("csrf_token_hash"),
                 createdAt = resultSet.getTimestamp("created_at").toInstant(),
                 expiresAt = resultSet.getTimestamp("expires_at").toInstant(),

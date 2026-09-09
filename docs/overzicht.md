@@ -10,9 +10,9 @@ queues en interne werking staan in de documenten onderaan.
 
 ## De Stakeholder is de klant
 
-Er is één globale Stakeholder: de klant voor wie we alle producten maken. De Stakeholder is een
-actor en wordt niet als apart productobject opgeslagen. Dezelfde Stakeholder beheert dus ieder
-product en mag ook Product Factory-brede instellingen wijzigen.
+Menselijke productinput blijft de Stakeholder vertegenwoordigen, maar toegang wordt nu uit duurzame
+identiteiten afgeleid. Een `FACTORY_OWNER` beheert de hele factory en productlidmaatschappen. Een
+`PRODUCT_OWNER` werkt uitsluitend binnen expliciet toegewezen producten.
 
 De Stakeholder communiceert met Product Factory via de gebruikersinterface. De UI vertaalt iedere
 actie naar een publiek command op de module die het betrokken productobject bezit; de Stakeholder
@@ -51,9 +51,25 @@ werkdocumenten, prompts en agentadministratie horen hier niet bij.
 | `Meeting` | Een overleg met de Stakeholder, inclusief agenda, gesprek en gecontroleerde uitkomst. |
 | `StakeholderQuestion` | Een tijdelijke vraag van één agentrol aan de Stakeholder, met een zichtbare antwoordstatus en bronoverleg. |
 | `AgentMemoryItem` | Een permanente, versieerbare herinnering van precies één agentrol binnen dit product. |
+| `ProductConversation` | Een duurzaam gesprek van een bevoegde gebruiker met Product Advisor binnen één product. |
+| `ProductRequest` | Een geversioneerd, bevroren wijzigingsvoorstel dat pas na bevestiging wordt gerouteerd. |
+| `DesignWorkItem` | Een gerichte epickandidaat voor Productontwerp die na een antwoord exact wordt hervat. |
 
 De **backlog** is geen apart object. Het is de lijst van stories met status `TODO` of
 `IN_PROGRESS`, geordend op `sequenceNumber`.
+
+## Product Advisor
+
+Een product owner kan Product Advisor vragen stellen over de publieke bronrevisie en de
+geconfigureerde testomgeving. Iedere beurt bevriest context, modelkeuze en Git-SHA en loopt
+asynchroon via Agent Runtime v2. Een strikt gevalideerd antwoord kan informatief zijn, een
+vervolgvraag bevatten of een voorstel maken; AI-output voert nooit zelf een mutatie uit.
+
+Na bevestiging gaat een `BUGFIX` rechtstreeks via Software Factory v2, een `EPIC_CANDIDATE` als
+gericht workitem naar Productontwerp en een `HOTFIX` via een aparte bestaande dashboardroute. De
+epicroute vereist product-owner- en daarna factory-ownerapproval op exact dezelfde versie. De
+hotfixroute blijft in productie uit totdat markergebaseerd herstel na een verloren response door de
+bestaande externe lijstendpoint bewezen is.
 
 ## De hele route
 

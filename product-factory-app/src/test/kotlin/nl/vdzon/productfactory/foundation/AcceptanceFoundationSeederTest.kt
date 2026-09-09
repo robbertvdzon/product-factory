@@ -42,7 +42,7 @@ class AcceptanceFoundationSeederTest(
     @Test
     fun `acceptatie seedt vaste synthetische metadata`() {
         assertThat(repository.find("dataset.kind")).isEqualTo("synthetic-temporary")
-        assertThat(repository.find("dataset.version")).isEqualTo("complete-mvp-v1")
+        assertThat(repository.find("dataset.version")).isEqualTo("product-advisor-v1")
         assertThat(testControlService.getAvailableScenarios().map { it.key.take(6) }.filter { it.startsWith("mvp-") })
             .containsExactly(*(1..19).map { "mvp-${it.toString().padStart(2, '0')}" }.toTypedArray())
     }

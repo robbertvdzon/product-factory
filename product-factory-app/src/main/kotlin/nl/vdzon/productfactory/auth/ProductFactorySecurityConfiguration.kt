@@ -123,7 +123,7 @@ private class ProductFactorySessionFilter(
             SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken.authenticated(
                 session,
                 null,
-                listOf(SimpleGrantedAuthority("ROLE_STAKEHOLDER")),
+                session.globalRoles.map { SimpleGrantedAuthority("ROLE_$it") },
             )
         }
 

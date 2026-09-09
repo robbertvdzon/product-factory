@@ -1,0 +1,42 @@
+# Bewijsrecord — Product Advisor en Product Requests
+
+Datum: 2026-09-10
+
+## Opgeleverd
+
+- duurzame identiteit, `FACTORY_OWNER` en geversioneerde product-ownerlidmaatschappen met
+  grant/revokehistorie en onmiddellijke backendautorisatie;
+- productgebonden gesprekken, append-only berichten, bookmarkbare gesprek-URL en persoonlijke
+  acties/notificaties;
+- `PRODUCT_ADVISOR.CONVERSE` via Agent Runtime v2 met bevroren Git-SHA, context, uitvoering,
+  promptversie en strikt resultaatschema;
+- onveranderlijke ProductRequest-versies met expliciete bevestiging, expected-version en
+  idempotentie;
+- gewone bugfix via Software Factory v2 met verloren-responseherstel;
+- gerichte DesignWorkItem-route, exact hervatten na geadresseerde vraag en product-owner- gevolgd
+  door factory-ownerapproval van dezelfde epicversie;
+- Flyway 21, Testbeddataset `product-advisor-v1`, negen scenario's, contract- en integratietests;
+- kortlevend dashboardtoken in de productie-SealedSecret en een reproduceerbaar rotatiescript.
+
+## Productieprobe bestaande hotfixingang
+
+Met een doelgebonden token antwoordde de live statusroute HTTP 200. Een gecontroleerde storyaanmaak
+met `hotfix=true`, `start=true` en marker
+`Product-Request: 00000000-0000-4000-8000-000000000016:v1` antwoordde HTTP 200 en leverde
+`SF-2377`. De detailroute bevestigde marker, repository, automatische approval, vragen toegestaan en
+de gevraagde notificatie-events.
+
+De live lijstendpoint retourneerde `SF-2377` daarna niet. Daardoor kon de adapter de marker niet via
+de bestaande lijstingang herstellen. Dit is niet oplosbaar binnen de afgesproken repositorygrens en
+maakt automatisch opnieuw proberen na een verloren create-response onveilig. Daarom is de adapter
+opgeleverd achter `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=false`; lokaal bewijzen contracttests het
+gewenste gedrag, maar de productieroute is bewust niet geactiveerd.
+
+## Verificatie
+
+De lokale releasecontrole is afgerond met 147 backendtests, 35 frontendtests, statische
+Flutter-analyse, een Flutter-webreleasebuild, rendercontroles voor acceptatie en productie en
+shell-/whitespacecontroles. De geautomatiseerde releaseworkflow bewaart de exacte bronrevisie en
+image-digests en promoveert hetzelfde gecontroleerde image eerst naar acceptatie en daarna naar
+productie. Broncontroles bevestigen dat uitsluitend `product-factory` is gewijzigd; de repositories
+`softwarefactory` en `pvdd` blijven schoon.

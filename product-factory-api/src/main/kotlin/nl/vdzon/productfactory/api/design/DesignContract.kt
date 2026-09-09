@@ -3,7 +3,7 @@ package nl.vdzon.productfactory.api.design
 import nl.vdzon.productfactory.api.shared.*
 import java.time.Instant
 
-enum class EpicStatus { NEEDS_RESEARCH, NEEDS_REFINEMENT, AWAITING_APPROVAL, AVAILABLE, IN_PLANNING, ACTIVE, VERIFYING, COMPLETED, NOT_SUCCESSFUL, SUPERSEDED, WITHDRAWN, CANCELLED }
+enum class EpicStatus { NEEDS_RESEARCH, NEEDS_REFINEMENT, AWAITING_APPROVAL, AWAITING_PRODUCT_OWNER_APPROVAL, AWAITING_FACTORY_OWNER_APPROVAL, AVAILABLE, IN_PLANNING, ACTIVE, VERIFYING, COMPLETED, NOT_SUCCESSFUL, SUPERSEDED, WITHDRAWN, CANCELLED }
 enum class EpicVerificationOutcome { PASSED, NOT_SUCCESSFUL, NEEDS_WORK, BLOCKED }
 enum class ResearchSourceStatus { CANDIDATE, VALIDATED, BLOCKED }
 enum class UxScreenState { INITIAL, MAIN, DETAIL, EMPTY, ERROR, OTHER }
@@ -60,6 +60,8 @@ data class EpicDetails(
     val uxArtifacts: List<ArtifactReference> = emptyList(),
     val uxScreens: List<EpicUxScreen> = emptyList(),
     val refinementReason: String? = null,
+    val sourceProductRequestId: String? = null,
+    val sourceProductRequestVersion: Long? = null,
 )
 data class ApproveEpicCommand(val epicId: EpicId, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class RequestEpicRefinementCommand(val epicId: EpicId, val reason: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)

@@ -140,7 +140,7 @@ class MemoryAndAiIntegrationTest(
     fun `globale AI instellingen zijn gevalideerd en geversioneerd`() {
         val defaults = ai.getAiJobConfigurations()
         assertThat(defaults).extracting<String> { it.jobKey.value }.containsExactly(
-            "MEETING.CONVERSE", "MEETING.SUMMARIZE", "PLANNING.SELECT_WORK", "PLANNING.SLICE_EPIC",
+            "MEETING.CONVERSE", "MEETING.SUMMARIZE", "PLANNING.SELECT_WORK", "PLANNING.SLICE_EPIC", "PRODUCT_ADVISOR.CONVERSE",
             "PRODUCT_DESIGN.CREATE_EPIC", "QUALITY.VERIFY_EPIC",
         )
         assertThat(defaults).allSatisfy {

@@ -1,5 +1,10 @@
 # Stap 10 — Product Factory naar Agent Runtime v2
 
+Implementatiestatus: uitgevoerd en op acceptatie en productie geverifieerd op 2026-09-09. Alle
+Product Factory-AI-uitvoering gebruikt Runtime v2; de bewust tijdelijke compatibiliteitsvelden en
+v1-ondersteuning aan Runtime-zijde blijven volgens het expand/contract-plan beschikbaar voor andere
+consumers en een latere cleanuprelease.
+
 ## Doel
 
 Migreer alle AI-uitvoering van Product Factory van Agent Runtime `/v1` naar `/v2`. Na deze stap

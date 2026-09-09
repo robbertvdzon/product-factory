@@ -103,6 +103,12 @@ void injectTestFault(InjectTestFaultCommand command);
 3. vult de vaste basisdataset opnieuw;
 4. wist alle Testbed-stories, AI-responses, clocks en fouten;
 5. activeert het gekozen scenario en de bijbehorende scenario-versie;
+
+Dataset `product-advisor-v1` bevat synthetische gebruikers, productlidmaatschappen, gesprekken,
+requestversies, persoonlijke acties en negen vaste advisor-scenario's: informatievraag,
+vervolgvraag, voorstel/revisie, gewone bugfix, gerichte epic, gebruikersvraag, dubbele approval,
+autorisatie-intrekking en veilige hotfixblokkade. Reset wist advisor- en identiteitsdata vóór het
+laden. Acceptatie heeft geen dashboardtoken en kan dus nooit een echte hotfixstory maken.
 6. retourneert pas wanneer UI en backend dezelfde schone uitgangssituatie zien.
 
 Reset is nooit beschikbaar in productie. In acceptatie krijgt de gebruiker vooraf een duidelijke
@@ -408,6 +414,9 @@ De productgerichte integratie- en acceptatieomgeving bewijst onder meer:
   geheugenwijzigingen voor meerdere rollen zonder dat gewone procesagents elkaars geheugen zien;
 - end-to-end UI-flows met voorspelbare externe reacties;
 - historie, resetbaarheid en operationele zichtbaarheid.
+- productgesprekken, centrale productautorisatie, geversioneerde requests, gerichte designhervatting,
+  dubbele epicapproval en persoonlijke notificaties;
+- de hotfixadapter tegen een lokale contractstub, inclusief markerherstel en geweigerde tokens.
 
 De omgeving bewijst niet dat Codex of Claude inhoudelijk goede productkeuzes maakt, dat de echte
 Runtime-worker na een echte OS- of Dockerstoring herstelt, dat GitHub altijd beschikbaar is of dat de

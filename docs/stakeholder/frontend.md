@@ -50,6 +50,25 @@ De frontend:
 - maakt onderscheid tussen niet ingelogd, niet bevoegd en een technische fout;
 - bewaart geen Google-token of applicatiesessie in leesbare productdata of logging.
 
+Een gebruiker ziet alleen producten waarvoor een actief `PRODUCT_OWNER`-lidmaatschap bestaat;
+een `FACTORY_OWNER` ziet alle producten en krijgt daarnaast **Beheer → Gebruikers**. Daar kan de
+factory owner gebruikers op e-mailadres registreren, lidmaatschappen toekennen en met reden en
+expliciete bevestiging intrekken. De backend controleert deze rechten bij iedere query en mutatie.
+
+## Product Advisor en persoonlijke acties
+
+Onder **Producten → Gesprekken** staan duurzame, productgebonden gesprekken. Een gekozen gesprek
+staat als `conversation`-queryparameter naast `product` in de URL, zodat reload, bookmark en
+browsernavigatie exact hetzelfde gesprek herstellen. Berichten zijn append-only; tijdens
+`PROCESSING` is een tweede bericht geblokkeerd. Een antwoord kan informatief blijven, een
+vervolgvraag stellen of een geversioneerde voorstelkaart tonen.
+
+Een product owner bevestigt uitsluitend de getoonde requestversie. Daarna toont de UI de route,
+externe sleutel of gekoppelde epic, leverstatus en veilige foutcode. Gerichte ontwerpvragen en
+product-ownerapproval verschijnen bij de juiste product owner. Factory-ownerapproval verschijnt
+pas na product-ownerapproval bij de factory owner. **Mijn acties** en notificaties zijn persoonlijk;
+gelezen-markering, approvals en andere mutaties sturen verwachte versie en idempotentiesleutel mee.
+
 De webimplementatie rendert de officiële Google Identity Services-knop. Een ontvangen ID-token
 wordt direct bij de backend omgewisseld en niet in browseropslag bewaard. De centrale API-client
 stuurt de HttpOnly-sessiecookie met credentials en voegt bij mutaties de door de backend uitgegeven

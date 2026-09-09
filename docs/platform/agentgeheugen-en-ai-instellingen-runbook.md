@@ -12,11 +12,12 @@ capabilities. De functionele invarianten blijven normatief vastgelegd in
 | Capability | Artifact | Variant |
 |---|---|---|
 | `agent-memory` | `agent-memory-impl` | `append-only-jdbc` |
-| `ai-execution` | `ai-execution-impl` | `agent-runtime-outbox-v1` |
+| `ai-execution` | `ai-execution-impl` | `agent-runtime-outbox-v2` |
 
-Flywayversies 4, 5 en 6 zijn respectievelijk eigenaar van het agentgeheugen, globale
-AI-jobinstellingen en de lokale Runtime-correlatie/outbox. Product Factory bewaart geen worker,
-attempt, lease, fencing token, artifactbytes of credentialwaarden.
+Flywayversies 4, 5, 6, 19 en 20 bevatten respectievelijk het agentgeheugen, globale
+AI-jobinstellingen en de expand/contract-velden van de lokale Runtime-v2-correlatie/outbox.
+Product Factory bewaart wel duurzaam gekopieerde, gevalideerde resultaatartifacts, maar geen
+Runtime-worker, lease, fencing token of credentialwaarde.
 
 ## Operationele controles
 

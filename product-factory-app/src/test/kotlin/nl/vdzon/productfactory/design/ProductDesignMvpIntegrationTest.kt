@@ -7,11 +7,14 @@ import nl.vdzon.productfactory.ai.AiExecutionApplicationService
 import nl.vdzon.productfactory.ai.FakeRuntime
 import nl.vdzon.productfactory.ai.RuntimeArtifactView
 import nl.vdzon.productfactory.api.design.*
+import nl.vdzon.productfactory.api.advisor.*
 import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
 import nl.vdzon.productfactory.design.mvp.ProductDesignMvpService
 import nl.vdzon.productfactory.design.mvp.ProductDesignAiOrchestrator
+import nl.vdzon.productfactory.advisor.ProductAdvisorApplicationService
+import nl.vdzon.productfactory.auth.UserIdentityRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -22,6 +25,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
 
@@ -38,15 +42,112 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     private val orchestrator: ProductDesignAiOrchestrator,
     private val runtime: FakeRuntime,
     private val mapper: ObjectMapper,
+    private val advisor: ProductAdvisorApplicationService,
+    private val users: UserIdentityRepository,
+    private val jdbc: JdbcTemplate,
 ) {
     private var productId = ProductId("not-initialized")
 
     @BeforeEach
     fun prepare() {
+        advisor.deleteAllOwnedData()
         designImplementation.deleteAllOwnedData()
         ai.deleteAllOwnedExecutionData()
         runtime.reset()
         productId = product("design-${UUID.randomUUID().toString().take(8)}")
+    }
+
+    @Test
+    fun `gericht ProductRequest wordt door Productontwerp een complete epic met twee approvals`() {
+        val owner = users.resolveOrCreate("owner-${productId.value}@example.test", true)
+        val conversation = advisor.createConversation(CreateConversationCommand(
+            productId, "Nieuwe productmogelijkheid", owner.id, "directed-conversation-${productId.value}",
+        ))
+        val requestId = ProductRequestId(UUID.randomUUID().toString())
+        val now = java.time.Instant.now()
+        jdbc.update(
+            """INSERT INTO pf_product_request(request_id,product_id,conversation_id,requested_by,request_type,status,current_version,created_at,updated_at,version)
+                VALUES (?,?,?,?,?,'PROPOSED',1,?,?,1)""".trimIndent(),
+            requestId.value, productId.value, conversation.value, owner.id.value, ProductRequestType.EPIC_CANDIDATE.name, now, now,
+        )
+        jdbc.update(
+            """INSERT INTO pf_product_request_version(request_id,version,request_type,title,summary,problem,user_impact,current_behavior,
+                desired_behavior,evidence_json,git_commit_sha,acceptance_criteria_json,scope_json,boundaries_json,excluded_hotfix_categories_json,created_at)
+                VALUES (?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            requestId.value, ProductRequestType.EPIC_CANDIDATE.name, "Duidelijke verbetering", "Een volledige nieuwe mogelijkheid.",
+            "Gebruikers missen een controleerbare route.", "Het doel wordt nu niet bereikt.", "De route ontbreekt.",
+            "De route werkt aantoonbaar.", "[]", "a".repeat(40), "[\"De route is aantoonbaar compleet.\"]", "[\"Nieuwe route\"]", "[\"Geen neveneffecten\"]", "[]", now,
+        )
+        advisor.approveRequest(ApproveProductRequestCommand(requestId, 1, 1, owner.id, "directed-approve-${productId.value}"))
+
+        advisor.routeApprovedRequests()
+        assertThat(advisor.getRequest(requestId).status).isEqualTo(ProductRequestStatus.ROUTING)
+        completeOnlyJob(validEpic())
+        assertThat(runtime.distinctIdempotencyKeys()).hasSize(1)
+        advisor.routeApprovedRequests()
+
+        val routed = advisor.getRequest(requestId)
+        assertThat(routed.status).isEqualTo(ProductRequestStatus.ROUTED)
+        val epic = queries.getEpic(EpicId(routed.linkedEpicId!!))
+        assertThat(epic.status).isEqualTo(EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL)
+        assertThat(epic.sourceProductRequestId).isEqualTo(requestId.value)
+        assertThat(epic.acceptanceCriteria).hasSize(2)
+
+        advisor.approveEpic(epic.id.value, ApprovalRole.PRODUCT_OWNER, owner.id, epic.version, "directed-po-${productId.value}")
+        assertThat(queries.getEpic(epic.id).status).isEqualTo(EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL)
+        advisor.approveEpic(epic.id.value, ApprovalRole.FACTORY_OWNER, owner.id, epic.version, "directed-fo-${productId.value}")
+        assertThat(queries.getEpic(epic.id).status).isEqualTo(EpicStatus.AVAILABLE)
+    }
+
+    @Test
+    fun `antwoord op gerichte ontwerpvraag hervat exact hetzelfde workitem`() {
+        val owner = users.resolveOrCreate("question-owner-${productId.value}@example.test", true)
+        val conversation = advisor.createConversation(CreateConversationCommand(
+            productId, "Gerichte ontwerpvraag", owner.id, "question-conversation-${productId.value}",
+        ))
+        val requestId = insertDirectedRequest(conversation, owner.id)
+        advisor.approveRequest(ApproveProductRequestCommand(requestId, 1, 1, owner.id, "question-approve-${productId.value}"))
+        advisor.routeApprovedRequests()
+
+        val first = validEpic().also { result ->
+            (result.path("epic").path("readiness") as ObjectNode).apply {
+                put("readyForPlanning", false)
+                putArray("openQuestions").add("Welke uitleg moet op de lege toestand staan?")
+            }
+            result.putObject("stakeholderQuestion")
+                .put("question", "Welke uitleg moet op de lege toestand staan?")
+                .put("context", "Dit antwoord is nodig om de gerichte epic af te ronden.")
+        }
+        completeOnlyJob(first)
+        advisor.routeApprovedRequests()
+
+        val question = productQueries.findStakeholderQuestions(StakeholderQuestionFilter(productId, "PRODUCT_DESIGNER_MVP")).single()
+        assertThat(question.requestedRespondentUserId).isEqualTo(owner.id)
+        assertThat(question.productRequestId).isEqualTo(requestId)
+        assertThat(jdbc.queryForObject("SELECT status FROM pf_design_work_item WHERE request_id=?", String::class.java, requestId.value))
+            .isEqualTo("WAITING_FOR_USER")
+
+        products.answerStakeholderQuestionDirectly(AnswerStakeholderQuestionDirectlyCommand(
+            question.id, "Leg uit dat er nog geen gecontroleerde resultaten zijn.", question.version,
+            ActorReference(ActorType.STAKEHOLDER, owner.id.value), "question-answer-${productId.value}",
+        ))
+        advisor.routeApprovedRequests()
+        val current = queries.findEpics(EpicFilter(productId)).single { it.sourceProductRequestId == requestId.value }
+        val revised = validEpic().apply {
+            put("outcome", "REVISE_EPIC")
+            put("epicId", current.id.value)
+            put("expectedVersion", current.version)
+            keepExistingUx(path("epic") as ObjectNode, current)
+        }
+        completeOnlyJob(revised)
+        advisor.routeApprovedRequests()
+
+        val routed = advisor.getRequest(requestId)
+        assertThat(routed.status).isEqualTo(ProductRequestStatus.ROUTED)
+        assertThat(routed.linkedEpicId).isEqualTo(current.id.value)
+        assertThat(jdbc.queryForObject("SELECT process_session_id FROM pf_design_work_item WHERE request_id=?", String::class.java, requestId.value))
+            .isEqualTo(question.processSessionId.value)
+        assertThat(runtime.distinctIdempotencyKeys()).hasSize(2)
     }
 
     @Test
@@ -421,6 +522,25 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         })
         putArray("processedSignalIds")
         putArray("memoryChanges")
+    }
+
+    private fun insertDirectedRequest(conversationId: ProductConversationId, ownerId: UserId): ProductRequestId {
+        val requestId = ProductRequestId(UUID.randomUUID().toString())
+        val now = java.time.Instant.now()
+        jdbc.update(
+            """INSERT INTO pf_product_request(request_id,product_id,conversation_id,requested_by,request_type,status,current_version,created_at,updated_at,version)
+                VALUES (?,?,?,?,?,'PROPOSED',1,?,?,1)""".trimIndent(),
+            requestId.value, productId.value, conversationId.value, ownerId.value, ProductRequestType.EPIC_CANDIDATE.name, now, now,
+        )
+        jdbc.update(
+            """INSERT INTO pf_product_request_version(request_id,version,request_type,title,summary,problem,user_impact,current_behavior,
+                desired_behavior,evidence_json,git_commit_sha,acceptance_criteria_json,scope_json,boundaries_json,excluded_hotfix_categories_json,created_at)
+                VALUES (?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            requestId.value, ProductRequestType.EPIC_CANDIDATE.name, "Gerichte verbetering", "Een volledige nieuwe mogelijkheid.",
+            "Gebruikers missen een controleerbare route.", "Het doel wordt nu niet bereikt.", "De route ontbreekt.",
+            "De route werkt aantoonbaar.", "[]", "a".repeat(40), "[\"De route is aantoonbaar compleet.\"]", "[\"Nieuwe route\"]", "[\"Geen neveneffecten\"]", "[]", now,
+        )
+        return requestId
     }
 
     private fun com.fasterxml.jackson.databind.node.ArrayNode.addUxArtifact(name: String, screenKey: String) {

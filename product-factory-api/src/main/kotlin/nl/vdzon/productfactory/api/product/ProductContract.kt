@@ -1,6 +1,8 @@
 package nl.vdzon.productfactory.api.product
 
 import nl.vdzon.productfactory.api.shared.*
+import nl.vdzon.productfactory.api.advisor.UserId
+import nl.vdzon.productfactory.api.advisor.ProductRequestId
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalTime
@@ -199,6 +201,10 @@ data class AskStakeholderCommand(
     val linkedObjects: List<SourceReference> = emptyList(),
     val actor: ActorReference,
     val idempotencyKey: String,
+    val requestedRespondentUserId: UserId? = null,
+    val productRequestId: ProductRequestId? = null,
+    val epicLinkId: EpicId? = null,
+    val storyLinkId: StoryId? = null,
 )
 data class RecordStakeholderAnswerCommand(
     val questionId: StakeholderQuestionId,
@@ -245,6 +251,10 @@ data class StakeholderQuestionDetails(
     val answeredAt: Instant? = null,
     val withdrawnAt: Instant? = null,
     val version: Long,
+    val requestedRespondentUserId: UserId? = null,
+    val productRequestId: ProductRequestId? = null,
+    val epicLinkId: EpicId? = null,
+    val storyLinkId: StoryId? = null,
 )
 
 data class StartMeetingCommand(

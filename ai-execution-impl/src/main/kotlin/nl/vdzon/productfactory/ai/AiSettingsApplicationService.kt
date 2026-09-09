@@ -153,6 +153,7 @@ class AiSettingsApplicationService(
         val TRUSTED_JOBS = listOf(
             JobDefinition(AiJobKey("MEETING.CONVERSE"), "Overleg voeren", DEFAULT_EXECUTION, true),
             JobDefinition(AiJobKey("MEETING.SUMMARIZE"), "Overleg samenvatten", DEFAULT_EXECUTION, true),
+            JobDefinition(AiJobKey("PRODUCT_ADVISOR.CONVERSE"), "Productadvies geven", DEFAULT_EXECUTION, true),
             JobDefinition(AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), "Epic ontwerpen", DEFAULT_EXECUTION, true),
             JobDefinition(AiJobKey("PLANNING.SELECT_WORK"), "Planningswerk selecteren", DEFAULT_EXECUTION, true),
             JobDefinition(AiJobKey("PLANNING.SLICE_EPIC"), "Epic opdelen in stories", DEFAULT_EXECUTION, true),

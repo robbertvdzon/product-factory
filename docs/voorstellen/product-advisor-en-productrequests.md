@@ -1,6 +1,8 @@
 # Voorstel — Product Advisor en Product Requests
 
-Status: toekomstontwerp, nog niet geïmplementeerd
+Status: gerealiseerd op 2026-09-09, behalve automatische hotfixactivering; die blijft fail-closed
+achter `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=false` totdat de bestaande Software Factory-lijstendpoint
+markerherstel productief aantoonbaar ondersteunt.
 Datum: 2026-09-09
 
 ## Samenvatting

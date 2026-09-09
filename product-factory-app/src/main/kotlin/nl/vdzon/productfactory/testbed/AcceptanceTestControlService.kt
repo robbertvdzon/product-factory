@@ -118,6 +118,15 @@ class AcceptanceTestControlService(
         TestScenarioSummary("software-factory-cancelled", "1", "Externe annulering", "CANCELLED wordt lokaal feitelijk verwerkt zonder niet-bestaande storycontrole."),
         TestScenarioSummary("software-factory-temporary-failure", "1", "Tijdelijke storing", "Een tijdelijke fout bewaart attempt, foutcode en begrensde volgende retry."),
         TestScenarioSummary("software-factory-contract-failure", "1", "Contractbreuk", "Een ongeldige response blokkeert dispatch zichtbaar zonder planwerk of aangepaste story."),
+        TestScenarioSummary("advisor-information", "1", "Informatief productgesprek", "De Productadviseur beantwoordt een bronvraag en het gesprek sluit zonder wijzigingsverzoek."),
+        TestScenarioSummary("advisor-follow-up", "1", "Gerichte vervolgvraag", "De Productadviseur vraagt ontbrekende context en hervat hetzelfde gesprek na antwoord."),
+        TestScenarioSummary("advisor-hotfix", "1", "Bevestigde hotfix", "Een bevestigde kleine correctie gebruikt uitsluitend de bestaande hotfix-storyroute."),
+        TestScenarioSummary("advisor-bugfix", "1", "Bevestigde gewone bugfix", "Een bevestigde bug gebruikt het v2-contract en maakt geen epic."),
+        TestScenarioSummary("advisor-epic", "1", "Gerichte productverbetering", "Een bevestigde verbetering wordt als gericht ontwerpworkitem tot volledige epic uitgewerkt."),
+        TestScenarioSummary("advisor-directed-question", "1", "Vraag tijdens Productontwerp", "Alleen het antwoord op de gekoppelde vraag hervat dezelfde ontwerpuitwerking."),
+        TestScenarioSummary("advisor-double-approval", "1", "Dubbele epicgoedkeuring", "Product owner en factory owner keuren achtereenvolgens exact dezelfde epicversie goed."),
+        TestScenarioSummary("advisor-refinement", "1", "Terugsturen en herzien", "Een teruggestuurde epic krijgt een nieuwe versie waarvoor beide approvals opnieuw nodig zijn."),
+        TestScenarioSummary("advisor-authorization", "1", "Productautorisatiescheiding", "Twee product owners zien uitsluitend hun eigen producten en geen globale bediening."),
     )
     private val active = AtomicReference(details(scenarios.first(), Instant.EPOCH))
 
@@ -215,8 +224,8 @@ class AcceptanceTestControlService(
     )
 
     companion object {
-        private const val DATASET_VERSION = "complete-mvp-v1"
-        private const val TESTBED_VERSION = "0.9.0"
+        private const val DATASET_VERSION = "product-advisor-v1"
+        private const val TESTBED_VERSION = "1.0.0"
         private const val STARTUP_SESSION = "startup"
         private val LOCK_DURATION = Duration.ofMinutes(15)
         private val BROWSER_SESSION = Regex("[A-Za-z0-9._-]{3,100}")

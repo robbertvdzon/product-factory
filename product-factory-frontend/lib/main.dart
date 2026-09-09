@@ -198,6 +198,10 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
         navigationLocation: widget.navigationLocation,
         runtimeEnvironment: status.environment,
         csrfToken: status.csrfToken,
+        isFactoryOwner:
+            !status.authRequired ||
+            status.globalRoles.contains('FACTORY_OWNER'),
+        productMemberships: status.productMemberships,
       );
     }
     return LoginPage(
@@ -301,6 +305,8 @@ class FoundationPage extends StatelessWidget {
     this.productGateway,
     this.memoryAiGateway,
     this.navigationLocation,
+    this.isFactoryOwner = true,
+    this.productMemberships = const {},
     super.key,
   });
 
@@ -318,6 +324,8 @@ class FoundationPage extends StatelessWidget {
   final ProductGateway? productGateway;
   final MemoryAiGateway? memoryAiGateway;
   final NavigationLocation? navigationLocation;
+  final bool isFactoryOwner;
+  final Set<String> productMemberships;
 
   @override
   Widget build(BuildContext context) => ApplicationShell(
@@ -335,5 +343,7 @@ class FoundationPage extends StatelessWidget {
     productGateway: productGateway,
     memoryAiGateway: memoryAiGateway,
     navigationLocation: navigationLocation,
+    isFactoryOwner: isFactoryOwner,
+    productMemberships: productMemberships,
   );
 }

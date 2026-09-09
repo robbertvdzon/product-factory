@@ -13,6 +13,8 @@ class AuthenticationStatus {
     this.csrfToken,
     this.environment = 'local',
     this.googleClientId,
+    this.globalRoles = const {},
+    this.productMemberships = const {},
   });
 
   factory AuthenticationStatus.fromJson(Map<String, Object?> json) =>
@@ -23,6 +25,12 @@ class AuthenticationStatus {
         csrfToken: json['csrfToken'] as String?,
         environment: json['environment'] as String? ?? 'local',
         googleClientId: json['googleClientId'] as String?,
+        globalRoles: (json['globalRoles'] as List? ?? const [])
+            .map((e) => '$e')
+            .toSet(),
+        productMemberships: (json['productMemberships'] as List? ?? const [])
+            .map((e) => '$e')
+            .toSet(),
       );
 
   final bool authenticated;
@@ -31,6 +39,8 @@ class AuthenticationStatus {
   final String? csrfToken;
   final String environment;
   final String? googleClientId;
+  final Set<String> globalRoles;
+  final Set<String> productMemberships;
 }
 
 abstract interface class AuthenticationGateway {

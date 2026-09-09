@@ -15,6 +15,9 @@ data class AuthenticationStatus(
     val csrfToken: String? = null,
     val environment: String = "local",
     val googleClientId: String? = null,
+    val userId: String? = null,
+    val globalRoles: Set<String> = emptySet(),
+    val productMemberships: Set<String> = emptySet(),
 )
 
 data class AuthenticationError(

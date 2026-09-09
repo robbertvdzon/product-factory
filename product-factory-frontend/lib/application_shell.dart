@@ -10,8 +10,10 @@ import 'navigation_location.dart';
 import 'page_refresh.dart';
 import 'page_reload.dart';
 import 'product_workspace.dart';
+import 'product_conversations.dart';
 import 'product_factory_theme.dart';
 import 'testbed.dart';
+import 'user_management.dart';
 
 enum _Destination {
   overview,
@@ -20,7 +22,9 @@ enum _Destination {
   quality,
   signals,
   meetings,
+  conversations,
   management,
+  members,
   settings,
   decisions,
   memory,
@@ -35,7 +39,9 @@ _Destination _destinationForPath(String path) => switch (path) {
   '/kwaliteit' => _Destination.quality,
   '/signalen' => _Destination.signals,
   '/overleggen' => _Destination.meetings,
+  '/gesprekken' => _Destination.conversations,
   '/beheer' => _Destination.management,
+  '/beheer/leden' => _Destination.members,
   '/beheer/instellingen' => _Destination.settings,
   '/beheer/besluiten' => _Destination.decisions,
   '/beheer/geheugen' => _Destination.memory,
@@ -52,7 +58,9 @@ String _pathForDestination(_Destination destination) => switch (destination) {
   _Destination.quality => '/kwaliteit',
   _Destination.signals => '/signalen',
   _Destination.meetings => '/overleggen',
+  _Destination.conversations => '/gesprekken',
   _Destination.management => '/beheer',
+  _Destination.members => '/beheer/leden',
   _Destination.settings => '/beheer/instellingen',
   _Destination.decisions => '/beheer/besluiten',
   _Destination.memory => '/beheer/geheugen',
@@ -77,6 +85,8 @@ class ApplicationShell extends StatefulWidget {
     this.memoryAiGateway,
     this.navigationLocation,
     this.csrfToken,
+    this.isFactoryOwner = true,
+    this.productMemberships = const {},
     super.key,
   });
 
@@ -94,6 +104,8 @@ class ApplicationShell extends StatefulWidget {
   final MemoryAiGateway? memoryAiGateway;
   final NavigationLocation? navigationLocation;
   final String? csrfToken;
+  final bool isFactoryOwner;
+  final Set<String> productMemberships;
 
   @override
   State<ApplicationShell> createState() => _ApplicationShellState();
@@ -103,6 +115,7 @@ class _ApplicationShellState extends State<ApplicationShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late _Destination _selected;
   String? _selectedProductId;
+  String? _selectedConversationId;
   bool _updateAvailable = false;
   final VersionUpdateTracker _updateTracker = VersionUpdateTracker();
   final PageRefreshController _pageRefresh = PageRefreshController();
@@ -205,6 +218,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
       ),
       _Destination.design => ProductWorkspacePage(
         gateway: products,
@@ -212,6 +227,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
       ),
       _Destination.planning => ProductWorkspacePage(
         gateway: products,
@@ -219,6 +236,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
       ),
       _Destination.quality => ProductWorkspacePage(
         gateway: products,
@@ -226,6 +245,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
       ),
       _Destination.signals => ProductWorkspacePage(
         gateway: products,
@@ -233,6 +254,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
       ),
       _Destination.meetings => ProductWorkspacePage(
         gateway: products,
@@ -240,14 +263,38 @@ class _ApplicationShellState extends State<ApplicationShell> {
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
+      ),
+      _Destination.conversations => ProductConversationsPage(
+        products: products,
+        initialProductId: _selectedProductId,
+        initialConversationId: _selectedConversationId,
+        onProductSelected: _selectProduct,
+        onConversationSelected: _selectConversation,
+        onOpenDesign: (productId) {
+          _selectProduct(productId);
+          _select(_Destination.design);
+        },
+        onOpenQuestions: (productId) {
+          _selectProduct(productId);
+          _select(_Destination.meetings);
+        },
+        csrfToken: widget.csrfToken,
       ),
       _Destination.management => _ManagementHub(onSelect: _select),
+      _Destination.members => UserManagementPage(
+        products: products,
+        csrfToken: widget.csrfToken,
+      ),
       _Destination.settings => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.settings,
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
         trailingContent: MemoryAiManagementPanel(
           gateway: memory,
           view: MemoryAiView.settings,
@@ -260,6 +307,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
       ),
       _Destination.memory => ManagementPage(
         versionGateway: widget.versionGateway,
@@ -278,6 +327,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
+        isFactoryOwner: widget.isFactoryOwner,
+        productMemberships: widget.productMemberships,
         trailingContent: MemoryAiManagementPanel(
           gateway: memory,
           view: MemoryAiView.operation,
@@ -426,24 +477,32 @@ class _ApplicationShellState extends State<ApplicationShell> {
           'Overleggen',
           closeAfterSelection,
         ),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
-          child: Text(
-            'BEHEER',
-            style: TextStyle(
-              color: Color(0xff6f918a),
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.4,
-            ),
-          ),
-        ),
         _navItem(
-          _Destination.management,
-          Icons.tune,
-          'Beheer',
+          _Destination.conversations,
+          Icons.chat_bubble_outline,
+          'Gesprekken',
           closeAfterSelection,
         ),
+        if (widget.isFactoryOwner)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
+            child: Text(
+              'BEHEER',
+              style: TextStyle(
+                color: Color(0xff6f918a),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ),
+        if (widget.isFactoryOwner)
+          _navItem(
+            _Destination.management,
+            Icons.tune,
+            'Beheer',
+            closeAfterSelection,
+          ),
         if (widget.showAcceptanceBanner)
           _navItem(
             _Destination.acceptance,
@@ -483,9 +542,12 @@ class _ApplicationShellState extends State<ApplicationShell> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const Text(
-                      'Stakeholder',
-                      style: TextStyle(color: Color(0xff90aaa4), fontSize: 12),
+                    Text(
+                      widget.isFactoryOwner ? 'Factory owner' : 'Product owner',
+                      style: const TextStyle(
+                        color: Color(0xff90aaa4),
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -558,6 +620,7 @@ class _ApplicationShellState extends State<ApplicationShell> {
     if (destination != _Destination.management) return _selected == destination;
     return const {
       _Destination.management,
+      _Destination.members,
       _Destination.settings,
       _Destination.decisions,
       _Destination.memory,
@@ -567,6 +630,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
   }
 
   void _select(_Destination destination) {
+    if (destination != _Destination.conversations) {
+      _selectedConversationId = null;
+    }
     if (_selected != destination) setState(() => _selected = destination);
     final location = _locationFor(destination, _selectedProductId);
     if (_navigationLocation.current != location) {
@@ -576,16 +642,31 @@ class _ApplicationShellState extends State<ApplicationShell> {
 
   void _selectProduct(String productId) {
     if (_selectedProductId == productId) return;
-    setState(() => _selectedProductId = productId);
+    setState(() {
+      _selectedProductId = productId;
+      _selectedConversationId = null;
+    });
     _navigationLocation.replace(_locationFor(_selected, productId));
+  }
+
+  void _selectConversation(String? conversationId) {
+    if (_selectedConversationId == conversationId) return;
+    setState(() => _selectedConversationId = conversationId);
+    _navigationLocation.replace(
+      _locationFor(_selected, _selectedProductId, conversationId),
+    );
   }
 
   void _applyLocation(Uri location, {bool notify = true}) {
     final destination = _destinationForPath(location.path);
     final productId = location.queryParameters['product']?.trim();
+    final conversationId = location.queryParameters['conversation']?.trim();
     void apply() {
       _selected = destination;
       _selectedProductId = productId?.isEmpty == true ? null : productId;
+      _selectedConversationId = conversationId?.isEmpty == true
+          ? null
+          : conversationId;
     }
 
     if (notify && mounted) {
@@ -595,9 +676,17 @@ class _ApplicationShellState extends State<ApplicationShell> {
     }
   }
 
-  Uri _locationFor(_Destination destination, String? productId) => Uri(
+  Uri _locationFor(
+    _Destination destination,
+    String? productId, [
+    String? conversationId,
+  ]) => Uri(
     path: _pathForDestination(destination),
-    queryParameters: productId == null ? null : {'product': productId},
+    queryParameters: {
+      'product': ?productId,
+      if (destination == _Destination.conversations)
+        'conversation': ?conversationId,
+    },
   );
 
   String _initials(String? email) {
@@ -775,6 +864,13 @@ class _ManagementHub extends StatelessWidget {
                   spacing: 16,
                   runSpacing: 16,
                   children: [
+                    _HubCard(
+                      width: width,
+                      icon: Icons.group_outlined,
+                      title: 'Leden',
+                      subtitle: 'Product owners en hun producttoegang',
+                      onTap: () => onSelect(_Destination.members),
+                    ),
                     _HubCard(
                       width: width,
                       icon: Icons.tune,

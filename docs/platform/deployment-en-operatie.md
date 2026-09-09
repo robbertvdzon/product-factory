@@ -150,6 +150,13 @@ Bij secretrotatie:
 5. controleer login, databaseverbinding of externe koppeling waarvoor de secret geldt;
 6. trek waar relevant de oude credential in.
 
+Voor het kortlevende Software Factory-dashboardtoken gebruikt operations uitsluitend
+`tools/rotate-software-factory-dashboard-token.sh`. Het hulpmiddel leest bronsecret en allowlist
+zonder waarden te tonen, genereert het bestaande dashboardtokenformaat en sealt opnieuw naar de
+vaste productieoverlay. De hotfixfeature wordt door tokenrotatie niet automatisch geactiveerd; dat
+is een afzonderlijk, bewijsgebonden configuratiebesluit. Zie het
+[Product Advisor-runbook](product-advisor-runbook.md).
+
 Een nieuwe sessieondertekeningssleutel mag bestaande dashboardsessies bewust ongeldig maken. Dat
 wordt bij de rollout vermeld.
 
@@ -212,6 +219,8 @@ Na iedere omgevingsrollout wordt minimaal gecontroleerd:
 - acceptatie gebruikt in-memory data en productie PostgreSQL;
 - er staan geen plaintext secrets in gerenderde manifests;
 - een frontenddeployment toont zonder handmatig cachelegen de nieuwe build.
+- de Product Advisor-implementatie-identiteit is zichtbaar, de persoonlijke endpoints vereisen
+  authenticatie en de hotfixguard heeft de bedoelde fail-closed waarde.
 
 ## Gerelateerde documenten
 

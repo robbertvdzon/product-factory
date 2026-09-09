@@ -13,6 +13,7 @@ class RuntimeSettingsTest {
         "PF_DB_PASSWORD" to "secret",
         "PF_GOOGLE_CLIENT_ID" to "client",
         "PF_STAKEHOLDER_EMAILS" to "stakeholder@example.invalid",
+        "PF_FACTORY_OWNER_EMAILS" to "stakeholder@example.invalid",
         "PF_SESSION_SIGNING_SECRET" to "x".repeat(32),
         "PF_PUBLIC_FRONTEND_URL" to "https://product-factory.example.invalid",
         "PF_PUBLIC_BACKEND_URL" to "https://product-factory-api.example.invalid",
@@ -65,5 +66,23 @@ class RuntimeSettingsTest {
         val testControl = completeProductionValues(RuntimeSettings.AGENT_RUNTIME_PRODUCTION_INTERNAL_URL) +
             ("PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN" to "forbidden")
         assertThatThrownBy { RuntimeSettings.validate(testControl) }.hasMessageContaining("test-controlcredential")
+    }
+
+    @Test
+    fun `productie vereist factory owners uit de loginallowlist`() {
+        val invalid = completeProductionValues(RuntimeSettings.AGENT_RUNTIME_PRODUCTION_INTERNAL_URL) +
+            ("PF_FACTORY_OWNER_EMAILS" to "outsider@example.invalid")
+
+        assertThatThrownBy { RuntimeSettings.validate(invalid) }
+            .hasMessageContaining("subset van PF_STAKEHOLDER_EMAILS")
+    }
+
+    @Test
+    fun `ingeschakelde hotfixroute vereist dashboardconfiguratie`() {
+        val invalid = completeProductionValues(RuntimeSettings.AGENT_RUNTIME_PRODUCTION_INTERNAL_URL) +
+            ("PF_SOFTWARE_FACTORY_HOTFIX_ENABLED" to "true")
+
+        assertThatThrownBy { RuntimeSettings.validate(invalid) }
+            .hasMessageContaining("dashboard-URL en dashboardtoken")
     }
 }

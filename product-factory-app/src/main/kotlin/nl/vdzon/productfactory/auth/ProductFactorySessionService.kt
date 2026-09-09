@@ -21,6 +21,9 @@ import javax.crypto.spec.SecretKeySpec
 data class ResolvedSession(
     val sessionId: String,
     val stakeholderEmail: String,
+    val userId: String,
+    val globalRoles: Set<String>,
+    val productMemberships: Set<String>,
     val csrfToken: String?,
 )
 
@@ -28,23 +31,28 @@ data class ResolvedSession(
 @ConditionalOnProperty(name = ["PF_AUTH_REQUIRED"], havingValue = "true")
 class ProductFactorySessionService(
     private val repository: AuthenticationSessionRepository,
+    private val users: UserIdentityRepository,
     @Value("\${PF_SESSION_SIGNING_SECRET}") signingSecret: String,
     @Value("\${PF_ENVIRONMENT:local}") environment: String,
+    @Value("\${PF_FACTORY_OWNER_EMAILS:\${PF_STAKEHOLDER_EMAILS:}}") factoryOwnerEmails: String,
     private val clock: Clock,
 ) {
     private val signer = SessionSigner(signingSecret)
     private val secureCookies = environment != "local"
     private val random = SecureRandom()
+    private val factoryOwners = factoryOwnerEmails.split(',', ';').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
 
     @Transactional
     fun create(email: String, response: HttpServletResponse): AuthenticationStatus {
         val now = clock.instant()
+        val user = users.resolveOrCreate(email, email.trim().lowercase() in factoryOwners)
         val sessionId = randomTokenHex(32)
         val csrfToken = randomTokenUrlSafe(32)
         repository.create(
             AuthenticationSession(
                 sessionId = sessionId,
                 stakeholderEmail = email,
+                userId = user.id.value,
                 csrfTokenHash = sha256Hex(csrfToken),
                 createdAt = now,
                 expiresAt = now.plus(SESSION_LIFETIME),
@@ -52,7 +60,11 @@ class ProductFactorySessionService(
         )
         addCookie(response, SESSION_COOKIE, signer.cookieValue(sessionId), httpOnly = true, SESSION_LIFETIME)
         addCookie(response, CSRF_COOKIE, csrfToken, httpOnly = false, SESSION_LIFETIME)
-        return AuthenticationStatus(true, true, email, csrfToken)
+        return AuthenticationStatus(
+            true, true, user.email, csrfToken, userId = user.id.value,
+            globalRoles = user.globalRoles.map { it.name }.toSet(),
+            productMemberships = user.memberships.filter { it.status.name == "ACTIVE" }.map { it.productId.value }.toSet(),
+        )
     }
 
     fun resolve(request: HttpServletRequest): ResolvedSession? {
@@ -61,7 +73,11 @@ class ProductFactorySessionService(
         val session = repository.findActive(sessionId, clock.instant()) ?: return null
         val csrfToken = request.cookie(CSRF_COOKIE)?.value
             ?.takeIf { constantTimeEquals(sha256Hex(it), session.csrfTokenHash) }
-        return ResolvedSession(session.sessionId, session.stakeholderEmail, csrfToken)
+        val user = users.get(nl.vdzon.productfactory.api.advisor.UserId(session.userId))
+        return ResolvedSession(
+            session.sessionId, user.email, user.id.value, user.globalRoles.map { it.name }.toSet(),
+            user.memberships.filter { it.status.name == "ACTIVE" }.map { it.productId.value }.toSet(), csrfToken,
+        )
     }
 
     fun validateCsrf(request: HttpServletRequest, session: ResolvedSession): Boolean {

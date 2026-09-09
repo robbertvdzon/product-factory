@@ -4,6 +4,7 @@ import nl.vdzon.productfactory.api.decisions.*
 import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.auth.ResolvedSession
+import nl.vdzon.productfactory.auth.ProductAuthorizationService
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
@@ -31,9 +32,9 @@ class ProductApiErrorHandler {
     fun unavailable(error: CapabilityNotAvailable) = ApiError("CAPABILITY_NOT_AVAILABLE", error.message ?: "Capability nog niet beschikbaar.")
 }
 
-private fun Authentication?.stakeholderActor(): ActorReference {
+internal fun Authentication?.stakeholderActor(): ActorReference {
     val session = this?.principal as? ResolvedSession
-    return ActorReference(ActorType.STAKEHOLDER, session?.stakeholderEmail ?: "local-stakeholder")
+    return ActorReference(ActorType.STAKEHOLDER, session?.userId ?: "local-stakeholder")
 }
 
 data class CreateProductRequest(val requestedId: String? = null, val name: String, val status: ProductStatus = ProductStatus.ACTIVE, val idempotencyKey: String)
@@ -60,8 +61,9 @@ class ProductController(
     private val commands: ProductCommandService,
     private val queries: ProductQueryService,
     private val meetingAi: MeetingAiOrchestrator,
+    private val authorization: ProductAuthorizationService,
 ) {
-    @GetMapping fun products() = queries.findProducts()
+    @GetMapping fun products(authentication: Authentication?) = queries.findProducts().filter { authorization.canReadProduct(it.id, authentication) }
     @GetMapping("/{productId}") fun product(@PathVariable productId: String) = queries.getProduct(ProductId(productId))
 
     @PostMapping
@@ -124,11 +126,23 @@ class ProductController(
     @PostMapping("/signals/{signalId}/epic") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun epic(@PathVariable signalId: String, @RequestBody request: EpicLinkRequest, authentication: Authentication?) = commands.linkSignalToEpic(LinkSignalToEpicCommand(UserSignalId(signalId), EpicId(request.epicId), request.epicVersion, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
 
-    @GetMapping("/{productId}/questions") fun questions(@PathVariable productId: String) = queries.findStakeholderQuestions(StakeholderQuestionFilter(ProductId(productId)))
+    @GetMapping("/{productId}/questions")
+    fun questions(@PathVariable productId: String, authentication: Authentication?): List<StakeholderQuestionDetails> {
+        val all = queries.findStakeholderQuestions(StakeholderQuestionFilter(ProductId(productId)))
+        if (authorization.isFactoryOwner(authentication)) return all
+        val userId = authorization.current(authentication)?.id ?: return emptyList()
+        return all.filter { it.requestedRespondentUserId == userId }
+    }
     @PostMapping("/questions/{questionId}/answer") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun answer(@PathVariable questionId: String, @RequestBody request: AnswerQuestionRequest, authentication: Authentication?) = commands.recordStakeholderAnswer(RecordStakeholderAnswerCommand(StakeholderQuestionId(questionId), MeetingId(request.meetingId), request.messageId, request.answer, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
+    fun answer(@PathVariable questionId: String, @RequestBody request: AnswerQuestionRequest, authentication: Authentication?) {
+        requireQuestionRespondent(questionId, authentication)
+        commands.recordStakeholderAnswer(RecordStakeholderAnswerCommand(StakeholderQuestionId(questionId), MeetingId(request.meetingId), request.messageId, request.answer, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
+    }
     @PostMapping("/questions/{questionId}/answer-directly") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun answerDirectly(@PathVariable questionId: String, @RequestBody request: AnswerQuestionDirectlyRequest, authentication: Authentication?) = commands.answerStakeholderQuestionDirectly(AnswerStakeholderQuestionDirectlyCommand(StakeholderQuestionId(questionId), request.answer, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
+    fun answerDirectly(@PathVariable questionId: String, @RequestBody request: AnswerQuestionDirectlyRequest, authentication: Authentication?) {
+        requireQuestionRespondent(questionId, authentication)
+        commands.answerStakeholderQuestionDirectly(AnswerStakeholderQuestionDirectlyCommand(StakeholderQuestionId(questionId), request.answer, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
+    }
     @PostMapping("/questions/{questionId}/withdraw") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun withdraw(@PathVariable questionId: String, @RequestBody request: WithdrawQuestionRequest, authentication: Authentication?) = commands.withdrawStakeholderQuestion(WithdrawStakeholderQuestionCommand(StakeholderQuestionId(questionId), request.reason, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
 
@@ -140,6 +154,14 @@ class ProductController(
     fun message(@PathVariable meetingId: String, @RequestBody request: MeetingMessageRequest, authentication: Authentication?) = meetingAi.addStakeholderMessage(MeetingId(meetingId), request, authentication.stakeholderActor())
     @PostMapping("/meetings/{meetingId}/close") @ResponseStatus(HttpStatus.ACCEPTED)
     fun close(@PathVariable meetingId: String, @RequestBody request: CloseMeetingRequest) = meetingAi.requestMinutes(MeetingId(meetingId), request)
+
+    private fun requireQuestionRespondent(questionId: String, authentication: Authentication?) {
+        val question = queries.getStakeholderQuestion(StakeholderQuestionId(questionId))
+        val actor = authorization.current(authentication)
+        if (!authorization.isFactoryOwner(authentication) && question.requestedRespondentUserId != actor?.id) {
+            throw org.springframework.security.access.AccessDeniedException("Deze vraag is aan een andere gebruiker gericht.")
+        }
+    }
 }
 
 data class CreateDecisionRequest(val decision: String, val origin: DecisionOrigin = DecisionOrigin.STAKEHOLDER, val idempotencyKey: String)

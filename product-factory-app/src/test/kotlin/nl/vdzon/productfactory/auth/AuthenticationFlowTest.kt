@@ -25,7 +25,8 @@ import java.time.Instant
         "PF_ENVIRONMENT=local",
         "PF_AUTH_REQUIRED=true",
         "PF_GOOGLE_CLIENT_ID=product-factory-client",
-        "PF_STAKEHOLDER_EMAILS=stakeholder@example.com",
+        "PF_STAKEHOLDER_EMAILS=stakeholder@example.com,owner-without-product@example.com",
+        "PF_FACTORY_OWNER_EMAILS=stakeholder@example.com",
         "PF_SESSION_SIGNING_SECRET=test-signing-secret-with-at-least-32-characters",
         "PF_PUBLIC_FRONTEND_URL=http://localhost:8082",
     ],
@@ -36,6 +37,7 @@ class AuthenticationFlowTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val objectMapper: ObjectMapper,
     @Autowired private val sessionRepository: AuthenticationSessionRepository,
+    @Autowired private val userIdentities: UserIdentityRepository,
 ) {
     @MockitoBean
     private lateinit var jwtDecoder: JwtDecoder
@@ -52,6 +54,18 @@ class AuthenticationFlowTest(
                 .issuedAt(now.minusSeconds(10))
                 .expiresAt(now.plusSeconds(300))
                 .claim("email", "stakeholder@example.com")
+                .claim("email_verified", true)
+                .build(),
+        )
+        `when`(jwtDecoder.decode("unassigned-google-token")).thenReturn(
+            Jwt.withTokenValue("unassigned-google-token")
+                .header("alg", "RS256")
+                .subject("unassigned-subject")
+                .issuer("https://accounts.google.com")
+                .audience(listOf("product-factory-client"))
+                .issuedAt(now.minusSeconds(10))
+                .expiresAt(now.plusSeconds(300))
+                .claim("email", "owner-without-product@example.com")
                 .claim("email_verified", true)
                 .build(),
         )
@@ -143,6 +157,7 @@ class AuthenticationFlowTest(
             AuthenticationSession(
                 sessionId = expiredId,
                 stakeholderEmail = "stakeholder@example.com",
+                userId = userIdentities.resolveOrCreate("stakeholder@example.com", true).id.value,
                 csrfTokenHash = "d".repeat(64),
                 createdAt = Instant.EPOCH,
                 expiresAt = Instant.EPOCH.plusSeconds(60),
@@ -194,6 +209,51 @@ class AuthenticationFlowTest(
             status { isUnauthorized() }
             jsonPath("$.code") { value("LOGIN_REJECTED") }
         }
+    }
+
+    @Test
+    fun `ingelogde gebruiker zonder lidmaatschap ziet geen product en krijgt 403 op directe toegang`() {
+        val ownerLogin = login()
+        val ownerSession = cookie(ownerLogin, ProductFactorySessionService.SESSION_COOKIE)
+        val ownerCsrf = cookie(ownerLogin, ProductFactorySessionService.CSRF_COOKIE)
+        val ownerToken = objectMapper.readTree(ownerLogin.contentAsByteArray).get("csrfToken").asText()
+        mockMvc.post("/api/products") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, ownerToken)
+            cookie(ownerSession, ownerCsrf)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"requestedId":"private-product","name":"Privéproduct","idempotencyKey":"create-private-product"}"""
+        }.andExpect { status { isCreated() } }
+
+        val login = mockMvc.post("/api/auth/google") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"idToken":"unassigned-google-token"}"""
+        }.andReturn().response
+        val session = cookie(login, ProductFactorySessionService.SESSION_COOKIE)
+        val csrf = cookie(login, ProductFactorySessionService.CSRF_COOKIE)
+
+        mockMvc.get("/api/products") { cookie(session, csrf) }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(0) }
+        }
+        mockMvc.get("/api/products/private-product") { cookie(session, csrf) }.andExpect { status { isForbidden() } }
+        mockMvc.get("/api/products/private-product/conversations") { cookie(session, csrf) }.andExpect { status { isForbidden() } }
+        mockMvc.get("/api/admin/users") { cookie(session, csrf) }.andExpect { status { isForbidden() } }
+
+        val factoryOwner = userIdentities.findByEmail("stakeholder@example.com")!!
+        val productOwner = userIdentities.findByEmail("owner-without-product@example.com")!!
+        userIdentities.grantProductOwner(
+            productOwner.id, nl.vdzon.productfactory.api.shared.ProductId("private-product"), factoryOwner.id,
+            0, "grant-private-product",
+        )
+        mockMvc.get("/api/products/private-product/conversations") { cookie(session, csrf) }.andExpect { status { isOk() } }
+
+        userIdentities.revokeProductOwner(
+            productOwner.id, nl.vdzon.productfactory.api.shared.ProductId("private-product"), "Toegangstest afgerond.", factoryOwner.id,
+            1, "revoke-private-product",
+        )
+        mockMvc.get("/api/products/private-product/conversations") { cookie(session, csrf) }.andExpect { status { isForbidden() } }
     }
 
     private fun login() = mockMvc.post("/api/auth/google") {

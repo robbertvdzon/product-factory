@@ -19,7 +19,7 @@ class FoundationController(
     fun getFoundation(): FoundationStatus = FoundationStatus(
         application = "Product Factory",
         state = FoundationState.READY,
-        message = "Productbasis, Agent Runtime-uitvoering, Productontwerp, Productplanning, Kwaliteitsbewaking en Software Factory-dispatching zijn actief.",
+        message = "Productbasis, Productadviseur, Agent Runtime-uitvoering, Productontwerp, Productplanning, Kwaliteitsbewaking en Software Factory-dispatching zijn actief.",
     )
 
     @GetMapping("/implementations")
@@ -33,7 +33,8 @@ class FoundationController(
                 "product" to ImplementationIdentity("product-impl", "jdbc", version, revision),
                 "decisions" to ImplementationIdentity("decisions-impl", "jdbc", version, revision),
                 "agent-memory" to ImplementationIdentity("agent-memory-impl", "append-only-jdbc", version, revision),
-                "ai-execution" to ImplementationIdentity("ai-execution-impl", "agent-runtime-outbox-v1", version, revision),
+                "ai-execution" to ImplementationIdentity("ai-execution-impl", "agent-runtime-outbox-v2", version, revision),
+                "product-advisor" to ImplementationIdentity("product-factory-app", "product-advisor-v1", version, revision),
                 "product-design" to ImplementationIdentity("product-design-impl-mvp", "single-agent", version, revision),
                 "product-planning" to ImplementationIdentity("product-planning-impl-mvp", "single-planner", version, revision),
                 "quality" to ImplementationIdentity("quality-impl-mvp", "single-tester", version, revision),

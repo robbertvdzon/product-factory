@@ -4,7 +4,7 @@
 
 Product Factory beheert de domeincorrelatie, configuratie, hervatting en publicatie van AI-taken.
 Agent Runtime voert ze uit. Product Factory roept geen modelprovider rechtstreeks aan en gebruikt
-voor alle zes bestaande jobtypes Agent Runtime `/v2` met tenant `product-factory`.
+voor alle zeven bestaande jobtypes Agent Runtime `/v2` met tenant `product-factory`.
 
 De tijdelijke configuratie `PF_AGENT_RUNTIME_API_VERSION=v1|v2` bestaat uitsluitend als
 release-rollback. Acceptatie draait op `v2`; productie wordt na het acceptatiebewijs omgezet. De
@@ -29,6 +29,13 @@ verplicht Draft 2020-12-resultaatschema:
 - `PLANNING.SELECT_WORK`
 - `PLANNING.SLICE_EPIC`
 - `QUALITY.VERIFY_EPIC`
+- `PRODUCT_ADVISOR.CONVERSE`
+
+Een advisorbeurt bevriest vóór indiening de exacte publieke Git-SHA, productopdracht,
+testconfiguratie, geldige besluiten, uitsluitend het eigen `PRODUCT_ADVISOR`-geheugen, eerdere
+gespreksberichten, provider/model/mode en configuratie- en promptversie. Gebruikers- en
+repositorytekst staat in de prompt expliciet als onvertrouwde data. De agent kan alleen een strikt
+JSON-antwoord voorstellen; uitsluitend latere deterministische backendcommands mogen muteren.
 
 Nieuwe jobkeys verschijnen zonder Runtime-codewijziging in tenant- en catalogusoverzichten doordat
 Runtime `taskType`, uitvoering en tenant uit de ingediende job registreert. Product Factory groepeert

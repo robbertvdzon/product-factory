@@ -28,6 +28,7 @@ data class RuntimeSettings(
             "PF_DB_PASSWORD",
             "PF_GOOGLE_CLIENT_ID",
             "PF_STAKEHOLDER_EMAILS",
+            "PF_FACTORY_OWNER_EMAILS",
             "PF_SESSION_SIGNING_SECRET",
             "PF_PUBLIC_FRONTEND_URL",
             "PF_PUBLIC_BACKEND_URL",
@@ -43,6 +44,8 @@ data class RuntimeSettings(
                 ?: throw IllegalStateException("PF_AUTH_REQUIRED moet true of false zijn.")
             val agentRuntimeApiVersion = values["PF_AGENT_RUNTIME_API_VERSION"].orEmpty().ifBlank { "v1" }
             check(agentRuntimeApiVersion in setOf("v1", "v2")) { "PF_AGENT_RUNTIME_API_VERSION moet v1 of v2 zijn." }
+            val hotfixEnabled = values["PF_SOFTWARE_FACTORY_HOTFIX_ENABLED"].orEmpty().ifBlank { "false" }.toBooleanStrictOrNull()
+                ?: throw IllegalStateException("PF_SOFTWARE_FACTORY_HOTFIX_ENABLED moet true of false zijn.")
 
             if (environment == RuntimeEnvironment.PRODUCTION) {
                 val missing = productionRequired.filter { values[it].isNullOrBlank() }.sorted()
@@ -50,6 +53,11 @@ data class RuntimeSettings(
                 check(authRequired) { "Productie mag niet starten met uitgeschakelde authenticatie." }
                 check(values.getValue("PF_SESSION_SIGNING_SECRET").length >= 32) {
                     "PF_SESSION_SIGNING_SECRET moet minimaal 32 tekens bevatten."
+                }
+                val allowedEmails = emailSet(values.getValue("PF_STAKEHOLDER_EMAILS"))
+                val factoryOwners = emailSet(values.getValue("PF_FACTORY_OWNER_EMAILS"))
+                check(factoryOwners.isNotEmpty() && allowedEmails.containsAll(factoryOwners)) {
+                    "PF_FACTORY_OWNER_EMAILS moet een niet-lege subset van PF_STAKEHOLDER_EMAILS zijn."
                 }
                 check(values.getValue("PF_PUBLIC_FRONTEND_URL").startsWith("https://")) {
                     "De publieke productie-frontend-URL moet HTTPS gebruiken."
@@ -66,6 +74,12 @@ data class RuntimeSettings(
                     "Productie vereist exact openai/gpt-5.6-sol/SUBSCRIPTION als standaarduitvoering."
                 }
                 check(values["PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN"].isNullOrBlank()) { "Productie weigert een Runtime-test-controlcredential." }
+                if (hotfixEnabled) {
+                    check(!values["PF_SOFTWARE_FACTORY_DASHBOARD_URL"].isNullOrBlank() &&
+                        !values["PF_SOFTWARE_FACTORY_DASHBOARD_TOKEN"].isNullOrBlank()) {
+                        "Ingeschakelde hotfixroutering vereist dashboard-URL en dashboardtoken."
+                    }
+                }
             }
             if (environment == RuntimeEnvironment.ACCEPTANCE) {
                 check(!authRequired) { "Acceptatie moet authenticatie expliciet uitgeschakeld houden." }
@@ -80,6 +94,11 @@ data class RuntimeSettings(
             }
             return RuntimeSettings(environment, authRequired, agentRuntimeApiVersion)
         }
+
+        private fun emailSet(raw: String): Set<String> = raw.split(',', ';')
+            .map { it.trim().lowercase() }
+            .filter { it.isNotEmpty() }
+            .toSet()
     }
 }
 
@@ -100,6 +119,7 @@ class RuntimeConfigurationGuard(
         "PF_DB_PASSWORD",
         "PF_GOOGLE_CLIENT_ID",
         "PF_STAKEHOLDER_EMAILS",
+        "PF_FACTORY_OWNER_EMAILS",
         "PF_SESSION_SIGNING_SECRET",
         "PF_PUBLIC_FRONTEND_URL",
         "PF_PUBLIC_BACKEND_URL",
@@ -110,5 +130,8 @@ class RuntimeConfigurationGuard(
         "PF_AI_VENDOR_ID",
         "PF_AI_MODEL",
         "PF_AI_EXECUTION_MODE",
+        "PF_SOFTWARE_FACTORY_DASHBOARD_URL",
+        "PF_SOFTWARE_FACTORY_DASHBOARD_TOKEN",
+        "PF_SOFTWARE_FACTORY_HOTFIX_ENABLED",
     ).mapNotNull { key -> getProperty(key)?.let { key to it } }.toMap()
 }

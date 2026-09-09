@@ -488,6 +488,12 @@ class AgentMemoryApplicationService(
 
         val TRUSTED_ROLES = listOf(
             AgentRoleDefinitionDetails(
+                AgentRoleKey("PRODUCT_ADVISOR"), "Productadviseur", "product-advisor", "v1",
+                "Beantwoordt productvragen en maakt controleerbare wijzigingsvoorstellen uit bevroren productcontext.",
+                listOf("Onderzoekt code en documentatie", "Kan de veilige testomgeving bekijken", "Stelt hotfix, bugfix of productverbetering voor"),
+                listOf("Wijzigt geen repository", "Maakt geen externe story of epic", "Keurt niets namens een gebruiker goed"), true,
+            ),
+            AgentRoleDefinitionDetails(
                 AgentRoleKey("MEETING_AGENT"), "Meeting Agent", "product-meetings", "meeting-v1",
                 "Begeleidt het gesprek en antwoordt herkenbaar vanuit actieve rolperspectieven.",
                 listOf("Verheldert vragen", "Combineert gecontroleerde rolperspectieven"),

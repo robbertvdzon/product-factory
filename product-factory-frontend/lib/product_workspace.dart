@@ -460,6 +460,16 @@ abstract interface class ProductGateway {
   Future<void> withdrawEpic(String epicId, int version, String reason);
   Future<void> cancelEpic(String epicId, int version, String reason);
   Future<void> approveEpic(String epicId, int version);
+  Future<void> approveProductRequestEpic(String epicId, int version);
+  Future<void> approveProductRequestEpicAsFactoryOwner(
+    String epicId,
+    int version,
+  );
+  Future<void> refineProductRequestEpic(
+    String epicId,
+    int version,
+    String reason,
+  );
   Future<void> requestEpicRefinement(String epicId, int version, String reason);
   Future<void> runProductPlanning(String productId);
   Future<void> requestManualReplan(String productId, String reason);
@@ -759,6 +769,33 @@ class HttpProductGateway implements ProductGateway {
   );
 
   @override
+  Future<void> approveProductRequestEpic(String epicId, int version) => _send(
+    'POST',
+    '/api/epics/$epicId/product-owner-approval',
+    {'expectedVersion': version, 'idempotencyKey': _key('product-approval')},
+  );
+
+  @override
+  Future<void> approveProductRequestEpicAsFactoryOwner(
+    String epicId,
+    int version,
+  ) => _send('POST', '/api/epics/$epicId/factory-owner-approval', {
+    'expectedVersion': version,
+    'idempotencyKey': _key('factory-approval'),
+  });
+
+  @override
+  Future<void> refineProductRequestEpic(
+    String epicId,
+    int version,
+    String reason,
+  ) => _send('POST', '/api/epics/$epicId/product-request-refinement', {
+    'reason': reason,
+    'expectedVersion': version,
+    'idempotencyKey': _key('product-request-refinement'),
+  });
+
+  @override
   Future<void> requestEpicRefinement(
     String epicId,
     int version,
@@ -938,6 +975,9 @@ String _epicStatusLabel(String status) => switch (status) {
   'NEEDS_RESEARCH' => 'Onderzoek nodig',
   'NEEDS_REFINEMENT' => 'Meer uitwerking nodig',
   'AWAITING_APPROVAL' => 'Wacht op goedkeuring',
+  'AWAITING_PRODUCT_OWNER_APPROVAL' =>
+    'Wacht op productinhoudelijke goedkeuring',
+  'AWAITING_FACTORY_OWNER_APPROVAL' => 'Wacht op eindgoedkeuring',
   'AVAILABLE' => 'Klaar voor planning',
   'IN_PLANNING' => 'Wordt gepland',
   'ACTIVE' => 'In uitvoering',
@@ -1094,7 +1134,12 @@ const Map<String, List<String>> _softwareFactoryModelsBySupplier = {
     'claude-sonnet-4-6',
     'claude-haiku-4-5',
   ],
-  'copilot': ['claude-opus-4.5', 'claude-sonnet-4.5', 'claude-haiku-4.5', 'gpt-4.1'],
+  'copilot': [
+    'claude-opus-4.5',
+    'claude-sonnet-4.5',
+    'claude-haiku-4.5',
+    'gpt-4.1',
+  ],
   'openai': ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
 };
 
@@ -1309,7 +1354,10 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
         initialValue: _aiSupplier,
         decoration: const InputDecoration(labelText: 'AI-supplier'),
         items: [
-          const DropdownMenuItem(value: null, child: Text('Standaard van Software Factory')),
+          const DropdownMenuItem(
+            value: null,
+            child: Text('Standaard van Software Factory'),
+          ),
           for (final supplier in _softwareFactoryModelsBySupplier.keys)
             DropdownMenuItem(value: supplier, child: Text(supplier)),
         ],
@@ -1324,11 +1372,18 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
         initialValue: _aiModel,
         decoration: const InputDecoration(labelText: 'AI-model'),
         items: [
-          const DropdownMenuItem(value: null, child: Text('Standaard van Software Factory')),
-          for (final model in _softwareFactoryModelsBySupplier[_aiSupplier] ?? const <String>[])
+          const DropdownMenuItem(
+            value: null,
+            child: Text('Standaard van Software Factory'),
+          ),
+          for (final model
+              in _softwareFactoryModelsBySupplier[_aiSupplier] ??
+                  const <String>[])
             DropdownMenuItem(value: model, child: Text(model)),
         ],
-        onChanged: _aiSupplier == null ? null : (value) => setState(() => _aiModel = value),
+        onChanged: _aiSupplier == null
+            ? null
+            : (value) => setState(() => _aiModel = value),
       ),
       if (_validationError != null) ...[
         const SizedBox(height: 12),
@@ -1374,6 +1429,8 @@ class ProductWorkspacePage extends StatefulWidget {
     this.initialProductId,
     this.onProductSelected,
     this.refreshController,
+    this.isFactoryOwner = true,
+    this.productMemberships = const {},
     super.key,
   });
   final ProductGateway gateway;
@@ -1382,6 +1439,8 @@ class ProductWorkspacePage extends StatefulWidget {
   final String? initialProductId;
   final ValueChanged<String>? onProductSelected;
   final PageRefreshController? refreshController;
+  final bool isFactoryOwner;
+  final Set<String> productMemberships;
   @override
   State<ProductWorkspacePage> createState() => _ProductWorkspacePageState();
 }
@@ -1554,8 +1613,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                     ),
                   ],
                 ),
-                if (widget.section == ProductWorkspaceSection.overview ||
-                    widget.section == ProductWorkspaceSection.settings)
+                if (widget.isFactoryOwner &&
+                    (widget.section == ProductWorkspaceSection.overview ||
+                        widget.section == ProductWorkspaceSection.settings))
                   FilledButton.icon(
                     onPressed: _createProduct,
                     icon: const Icon(Icons.add),
@@ -2567,17 +2627,18 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   Widget _design(
     ProductWorkspaceData data,
   ) => _section('Ontwerp', Icons.architecture_outlined, [
-    Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        FilledButton.icon(
-          onPressed: () =>
-              _mutate(() => widget.gateway.runProductDesign(data.product.id)),
-          icon: const Icon(Icons.play_arrow),
-          label: const Text('Productontwerp starten of hervatten'),
-        ),
-      ],
-    ),
+    if (widget.isFactoryOwner)
+      Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FilledButton.icon(
+            onPressed: () =>
+                _mutate(() => widget.gateway.runProductDesign(data.product.id)),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Productontwerp starten of hervatten'),
+          ),
+        ],
+      ),
     const SizedBox(height: 12),
     SelectableText('Epics', style: Theme.of(context).textTheme.titleMedium),
     if (data.epics.isEmpty)
@@ -2596,6 +2657,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             SelectableText(
               'Epic ${_value(epic['id'])} · versie ${epic['version']}',
             ),
+            if (epic['sourceProductRequestId'] != null)
+              SelectableText(
+                'Bronverzoek ${epic['sourceProductRequestId']} · requestversie ${epic['sourceProductRequestVersion']}',
+              ),
             if (epic['status'] == 'NEEDS_RESEARCH') ...[
               const SizedBox(height: 8),
               Card(
@@ -2635,6 +2700,34 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                   title: SelectableText('Wacht op jouw goedkeuring'),
                   subtitle: SelectableText(
                     'Controleer vooral of UX, databronnen, toegang en technische haalbaarheid concreet genoeg zijn. Na goedkeuring kan de planner direct stories maken.',
+                  ),
+                ),
+              ),
+            ],
+            if (epic['status'] == 'AWAITING_PRODUCT_OWNER_APPROVAL') ...[
+              const SizedBox(height: 8),
+              Card(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                child: const ListTile(
+                  leading: Icon(Icons.fact_check_outlined),
+                  title: SelectableText(
+                    'Productinhoudelijke beoordeling nodig',
+                  ),
+                  subtitle: SelectableText(
+                    'De aangewezen product owner controleert deze exacte epicversie eerst. Daarna volgt de eindgoedkeuring.',
+                  ),
+                ),
+              ),
+            ],
+            if (epic['status'] == 'AWAITING_FACTORY_OWNER_APPROVAL') ...[
+              const SizedBox(height: 8),
+              Card(
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                child: const ListTile(
+                  leading: Icon(Icons.verified_user_outlined),
+                  title: SelectableText('Eindgoedkeuring nodig'),
+                  subtitle: SelectableText(
+                    'De product owner heeft deze versie goedgekeurd. De factory owner beoordeelt nu de technische en bredere gevolgen.',
                   ),
                 ),
               ),
@@ -2753,7 +2846,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               ),
             ),
             const SizedBox(height: 12),
-            if (epic['status'] == 'AWAITING_APPROVAL')
+            if (widget.isFactoryOwner && epic['status'] == 'AWAITING_APPROVAL')
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
@@ -2762,15 +2855,50 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                   label: const Text('Goedkeuren voor planning'),
                 ),
               ),
+            if (epic['status'] == 'AWAITING_PRODUCT_OWNER_APPROVAL' &&
+                widget.productMemberships.contains(data.product.id))
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () =>
+                      _approveProductRequestEpic(epic, factoryOwner: false),
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('Productinhoud goedkeuren'),
+                ),
+              ),
+            if (widget.isFactoryOwner &&
+                epic['status'] == 'AWAITING_FACTORY_OWNER_APPROVAL')
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () =>
+                      _approveProductRequestEpic(epic, factoryOwner: true),
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Eindgoedkeuring geven'),
+                ),
+              ),
             if (const {
-              'AWAITING_APPROVAL',
-              'AVAILABLE',
-              'IN_PLANNING',
-              'ACTIVE',
-              'VERIFYING',
-              'COMPLETED',
-              'NOT_SUCCESSFUL',
+              'AWAITING_PRODUCT_OWNER_APPROVAL',
+              'AWAITING_FACTORY_OWNER_APPROVAL',
             }.contains(epic['status']))
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: () => _requestProductRequestEpicRefinement(epic),
+                  icon: const Icon(Icons.undo_outlined),
+                  label: const Text('Terugsturen'),
+                ),
+              ),
+            if (widget.isFactoryOwner &&
+                const {
+                  'AWAITING_APPROVAL',
+                  'AVAILABLE',
+                  'IN_PLANNING',
+                  'ACTIVE',
+                  'VERIFYING',
+                  'COMPLETED',
+                  'NOT_SUCCESSFUL',
+                }.contains(epic['status']))
               Align(
                 alignment: Alignment.centerRight,
                 child: OutlinedButton.icon(
@@ -2779,12 +2907,13 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                   label: const Text('Terugsturen voor verdere uitwerking'),
                 ),
               ),
-            if (const {
-              'NEEDS_RESEARCH',
-              'NEEDS_REFINEMENT',
-              'AWAITING_APPROVAL',
-              'AVAILABLE',
-            }.contains(epic['status']))
+            if (widget.isFactoryOwner &&
+                const {
+                  'NEEDS_RESEARCH',
+                  'NEEDS_REFINEMENT',
+                  'AWAITING_APPROVAL',
+                  'AVAILABLE',
+                }.contains(epic['status']))
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -2793,11 +2922,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                   label: const Text('Epic intrekken'),
                 ),
               ),
-            if (const {
-              'IN_PLANNING',
-              'ACTIVE',
-              'VERIFYING',
-            }.contains(epic['status']))
+            if (widget.isFactoryOwner &&
+                const {
+                  'IN_PLANNING',
+                  'ACTIVE',
+                  'VERIFYING',
+                }.contains(epic['status']))
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -2806,11 +2936,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                   label: const Text('Epic annuleren'),
                 ),
               ),
-            if (const {
-              'AVAILABLE',
-              'IN_PLANNING',
-              'ACTIVE',
-            }.contains(epic['status']))
+            if (widget.isFactoryOwner &&
+                const {
+                  'AVAILABLE',
+                  'IN_PLANNING',
+                  'ACTIVE',
+                }.contains(epic['status']))
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -3040,6 +3171,33 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     () => widget.gateway.approveEpic(
       _value(epic['id']),
       (epic['version'] as num).toInt(),
+    ),
+  );
+
+  Future<void> _approveProductRequestEpic(
+    Map<String, Object?> epic, {
+    required bool factoryOwner,
+  }) => _mutate(
+    () => factoryOwner
+        ? widget.gateway.approveProductRequestEpicAsFactoryOwner(
+            _value(epic['id']),
+            (epic['version'] as num).toInt(),
+          )
+        : widget.gateway.approveProductRequestEpic(
+            _value(epic['id']),
+            (epic['version'] as num).toInt(),
+          ),
+  );
+
+  Future<void> _requestProductRequestEpicRefinement(
+    Map<String, Object?> epic,
+  ) => _textAction(
+    'Epic terugsturen',
+    'Wat moet in een nieuwe versie worden aangepast?',
+    (reason) => widget.gateway.refineProductRequestEpic(
+      _value(epic['id']),
+      (epic['version'] as num).toInt(),
+      reason,
     ),
   );
 

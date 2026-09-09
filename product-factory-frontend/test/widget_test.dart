@@ -1164,6 +1164,22 @@ class FakeProductGateway implements ProductGateway {
   Future<void> cancelEpic(String epicId, int version, String reason) async {}
   @override
   Future<void> approveEpic(String epicId, int version) async {}
+
+  @override
+  Future<void> approveProductRequestEpic(String epicId, int version) async {}
+
+  @override
+  Future<void> approveProductRequestEpicAsFactoryOwner(
+    String epicId,
+    int version,
+  ) async {}
+
+  @override
+  Future<void> refineProductRequestEpic(
+    String epicId,
+    int version,
+    String reason,
+  ) async {}
   @override
   Future<void> requestEpicRefinement(
     String epicId,

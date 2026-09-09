@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.api.ai.*
+import nl.vdzon.productfactory.api.advisor.ProductRequestId
+import nl.vdzon.productfactory.api.advisor.UserId
 import nl.vdzon.productfactory.api.decisions.*
 import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
@@ -83,6 +85,10 @@ class ProductDesignMvpService(
             return ClaimedSession(open, false)
         }
         val sessionId = ProcessSessionId(UUID.randomUUID().toString())
+        val directedWorkId = jdbc.query(
+            "SELECT work_item_id FROM pf_design_work_item WHERE product_id=? AND status='PENDING' ORDER BY created_at",
+            { rs, _ -> rs.getString(1) }, productId.value,
+        ).firstOrNull()
         try {
             jdbc.update(
                 """INSERT INTO pf_design_process_session(
@@ -97,6 +103,12 @@ class ProductDesignMvpService(
         } catch (_: DuplicateKeyException) {
             throw ProcessAlreadyRunning(productId)
         }
+        if (directedWorkId != null && jdbc.update(
+                """UPDATE pf_design_work_item SET status='IN_PROGRESS',process_session_id=?,claimed_at=?,attempt_count=attempt_count+1,updated_at=?
+                    WHERE work_item_id=? AND status='PENDING'""".trimIndent(),
+                sessionId.value, now, now, directedWorkId,
+            ) != 1
+        ) throw ProcessAlreadyRunning(productId)
         return ClaimedSession(getProcessSession(sessionId), true)
     }
 
@@ -114,6 +126,7 @@ class ProductDesignMvpService(
         val bugs = qualityQueries.ifAvailable?.findBugs(BugFilter(productId)).orEmpty()
         val qualitySnapshot = qualityQueries.ifAvailable?.getCurrentQuality(productId)
         val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant())
+        val directedWork = directedWork(sessionId)
 
         val sources = buildList {
             add(SourceReference("PRODUCT_ASSIGNMENT", productId.value, assignment.version))
@@ -125,6 +138,7 @@ class ProductDesignMvpService(
             bugs.forEach { add(SourceReference("BUG", it.id.value, it.version)) }
             qualitySnapshot?.sources?.forEach { add(it) }
             currentMemory.forEach { add(SourceReference("MEMORY_VERSION", it.activeVersionId.value, 1)) }
+            directedWork?.let { add(SourceReference("PRODUCT_REQUEST", it.requestId, it.requestVersion)) }
         }.sortedWith(compareBy(SourceReference::type, SourceReference::id, SourceReference::version))
         val snapshot = linkedMapOf<String, Any?>(
             "product" to products.getProduct(productId),
@@ -137,6 +151,7 @@ class ProductDesignMvpService(
             "qualitySnapshot" to qualitySnapshot,
             "openAndHistoricalBugs" to bugs,
             "agentMemory" to currentMemory,
+            "directedProductRequest" to directedWork?.let { directedRequestSnapshot(it) },
             "git" to RepositorySnapshot(assignment.publicGitUrl, gitSha),
         )
         val snapshotJson = mapper.writeValueAsString(snapshot)
@@ -179,6 +194,7 @@ class ProductDesignMvpService(
                 call_claimed_until=NULL,updated_at=?,blocked_reason=NULL,error_code=NULL WHERE id=?""".trimIndent(),
             taskId.value, mapper.writeValueAsString(allTasks), attempt, clock.instant(), sessionId.value,
         )
+        jdbc.update("UPDATE pf_design_work_item SET status='IN_PROGRESS',updated_at=? WHERE process_session_id=? AND status='BLOCKED'", clock.instant(), sessionId.value)
     }
 
     private fun resumeWaiting(session: ProcessSessionDetails) {
@@ -210,6 +226,34 @@ class ProductDesignMvpService(
             startNewSession(session.id, session.productId)
             return
         }
+        val directed = directedWork(session.id)
+        val answeredQuestion = directed?.let {
+            jdbc.query(
+                """SELECT question_id,question,answer,version FROM pf_stakeholder_question
+                    WHERE process_session_id=? AND product_request_id=? AND status='ANSWERED'
+                    ORDER BY answered_at DESC""".trimIndent(),
+                { rs, _ -> mapOf(
+                    "questionId" to rs.getString(1),
+                    "question" to rs.getString(2),
+                    "answer" to rs.getString(3),
+                    "version" to rs.getLong(4),
+                ) }, session.id.value, it.requestId,
+            ).firstOrNull()
+        }
+        if (answeredQuestion != null) {
+            val directedRequestId = requireNotNull(directed).requestId
+            val currentEpic = findEpics(EpicFilter(session.productId)).singleOrNull {
+                it.sourceProductRequestId == directedRequestId
+            } ?: throw InvalidCommand("De gerichte vraag mist haar ontwerp-epic.")
+            val snapshot = (mapper.readTree(row.snapshot) as ObjectNode).apply {
+                set<JsonNode>("currentEpicToRefine", mapper.valueToTree(currentEpic))
+                set<JsonNode>("directedQuestionAnswer", mapper.valueToTree(answeredQuestion))
+                putArray("requiredRefinements").addAll(currentEpic.readiness.unmetConditions.map(mapper.nodeFactory::textNode))
+                putArray("openQuestionsToResolve").addAll(currentEpic.readiness.openQuestions.map(mapper.nodeFactory::textNode))
+            }
+            requestTask(session.id, session.productId, mapper.writeValueAsString(snapshot), row.gitUrl, row.gitSha, row.attempt + 1)
+            return
+        }
         requestTask(session.id, session.productId, row.snapshot, row.gitUrl, row.gitSha, row.attempt + 1)
     }
 
@@ -235,6 +279,7 @@ class ProductDesignMvpService(
         rejectStoryOutput(result)
         when (result.path("outcome").asText()) {
             "NO_EPIC" -> {
+                if (directedWork(sessionId) != null) throw InvalidCommand("Een gericht ProductRequest vereist een complete epic of een gerichte vervolgvraag.")
                 val reason = requiredText(result, "reason", 10, MAX_NO_EPIC_REASON_LENGTH)
                 finishSession(sessionId, "Geen epic: $reason", emptyList())
             }
@@ -263,7 +308,10 @@ class ProductDesignMvpService(
                 }
                 ai.retainAiArtifacts(RetainAiArtifactsCommand(epic.uxArtifacts, "EPIC", epic.id.value, epic.version))
                 applyTrustedEffects(sessionId, result, epic)
-                if (epic.status in setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT) && sessionTaskIds(sessionId).size < MAX_DESIGN_ITERATIONS) {
+                val waitsForDirectedAnswer = directedWork(sessionId) != null && result.path("stakeholderQuestion").isObject
+                if (waitsForDirectedAnswer) {
+                    waitForDirectedAnswer(sessionId)
+                } else if (epic.status in setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT) && sessionTaskIds(sessionId).size < MAX_DESIGN_ITERATIONS) {
                     requestRefinement(sessionId, epic)
                 } else {
                     val summary = if (epic.status in setOf(EpicStatus.AVAILABLE, EpicStatus.AWAITING_APPROVAL)) {
@@ -473,15 +521,17 @@ class ProductDesignMvpService(
 
     private fun publishNewEpic(sessionId: ProcessSessionId, draft: EpicDraft): EpicDetails {
         val session = getProcessSession(sessionId)
-        if (findEpics(EpicFilter(session.productId, setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT))).isNotEmpty()) {
+        val directed = directedWork(sessionId)
+        if (directed == null && findEpics(EpicFilter(session.productId, setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT))).isNotEmpty()) {
             throw InvalidCommand("Werk de bestaande epic met ontbrekende uitwerking bij voordat een nieuwe epic wordt gemaakt.")
         }
         val id = EpicId(UUID.randomUUID().toString())
         val now = clock.instant()
-        val status = publicationStatus(session.productId, draft.status())
+        val status = if (directed != null && draft.status() == EpicStatus.AVAILABLE) EpicStatus.AVAILABLE else publicationStatus(session.productId, draft.status())
         jdbc.update(
-            "INSERT INTO pf_epic(id,product_id,current_version,status,created_at,updated_at) VALUES (?,?,?,?,?,?)",
-            id.value, session.productId.value, 1L, status.aggregateStatus().name, now, now,
+            """INSERT INTO pf_epic(id,product_id,current_version,status,created_at,updated_at,source_product_request_id,source_product_request_version)
+                VALUES (?,?,?,?,?,?,?,?)""".trimIndent(),
+            id.value, session.productId.value, 1L, status.aggregateStatus().name, now, now, directed?.requestId, directed?.requestVersion,
         )
         insertVersion(id, 1, draft, status, frozenInputs(sessionId), DESIGN_ACTOR, now)
         return getEpic(id)
@@ -506,7 +556,7 @@ class ProductDesignMvpService(
         }
         val next = current.version + 1
         val now = clock.instant()
-        val status = publicationStatus(current.productId, draft.status())
+        val status = if (directedWork(sessionId) != null && draft.status() == EpicStatus.AVAILABLE) EpicStatus.AVAILABLE else publicationStatus(current.productId, draft.status())
         insertVersion(epicId, next, draft, status, frozenInputs(sessionId), DESIGN_ACTOR, now, supersedesVersion = expected)
         if (jdbc.update(
                 "UPDATE pf_epic SET current_version=?,status=?,refinement_reason=NULL,updated_at=? WHERE id=? AND current_version=?",
@@ -527,10 +577,12 @@ class ProductDesignMvpService(
             ))
         }
         result.path("stakeholderQuestion").takeIf { it.isObject }?.let { question ->
+            val directed = directedWork(sessionId)
             productCommands.askStakeholder(AskStakeholderCommand(
                 epic.productId, ROLE.value, requiredText(question, "question", 5, 1000),
                 requiredText(question, "context", 5, 2000), sessionId, listOf(SourceReference("EPIC", epic.id.value, epic.version)),
-                DESIGN_ACTOR, "design-question-${sessionId.value}",
+                DESIGN_ACTOR, "design-question-${sessionId.value}", directed?.requestedBy?.let(::UserId),
+                directed?.requestId?.let(::ProductRequestId), epic.id,
             ))
         }
         result.path("factoryDecision").takeIf { it.isTextual && it.asText().isNotBlank() }?.let { decision ->
@@ -559,10 +611,17 @@ class ProductDesignMvpService(
     }
 
     @Transactional
-    override fun approveEpic(command: ApproveEpicCommand) = transition(
-        command.epicId, command.expectedVersion, setOf(EpicStatus.AWAITING_APPROVAL), EpicStatus.AVAILABLE,
-        command.actor, command.idempotencyKey,
-    )
+    override fun approveEpic(command: ApproveEpicCommand) {
+        val requestEpic = (jdbc.queryForObject(
+            "SELECT COUNT(*) FROM pf_epic WHERE id=? AND source_product_request_id IS NOT NULL",
+            Long::class.java, command.epicId.value,
+        ) ?: 0L) > 0
+        if (requestEpic) throw InvalidCommand("Een ProductRequest-epic vereist afzonderlijke product owner- en factory owner-goedkeuring.")
+        transition(
+            command.epicId, command.expectedVersion, setOf(EpicStatus.AWAITING_APPROVAL), EpicStatus.AVAILABLE,
+            command.actor, command.idempotencyKey,
+        )
+    }
 
     @Transactional
     override fun requestEpicRefinement(command: RequestEpicRefinementCommand) {
@@ -712,8 +771,16 @@ class ProductDesignMvpService(
         """SELECT e.id,e.product_id,v.title,v.summary,v.problem,v.solution,v.direction_references_json,v.ux_design,
             v.acceptance_criteria_json,v.slicability_rationale,
             CASE WHEN EXISTS (SELECT 1 FROM pf_epic_version newer WHERE newer.epic_id=v.epic_id AND newer.supersedes_version=v.version)
-                 THEN 'SUPERSEDED' ELSE v.status END,
-            v.version,e.created_at,e.updated_at,e.verification_id,v.research_sources_json,v.readiness_json,v.ux_artifacts_json,v.ux_screens_json,v.refinement_reason
+                 THEN 'SUPERSEDED'
+                 WHEN e.source_product_request_id IS NOT NULL AND v.status='AVAILABLE' AND NOT EXISTS (
+                     SELECT 1 FROM pf_epic_approval_record a WHERE a.epic_id=e.id AND a.epic_version=v.version AND a.approval_role='PRODUCT_OWNER'
+                 ) THEN 'AWAITING_PRODUCT_OWNER_APPROVAL'
+                 WHEN e.source_product_request_id IS NOT NULL AND v.status='AVAILABLE' AND NOT EXISTS (
+                     SELECT 1 FROM pf_epic_approval_record a WHERE a.epic_id=e.id AND a.epic_version=v.version AND a.approval_role='FACTORY_OWNER'
+                 ) THEN 'AWAITING_FACTORY_OWNER_APPROVAL'
+                 ELSE v.status END,
+            v.version,e.created_at,e.updated_at,e.verification_id,v.research_sources_json,v.readiness_json,v.ux_artifacts_json,v.ux_screens_json,v.refinement_reason,
+            e.source_product_request_id,e.source_product_request_version
             FROM pf_epic e JOIN pf_epic_version v ON v.epic_id=e.id $where ORDER BY e.updated_at DESC,v.version DESC""".trimIndent(),
         { rs, _ ->
             EpicDetails(
@@ -725,7 +792,7 @@ class ProductDesignMvpService(
                 mapper.readValue(rs.getString(17), EpicReadinessDetails::class.java),
                 mapper.readValue(rs.getString(18), object : TypeReference<List<ArtifactReference>>() {}),
                 mapper.readValue(rs.getString(19), object : TypeReference<List<EpicUxScreen>>() {}),
-                rs.getString(20),
+                rs.getString(20), rs.getString(21), rs.getObject(22)?.let { rs.getLong(22) },
             )
         }, *args,
     )
@@ -817,12 +884,63 @@ class ProductDesignMvpService(
                 blocked_reason=NULL,error_code=NULL,call_claimed_until=NULL,updated_at=?,finished_at=? WHERE id=?""".trimIndent(),
             mapper.writeValueAsString(publications), summary.take(2000), now, now, sessionId.value,
         )
+        val directed = directedWork(sessionId)
+        val epicId = publications.singleOrNull { it.type == "EPIC" }?.id
+        if (directed != null && epicId != null) {
+            jdbc.update("UPDATE pf_design_work_item SET status='DONE',epic_id=?,updated_at=? WHERE work_item_id=? AND process_session_id=?", epicId, now, directed.workItemId, sessionId.value)
+            jdbc.update("UPDATE pf_product_request SET status='ROUTED',linked_epic_id=?,delivery_status='OPEN',updated_at=?,version=version+1 WHERE request_id=? AND current_version=?", epicId, now, directed.requestId, directed.requestVersion)
+            jdbc.update("UPDATE pf_product_request_route SET status='OPEN',external_key=?,updated_at=? WHERE request_id=? AND request_version=?", epicId, now, directed.requestId, directed.requestVersion)
+            try {
+                jdbc.update(
+                    """INSERT INTO pf_personal_notification(notification_id,recipient_user_id,product_id,event_key,kind,title,target_type,target_id,created_at)
+                        VALUES (?,?,?,?,?,?,?,?,?)""".trimIndent(),
+                    UUID.randomUUID().toString(), directed.requestedBy, directed.productId, "epic-created:$epicId", "PRODUCT_APPROVAL_REQUIRED",
+                    "Epic wacht op productinhoudelijke goedkeuring", "EPIC", epicId, now,
+                )
+            } catch (_: DuplicateKeyException) { }
+        }
     }
 
     private fun blockSession(sessionId: ProcessSessionId, code: String, message: String) {
         jdbc.update(
             "UPDATE pf_design_process_session SET status='BLOCKED',blocked_reason=?,error_code=?,call_claimed_until=NULL,updated_at=? WHERE id=?",
             message.take(1000), code.take(160), clock.instant(), sessionId.value,
+        )
+        jdbc.update("UPDATE pf_design_work_item SET status='BLOCKED',updated_at=? WHERE process_session_id=? AND status='IN_PROGRESS'", clock.instant(), sessionId.value)
+    }
+
+    private fun waitForDirectedAnswer(sessionId: ProcessSessionId) {
+        val now = clock.instant()
+        jdbc.update(
+            """UPDATE pf_design_process_session SET status='BLOCKED',blocked_reason='Productontwerp wacht op antwoord van de product owner.',
+                error_code='WAITING_FOR_USER',call_claimed_until=NULL,updated_at=? WHERE id=?""".trimIndent(),
+            now, sessionId.value,
+        )
+        jdbc.update(
+            "UPDATE pf_design_work_item SET status='WAITING_FOR_USER',updated_at=? WHERE process_session_id=? AND status='IN_PROGRESS'",
+            now, sessionId.value,
+        )
+    }
+
+    private fun directedWork(sessionId: ProcessSessionId): DirectedWork? = jdbc.query(
+        """SELECT w.work_item_id,w.product_id,w.request_id,w.request_version,r.requested_by,r.conversation_id
+            FROM pf_design_work_item w JOIN pf_product_request r ON r.request_id=w.request_id
+            WHERE w.process_session_id=?""".trimIndent(),
+        { rs, _ -> DirectedWork(rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4), rs.getString(5), rs.getString(6)) },
+        sessionId.value,
+    ).singleOrNull()
+
+    private fun directedRequestSnapshot(work: DirectedWork): Map<String, Any?> {
+        val version = jdbc.queryForMap(
+            "SELECT * FROM pf_product_request_version WHERE request_id=? AND version=?", work.requestId, work.requestVersion,
+        )
+        return linkedMapOf(
+            "requestId" to work.requestId,
+            "requestVersion" to work.requestVersion,
+            "requestedBy" to work.requestedBy,
+            "conversationId" to work.conversationId,
+            "approvedContent" to version,
+            "instruction" to "Werk uitsluitend dit goedgekeurde verzoek uit tot een volledige epic; kopieer het niet blind en maak nog geen stories.",
         )
     }
 
@@ -924,6 +1042,7 @@ $snapshotJson"""
 
     private data class RetryRow(val snapshot: String?, val gitUrl: String?, val gitSha: String?, val attempt: Int)
     private data class ClaimedSession(val session: ProcessSessionDetails, val created: Boolean)
+    private data class DirectedWork(val workItemId: String, val productId: String, val requestId: String, val requestVersion: Long, val requestedBy: String, val conversationId: String)
     private data class EpicDraft(
         val title: String,
         val summary: String,
@@ -959,7 +1078,8 @@ $snapshotJson"""
         } else status
 
     private fun EpicStatus.aggregateStatus() = when (this) {
-        EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT, EpicStatus.AWAITING_APPROVAL -> EpicStatus.AVAILABLE
+        EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT, EpicStatus.AWAITING_APPROVAL,
+        EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL, EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL -> EpicStatus.AVAILABLE
         else -> this
     }
 
@@ -990,9 +1110,9 @@ $snapshotJson"""
          * ruim onder de 2000 tekens van pf_design_process_session.result_summary.
          */
         private const val MAX_NO_EPIC_REASON_LENGTH = 1_800
-        private val REFINABLE_STATUSES = setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT, EpicStatus.AWAITING_APPROVAL, EpicStatus.AVAILABLE)
+        private val REFINABLE_STATUSES = setOf(EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT, EpicStatus.AWAITING_APPROVAL, EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL, EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL, EpicStatus.AVAILABLE)
         private val RETURNABLE_FOR_REFINEMENT = setOf(
-            EpicStatus.AWAITING_APPROVAL, EpicStatus.AVAILABLE, EpicStatus.IN_PLANNING, EpicStatus.ACTIVE,
+            EpicStatus.AWAITING_APPROVAL, EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL, EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL, EpicStatus.AVAILABLE, EpicStatus.IN_PLANNING, EpicStatus.ACTIVE,
             EpicStatus.VERIFYING, EpicStatus.COMPLETED, EpicStatus.NOT_SUCCESSFUL,
         )
         private val EXTERNAL_DATA_PATTERN = Regex("""(?i)\b(bron|bronnen|archief|archieven|collectie|collecties|dataset|datasets|api|data|gegevens)\b""")

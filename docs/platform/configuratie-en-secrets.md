@@ -25,10 +25,14 @@ stoppen startup zonder waarden te loggen.
 | `PF_DB_PASSWORD` | ja | ja | afzonderlijk databasewachtwoord per omgeving |
 | `PF_GOOGLE_CLIENT_ID` | ja | ja | audience voor Google-login |
 | `PF_STAKEHOLDER_EMAILS` | ja | ja | gesloten allowlist van Stakeholder-e-mailadressen |
+| `PF_FACTORY_OWNER_EMAILS` | ja | ja | subset met globale `FACTORY_OWNER`-rechten; overige toegelaten gebruikers krijgen alleen expliciete productlidmaatschappen |
 | `PF_SESSION_SIGNING_SECRET` | ja | ja | nieuwe sleutel voor Product Factory-sessies |
 | `PF_SOFTWARE_FACTORY_MODE` | nee | ja | `DISABLED` vóór stap 8, `MOCKED` in acceptatie en `REAL` voor de echte productieadapter |
 | `PF_SOFTWARE_FACTORY_URL` | nee | ja vanaf stap 8 | HTTPS-basis-URL van het Software Factory v2-contract; productie gebruikt `https://dashboard.vdzonsoftware.nl/api/integrations/v2` |
 | `PF_SOFTWARE_FACTORY_TOKEN` | ja | ja vanaf stap 8 | Bearer-token voor de echte adapter; dezelfde waarde heet aan Software Factory-zijde `SF_PRODUCT_FACTORY_TOKEN` |
+| `PF_SOFTWARE_FACTORY_DASHBOARD_URL` | nee | ja voor hotfixstatus | interne basis-URL van de bestaande dashboard-story-API |
+| `PF_SOFTWARE_FACTORY_DASHBOARD_TOKEN` | ja | ja voor hotfixstatus | kortlevend, doelgebonden dashboardtoken; nooit aan Agent Runtime of Product Advisor doorgeven |
+| `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED` | nee | ja | fail-closed featureguard; blijft `false` totdat create-responseherstel via de bestaande lijstendpoint is bewezen |
 | `PF_AGENT_RUNTIME_URL` | nee | ja vanaf stap 4 | HTTPS-basis-URL van de Agent Runtime voor deze omgeving |
 | `PF_AGENT_RUNTIME_TOKEN` | ja | ja vanaf stap 4 | gescopete Product Factory-consumentcredential; nooit een worker- of admincredential |
 | `PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN` | ja | nee | alleen integratie/acceptatie voor gescopete Runtime-mockfixtures; nooit in productie |
@@ -70,5 +74,7 @@ output wordt alleen via de expliciete `PF_SEAL_*`-variabelen gekozen.
 
 Het plaintext bestand blijft altijd in de repositoryroot, gitignored en met rechten `0600`.
 Vanaf stap 8 bevat de gesloten sleutellijst van hetzelfde script ook
-`PF_SOFTWARE_FACTORY_TOKEN`. Er komt geen tweede seal-script of alternatieve locatie voor
-`secrets.env`.
+`PF_SOFTWARE_FACTORY_TOKEN`, `PF_FACTORY_OWNER_EMAILS` en
+`PF_SOFTWARE_FACTORY_DASHBOARD_TOKEN`. Er komt geen tweede seal-script of alternatieve locatie voor
+`secrets.env`. Het aparte rotatiehulpmiddel maakt alleen het dashboardtoken opnieuw aan en gebruikt
+dezelfde productie-SealedSecretlocatie; zie het [Product Advisor-runbook](product-advisor-runbook.md).

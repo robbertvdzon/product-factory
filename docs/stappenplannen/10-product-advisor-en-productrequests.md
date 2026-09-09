@@ -1,6 +1,12 @@
 # Stap 10 — Product Advisor en Product Requests
 
-Implementatiestatus: gepland, nog niet uitgevoerd.
+Implementatiestatus: uitgevoerd op 2026-09-09, met één bewust gesloten productieguard. De gewone
+bugfix- en epicroutes, autorisatie, gesprekken, advisor, approvals, vragen, status en Testbed zijn
+opgeleverd. De hotfixadapter en het roteerbare dashboardtoken zijn op productie getest, maar
+`PF_SOFTWARE_FACTORY_HOTFIX_ENABLED` blijft `false`: de bestaande Software Factory-detailroute vond
+de probe wel terug, terwijl de lijstendpoint het marker-item niet retourneerde. Daardoor is veilig
+herstel na een verloren create-response nog niet bewezen. Zie het
+[bewijsrecord](../product-advisor-bewijsrecord.md) en [runbook](../platform/product-advisor-runbook.md).
 
 ## Doel en eindtoestand
 

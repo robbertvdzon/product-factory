@@ -11,6 +11,17 @@ geen intelligente procesmodule, gebruikt geen AI-agents en bezit geen productlog
 Daarom heeft hij geen `AgentRoleKey`, leest of schrijft hij geen Agentgeheugen en vraagt hij geen
 `AiTask` aan.
 
+Product Advisor gebruikt daarnaast twee afgescheiden routes. Een bevestigde `BUGFIX` gebruikt
+rechtstreeks hetzelfde bestaande v2-contract met `sourceStoryId` gelijk aan het ProductRequest-ID
+en `sourceStoryVersion` gelijk aan de bevestigde versie. Een `HOTFIX` gebruikt uitsluitend de
+bestaande dashboard-story-API met `hotfix=true` en de zichtbare marker
+`Product-Request: <uuid>:v<versie>`. Het dashboardtoken blijft buiten Runtime en prompts.
+
+De hotfixroute is operationeel fail-closed via `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED`. Productie houdt
+die schakelaar uit totdat een productieprobe aantoont dat de lijstendpoint de marker teruggeeft;
+zonder dat bewijs is retry na een mogelijk verloren create-response niet idempotent aantoonbaar.
+Details staan in het [Product Advisor-runbook](../platform/product-advisor-runbook.md).
+
 ## Verantwoordelijkheid
 
 De dispatcher:

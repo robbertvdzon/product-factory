@@ -3,10 +3,12 @@ package nl.vdzon.productfactory.product
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.api.product.*
+import nl.vdzon.productfactory.api.advisor.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.api.quality.*
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.dao.EmptyResultDataAccessException
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -251,13 +253,43 @@ class ProductApplicationService(
         requireProduct(command.productId)
         val id = StakeholderQuestionId(UUID.randomUUID().toString())
         val now = clock.instant()
+        val respondent = command.requestedRespondentUserId
+            ?: command.productRequestId?.let { requestId -> jdbc.query(
+                "SELECT requested_by FROM pf_product_request WHERE request_id=? AND product_id=?",
+                { rs, _ -> UserId(rs.getString(1)) }, requestId.value, command.productId.value,
+            ).singleOrNull() }
+            ?: jdbc.query(
+                "SELECT user_id FROM pf_user_global_role WHERE role='FACTORY_OWNER' ORDER BY granted_at",
+                { rs, _ -> UserId(rs.getString(1)) },
+            ).firstOrNull()
+        respondent?.let {
+            val valid = jdbc.queryForObject(
+                """SELECT COUNT(*) FROM pf_user_account u WHERE u.user_id=? AND u.active=TRUE AND (
+                    EXISTS (SELECT 1 FROM pf_user_global_role r WHERE r.user_id=u.user_id AND r.role='FACTORY_OWNER') OR
+                    EXISTS (SELECT 1 FROM pf_product_membership m WHERE m.user_id=u.user_id AND m.product_id=? AND m.status='ACTIVE'))""".trimIndent(),
+                Long::class.java, it.value, command.productId.value,
+            ) ?: 0
+            if (valid == 0L) throw InvalidCommand("De geadresseerde heeft geen actieve producttoegang.")
+        }
         jdbc.update(
-            """INSERT INTO pf_stakeholder_question(question_id,product_id,agent_role,question,context,process_session_id,linked_objects_json,status,created_at,updated_by_type,updated_by_id,version)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            """INSERT INTO pf_stakeholder_question(question_id,product_id,agent_role,question,context,process_session_id,linked_objects_json,status,
+               created_at,updated_by_type,updated_by_id,version,requested_respondent_user_id,product_request_id,epic_link_id,story_link_id)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             id.value, command.productId.value, requiredText(command.agentRole, "Agentrol"), requiredText(command.question, "Vraag"),
             requiredText(command.context, "Vraagcontext"), command.processSessionId.value, json(command.linkedObjects),
             StakeholderQuestionStatus.OPEN.name, now, command.actor.type.name, command.actor.id, 1L,
+            respondent?.value, command.productRequestId?.value, command.epicLinkId?.value, command.storyLinkId?.value,
         )
+        respondent?.let {
+            try {
+                jdbc.update(
+                    """INSERT INTO pf_personal_notification(notification_id,recipient_user_id,product_id,event_key,kind,title,target_type,target_id,created_at)
+                        VALUES (?,?,?,?,?,?,?,?,?)""".trimIndent(),
+                    UUID.randomUUID().toString(), it.value, command.productId.value, "question:${id.value}", "QUESTION_OPEN",
+                    command.question.take(300), "QUESTION", id.value, now,
+                )
+            } catch (_: DuplicateKeyException) { }
+        }
         appendQuestionToOpenMeetings(command.productId, id, command.question, now)
         remember(command.idempotencyKey, "ASK_STAKEHOLDER", id.value, fingerprint, id.value, command.actor, now)
         return id
@@ -584,6 +616,8 @@ class ProductApplicationService(
         StakeholderQuestionStatus.valueOf(rs.getString("status")), rs.getString("answer"), rs.getString("meeting_id")?.let(::MeetingId),
         rs.getString("answer_message_id"), rs.getString("withdrawal_reason"), instant(rs, "created_at")!!,
         instant(rs, "answered_at"), instant(rs, "withdrawn_at"), rs.getLong("version"),
+        rs.getString("requested_respondent_user_id")?.let(::UserId), rs.getString("product_request_id")?.let(::ProductRequestId),
+        rs.getString("epic_link_id")?.let(::EpicId), rs.getString("story_link_id")?.let(::StoryId),
     )
 
     private fun meeting(rs: ResultSet): MeetingDetails {

@@ -91,6 +91,9 @@ class AuthenticationController(
             authRequired = true,
             stakeholderEmail = resolved.stakeholderEmail,
             csrfToken = resolved.csrfToken,
+            userId = resolved.userId,
+            globalRoles = resolved.globalRoles,
+            productMemberships = resolved.productMemberships,
         ))
     }
 

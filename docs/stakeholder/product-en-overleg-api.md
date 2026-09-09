@@ -19,6 +19,17 @@ authenticatie en autorisatie, niet bij dit domeinmodel.
 
 ## Publieke interface
 
+Naast de bestaande product- en overlegcommands biedt Product Advisor geauthenticeerde REST-routes
+voor productgesprekken, append-only berichten, requestdetails en versiegebonden goedkeuring. Alle
+productroutes gebruiken één centrale autorisatiecontrole: een actieve product owner ziet alleen
+toegewezen producten; een factory owner ziet alles. Gebruikers- en lidmaatschapsbeheer staat alleen
+open voor de factory owner en bewaart een auditbare grant/revokehistorie.
+
+De persoonlijke queries `/api/my/actions` en `/api/my/notifications` leiden de gebruiker altijd uit
+de backend-sessie af. Een client kan geen ander user-ID meegeven. Iedere publieke mutatie gebruikt
+een verwachte versie en idempotentiesleutel; intrekken van toegang vereist daarnaast reden en
+expliciete bevestiging.
+
 ```java
 ProductId createProduct(CreateProductCommand command);
 void updateProductAssignment(UpdateProductAssignmentCommand command);
