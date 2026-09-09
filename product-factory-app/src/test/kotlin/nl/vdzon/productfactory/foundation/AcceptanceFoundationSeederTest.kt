@@ -3,6 +3,9 @@ package nl.vdzon.productfactory.foundation
 import nl.vdzon.productfactory.api.testbed.ActivateTestScenarioCommand
 import nl.vdzon.productfactory.api.testbed.ResetAcceptanceEnvironmentCommand
 import nl.vdzon.productfactory.api.testbed.TestControlService
+import nl.vdzon.productfactory.api.product.ProductQueryService
+import nl.vdzon.productfactory.api.shared.ProductId
+import nl.vdzon.productfactory.advisor.AcceptanceProductAdvisorScenarioContributor
 import nl.vdzon.productfactory.testbed.ExternalMutationGate
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -38,6 +41,7 @@ class AcceptanceFoundationSeederTest(
     @Autowired private val testControlService: TestControlService,
     @Autowired private val externalMutationGate: ExternalMutationGate,
     @Autowired private val mockMvc: MockMvc,
+    @Autowired private val products: ProductQueryService,
 ) {
     @Test
     fun `acceptatie seedt vaste synthetische metadata`() {
@@ -57,6 +61,10 @@ class AcceptanceFoundationSeederTest(
         assertThat(repository.find("scenario.key")).isEqualTo("outbound-mutations-blocked")
         assertThat(testControlService.getActiveScenario().scenario.key).isEqualTo("outbound-mutations-blocked")
         assertThat(testControlService.getActiveScenario().lock?.browserSessionId).isEqualTo("browser-owner")
+
+        testControlService.resetAcceptanceEnvironment(ResetAcceptanceEnvironmentCommand("advisor-information", "browser-owner"))
+        assertThat(products.getProductAssignment(ProductId("synthetic-history")).publicGitUrl)
+            .isEqualTo(AcceptanceProductAdvisorScenarioContributor.PVD_D_GIT_URL)
     }
 
     @Test
@@ -93,4 +101,5 @@ class AcceptanceFoundationSeederTest(
             jsonPath("$.code") { value("INVALID_TEST_CONTROL_COMMAND") }
         }
     }
+
 }

@@ -1,6 +1,11 @@
 package nl.vdzon.productfactory.advisor
 
 import nl.vdzon.productfactory.api.advisor.CreateConversationCommand
+import nl.vdzon.productfactory.api.product.ProductCommandService
+import nl.vdzon.productfactory.api.product.ProductQueryService
+import nl.vdzon.productfactory.api.product.UpdateProductAssignmentCommand
+import nl.vdzon.productfactory.api.shared.ActorReference
+import nl.vdzon.productfactory.api.shared.ActorType
 import nl.vdzon.productfactory.api.shared.ProductId
 import nl.vdzon.productfactory.api.testbed.AcceptanceFixtureContext
 import nl.vdzon.productfactory.api.testbed.AcceptanceFixtureContributor
@@ -45,6 +50,8 @@ class AcceptanceProductAdvisorIdentityResetContributor(
 class AcceptanceProductAdvisorScenarioContributor(
     private val advisor: ProductAdvisorApplicationService,
     private val users: UserIdentityRepository,
+    private val productCommands: ProductCommandService,
+    private val productQueries: ProductQueryService,
 ) : AcceptanceFixtureContributor {
     override val key = "product-advisor-scenario"
     override val order = 260
@@ -52,6 +59,19 @@ class AcceptanceProductAdvisorScenarioContributor(
     override fun reset(context: AcceptanceFixtureContext) {
         if (!context.scenarioKey.startsWith("advisor-")) return
         val productId = ProductId("synthetic-history")
+        val assignment = productQueries.getProductAssignment(productId)
+        productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
+            productId = productId,
+            audience = assignment.audience,
+            goal = assignment.goal,
+            hardBoundaries = assignment.hardBoundaries,
+            publicGitUrl = PVD_D_GIT_URL,
+            expectedVersion = assignment.version,
+            actor = SYSTEM,
+            idempotencyKey = "fixture:${context.datasetVersion}:${context.scenarioKey}:advisor-repository",
+            aiSupplier = assignment.aiSupplier,
+            aiModel = assignment.aiModel,
+        ))
         val factoryOwner = users.resolveOrCreate("factory-owner@acceptance.invalid", true)
         val productOwner = users.resolveOrCreate("product-owner@acceptance.invalid", false)
         users.grantProductOwner(
@@ -76,5 +96,10 @@ class AcceptanceProductAdvisorScenarioContributor(
         "advisor-double-approval" -> "Epic in twee stappen beoordelen"
         "advisor-refinement" -> "Epic terugsturen en herzien"
         else -> "Autorisatiescheiding controleren"
+    }
+
+    companion object {
+        const val PVD_D_GIT_URL = "https://github.com/robbertvdzon/pvdd.git"
+        private val SYSTEM = ActorReference(ActorType.SYSTEM, "acceptance-product-advisor-fixture")
     }
 }
