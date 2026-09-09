@@ -49,9 +49,12 @@ MVP-eisen en worden niet in code of productieseed hardgecodeerd.
 | 7 | [Kwaliteitsbewaking MVP](07-kwaliteitsbewaking-mvp.md) | Eén testeragent levert verificaties, bugs en kwaliteitshistorie. |
 | 8 | [Software Factory-dispatcher](08-software-factory-dispatcher.md) | Stories worden één voor één geleverd en opleveringen worden verwerkt. |
 | 9 | [Volledige MVP-productflow](09-volledige-mvp-productflow.md) | De complete route van Stakeholder tot gebouwde en gecontroleerde verbetering werkt. |
+| 10 | [Agent Runtime v2-migratie](10-agent-runtime-v2-migratie.md) | Alle Product Factory-AI gebruikt expliciete v2-uitvoering, hervatbare objectuploads, artifacts en centrale usage/kosten. |
 
 De stappen 1 tot en met 9 zijn uitgevoerd. Het technische MVP is afgesloten met automatische
 schedules, de volledige keten, negentien vaste Testbedscenario's en een normatief bewijsrecord.
+Stap 10 is een post-MVP-migratieplan en begint pas wanneer de daarin genoemde additive Agent
+Runtime-voorwaarden beschikbaar zijn.
 
 ## Algemene regels voor iedere stap
 
