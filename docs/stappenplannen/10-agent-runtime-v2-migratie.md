@@ -95,10 +95,9 @@ Product Factory gebruikt nu `/v1` en heeft de volgende eigenschappen:
   standaard na een bewaartermijn kan worden verwijderd.
 
 Agent Runtime v2 lost de grote REST-body op met hervatbare uploads, maar mist op het moment van dit
-plan nog vier Product Factory-voorwaarden: een v2-uitvoeringscatalogus, een v2-environmentcatalogus,
-een gerichte v2-mockfixture-API en directe idempotency-lookup. Deze voorwaarden worden in fase 0
-achterwaarts compatibel toegevoegd. Product Factory mag pas omschakelen als ze op de doelomgeving
-zijn gedeployd.
+plan nog drie Product Factory-voorwaarden: een v2-uitvoeringscatalogus, een v2-environmentcatalogus
+en een gerichte v2-mockfixture-API. Deze voorwaarden worden in fase 0 achterwaarts compatibel
+toegevoegd. Product Factory mag pas omschakelen als ze op de doelomgeving zijn gedeployd.
 
 ## Vaste ontwerpbesluiten
 
@@ -357,16 +356,7 @@ haal geen bestand rechtstreeks van disk.
 Voer deze fase uit in `GIT_ROOT/agent-runtime`, met additive contracts en zonder `/v1` te wijzigen of
 te verwijderen. Release deze wijzigingen eerst naar acceptatie en productie.
 
-### 0.1 Exacte idempotency-lookup
-
-Breid `GET /v2/jobs` uit met een optionele exacte queryparameter `idempotencyKey`. De consumer ziet
-alleen zijn eigen tenant. Met deze filter bevat de pagina nul of één job; combinaties met status,
-cursor en ongeldige limieten worden eenduidig gevalideerd en in OpenAPI beschreven.
-
-Dit is nodig om na een verloren `POST /v2/jobs`-response vast te stellen of de job al bestaat. Een
-onbegrensde paginascannende workaround is voor de Product Factory-outbox niet acceptabel.
-
-### 0.2 Uitvoeringscatalogus voor consumers
+### 0.1 Uitvoeringscatalogus voor consumers
 
 Voeg een tenant-gefilterde consumerroute toe:
 
@@ -390,7 +380,7 @@ Baseer beschikbaarheid op v2-workerregistraties en heartbeats, pas de tenantallo
 server-side `mock/mock/MOCK`-mogelijkheid alleen buiten productie op. Dit is een catalogus, geen
 fallbackmechanisme.
 
-### 0.3 Environmentkeycatalogus voor v2
+### 0.2 Environmentkeycatalogus voor v2
 
 Voeg een tenant-gefilterde consumerroute toe:
 
@@ -402,7 +392,7 @@ Gebruik v2-workerregistraties als bron en retourneer naam, projectprefix, beschi
 `matchingOnlineWorkers` en `lastSeenAt`. Geef nooit een secretwaarde terug. Valideer dat de prefix
 binnen de tenantpolicy valt. De bestaande v1-catalogus is geen geldige bron voor v2-workers.
 
-### 0.4 Gerichte v2-mockfixtures
+### 0.3 Gerichte v2-mockfixtures
 
 De generieke v2-mock die lege waarden uit een JSON-schema maakt, is onvoldoende voor Product
 Factory-scenario's. Voeg een acceptance-only route toe onder `/v2/test-control/mocks`, met list,
@@ -420,11 +410,11 @@ de job zichtbaar met `NO_MOCK_RESPONSE_CONFIGURED`; genereer voor deze tenant ni
 schemaresultaat. `outputSequence` blijft bruikbaar om eerst ongeldige en daarna geldige structured
 output te testen.
 
-### 0.5 Runtime-bewijs voor fase 0
+### 0.4 Runtime-bewijs voor fase 0
 
 Voeg contract-, security-, repository- en integratietests toe voor:
 
-- tenantisolatie van lookup en catalogi;
+- tenantisolatie van beide catalogi;
 - geen fallback bij een onbekende vendor/model/mode/task-combinatie;
 - online/offline workerberekening;
 - alleen keynamen uit toegestane prefixes;
@@ -506,7 +496,8 @@ en de Product Factory-interface bewust klein en testbaar.
 Implementeer:
 
 - upload create, HEAD, PATCH, complete en best-effort DELETE;
-- job create en exact lookup op idempotency key;
+- idempotente jobcreate waarbij exact dezelfde request na een verloren response opnieuw kan worden
+  verstuurd;
 - status, result, attempts, events, cancel en contentdelete;
 - execution- en environmentcatalogi;
 - artifactdownload met `Range`, stream-copy, maximale grootte, hashcontrole en hervatting;
@@ -522,18 +513,24 @@ niet voor fileupload of -download.
 inhoud, metadata, fingerprint en outboxopdracht. De dispatcher voert per taak exact dit algoritme
 uit:
 
-1. Zoek vóór uploaden en vóór create bij Runtime op de exacte `runtime_idempotency_key`.
-2. Is een job gevonden, sla het Runtime-job-ID op en ga direct naar reconciliatie.
-3. Doorloop anders de immutable lokale inputobjecten in vaste volgorde.
-4. Heeft een input een niet-verlopen upload-ID, vraag met HEAD de actuele offset op.
-5. Upload ontbrekende bytes vanaf die offset in de door Runtime geadviseerde chunkgrootte.
-6. Rond de upload af en bewaar het gecontroleerde READY-object-ID.
-7. Is een upload verlopen of definitief verdwenen, maak alleen voor dat inputobject een nieuwe
-   upload. Controleer vooraf nogmaals dat geen job met de idempotency key bestaat.
-8. Bouw de definitieve `CreateJobRequest` deterministisch uit de opgeslagen READY-object-ID's.
-9. Verstuur `POST /v2/jobs`.
-10. Is de response zeker afgewezen, pas de bestaande retry/failregels toe. Is de response mogelijk
-    verloren, doe eerst exacte lookup; maak niet meteen een nieuwe upload of logische job.
+1. Staat al een definitieve `CreateJobRequest` in de outbox, verstuur dan exact diezelfde request
+   opnieuw en sla alle uploadstappen over. De bestaande Runtime-idempotency garandeert dat dit
+   dezelfde job teruggeeft als een eerdere response verloren ging.
+2. Doorloop anders de immutable lokale inputobjecten in vaste volgorde.
+3. Heeft een input een niet-verlopen upload-ID, vraag met HEAD de actuele offset op.
+4. Upload ontbrekende bytes vanaf die offset in de door Runtime geadviseerde chunkgrootte.
+5. Rond de upload af en bewaar het gecontroleerde READY-object-ID.
+6. Is een upload verlopen of definitief verdwenen voordat de definitieve jobrequest is bevroren,
+   maak dan alleen voor dat inputobject een nieuwe upload.
+7. Bouw de definitieve `CreateJobRequest` deterministisch uit de opgeslagen READY-object-ID's en
+   bewaar de volledige request transactioneel in de outbox voordat de eerste POST wordt verstuurd.
+8. Verstuur `POST /v2/jobs`.
+9. Is de response mogelijk verloren, plan dan een retry van exact de opgeslagen request; maak geen
+   nieuwe uploads, wijzig geen object-ID en maak geen nieuwe logische job.
+10. Wijst Runtime de opgeslagen request definitief af met `INPUT_OBJECT_NOT_READY`, dan heeft de
+    idempotencycontrole van Runtime eerst vastgesteld dat er nog geen bestaande job is. Alleen dan
+    mag Product Factory de definitieve request vrijgeven, het betrokken object opnieuw uploaden en
+    een nieuwe request met dezelfde inhoudelijke fingerprint opbouwen.
 11. Na geaccepteerde create: sla job-ID en status op, markeer de outbox verzonden en wis lokale
     inputbytes volgens het retentiebeleid.
 
@@ -701,7 +698,8 @@ Test minimaal:
 - prompt en Markdown/textattachments staan als objectrefs in job-JSON en nooit als Base64;
 - upload create/PATCH/HEAD/complete, verkeerde offset, verlopen upload en hervatting;
 - upload- en downloadstreams gebruiken begrensde buffers en Range;
-- verloren create-response leidt via idempotency-lookup tot exact één Runtime-job;
+- verloren create-response leidt door herhaling van exact dezelfde opgeslagen POST tot exact één
+  Runtime-job;
 - restart halverwege upload en restart tussen complete en jobcreate;
 - dezelfde idempotency key met gewijzigde inhoud faalt;
 - outboxdispatchers kunnen dezelfde taak niet parallel dubbel indienen;
@@ -812,7 +810,7 @@ voor de exacte actuele commando's.
 
 ## Aanbevolen commitgrenzen
 
-1. Agent Runtime idempotency-lookup en v2-catalogi.
+1. Agent Runtime v2-catalogi.
 2. Agent Runtime test-control-rol, gerichte mocks en OpenAPI/tests.
 3. Product Factory expandmigratie en publieke executioncontracten.
 4. V2-upload/jobclient en outboxherstel.
