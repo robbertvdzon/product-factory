@@ -41,8 +41,9 @@ data class RetractMemoryRequest(
 )
 
 data class UpdateAiSettingsRequest(
-    val provider: AiProvider,
+    val vendorId: String,
     val model: String,
+    val mode: AiExecutionMode,
     val enabled: Boolean,
     val expectedVersion: Long,
     val idempotencyKey: String,
@@ -51,7 +52,7 @@ data class UpdateAiSettingsRequest(
 data class MemoryIdResponse(val id: String)
 data class CancelAiTaskRequest(val reason: String)
 data class RefreshEnvironmentCatalogRequest(val projectPrefix: String)
-data class RefreshModelCatalogRequest(val provider: String)
+data class RefreshExecutionCatalogRequest(val taskType: String = "STRUCTURED_GENERATION")
 data class SetProductEnvironmentKeyRequest(val active: Boolean, val expectedVersion: Long, val idempotencyKey: String)
 data class SetAgentEnvironmentGrantRequest(val granted: Boolean, val idempotencyKey: String)
 
@@ -152,7 +153,7 @@ class AiSettingsController(
         @RequestBody request: UpdateAiSettingsRequest,
         authentication: Authentication?,
     ) = commands.updateAiJobConfiguration(UpdateAiJobConfigurationCommand(
-        AiJobKey(jobKey), request.provider, request.model, request.enabled, request.expectedVersion,
+        AiJobKey(jobKey), AiExecutionSelection(request.vendorId, request.model, request.mode), request.enabled, request.expectedVersion,
         authentication.memoryStakeholder(), request.idempotencyKey,
     ))
 }
@@ -176,6 +177,12 @@ class AiTaskController(
 
     @GetMapping("/{taskId}/result")
     fun result(@PathVariable taskId: String) = queries.getAiTaskResult(AiTaskId(taskId))
+
+    @GetMapping("/{taskId}/events")
+    fun events(@PathVariable taskId: String) = queries.getAiTaskEvents(AiTaskId(taskId))
+
+    @GetMapping("/{taskId}/usage")
+    fun usage(@PathVariable taskId: String) = queries.getAiTaskUsage(AiTaskId(taskId))
 
     @PostMapping("/{taskId}/cancel")
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -205,12 +212,12 @@ class AgentEnvironmentAccessController(
     fun refresh(@RequestBody request: RefreshEnvironmentCatalogRequest) =
         commands.refreshEnvironmentCatalog(RefreshEnvironmentCatalogCommand(request.projectPrefix))
 
-    @GetMapping("/api/ai/model-catalog")
-    fun modelCatalog(@RequestParam provider: String) = queries.getModelCatalog(AiProvider.valueOf(provider))
+    @GetMapping("/api/ai/execution-catalog")
+    fun executionCatalog(@RequestParam(defaultValue = "STRUCTURED_GENERATION") taskType: String) = queries.getExecutionCatalog(taskType)
 
-    @PostMapping("/api/ai/model-catalog/refresh")
-    fun refreshModelCatalog(@RequestBody request: RefreshModelCatalogRequest) =
-        commands.refreshModelCatalog(RefreshModelCatalogCommand(AiProvider.valueOf(request.provider)))
+    @PostMapping("/api/ai/execution-catalog/refresh")
+    fun refreshExecutionCatalog(@RequestBody request: RefreshExecutionCatalogRequest) =
+        commands.refreshExecutionCatalog(RefreshExecutionCatalogCommand(request.taskType))
 
     @GetMapping("/api/products/{productId}/agent-environment-keys")
     fun productKeys(@PathVariable productId: String) = queries.getProductEnvironmentKeys(ProductId(productId))

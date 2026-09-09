@@ -185,7 +185,7 @@ class QualityMvpService(
     ) {
         val config = aiQueries.getAiJobConfiguration(JOB)
         val taskId = ai.requestAiTask(RequestAiTaskCommand(
-            JOB, productId, "quality", sessionId, ROLE.value, config.provider, config.model, config.version, 1,
+            JOB, productId, "quality", sessionId, ROLE.value, config.execution, config.version, 1,
             testerPrompt(contextJson), RESULT_SCHEMA, RepositorySnapshot(gitUrl, gitSha),
             executionTimeout = Duration.ofMinutes(45), idempotencyKey = "quality-${sessionId.value}-attempt-1",
         ))

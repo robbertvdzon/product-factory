@@ -111,7 +111,7 @@ class MeetingAiOrchestrator(
         val prompt = prompt(meeting, type, targetRole)
         val taskId = ai.requestAiTask(RequestAiTaskCommand(
             configuration.jobKey, meeting.productId, "stakeholder-meeting", null, targetRole,
-            configuration.provider, configuration.model, configuration.version, PROMPT_TEMPLATE_VERSION,
+            configuration.execution, configuration.version, PROMPT_TEMPLATE_VERSION,
             prompt, if (type == "CONVERSE") CONVERSATION_SCHEMA else MINUTES_SCHEMA,
             executionTimeout = Duration.ofMinutes(15), idempotencyKey = "meeting-$type-$idempotencyKey".take(150),
         ))

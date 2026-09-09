@@ -722,16 +722,35 @@ void main() {
         {
           'jobKey': 'MEETING.CONVERSE',
           'displayName': 'Overleg voeren',
-          'provider': 'CODEX',
-          'model': 'gpt-5.6-sol',
+          'execution': {
+            'vendorId': 'openai',
+            'model': 'gpt-5.6-sol',
+            'mode': 'SUBSCRIPTION',
+          },
           'enabled': true,
           'version': 3,
           'updatedAt': '2026-08-27T00:00:00Z',
           'updatedBy': {'type': 'SYSTEM', 'id': 'trusted-default'},
         },
       ]
-      ..modelsByProvider['CODEX'] = ['gpt-5.6-sol', 'gpt-4.1']
-      ..modelsByProvider['CLAUDE'] = ['claude-opus-5', 'claude-sonnet-5'];
+      ..executionOptions = [
+        {
+          'execution': {
+            'vendorId': 'openai',
+            'model': 'gpt-5.6-sol',
+            'mode': 'SUBSCRIPTION',
+          },
+          'available': true,
+        },
+        {
+          'execution': {
+            'vendorId': 'anthropic',
+            'model': 'claude-opus-5',
+            'mode': 'SUBSCRIPTION',
+          },
+          'available': true,
+        },
+      ];
 
     await tester.pumpWidget(
       MaterialApp(
@@ -746,7 +765,7 @@ void main() {
 
     await tester.tap(find.byTooltip('AI-model wijzigen'));
     await tester.pumpAndSettle();
-    expect(gateway.modelCatalogRequests, contains('CODEX'));
+    expect(gateway.executionCatalogRequests, 1);
 
     final dialogDropdowns = find.descendant(
       of: find.byType(AlertDialog),
@@ -755,20 +774,17 @@ void main() {
 
     await tester.tap(dialogDropdowns.first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('CLAUDE').last);
-    await tester.pumpAndSettle();
-    expect(gateway.modelCatalogRequests, contains('CLAUDE'));
-
-    await tester.tap(dialogDropdowns.last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('claude-opus-5').last);
+    await tester.tap(
+      find.text('anthropic / claude-opus-5 / SUBSCRIPTION').last,
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(appText('Opslaan'));
     await tester.pumpAndSettle();
 
-    expect(gateway.lastUpdateProvider, 'CLAUDE');
+    expect(gateway.lastUpdateVendorId, 'anthropic');
     expect(gateway.lastUpdateModel, 'claude-opus-5');
+    expect(gateway.lastUpdateMode, 'SUBSCRIPTION');
   });
 
   testWidgets(
@@ -781,8 +797,11 @@ void main() {
           {
             'jobKey': 'MEETING.CONVERSE',
             'displayName': 'Overleg voeren',
-            'provider': 'CODEX',
-            'model': 'gpt-5.6-sol',
+            'execution': {
+              'vendorId': 'openai',
+              'model': 'gpt-5.6-sol',
+              'mode': 'SUBSCRIPTION',
+            },
             'enabled': true,
             'version': 3,
             'updatedAt': '2026-08-27T00:00:00Z',
@@ -806,7 +825,7 @@ void main() {
 
       expect(find.byType(TextFormField), findsWidgets);
       expect(
-        appTextContaining('Kon modellen niet ophalen'),
+        appTextContaining('Kon uitvoeringsopties niet ophalen'),
         findsOneWidget,
       );
     },
@@ -815,7 +834,7 @@ void main() {
 
 class _ThrowingModelCatalogGateway extends FakeAgentRuntimeManagementGateway {
   @override
-  Future<List<Map<String, Object?>>> modelCatalog(String provider) async {
+  Future<List<Map<String, Object?>>> executionCatalog() async {
     throw StateError('Agent Runtime niet bereikbaar');
   }
 }
@@ -882,8 +901,9 @@ class FakeMemoryAiGateway implements MemoryAiGateway {
   @override
   Future<void> updateAi(
     Map<String, Object?> setting,
-    String provider,
+    String vendorId,
     String model,
+    String mode,
     bool enabled,
   ) => throw UnimplementedError();
 }
@@ -1303,11 +1323,12 @@ class FakeAgentRuntimeManagementGateway extends FakeMemoryAiGateway
   final List<String> catalogPrefixes = [];
   String? refreshedPrefix;
   List<Map<String, Object?>> aiSettingsData = const [];
-  final Map<String, List<String>> modelsByProvider = {};
-  final List<String> modelCatalogRequests = [];
-  String? refreshedModelProvider;
-  String? lastUpdateProvider;
+  List<Map<String, Object?>> executionOptions = const [];
+  int executionCatalogRequests = 0;
+  bool refreshedExecutionCatalog = false;
+  String? lastUpdateVendorId;
   String? lastUpdateModel;
+  String? lastUpdateMode;
 
   @override
   Future<List<Map<String, Object?>>> products() async => const [
@@ -1320,25 +1341,25 @@ class FakeAgentRuntimeManagementGateway extends FakeMemoryAiGateway
   @override
   Future<void> updateAi(
     Map<String, Object?> setting,
-    String provider,
+    String vendorId,
     String model,
+    String mode,
     bool enabled,
   ) async {
-    lastUpdateProvider = provider;
+    lastUpdateVendorId = vendorId;
     lastUpdateModel = model;
+    lastUpdateMode = mode;
   }
 
   @override
-  Future<List<Map<String, Object?>>> modelCatalog(String provider) async {
-    modelCatalogRequests.add(provider);
-    return (modelsByProvider[provider] ?? const [])
-        .map((model) => {'provider': provider, 'model': model})
-        .toList();
+  Future<List<Map<String, Object?>>> executionCatalog() async {
+    executionCatalogRequests++;
+    return executionOptions;
   }
 
   @override
-  Future<void> refreshModelCatalog(String provider) async {
-    refreshedModelProvider = provider;
+  Future<void> refreshExecutionCatalog() async {
+    refreshedExecutionCatalog = true;
   }
 
   @override

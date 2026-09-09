@@ -175,7 +175,7 @@ class ProductPlanningMvpService(
         val jobKey = if (phase == "SELECTING") SELECT_JOB else PLAN_JOB
         val config = aiQueries.getAiJobConfiguration(jobKey)
         val taskId = ai.requestAiTask(RequestAiTaskCommand(
-            jobKey, productId, "product-planning", sessionId, ROLE.value, config.provider, config.model, config.version,
+            jobKey, productId, "product-planning", sessionId, ROLE.value, config.execution, config.version,
             if (phase == "SELECTING") SELECT_PROMPT_VERSION else PLAN_PROMPT_VERSION,
             if (phase == "SELECTING") selectionPrompt(snapshotJson) else planningPrompt(snapshotJson),
             if (phase == "SELECTING") SELECTION_SCHEMA else PLAN_SCHEMA, RepositorySnapshot(gitUrl, sha),

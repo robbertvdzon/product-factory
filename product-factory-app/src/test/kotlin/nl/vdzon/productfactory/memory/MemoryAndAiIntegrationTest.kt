@@ -144,17 +144,16 @@ class MemoryAndAiIntegrationTest(
             "PRODUCT_DESIGN.CREATE_EPIC", "QUALITY.VERIFY_EPIC",
         )
         assertThat(defaults).allSatisfy {
-            assertThat(it.provider).isEqualTo(AiProvider.CODEX)
-            assertThat(it.model).isEqualTo("gpt-5.6-sol")
+            assertThat(it.execution).isEqualTo(AiExecutionSelection("openai", "gpt-5.6-sol", AiExecutionMode.SUBSCRIPTION))
         }
         val command = UpdateAiJobConfigurationCommand(
-            AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), AiProvider.CLAUDE, "claude-sonnet-4-5", true, 0,
+            AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), AiExecutionSelection("anthropic", "claude-sonnet-4-5", AiExecutionMode.SUBSCRIPTION), true, 0,
             STAKEHOLDER, "ai-settings-${UUID.randomUUID()}",
         )
         val updated = ai.updateAiJobConfiguration(command)
         assertThat(ai.updateAiJobConfiguration(command)).isEqualTo(updated)
         assertThat(updated.version).isEqualTo(1)
-        assertThatThrownBy { ai.updateAiJobConfiguration(command.copy(model = "onbekend", expectedVersion = 1, idempotencyKey = "ai-invalid-${UUID.randomUUID()}")) }
+        assertThatThrownBy { ai.updateAiJobConfiguration(command.copy(execution = AiExecutionSelection("mock", "onbekend", AiExecutionMode.MOCK), expectedVersion = 1, idempotencyKey = "ai-invalid-${UUID.randomUUID()}")) }
             .isInstanceOf(InvalidCommand::class.java)
         assertThatThrownBy { ai.updateAiJobConfiguration(command.copy(expectedVersion = 0, idempotencyKey = "ai-stale-${UUID.randomUUID()}")) }
             .isInstanceOf(VersionConflict::class.java)
@@ -162,7 +161,7 @@ class MemoryAndAiIntegrationTest(
         val production = AiSettingsApplicationService(jdbc, clock, "production")
         assertThatThrownBy {
             production.updateAiJobConfiguration(
-                UpdateAiJobConfigurationCommand(AiJobKey("MEETING.CONVERSE"), AiProvider.MOCKED, "scenario", true, 0, STAKEHOLDER, "prod-mocked-${UUID.randomUUID()}"),
+                UpdateAiJobConfigurationCommand(AiJobKey("MEETING.CONVERSE"), AiExecutionSelection("mock", "mock", AiExecutionMode.MOCK), true, 0, STAKEHOLDER, "prod-mocked-${UUID.randomUUID()}"),
             )
         }.isInstanceOf(InvalidCommand::class.java).hasMessageContaining("productie")
         assertThat(jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE lower(table_name)='pf_ai_task'")).hasSize(1)

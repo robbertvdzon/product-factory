@@ -30,12 +30,12 @@ class AiSettingsApplicationService(
         val current = currentConfiguration(command.jobKey)
         val currentVersion = current?.version ?: 0L
         if (currentVersion != command.expectedVersion) throw VersionConflict("AI-jobconfiguratie is intussen gewijzigd.")
-        validateSelection(command.provider, command.model)
+        validateSelection(command.execution)
         val now = clock.instant()
         val nextVersion = currentVersion + 1
         jdbc.update(
-            "INSERT INTO pf_ai_job_configuration(job_key,version,provider,model,enabled,updated_at,actor_type,actor_id) VALUES (?,?,?,?,?,?,?,?)",
-            command.jobKey.value, nextVersion, command.provider.name, command.model.trim(), command.enabled,
+            "INSERT INTO pf_ai_job_configuration(job_key,version,provider,vendor_id,model,execution_mode,enabled,updated_at,actor_type,actor_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            command.jobKey.value, nextVersion, legacyProvider(command.execution), command.execution.vendorId.trim(), command.execution.model.trim(), command.execution.mode.name, command.enabled,
             now, command.actor.type.name, command.actor.id,
         )
         jdbc.update(
@@ -50,7 +50,7 @@ class AiSettingsApplicationService(
     fun getAiJobConfiguration(jobKey: AiJobKey): AiJobConfigurationDetails {
         val definition = definition(jobKey)
         return currentConfiguration(jobKey) ?: AiJobConfigurationDetails(
-            jobKey, definition.displayName, definition.defaultProvider, definition.defaultModel,
+            jobKey, definition.displayName, definition.defaultExecution,
             definition.defaultEnabled, 0, Instant.EPOCH, ActorReference(ActorType.SYSTEM, "trusted-default"),
         )
     }
@@ -63,8 +63,9 @@ class AiSettingsApplicationService(
             val exists = jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_job_definition WHERE job_key=?", Long::class.java, definition.jobKey.value) ?: 0
             if (exists == 0L) {
                 jdbc.update(
-                    "INSERT INTO pf_ai_job_definition(job_key,display_name,default_provider,default_model,default_enabled) VALUES (?,?,?,?,?)",
-                    definition.jobKey.value, definition.displayName, definition.defaultProvider.name, definition.defaultModel, definition.defaultEnabled,
+                    "INSERT INTO pf_ai_job_definition(job_key,display_name,default_provider,default_vendor_id,default_model,default_execution_mode,default_enabled) VALUES (?,?,?,?,?,?,?)",
+                    definition.jobKey.value, definition.displayName, legacyProvider(definition.defaultExecution), definition.defaultExecution.vendorId,
+                    definition.defaultExecution.model, definition.defaultExecution.mode.name, definition.defaultEnabled,
                 )
             }
         }
@@ -78,10 +79,11 @@ class AiSettingsApplicationService(
     private fun currentConfiguration(jobKey: AiJobKey): AiJobConfigurationDetails? {
         val definition = definition(jobKey)
         return jdbc.query(
-            "SELECT provider,model,enabled,version,updated_at,actor_type,actor_id FROM pf_ai_job_configuration WHERE job_key=? ORDER BY version DESC",
+            "SELECT vendor_id,model,execution_mode,enabled,version,updated_at,actor_type,actor_id FROM pf_ai_job_configuration WHERE job_key=? ORDER BY version DESC",
             { rs, _ ->
                 AiJobConfigurationDetails(
-                    jobKey, definition.displayName, AiProvider.valueOf(rs.getString("provider")), rs.getString("model"),
+                    jobKey, definition.displayName,
+                    AiExecutionSelection(rs.getString("vendor_id"), rs.getString("model"), AiExecutionMode.valueOf(rs.getString("execution_mode"))),
                     rs.getBoolean("enabled"), rs.getLong("version"), rs.getTimestamp("updated_at").toInstant(),
                     ActorReference(ActorType.valueOf(rs.getString("actor_type")), rs.getString("actor_id")),
                 )
@@ -93,22 +95,31 @@ class AiSettingsApplicationService(
         ?: throw InvalidCommand("Onbekende AI-jobkey ${jobKey.value}.")
 
     private fun definitions(): List<JobDefinition> = jdbc.query(
-        "SELECT job_key,display_name,default_provider,default_model,default_enabled FROM pf_ai_job_definition ORDER BY job_key",
+        "SELECT job_key,display_name,default_vendor_id,default_model,default_execution_mode,default_enabled FROM pf_ai_job_definition ORDER BY job_key",
     ) { rs, _ ->
-        JobDefinition(AiJobKey(rs.getString(1)), rs.getString(2), AiProvider.valueOf(rs.getString(3)), rs.getString(4), rs.getBoolean(5))
+        JobDefinition(
+            AiJobKey(rs.getString(1)), rs.getString(2),
+            AiExecutionSelection(rs.getString(3), rs.getString(4), AiExecutionMode.valueOf(rs.getString(5))),
+            rs.getBoolean(6),
+        )
     }
 
-    private fun validateSelection(provider: AiProvider, model: String) {
-        val normalized = model.trim()
-        if (normalized.isBlank() || normalized.length > 200) throw InvalidCommand("Model of mockprofiel is ongeldig.")
-        when (provider) {
-            AiProvider.CODEX -> if (!CODEX_MODEL.matches(normalized)) throw InvalidCommand("Ongeldig CODEX-model.")
-            AiProvider.CLAUDE -> if (!CLAUDE_MODEL.matches(normalized)) throw InvalidCommand("Ongeldig CLAUDE-model.")
-            AiProvider.MOCKED -> {
-                if (environment == "production") throw InvalidCommand("MOCKED AI-uitvoering is in productie niet toegestaan.")
-                if (!MOCK_PROFILE.matches(normalized)) throw InvalidCommand("Ongeldig mockprofiel.")
-            }
+    private fun validateSelection(selection: AiExecutionSelection) {
+        val vendor = selection.vendorId.trim()
+        val model = selection.model.trim()
+        if (!IDENTIFIER.matches(vendor) || model.isBlank() || model.length > 200) throw InvalidCommand("Leverancier of model is ongeldig.")
+        if (selection.mode == AiExecutionMode.MOCK) {
+            if (environment == "production") throw InvalidCommand("Mock-AI-uitvoering is in productie niet toegestaan.")
+            if (vendor != "mock" || model != "mock") throw InvalidCommand("Mockuitvoering vereist exact mock / mock / MOCK.")
+        } else if (vendor == "mock" || model == "mock") {
+            throw InvalidCommand("De mockleverancier en het mockmodel vereisen uitvoeringswijze MOCK.")
         }
+    }
+
+    private fun legacyProvider(selection: AiExecutionSelection): String = when {
+        selection.mode == AiExecutionMode.MOCK -> "MOCKED"
+        selection.vendorId == "anthropic" -> "CLAUDE"
+        else -> "CODEX"
     }
 
     private fun validateActor(actor: ActorReference) {
@@ -132,22 +143,20 @@ class AiSettingsApplicationService(
     data class JobDefinition(
         val jobKey: AiJobKey,
         val displayName: String,
-        val defaultProvider: AiProvider,
-        val defaultModel: String,
+        val defaultExecution: AiExecutionSelection,
         val defaultEnabled: Boolean,
     )
 
     companion object {
-        private val CODEX_MODEL = Regex("(?:gpt|o)[A-Za-z0-9._-]{1,100}")
-        private val CLAUDE_MODEL = Regex("claude-[A-Za-z0-9._-]{1,100}")
-        private val MOCK_PROFILE = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
+        private val IDENTIFIER = Regex("[a-z0-9][a-z0-9._-]{0,119}")
+        private val DEFAULT_EXECUTION = AiExecutionSelection("openai", "gpt-5.6-sol", AiExecutionMode.SUBSCRIPTION)
         val TRUSTED_JOBS = listOf(
-            JobDefinition(AiJobKey("MEETING.CONVERSE"), "Overleg voeren", AiProvider.CODEX, "gpt-5.6-sol", true),
-            JobDefinition(AiJobKey("MEETING.SUMMARIZE"), "Overleg samenvatten", AiProvider.CODEX, "gpt-5.6-sol", true),
-            JobDefinition(AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), "Epic ontwerpen", AiProvider.CODEX, "gpt-5.6-sol", true),
-            JobDefinition(AiJobKey("PLANNING.SELECT_WORK"), "Planningswerk selecteren", AiProvider.CODEX, "gpt-5.6-sol", true),
-            JobDefinition(AiJobKey("PLANNING.SLICE_EPIC"), "Epic opdelen in stories", AiProvider.CODEX, "gpt-5.6-sol", true),
-            JobDefinition(AiJobKey("QUALITY.VERIFY_EPIC"), "Gericht kwaliteitswerk uitvoeren", AiProvider.CODEX, "gpt-5.6-sol", true),
+            JobDefinition(AiJobKey("MEETING.CONVERSE"), "Overleg voeren", DEFAULT_EXECUTION, true),
+            JobDefinition(AiJobKey("MEETING.SUMMARIZE"), "Overleg samenvatten", DEFAULT_EXECUTION, true),
+            JobDefinition(AiJobKey("PRODUCT_DESIGN.CREATE_EPIC"), "Epic ontwerpen", DEFAULT_EXECUTION, true),
+            JobDefinition(AiJobKey("PLANNING.SELECT_WORK"), "Planningswerk selecteren", DEFAULT_EXECUTION, true),
+            JobDefinition(AiJobKey("PLANNING.SLICE_EPIC"), "Epic opdelen in stories", DEFAULT_EXECUTION, true),
+            JobDefinition(AiJobKey("QUALITY.VERIFY_EPIC"), "Gericht kwaliteitswerk uitvoeren", DEFAULT_EXECUTION, true),
         )
     }
 }

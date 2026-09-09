@@ -160,7 +160,7 @@ class AiExecutionRuntimeIntegrationTest @Autowired constructor(
     }
 
     private fun taskCommand(key: String) = RequestAiTaskCommand(
-        AiJobKey("MEETING.CONVERSE"), productId, "meeting", null, "MEETING_AGENT", AiProvider.CODEX, "gpt-5.6-sol", 0,
+        AiJobKey("MEETING.CONVERSE"), productId, "meeting", null, "MEETING_AGENT", DEFAULT_EXECUTION, 0,
         1, "Beantwoord de overlegvraag zonder technische keynamen.", """{"type":"object"}""", executionTimeout = Duration.ofMinutes(5), idempotencyKey = key,
     )
 
@@ -172,6 +172,7 @@ class AiExecutionRuntimeIntegrationTest @Autowired constructor(
     }
 
     companion object {
+        private val DEFAULT_EXECUTION = AiExecutionSelection("openai", "gpt-5.6-sol", AiExecutionMode.SUBSCRIPTION)
         private val ACTOR = ActorReference(ActorType.STAKEHOLDER, "stakeholder@example.com")
     }
 }

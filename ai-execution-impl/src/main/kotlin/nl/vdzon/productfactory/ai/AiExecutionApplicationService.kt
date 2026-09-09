@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.ai
 
 import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.api.ai.*
 import nl.vdzon.productfactory.api.shared.*
@@ -44,7 +45,7 @@ class AiExecutionApplicationService(
         }
         val configuration = settings.getAiJobConfiguration(command.jobKey)
         if (!configuration.enabled) throw InvalidCommand("AI-job ${command.jobKey.value} is uitgeschakeld.")
-        if (configuration.provider != command.provider || configuration.model != command.model || configuration.version != command.configurationVersion) {
+        if (configuration.execution != command.execution || configuration.version != command.configurationVersion) {
             throw VersionConflict("De bevroren AI-jobconfiguratie is niet meer actueel.")
         }
         requireTrustedRole(command.productId, command.agentRole)
@@ -52,10 +53,10 @@ class AiExecutionApplicationService(
         val runtimeIdempotencyKey = "pf-${command.idempotencyKey}".take(160)
         val runtimeRequest = RuntimeCreateJobRequest(
             idempotencyKey = runtimeIdempotencyKey,
-            provider = command.provider.name,
-            model = command.model,
+            provider = legacyProvider(command.execution),
+            model = command.execution.model,
             prompt = command.prompt,
-            responseSchema = command.responseSchema?.let(mapper::readTree),
+            responseSchema = mapper.readTree(command.responseSchema),
             repositorySnapshot = command.repository?.let { RuntimeRepositorySnapshot(it.publicGitUrl, it.commitSha) },
             environmentKeys = environmentKeys,
             attachments = command.attachments.map { RuntimeAttachmentRequest(it.filename, it.mediaType, Base64.getEncoder().encodeToString(it.content)) },
@@ -64,15 +65,19 @@ class AiExecutionApplicationService(
         val id = UUID.randomUUID().toString()
         val now = clock.instant()
         jdbc.update(
-            """INSERT INTO pf_ai_task(id,idempotency_key,request_fingerprint,job_key,product_id,requester_capability,requester_session_id,agent_role,provider,model,configuration_version,prompt_template_version,status,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
+            """INSERT INTO pf_ai_task(id,idempotency_key,request_fingerprint,job_key,product_id,requester_capability,requester_session_id,agent_role,provider,vendor_id,model,execution_mode,configuration_version,prompt_template_version,status,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
             id, command.idempotencyKey, fingerprint, command.jobKey.value, command.productId?.value,
-            command.requesterCapability, command.requesterSessionId?.value, command.agentRole, command.provider.name,
-            command.model, command.configurationVersion, command.promptTemplateVersion, AiTaskStatus.PENDING_SUBMISSION.name, now, now,
+            command.requesterCapability, command.requesterSessionId?.value, command.agentRole, legacyProvider(command.execution), command.execution.vendorId,
+            command.execution.model, command.execution.mode.name, command.configurationVersion, command.promptTemplateVersion, AiTaskStatus.PENDING_SUBMISSION.name, now, now,
         )
+        persistInput(id, 0, "prompt", "prompt.md", "text/markdown", AiInputRole.PROMPT, command.prompt.toByteArray(), now)
+        command.attachments.forEachIndexed { index, attachment ->
+            persistInput(id, index + 1, attachment.name, attachment.filename, attachment.mediaType, attachment.role, attachment.content, now)
+        }
         jdbc.update(
-            "INSERT INTO pf_ai_runtime_outbox(task_id,runtime_idempotency_key,frozen_request_json,created_at,updated_at) VALUES (?,?,?,?,?)",
-            id, runtimeIdempotencyKey, mapper.writeValueAsString(runtimeRequest), now, now,
+            "INSERT INTO pf_ai_runtime_outbox(task_id,runtime_idempotency_key,frozen_request_json,api_version,request_fingerprint,dispatch_state,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            id, runtimeIdempotencyKey, mapper.writeValueAsString(runtimeRequest), "v1", fingerprint, "REQUEST_FROZEN", now, now,
         )
         return AiTaskId(id)
     }
@@ -111,24 +116,28 @@ class AiExecutionApplicationService(
     }
 
     @Transactional
-    override fun refreshModelCatalog(command: RefreshModelCatalogCommand): List<ModelCatalogEntry> {
-        if (command.provider == AiProvider.MOCKED) return getModelCatalog(command.provider)
+    override fun refreshExecutionCatalog(command: RefreshExecutionCatalogCommand): List<ExecutionCatalogEntry> {
+        if (command.taskType != "STRUCTURED_GENERATION") throw InvalidCommand("Onbekend Runtime-tasktype.")
         val now = clock.instant()
-        jdbc.update(
-            "UPDATE pf_ai_model_catalog SET available=FALSE,matching_online_workers=0,refreshed_at=? WHERE provider=?",
-            now, command.provider.name,
-        )
-        runtime.listModels(command.provider.name).forEach { entry ->
-            val updated = jdbc.update(
-                "UPDATE pf_ai_model_catalog SET available=?,matching_online_workers=?,last_seen_at=?,refreshed_at=? WHERE provider=? AND model=?",
-                entry.available, entry.matchingOnlineWorkers, entry.lastSeenAt, now, command.provider.name, entry.model,
+        val selections = settings.getAiJobConfigurations().map { it.execution }.distinct()
+        selections.filter { it.mode != AiExecutionMode.MOCK }.forEach { selection ->
+            val provider = legacyProvider(selection)
+            jdbc.update(
+                "UPDATE pf_ai_model_catalog SET available=FALSE,matching_online_workers=0,refreshed_at=? WHERE vendor_id=? AND execution_mode=?",
+                now, selection.vendorId, selection.mode.name,
             )
-            if (updated == 0) jdbc.update(
-                "INSERT INTO pf_ai_model_catalog(provider,model,available,matching_online_workers,last_seen_at,refreshed_at) VALUES (?,?,?,?,?,?)",
-                command.provider.name, entry.model, entry.available, entry.matchingOnlineWorkers, entry.lastSeenAt, now,
-            )
+            runtime.listModels(provider).forEach { entry ->
+                val updated = jdbc.update(
+                    "UPDATE pf_ai_model_catalog SET available=?,matching_online_workers=?,last_seen_at=?,refreshed_at=? WHERE vendor_id=? AND model=? AND execution_mode=?",
+                    entry.available, entry.matchingOnlineWorkers, entry.lastSeenAt, now, selection.vendorId, entry.model, selection.mode.name,
+                )
+                if (updated == 0) jdbc.update(
+                    "INSERT INTO pf_ai_model_catalog(provider,vendor_id,model,execution_mode,available,matching_online_workers,last_seen_at,refreshed_at) VALUES (?,?,?,?,?,?,?,?)",
+                    provider, selection.vendorId, entry.model, selection.mode.name, entry.available, entry.matchingOnlineWorkers, entry.lastSeenAt, now,
+                )
+            }
         }
-        return getModelCatalog(command.provider)
+        return getExecutionCatalog(command.taskType)
     }
 
     @Transactional
@@ -224,20 +233,49 @@ class AiExecutionApplicationService(
     }
 
     @Transactional(readOnly = true)
-    override fun getModelCatalog(provider: AiProvider): List<ModelCatalogEntry> {
-        if (provider == AiProvider.MOCKED) {
-            return settings.getAiJobConfigurations().asSequence()
-                .filter { it.provider == AiProvider.MOCKED }
-                .map { it.model }.distinct().sorted()
-                .map { ModelCatalogEntry(AiProvider.MOCKED, it, true, 0, clock.instant()) }
-                .toList()
+    override fun getExecutionCatalog(taskType: String): List<ExecutionCatalogEntry> {
+        if (taskType != "STRUCTURED_GENERATION") throw InvalidCommand("Onbekend Runtime-tasktype.")
+        val entries = jdbc.query(
+            "SELECT vendor_id,model,execution_mode,available,matching_online_workers,last_seen_at FROM pf_ai_model_catalog ORDER BY vendor_id,model,execution_mode",
+        ) { rs, _ ->
+            ExecutionCatalogEntry(
+                AiExecutionSelection(rs.getString(1), rs.getString(2), AiExecutionMode.valueOf(rs.getString(3))),
+                setOf(taskType), rs.getBoolean(4), rs.getInt(5), rs.getTimestamp(6).toInstant(),
+            )
         }
-        return jdbc.query(
-            "SELECT model,available,matching_online_workers,last_seen_at FROM pf_ai_model_catalog WHERE provider=? ORDER BY model",
-            { rs, _ -> ModelCatalogEntry(provider, rs.getString(1), rs.getBoolean(2), rs.getInt(3), rs.getTimestamp(4).toInstant()) },
-            provider.name,
+        if (environment == "production" || entries.any { it.execution.mode == AiExecutionMode.MOCK }) return entries
+        return entries + ExecutionCatalogEntry(
+            AiExecutionSelection("mock", "mock", AiExecutionMode.MOCK), setOf(taskType), true, 1, clock.instant(),
         )
     }
+
+    @Transactional(readOnly = true)
+    override fun getAiTaskEvents(taskId: AiTaskId): List<AiTaskEventDetails> {
+        getAiTask(taskId)
+        return jdbc.query(
+            "SELECT event_sequence,event_type,safe_message,progress_percent,occurred_at FROM pf_ai_runtime_event WHERE task_id=? ORDER BY event_sequence",
+            { rs, _ -> AiTaskEventDetails(
+                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getObject(4)?.let { rs.getInt(4) }, rs.getTimestamp(5).toInstant(),
+            ) }, taskId.value,
+        )
+    }
+
+    @Transactional(readOnly = true)
+    override fun getAiTaskUsage(taskId: AiTaskId): AiTaskUsageDetails? = jdbc.query(
+        "SELECT task_type,vendor_id,model,execution_mode,attempt_count,usage_quality,usage_json,cost_json,captured_at FROM pf_ai_runtime_usage WHERE task_id=?",
+        { rs, _ ->
+            val usage = mapper.readTree(rs.getString("usage_json"))
+            val costs = mapper.readTree(rs.getString("cost_json")).takeIf { it.isArray }?.map { cost ->
+                AiCostDetails(cost.path("kind").asText(), cost.path("status").asText(), cost.path("amount").takeUnless { it.isMissingNode || it.isNull }?.asText(), cost.path("currency").takeUnless { it.isMissingNode || it.isNull }?.asText())
+            }.orEmpty()
+            AiTaskUsageDetails(
+                taskId, rs.getString("task_type"),
+                AiExecutionSelection(rs.getString("vendor_id"), rs.getString("model"), AiExecutionMode.valueOf(rs.getString("execution_mode"))),
+                rs.getInt("attempt_count"), rs.getString("usage_quality"), usage.longOrNull("inputTokens"), usage.longOrNull("cachedInputTokens"),
+                usage.longOrNull("outputTokens"), usage.longOrNull("reasoningTokens"), costs, rs.getTimestamp("captured_at").toInstant(),
+            )
+        }, taskId.value,
+    ).singleOrNull()
 
     @Transactional(readOnly = true)
     override fun getProductEnvironmentKeys(productId: ProductId): List<ProductEnvironmentKeyDetails> = jdbc.query(
@@ -276,6 +314,14 @@ class AiExecutionApplicationService(
     @Transactional
     fun deleteAllOwnedExecutionData() {
         jdbc.update("DELETE FROM pf_meeting_ai_work")
+        jdbc.update("DELETE FROM pf_ai_artifact_domain_reference")
+        jdbc.update("DELETE FROM pf_ai_artifact")
+        jdbc.update("DELETE FROM pf_ai_runtime_attempt_usage")
+        jdbc.update("DELETE FROM pf_ai_runtime_usage")
+        jdbc.update("DELETE FROM pf_ai_runtime_event")
+        jdbc.update("DELETE FROM pf_ai_runtime_event_cursor")
+        jdbc.update("DELETE FROM pf_ai_runtime_upload")
+        jdbc.update("DELETE FROM pf_ai_task_input")
         jdbc.update("DELETE FROM pf_ai_task_result")
         jdbc.update("DELETE FROM pf_ai_runtime_outbox")
         jdbc.update("DELETE FROM pf_ai_task")
@@ -365,15 +411,30 @@ class AiExecutionApplicationService(
         if (command.prompt.isBlank() || command.prompt.length > 200_000) throw InvalidCommand("De complete AI-prompt is leeg of te groot.")
         if (command.promptTemplateVersion < 1) throw InvalidCommand("Een positieve prompttemplateversie is verplicht.")
         if (command.executionTimeout.seconds !in 30..86_400 || command.executionTimeout.nano != 0) throw InvalidCommand("Uitvoeringstime-out moet tussen 30 seconden en 24 uur liggen.")
-        if (environment == "production" && command.provider == AiProvider.MOCKED) throw InvalidCommand("MOCKED AI-uitvoering is in productie niet toegestaan.")
-        command.responseSchema?.let { runCatching { mapper.readTree(it) }.getOrElse { throw InvalidCommand("Responseschema is geen geldige JSON.") } }
+        if (environment == "production" && command.execution.mode == AiExecutionMode.MOCK) throw InvalidCommand("Mock-AI-uitvoering is in productie niet toegestaan.")
+        if (command.execution.vendorId.isBlank() || command.execution.model.isBlank()) throw InvalidCommand("Een expliciete leverancier en model zijn verplicht.")
+        if (command.execution.mode == AiExecutionMode.MOCK && command.execution != AiExecutionSelection("mock", "mock", AiExecutionMode.MOCK)) {
+            throw InvalidCommand("Mockuitvoering vereist exact mock / mock / MOCK.")
+        }
+        runCatching { mapper.readTree(command.responseSchema) }.getOrElse { throw InvalidCommand("Responseschema is geen geldige JSON.") }
         command.repository?.let {
             if (!it.publicGitUrl.startsWith("https://") || !SHA.matches(it.commitSha)) throw InvalidCommand("Repositorysnapshot moet HTTPS en een exacte commit-SHA gebruiken.")
         }
         if (command.attachments.size > 10 || command.attachments.sumOf { it.content.size } > 10 * 1024 * 1024) throw InvalidCommand("Te veel of te grote inputattachments.")
         command.attachments.forEach {
-            if (!FILENAME.matches(it.filename) || it.content.size > 2 * 1024 * 1024 || it.mediaType !in ALLOWED_MEDIA_TYPES) {
+            if (!LOGICAL_NAME.matches(it.name) || !FILENAME.matches(it.filename) || it.content.size > 2 * 1024 * 1024 || it.mediaType !in ALLOWED_MEDIA_TYPES) {
                 throw InvalidCommand("Inputattachment ${it.filename} heeft een onveilige naam, type of grootte.")
+            }
+        }
+        if (command.attachments.map { it.name }.toSet().size != command.attachments.size || command.attachments.any { it.name == "prompt" }) {
+            throw InvalidCommand("Inputobjectnamen moeten uniek zijn; prompt is gereserveerd.")
+        }
+        if (command.outputArtifacts.size > 50 || command.outputArtifacts.map { it.name }.toSet().size != command.outputArtifacts.size) {
+            throw InvalidCommand("Outputartifactnamen moeten uniek zijn en tot vijftig declaraties beperkt blijven.")
+        }
+        command.outputArtifacts.forEach {
+            if (!LOGICAL_NAME.matches(it.name) || it.mimeTypes.isEmpty() || it.mimeTypes.any { mime -> mime !in ALLOWED_OUTPUT_MEDIA_TYPES } || it.maxBytes !in 1..10L * 1024 * 1024) {
+                throw InvalidCommand("Outputartifact ${it.name} heeft een onveilige declaratie.")
             }
         }
     }
@@ -399,12 +460,13 @@ class AiExecutionApplicationService(
     )
 
     private fun taskRows(where: String = "", vararg args: Any): List<AiTaskDetails> = jdbc.query(
-        """SELECT id,job_key,product_id,requester_capability,requester_session_id,agent_role,provider,model,configuration_version,prompt_template_version,status,runtime_job_id,runtime_phase,runtime_attempt_count,safe_progress_percent,safe_progress,error_code,cancel_reason,created_at,updated_at
+        """SELECT id,job_key,product_id,requester_capability,requester_session_id,agent_role,vendor_id,model,execution_mode,configuration_version,prompt_template_version,status,runtime_job_id,runtime_phase,runtime_attempt_count,safe_progress_percent,safe_progress,error_code,cancel_reason,created_at,updated_at
             FROM pf_ai_task $where ORDER BY created_at DESC""".trimIndent(),
         { rs, _ ->
             AiTaskDetails(
                 AiTaskId(rs.getString("id")), AiJobKey(rs.getString("job_key")), rs.getString("product_id")?.let(::ProductId),
-                rs.getString("requester_capability"), AiProvider.valueOf(rs.getString("provider")), rs.getString("model"),
+                rs.getString("requester_capability"),
+                AiExecutionSelection(rs.getString("vendor_id"), rs.getString("model"), AiExecutionMode.valueOf(rs.getString("execution_mode"))),
                 rs.getLong("configuration_version"), rs.getLong("prompt_template_version"), rs.getString("requester_session_id")?.let(::ProcessSessionId),
                 rs.getString("agent_role"), AiTaskStatus.valueOf(rs.getString("status")), rs.getString("runtime_job_id"), rs.getString("runtime_phase"),
                 rs.getInt("runtime_attempt_count"), rs.getObject("safe_progress_percent")?.let { rs.getInt("safe_progress_percent") },
@@ -417,6 +479,32 @@ class AiExecutionApplicationService(
     private fun existingTask(key: String) = jdbc.query(
         "SELECT id,request_fingerprint FROM pf_ai_task WHERE idempotency_key=?", { rs, _ -> rs.getString(1) to rs.getString(2) }, key,
     ).singleOrNull()
+
+    private fun persistInput(
+        taskId: String,
+        sequence: Int,
+        name: String,
+        filename: String,
+        mediaType: String,
+        role: AiInputRole,
+        content: ByteArray,
+        now: Instant,
+    ) {
+        jdbc.update(
+            "INSERT INTO pf_ai_task_input(task_id,input_sequence,logical_name,filename,mime_type,input_role,content_bytes,size_bytes,sha256,staged_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            taskId, sequence, name, filename, mediaType, role.name, content, content.size.toLong(), sha256(content), now,
+        )
+    }
+
+    private fun legacyProvider(selection: AiExecutionSelection): String = when {
+        selection.mode == AiExecutionMode.MOCK -> "MOCKED"
+        selection.vendorId == "anthropic" -> "CLAUDE"
+        else -> "CODEX"
+    }
+
+    private fun sha256(content: ByteArray) = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content))
+
+    private fun JsonNode.longOrNull(field: String): Long? = path(field).takeUnless { it.isMissingNode || it.isNull }?.asLong()
 
     private fun productEnvironmentKey(productId: ProductId, name: String): ProductEnvironmentKeyDetails = jdbc.query(
         """SELECT c.project_prefix,p.active,c.available,c.matching_online_workers,c.last_seen_at,p.version
@@ -466,8 +554,10 @@ class AiExecutionApplicationService(
         private val RETRYABLE_CODES = setOf("RUNTIME_NOT_CONFIGURED", "RUNTIME_SUBMISSION_FAILED", "RUNTIME_EMPTY_RESPONSE")
         private val SHA = Regex("[0-9a-fA-F]{40}")
         private val FILENAME = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,254}")
+        private val LOGICAL_NAME = Regex("[A-Za-z][A-Za-z0-9._-]{0,119}")
         private val PROJECT_PREFIX = Regex("[A-Z][A-Z0-9_]*")
-        private val ALLOWED_MEDIA_TYPES = setOf("image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain", "application/json")
+        private val ALLOWED_MEDIA_TYPES = setOf("image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain", "text/markdown", "application/json")
+        private val ALLOWED_OUTPUT_MEDIA_TYPES = setOf("image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain", "text/markdown", "application/json")
         private val JOB_ROLE = mapOf(
             "MEETING.CONVERSE" to "MEETING_AGENT",
             "MEETING.SUMMARIZE" to "MEETING_MINUTES_AGENT",

@@ -60,8 +60,9 @@ class MemoryAndAiHttpApiTest(
         mockMvc.put("/api/ai/job-configurations/MEETING.CONVERSE") {
             contentType = MediaType.APPLICATION_JSON
             content = mapper.writeValueAsString(mapOf(
-                "provider" to "CLAUDE",
+                "vendorId" to "anthropic",
                 "model" to "claude-sonnet-4-5",
+                "mode" to "SUBSCRIPTION",
                 "enabled" to true,
                 "expectedVersion" to 0,
                 "idempotencyKey" to "http-ai-${productId.value}",

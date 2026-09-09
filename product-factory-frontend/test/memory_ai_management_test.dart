@@ -68,15 +68,17 @@ void main() {
         'jobKey': {'value': 'MEETING.CONVERSE'},
         'version': 3,
       },
-      'CLAUDE',
+      'anthropic',
       'claude-sonnet-4-5',
+      'SUBSCRIPTION',
       true,
     );
 
     expect(mutation?.url.path, '/api/ai/job-configurations/MEETING.CONVERSE');
     final body = jsonDecode(mutation!.body) as Map<String, Object?>;
     expect(body['expectedVersion'], 3);
-    expect(body['provider'], 'CLAUDE');
+    expect(body['vendorId'], 'anthropic');
+    expect(body['mode'], 'SUBSCRIPTION');
     expect(body['idempotencyKey'], startsWith('ui-ai-settings-'));
   });
 

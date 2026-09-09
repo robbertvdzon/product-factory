@@ -159,8 +159,9 @@ class ProductDesignMvpService(
         val configuration = aiQueries.getAiJobConfiguration(JOB_KEY)
         val taskId = ai.requestAiTask(RequestAiTaskCommand(
             JOB_KEY, productId, "product-design", sessionId, ROLE.value,
-            configuration.provider, configuration.model, configuration.version, PROMPT_TEMPLATE_VERSION,
+            configuration.execution, configuration.version, PROMPT_TEMPLATE_VERSION,
             designPrompt(snapshotJson), RESPONSE_SCHEMA, RepositorySnapshot(gitUrl, gitSha),
+            outputArtifacts = UX_ARTIFACT_DECLARATIONS,
             executionTimeout = Duration.ofMinutes(30), idempotencyKey = "design-${sessionId.value}-$attempt",
         ))
         val auditedMemory = memory.getActiveMemory(AgentExecutionContext(productId, ROLE, sessionId, taskId))
@@ -961,6 +962,9 @@ $snapshotJson"""
     }
 
     companion object {
+        private val UX_ARTIFACT_DECLARATIONS = (1..50).map { index ->
+            AiOutputArtifactDeclaration("ux-${index.toString().padStart(2, '0')}", false, setOf("image/png"), 5L * 1024 * 1024)
+        }
         private val IMPLEMENTATION = ImplementationIdentity("product-design-impl-mvp", "single-agent", "runtime", "runtime")
         private val ROLE = AgentRoleKey("PRODUCT_DESIGNER_MVP")
         private val JOB_KEY = AiJobKey("PRODUCT_DESIGN.CREATE_EPIC")

@@ -51,8 +51,9 @@ abstract interface class MemoryAiGateway {
   Future<List<Map<String, Object?>>> aiSettings();
   Future<void> updateAi(
     Map<String, Object?> setting,
-    String provider,
+    String vendorId,
     String model,
+    String mode,
     bool enabled,
   );
 }
@@ -75,8 +76,8 @@ abstract interface class AgentRuntimeGateway {
     bool granted,
   );
   Future<void> cancelAiTask(String taskId, String reason);
-  Future<List<Map<String, Object?>>> modelCatalog(String provider);
-  Future<void> refreshModelCatalog(String provider);
+  Future<List<Map<String, Object?>>> executionCatalog();
+  Future<void> refreshExecutionCatalog();
 }
 
 class HttpMemoryAiGateway implements MemoryAiGateway, AgentRuntimeGateway {
@@ -181,15 +182,17 @@ class HttpMemoryAiGateway implements MemoryAiGateway, AgentRuntimeGateway {
   @override
   Future<void> updateAi(
     Map<String, Object?> setting,
-    String provider,
+    String vendorId,
     String model,
+    String mode,
     bool enabled,
   ) => _send(
     'PUT',
     '/api/ai/job-configurations/${Uri.encodeComponent(_v(setting['jobKey']))}',
     {
-      'provider': provider,
+      'vendorId': vendorId,
       'model': model,
+      'mode': mode,
       'enabled': enabled,
       'expectedVersion': (setting['version'] as num?)?.toInt() ?? 0,
       'idempotencyKey': _key('ai-settings'),
@@ -249,12 +252,14 @@ class HttpMemoryAiGateway implements MemoryAiGateway, AgentRuntimeGateway {
     {'reason': reason},
   );
   @override
-  Future<List<Map<String, Object?>>> modelCatalog(String provider) => _list(
-    '/api/ai/model-catalog?provider=${Uri.encodeQueryComponent(provider)}',
-  );
+  Future<List<Map<String, Object?>>> executionCatalog() =>
+      _list('/api/ai/execution-catalog?taskType=STRUCTURED_GENERATION');
   @override
-  Future<void> refreshModelCatalog(String provider) =>
-      _send('POST', '/api/ai/model-catalog/refresh', {'provider': provider});
+  Future<void> refreshExecutionCatalog() => _send(
+    'POST',
+    '/api/ai/execution-catalog/refresh',
+    {'taskType': 'STRUCTURED_GENERATION'},
+  );
 
   String _key(String prefix) =>
       'ui-$prefix-${DateTime.now().microsecondsSinceEpoch}-${_sequence++}';
@@ -863,6 +868,8 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
   Widget _aiCard(Map<String, Object?> setting) {
     final updatedBy =
         (setting['updatedBy'] as Map?)?.cast<String, Object?>() ?? const {};
+    final execution =
+        (setting['execution'] as Map?)?.cast<String, Object?>() ?? const {};
     return Card(
       child: ListTile(
         leading: Icon(
@@ -873,7 +880,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
           '${setting['displayName']} · ${_v(setting['jobKey'])}',
         ),
         subtitle: SelectableText(
-          '${setting['provider']} / ${setting['model']} · versie ${setting['version']}\nGewijzigd door ${updatedBy['type'] ?? 'SYSTEM'} · ${updatedBy['id'] ?? 'trusted-default'} op ${setting['updatedAt']}',
+          '${execution['vendorId']} / ${execution['model']} / ${execution['mode']} · versie ${setting['version']}\nGewijzigd door ${updatedBy['type'] ?? 'SYSTEM'} · ${updatedBy['id'] ?? 'trusted-default'} op ${setting['updatedAt']}',
         ),
         trailing: IconButton(
           onPressed: () => _editAi(setting),
@@ -1216,42 +1223,50 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
   }
 
   Future<void> _editAi(Map<String, Object?> setting) async {
-    var provider = '${setting['provider']}';
-    var model = '${setting['model']}';
+    final configured =
+        (setting['execution'] as Map?)?.cast<String, Object?>() ?? const {};
+    var vendorId = '${configured['vendorId']}';
+    var model = '${configured['model']}';
+    var mode = '${configured['mode']}';
     var enabled = setting['enabled'] == true;
-    List<String>? models;
-    var loadingModels = false;
+    List<Map<String, Object?>>? options;
+    var loadingOptions = false;
     var loadScheduled = false;
-    var modelsError = false;
-    var useCustomModel = false;
+    var optionsError = false;
 
-    Future<void> loadModels(void Function(void Function()) setDialogState) async {
-      final forProvider = provider;
+    String optionKey(Map<String, Object?> entry) {
+      final execution =
+          (entry['execution'] as Map?)?.cast<String, Object?>() ?? entry;
+      return '${execution['vendorId']}|${execution['model']}|${execution['mode']}';
+    }
+
+    Future<void> loadOptions(
+      void Function(void Function()) setDialogState,
+    ) async {
       setDialogState(() {
-        loadingModels = true;
-        modelsError = false;
+        loadingOptions = true;
+        optionsError = false;
       });
       try {
         final gateway = widget.gateway as AgentRuntimeGateway;
         try {
-          await gateway.refreshModelCatalog(forProvider);
+          await gateway.refreshExecutionCatalog();
         } catch (_) {
           // Vernieuwen is een best-effort synchronisatie met Agent Runtime;
           // bij een fout tonen we alsnog de laatst bekende gecachte lijst.
         }
-        final fetched = await gateway.modelCatalog(forProvider);
-        if (forProvider != provider) return;
+        final fetched = await gateway.executionCatalog();
         setDialogState(() {
-          models = fetched.map((entry) => _v(entry['model'])).toList()
-            ..sort();
-          loadingModels = false;
+          options =
+              fetched.where((entry) => entry['available'] == true).toList()
+                ..sort((a, b) => optionKey(a).compareTo(optionKey(b)));
+          loadingOptions = false;
         });
       } catch (_) {
-        if (forProvider != provider) return;
         setDialogState(() {
-          models = null;
-          loadingModels = false;
-          modelsError = true;
+          options = null;
+          loadingOptions = false;
+          optionsError = true;
         });
       }
     }
@@ -1260,23 +1275,28 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          if (models == null &&
-              !modelsError &&
+          if (options == null &&
+              !optionsError &&
               !loadScheduled &&
-              !loadingModels) {
+              !loadingOptions) {
             loadScheduled = true;
             Future.microtask(() {
               loadScheduled = false;
-              loadModels(setDialogState);
+              loadOptions(setDialogState);
             });
           }
-          final known = models;
-          final dropdownOptions = <String>{
-            ...?known,
-            if (model.isNotEmpty) model,
-          }.toList()..sort();
-          final showDropdown =
-              !useCustomModel && known != null && known.isNotEmpty;
+          final currentKey = '$vendorId|$model|$mode';
+          final available = <String, Map<String, Object?>>{
+            for (final option in options ?? const <Map<String, Object?>>[])
+              optionKey(option): option,
+          };
+          available.putIfAbsent(
+            currentKey,
+            () => {
+              'execution': {'vendorId': vendorId, 'model': model, 'mode': mode},
+              'available': false,
+            },
+          );
           return AlertDialog(
             title: SelectableText('${setting['displayName']} wijzigen'),
             content: SizedBox(
@@ -1289,95 +1309,55 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
                     child: SelectableText('Geldt voor alle producten.'),
                   ),
                   DropdownButtonFormField<String>(
-                    initialValue: provider,
-                    decoration: const InputDecoration(labelText: 'Provider'),
-                    items: const ['CODEX', 'CLAUDE', 'MOCKED']
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
+                    initialValue: currentKey,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Leverancier / model / uitvoeringswijze',
+                      helperText: loadingOptions
+                          ? 'Uitvoeringsopties laden…'
+                          : optionsError
+                          ? 'Kon uitvoeringsopties niet ophalen; de huidige keuze blijft beschikbaar.'
+                          : null,
+                    ),
+                    items: available.entries.map((entry) {
+                      final execution = (entry.value['execution'] as Map)
+                          .cast<String, Object?>();
+                      final suffix = entry.value['available'] == true
+                          ? ''
+                          : ' (huidig)';
+                      return DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(
+                          '${execution['vendorId']} / ${execution['model']} / ${execution['mode']}$suffix',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
                     onChanged: (value) {
-                      if (value == null || value == provider) return;
+                      if (value == null) return;
+                      final parts = value.split('|');
                       setDialogState(() {
-                        provider = value;
-                        models = null;
-                        modelsError = false;
-                        useCustomModel = false;
+                        vendorId = parts[0];
+                        model = parts[1];
+                        mode = parts[2];
                       });
                     },
                   ),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: showDropdown
-                            ? DropdownButtonFormField<String>(
-                                initialValue: dropdownOptions.contains(model)
-                                    ? model
-                                    : null,
-                                decoration: const InputDecoration(
-                                  labelText: 'Model of mockprofiel',
-                                ),
-                                items: [
-                                  ...dropdownOptions.map(
-                                    (value) => DropdownMenuItem(
-                                      value: value,
-                                      child: Text(value),
-                                    ),
-                                  ),
-                                  const DropdownMenuItem(
-                                    value: '__custom__',
-                                    child: Text('Aangepast…'),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  if (value == null) return;
-                                  if (value == '__custom__') {
-                                    setDialogState(() => useCustomModel = true);
-                                  } else {
-                                    setDialogState(() => model = value);
-                                  }
-                                },
-                              )
-                            : TextFormField(
-                                initialValue: model,
-                                decoration: InputDecoration(
-                                  labelText: 'Model of mockprofiel',
-                                  helperText: loadingModels
-                                      ? 'Modellen laden…'
-                                      : modelsError
-                                      ? 'Kon modellen niet ophalen van Agent Runtime.'
-                                      : null,
-                                ),
-                                onChanged: (value) => model = value,
-                              ),
-                      ),
-                      if (useCustomModel && known != null && known.isNotEmpty)
-                        IconButton(
-                          tooltip: 'Kies uit lijst',
-                          icon: const Icon(Icons.list_alt),
-                          onPressed: () =>
-                              setDialogState(() => useCustomModel = false),
-                        ),
-                      IconButton(
-                        tooltip: 'Modellen verversen',
-                        icon: loadingModels
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.refresh),
-                        onPressed: loadingModels
-                            ? null
-                            : () => loadModels(setDialogState),
-                      ),
-                    ],
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      tooltip: 'Uitvoeringsopties verversen',
+                      icon: loadingOptions
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh),
+                      onPressed: loadingOptions
+                          ? null
+                          : () => loadOptions(setDialogState),
+                    ),
                   ),
                   SwitchListTile(
                     value: enabled,
@@ -1403,7 +1383,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
     );
     if (accepted == true) {
       await _mutate(
-        () => widget.gateway.updateAi(setting, provider, model.trim(), enabled),
+        () => widget.gateway.updateAi(setting, vendorId, model, mode, enabled),
       );
     }
   }

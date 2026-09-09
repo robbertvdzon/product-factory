@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.ai
 
-import nl.vdzon.productfactory.api.ai.AiProvider
+import nl.vdzon.productfactory.api.ai.AiExecutionMode
+import nl.vdzon.productfactory.api.ai.AiExecutionSelection
 import nl.vdzon.productfactory.api.ai.UpdateAiJobConfigurationCommand
 import nl.vdzon.productfactory.api.shared.ActorReference
 import nl.vdzon.productfactory.api.shared.ActorType
@@ -23,7 +24,7 @@ class AcceptanceAiSettingsFixtureContributor(
         settings.deleteAllOwnedConfiguration()
         settings.getAiJobConfigurations().forEach { configuration ->
             settings.updateAiJobConfiguration(UpdateAiJobConfigurationCommand(
-                configuration.jobKey, AiProvider.MOCKED, "${context.scenarioKey}.${configuration.jobKey.value.lowercase()}",
+                configuration.jobKey, AiExecutionSelection("mock", "mock", AiExecutionMode.MOCK),
                 true, 0, SYSTEM, "fixture:${context.datasetVersion}:${context.scenarioKey}:ai:${configuration.jobKey.value}",
             ))
         }

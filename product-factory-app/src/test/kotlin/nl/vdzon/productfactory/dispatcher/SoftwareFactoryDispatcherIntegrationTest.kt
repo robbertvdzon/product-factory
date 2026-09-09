@@ -222,7 +222,7 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
 
     private fun createUxArtifact(): ArtifactReference {
         val taskId = aiCommands.requestAiTask(RequestAiTaskCommand(
-            AiJobKey("PLANNING.SLICE_EPIC"), productId, "planning", null, "PLANNER_MVP", AiProvider.CODEX, "gpt-5.6-sol", 0,
+            AiJobKey("PLANNING.SLICE_EPIC"), productId, "planning", null, "PLANNER_MVP", AiExecutionSelection("openai", "gpt-5.6-sol", AiExecutionMode.SUBSCRIPTION), 0,
             1, "Maak een UX-model.", """{"type":"object"}""", executionTimeout = Duration.ofMinutes(5), idempotencyKey = "ux-${productId.value}",
         ))
         aiImpl.dispatchPending()
