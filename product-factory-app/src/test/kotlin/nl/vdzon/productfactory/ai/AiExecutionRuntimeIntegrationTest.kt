@@ -153,6 +153,37 @@ class AiExecutionRuntimeIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `geslaagde Runtime job blijft lopend totdat artifactprojectie duurzaam slaagt`() {
+        val taskId = commands.requestAiTask(taskCommand(
+            "result-projection-retry", listOf(AiOutputArtifactDeclaration("artifact-1", false, setOf("image/png"), 1024)),
+        ))
+        implementation.dispatchPending()
+        val job = runtime.onlyJob()
+        runtime.v2ResultArtifacts[job.id] = listOf(
+            RuntimeV2ArtifactView(
+                "artifact-1", "artifact-1", "zoekscherm.png", "image/png", 6, sha256("bewijs".toByteArray()),
+                "READY", Instant.now(), Instant.now(), "/v2/jobs/${job.id}/objects/artifact-1/content",
+            ),
+        )
+        runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
+        runtime.artifactCopyFailuresRemaining = 1
+
+        implementation.reconcileActive()
+
+        val retrying = queries.getAiTask(taskId)
+        assertThat(retrying.status).isEqualTo(AiTaskStatus.RUNNING)
+        assertThat(retrying.runtimePhase).isEqualTo("RESULT_PROJECTION_RETRY")
+        assertThat(retrying.errorCode).isEqualTo("RUNTIME_ARTIFACT_FAILED")
+        assertThat(queries.getAiTaskResult(taskId)).isNull()
+
+        implementation.reconcileActive()
+
+        assertThat(queries.getAiTask(taskId).status).isEqualTo(AiTaskStatus.SUCCEEDED)
+        assertThat(queries.getAiTaskResult(taskId)?.responseJson).contains("antwoord")
+        assertThat(queries.getAiTaskResult(taskId)?.artifacts).hasSize(1)
+    }
+
+    @Test
     fun `lokale schemavalidatie blokkeert afwijkend Runtime resultaat`() {
         val taskId = commands.requestAiTask(taskCommand("invalid-result"))
         implementation.dispatchPending()
@@ -257,6 +288,7 @@ class FakeRuntime : AgentRuntimeClient {
     var loseFirstCreateResponse = false
     var loseFirstPatchResponse = false
     var rejectFirstJobForInput = false
+    var artifactCopyFailuresRemaining = 0
     var createdUploadCount = 0
     private var lost = false
     private var patchLost = false
@@ -283,6 +315,10 @@ class FakeRuntime : AgentRuntimeClient {
     override fun listModels(provider: String?) = models.filter { provider == null || it.provider == provider }
     override fun downloadArtifact(jobId: String, artifactId: String) = "bewijs".toByteArray()
     override fun copyV2Artifact(downloadUrl: String, offset: Long, expectedSize: Long, output: java.io.OutputStream): RuntimeArtifactCopyResult {
+        if (artifactCopyFailuresRemaining > 0) {
+            artifactCopyFailuresRemaining--
+            throw RuntimeCallException("RUNTIME_ARTIFACT_FAILED", "Artifact tijdelijk niet bereikbaar.", true)
+        }
         val bytes = "bewijs".toByteArray()
         output.write(bytes, offset.toInt(), bytes.size - offset.toInt())
         return RuntimeArtifactCopyResult(bytes.size.toLong(), true)
@@ -350,7 +386,7 @@ class FakeRuntime : AgentRuntimeClient {
     fun distinctIdempotencyKeys() = (requests.map { it.idempotencyKey } + v2Requests.map { it.idempotencyKey }).distinct()
     fun jobCount() = jobs.size
     fun uploadedText() = uploads.values.flatMap { it.content }.toByteArray().toString(Charsets.UTF_8)
-    fun reset() { requests.clear(); v2Requests.clear(); jobs.clear(); environmentKeys.clear(); models.clear(); results.clear(); resultArtifacts.clear(); v2ResultArtifacts.clear(); attempts.clear(); uploads.clear(); loseFirstCreateResponse = false; loseFirstPatchResponse = false; rejectFirstJobForInput = false; createdUploadCount = 0; lost = false; patchLost = false; inputRejected = false }
+    fun reset() { requests.clear(); v2Requests.clear(); jobs.clear(); environmentKeys.clear(); models.clear(); results.clear(); resultArtifacts.clear(); v2ResultArtifacts.clear(); attempts.clear(); uploads.clear(); loseFirstCreateResponse = false; loseFirstPatchResponse = false; rejectFirstJobForInput = false; artifactCopyFailuresRemaining = 0; createdUploadCount = 0; lost = false; patchLost = false; inputRejected = false }
     private fun upload(url: String) = uploads.getValue(url.substringAfterLast('/'))
     private fun idFor(key: String) = UUID.nameUUIDFromBytes(key.toByteArray()).toString()
     private data class FakeUpload(val request: RuntimeCreateUploadRequest, val objectId: String, val content: MutableList<Byte> = mutableListOf())

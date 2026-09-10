@@ -167,7 +167,12 @@ data class RuntimeExecutionOption(
 )
 data class RuntimeArtifactCopyResult(val confirmedBytes: Long, val complete: Boolean)
 
-class RuntimeCallException(val code: String, val safeMessage: String, val responseMayHaveBeenLost: Boolean = false) : RuntimeException(safeMessage)
+class RuntimeCallException(
+    val code: String,
+    val safeMessage: String,
+    val responseMayHaveBeenLost: Boolean = false,
+    cause: Throwable? = null,
+) : RuntimeException(safeMessage, cause)
 
 interface AgentRuntimeClient {
     fun createJob(request: RuntimeCreateJobRequest): RuntimeJobView
@@ -383,8 +388,8 @@ class HttpAgentRuntimeClient(
             block()
         } catch (error: RuntimeCallException) {
             throw error
-        } catch (_: Exception) {
-            throw RuntimeCallException(fallbackCode, "Agent Runtime is tijdelijk niet bereikbaar.", responseMayHaveBeenLost)
+        } catch (error: Exception) {
+            throw RuntimeCallException(fallbackCode, "Agent Runtime is tijdelijk niet bereikbaar.", responseMayHaveBeenLost, error)
         }
     }
 
@@ -398,7 +403,7 @@ class HttpAgentRuntimeClient(
             val remoteCode = runCatching { mapper.readTree(error.responseBodyAsString).path("code").asText() }.getOrNull().orEmpty()
             throw RuntimeCallException(remoteCode.ifBlank { fallbackCode }, "Agent Runtime wees de aanvraag veilig af (${error.statusCode.value()}).")
         } catch (error: RestClientException) {
-            throw RuntimeCallException(fallbackCode, "Agent Runtime is tijdelijk niet bereikbaar.", responseMayHaveBeenLost)
+            throw RuntimeCallException(fallbackCode, "Agent Runtime is tijdelijk niet bereikbaar.", responseMayHaveBeenLost, error)
         }
     }
 

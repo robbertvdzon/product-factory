@@ -19,7 +19,11 @@ class ProductDesignAiOrchestrator(
         val products = jdbc.query(
             """SELECT s.product_id FROM pf_design_process_session s
                 JOIN pf_ai_task t ON t.id=s.current_ai_task_id
-                WHERE s.status='WAITING_FOR_AI' AND t.status IN ('SUCCEEDED','FAILED','CANCELLED')
+                WHERE (s.status='WAITING_FOR_AI' AND
+                       (t.status IN ('FAILED','CANCELLED') OR
+                        (t.status='SUCCEEDED' AND EXISTS (SELECT 1 FROM pf_ai_task_result r WHERE r.task_id=t.id))))
+                   OR (s.status='BLOCKED' AND s.error_code='AI_RESULT_MISSING' AND t.status='SUCCEEDED' AND
+                       EXISTS (SELECT 1 FROM pf_ai_task_result r WHERE r.task_id=t.id))
                 ORDER BY s.updated_at LIMIT 20""".trimIndent(),
             { rs, _ -> ProductId(rs.getString(1)) },
         )

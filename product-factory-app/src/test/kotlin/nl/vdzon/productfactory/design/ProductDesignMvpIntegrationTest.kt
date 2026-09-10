@@ -173,6 +173,37 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `oude blokkade zonder lokaal resultaat hervat dezelfde taak zodra projectie gereed is`() {
+        design.runProcessSession(productId)
+        ai.dispatchPending()
+        val session = queries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        val taskId = session.aiTaskIds.single()
+        val job = runtime.onlyJob()
+        val result = validEpic()
+        runtime.results[job.id] = result
+        runtime.resultArtifacts[job.id] = result.path("epic").path("uxArtifactChanges")
+            .mapNotNull { it.path("outputArtifactName").takeIf(JsonNode::isTextual)?.asText() }
+            .mapIndexed { index, name ->
+                RuntimeArtifactView("ux-$index", job.id, name, "image/png", 128, (index + 1).toString().take(1).repeat(64), java.time.Instant.now())
+            }
+        runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
+        jdbc.update("UPDATE pf_ai_task SET status='SUCCEEDED' WHERE id=?", taskId.value)
+        jdbc.update(
+            "UPDATE pf_design_process_session SET status='BLOCKED',error_code='AI_RESULT_MISSING',blocked_reason='Oude projectiefout' WHERE id=?",
+            session.id.value,
+        )
+
+        ai.reconcileActive()
+        orchestrator.resumeReady()
+
+        val completed = queries.getProcessSession(session.id)
+        assertThat(completed.status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(queries.findEpics(EpicFilter(productId))).hasSize(1)
+        assertThat(completed.aiTaskIds).containsExactly(taskId)
+        assertThat(runtime.distinctIdempotencyKeys()).hasSize(1)
+    }
+
+    @Test
     fun `product kan iedere rijpe epic eerst door stakeholder laten goedkeuren of terugsturen`() {
         val product = productQueries.getProduct(productId)
         products.setEpicApprovalMode(SetEpicApprovalModeCommand(

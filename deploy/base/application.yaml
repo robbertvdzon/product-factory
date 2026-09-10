@@ -19,11 +19,13 @@ spec:
         app.kubernetes.io/name: product-factory
         app.kubernetes.io/component: backend
     spec:
-      serviceAccountName: product-factory
+      serviceAccountName: product-factory-backend
       terminationGracePeriodSeconds: 40
       securityContext:
-        seccompProfile:
-          type: RuntimeDefault
+        # local-path PVCs are backed by a host path that OpenShift cannot relabel.
+        # The matching SCC binding is defined with the artifact PVC.
+        seLinuxOptions:
+          type: spc_t
       containers:
         - name: backend
           image: ghcr.io/robbertvdzon/product-factory-backend:manual-placeholder

@@ -8,3 +8,15 @@ spec:
   resources:
     requests:
       storage: 20Gi
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: product-factory-artifact-local-path-scc
+subjects:
+  - kind: ServiceAccount
+    name: product-factory-backend
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:hostmount-anyuid-v2

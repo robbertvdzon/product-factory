@@ -62,7 +62,11 @@ class ProductDesignMvpService(
             transactions.executeWithoutResult {
                 if (claimed.created) startNewSession(claimed.session.id, productId) else when (claimed.session.status) {
                     ProcessSessionStatus.WAITING_FOR_AI -> resumeWaiting(claimed.session)
-                    ProcessSessionStatus.BLOCKED -> retryBlocked(claimed.session)
+                    ProcessSessionStatus.BLOCKED -> if (claimed.session.errorCode == "AI_RESULT_MISSING") {
+                        resumeWaiting(claimed.session)
+                    } else {
+                        retryBlocked(claimed.session)
+                    }
                     ProcessSessionStatus.RUNNING -> retryBlocked(claimed.session)
                     else -> throw ProcessAlreadyRunning(productId)
                 }
@@ -204,7 +208,7 @@ class ProductDesignMvpService(
             AiTaskStatus.SUCCEEDED -> {
                 val taskResult = aiQueries.getAiTaskResult(taskId)
                 val result = taskResult?.responseJson
-                    ?: return blockSession(session.id, "AI_RESULT_MISSING", "De geslaagde ontwerptaak heeft geen resultaat.")
+                    ?: return waitForResultProjection(session.id)
                 publishResult(session.id, mapper.readTree(result), taskResult.artifacts)
             }
             AiTaskStatus.FAILED, AiTaskStatus.CANCELLED -> blockSession(
@@ -215,6 +219,14 @@ class ProductDesignMvpService(
                 clock.instant(), session.id.value,
             )
         }
+    }
+
+    private fun waitForResultProjection(sessionId: ProcessSessionId) {
+        jdbc.update(
+            """UPDATE pf_design_process_session SET status='WAITING_FOR_AI',blocked_reason=NULL,error_code=NULL,
+                call_claimed_until=NULL,updated_at=? WHERE id=?""".trimIndent(),
+            clock.instant(), sessionId.value,
+        )
     }
 
     private fun retryBlocked(session: ProcessSessionDetails) {

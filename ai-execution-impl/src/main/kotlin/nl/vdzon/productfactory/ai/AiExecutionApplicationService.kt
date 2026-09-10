@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.api.ai.*
 import nl.vdzon.productfactory.api.shared.*
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Scheduled
@@ -39,6 +40,7 @@ class AiExecutionApplicationService(
         require(it in setOf("v1", "v2")) { "PF_AGENT_RUNTIME_API_VERSION moet v1 of v2 zijn." }
     }
     private val coordinatorId = "pf-${UUID.randomUUID()}"
+    private val log = LoggerFactory.getLogger(javaClass)
 
     @Transactional
     override fun updateAiJobConfiguration(command: UpdateAiJobConfigurationCommand) = settings.updateAiJobConfiguration(command)
@@ -553,23 +555,58 @@ class AiExecutionApplicationService(
     private fun reconcileOne(taskId: String) {
         val task = getAiTask(AiTaskId(taskId))
         val runtimeId = task.runtimeJobId ?: return
+        var projectingResult = false
         try {
             val v2 = taskApiVersion(taskId) == "v2"
             if (task.cancelReason != null) if (v2) runtime.cancelV2Job(runtimeId) else runtime.cancelJob(runtimeId)
             val view = if (v2) runtime.getV2Job(runtimeId) else runtime.getJob(runtimeId)
-            applyRuntimeStatus(taskId, view)
             if (v2) storeRuntimeEvents(taskId, runtimeId)
-            if (view.status == "SUCCEEDED") {
-                if (v2) storeRuntimeV2Result(taskId, task, runtime.getV2Result(runtimeId)) else storeRuntimeResult(taskId, runtime.getResult(runtimeId))
-            }
-            if (view.status == "FAILED" || view.status == "CANCELLED") {
-                if (v2) storeRuntimeAttempts(taskId, task, runtimeId, runtime.getV2Attempts(runtimeId))
-                storeTerminalFailure(taskId, view)
+            when (view.status) {
+                "SUCCEEDED" -> {
+                    projectingResult = true
+                    markResultProjectionPending(taskId, view)
+                    if (v2) storeRuntimeV2Result(taskId, task, runtime.getV2Result(runtimeId)) else storeRuntimeResult(taskId, runtime.getResult(runtimeId))
+                    applyRuntimeStatus(taskId, view)
+                }
+                "FAILED", "CANCELLED" -> {
+                    applyRuntimeStatus(taskId, view)
+                    if (v2) storeRuntimeAttempts(taskId, task, runtimeId, runtime.getV2Attempts(runtimeId))
+                    storeTerminalFailure(taskId, view)
+                }
+                else -> applyRuntimeStatus(taskId, view)
             }
         } catch (error: RuntimeCallException) {
-            if (error.code in LOCAL_RESULT_FATAL_CODES) failResultProjection(taskId, error)
+            if (projectingResult) {
+                if (error.code in LOCAL_RESULT_FATAL_CODES) {
+                    failResultProjection(taskId, error)
+                } else {
+                    markResultProjectionRetry(taskId, error)
+                    val repeated = task.runtimePhase == RESULT_PROJECTION_RETRY_PHASE && task.errorCode == error.code
+                    if (!repeated) log.warn(
+                        "ai_result_projection_retry taskId={} runtimeJobId={} code={} failureType={}",
+                        taskId, runtimeId, error.code, error.cause?.javaClass?.simpleName ?: error.javaClass.simpleName, error,
+                    )
+                }
+            }
             // Transient projection failures remain eligible for the next restart-safe reconciliation.
         }
+    }
+
+    private fun markResultProjectionPending(taskId: String, view: RuntimeJobView) {
+        jdbc.update(
+            """UPDATE pf_ai_task SET runtime_job_id=?,status='RUNNING',runtime_phase=?,runtime_attempt_count=?,safe_progress_percent=95,
+                safe_progress=?,error_code=NULL,safe_error_message=NULL,updated_at=? WHERE id=?""".trimIndent(),
+            view.id, RESULT_PROJECTION_PHASE, view.attemptCount, "Resultaat en artifacts worden duurzaam overgenomen.", clock.instant(), taskId,
+        )
+    }
+
+    private fun markResultProjectionRetry(taskId: String, error: RuntimeCallException) {
+        jdbc.update(
+            """UPDATE pf_ai_task SET status='RUNNING',runtime_phase=?,safe_progress_percent=95,safe_progress=?,error_code=?,
+                safe_error_message=?,updated_at=? WHERE id=?""".trimIndent(),
+            RESULT_PROJECTION_RETRY_PHASE, "Duurzame resultaatopslag wordt opnieuw geprobeerd.", error.code.take(160),
+            error.safeMessage.take(1000), clock.instant(), taskId,
+        )
     }
 
     private fun applyRuntimeStatus(taskId: String, view: RuntimeJobView) {
@@ -666,11 +703,16 @@ class AiExecutionApplicationService(
                 clock.instant(), row.id,
             )
             return row.id
-        } catch (error: RuntimeCallException) {
-            throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             jdbc.update("UPDATE pf_ai_artifact SET artifact_status='FAILED' WHERE id=?", row.id)
-            throw RuntimeCallException("RUNTIME_ARTIFACT_COPY_FAILED", "Het Runtime-artifact kon niet duurzaam worden overgenomen.", true)
+            if (error is RuntimeCallException) throw error
+            log.warn(
+                "ai_artifact_copy_failed taskId={} runtimeJobId={} logicalName={} runtimeObjectId={} failureType={}",
+                taskId, runtimeJobId, artifact.name, artifact.objectId, error.javaClass.simpleName, error,
+            )
+            throw RuntimeCallException(
+                "RUNTIME_ARTIFACT_COPY_FAILED", "Het Runtime-artifact kon niet duurzaam worden overgenomen.", true, error,
+            )
         }
     }
 
@@ -1104,6 +1146,8 @@ class AiExecutionApplicationService(
         private const val MAX_EVENT_TEXT = 2_000
         private const val TEMPORARY_ARTIFACT_RETENTION_SECONDS = 7 * 24 * 60 * 60L
         private const val UPLOAD_CORRELATION_RETENTION_SECONDS = 7 * 24 * 60 * 60L
+        private const val RESULT_PROJECTION_PHASE = "PROJECTING_RESULT"
+        private const val RESULT_PROJECTION_RETRY_PHASE = "RESULT_PROJECTION_RETRY"
         private val TERMINAL_STATUSES = setOf(AiTaskStatus.SUCCEEDED, AiTaskStatus.FAILED, AiTaskStatus.CANCELLED)
         private val RETRYABLE_CODES = setOf(
             "RUNTIME_NOT_CONFIGURED", "RUNTIME_SUBMISSION_FAILED", "RUNTIME_EMPTY_RESPONSE",
