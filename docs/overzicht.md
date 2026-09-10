@@ -68,8 +68,10 @@ vervolgvraag bevatten of een voorstel maken; AI-output voert nooit zelf een muta
 Na bevestiging gaat een `BUGFIX` rechtstreeks via Software Factory v2, een `EPIC_CANDIDATE` als
 gericht workitem naar Productontwerp en een `HOTFIX` via een aparte bestaande dashboardroute. De
 epicroute vereist product-owner- en daarna factory-ownerapproval op exact dezelfde versie. De
-hotfixroute blijft in productie uit totdat markergebaseerd herstel na een verloren response door de
-bestaande externe lijstendpoint bewezen is.
+hotfixroute is op 2026-09-10 bewust in productie geactiveerd. Omdat de bestaande externe
+lijstendpoint markergebaseerd herstel na een verloren response niet volledig ondersteunt, zijn
+maximaal twee verzendpogingen per exacte requestversie toegestaan. Daarmee is maximaal één dubbele
+story na een verloren eerste response een geaccepteerd risico.
 
 ## De hele route
 

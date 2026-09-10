@@ -26,15 +26,16 @@ met `hotfix=true`, `start=true` en marker
 `SF-2377`. De detailroute bevestigde marker, repository, automatische approval, vragen toegestaan en
 de gevraagde notificatie-events.
 
-De live lijstendpoint retourneerde `SF-2377` daarna niet. Daardoor kon de adapter de marker niet via
-de bestaande lijstingang herstellen. Dit is niet oplosbaar binnen de afgesproken repositorygrens en
-maakt automatisch opnieuw proberen na een verloren create-response onveilig. Daarom is de adapter
-opgeleverd achter `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=false`; lokaal bewijzen contracttests het
-gewenste gedrag, maar de productieroute is bewust niet geactiveerd.
+De live lijstendpoint retourneerde `SF-2377` daarna niet. Daardoor kan de adapter de marker na een
+verloren create-response niet altijd via de bestaande lijstingang herstellen. De productieroute is
+op 2026-09-10 bewust geactiveerd met at-least-once-semantiek: per exacte ProductRequest-versie zijn
+maximaal twee verzendpogingen toegestaan. In het zeldzame geval dat de eerste POST slaagt maar het
+antwoord verloren gaat, kan daardoor maximaal één dubbele story ontstaan. Daarna blijft het
+request zichtbaar op `ROUTING_FAILED` voor handmatig herstel.
 
 ## Verificatie
 
-De lokale releasecontrole is afgerond met 147 backendtests, 35 frontendtests, statische
+De lokale releasecontrole is afgerond met 148 backendtests, 35 frontendtests, statische
 Flutter-analyse, een Flutter-webreleasebuild, rendercontroles voor acceptatie en productie en
 shell-/whitespacecontroles. De geautomatiseerde releaseworkflow bewaart de exacte bronrevisie en
 image-digests en promoveert hetzelfde gecontroleerde image eerst naar acceptatie en daarna naar

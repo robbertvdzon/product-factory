@@ -348,11 +348,20 @@ class ProductAdvisorApplicationService(
     override fun routeApprovedRequests(limit: Int) {
         jdbc.query(
             """SELECT request_id FROM pf_product_request
-                WHERE status IN ('APPROVED','ROUTING')
-                   OR (status='ROUTING_FAILED' AND (request_type<>'HOTFIX' OR ?))
+                WHERE status='APPROVED'
+                   OR (status IN ('ROUTING','ROUTING_FAILED') AND (
+                       request_type<>'HOTFIX' OR (
+                           ? AND COALESCE((
+                               SELECT route.attempt_count FROM pf_product_request_route route
+                               WHERE route.request_id=pf_product_request.request_id
+                                 AND route.request_version=pf_product_request.current_version
+                           ), 0) < ?
+                       )
+                   ))
                 ORDER BY updated_at""".trimIndent(),
             { rs, _ -> ProductRequestId(rs.getString(1)) },
             hotfixEnabled,
+            MAX_HOTFIX_ROUTE_ATTEMPTS,
         ).take(limit).forEach { id -> runCatching { routeOne(id) }.onFailure { markRouteFailure(id, safeCode(it)) } }
         processDesignWorkItems(limit)
         synchronizeDeliveries(limit)
@@ -778,6 +787,7 @@ class ProductAdvisorApplicationService(
         const val JOB_KEY = "PRODUCT_ADVISOR.CONVERSE"
         const val PROMPT_VERSION = 1L
         const val MAX_ATTEMPTS = 3
+        const val MAX_HOTFIX_ROUTE_ATTEMPTS = 2
         val SHA = Regex("[0-9a-fA-F]{40}")
         val RESPONSE_SCHEMA = """{"type":"object","additionalProperties":false,"required":["message","outcome","observations","proposal"],"properties":{"message":{"type":"string","minLength":1,"maxLength":20000},"outcome":{"type":"string","enum":["ANSWER","ASK_FOLLOW_UP","PROPOSE_CHANGE"]},"observations":{"type":"array","items":{"type":"string","minLength":1,"maxLength":4000}},"proposal":{"type":["object","null"],"additionalProperties":false,"required":["type","title","summary","problem","userImpact","currentBehavior","desiredBehavior","evidence","gitCommitSha","acceptanceCriteria","scope","boundaries","excludedHotfixCategories"],"properties":{"type":{"type":"string","enum":["HOTFIX","BUGFIX","EPIC_CANDIDATE"]},"title":{"type":"string","minLength":1,"maxLength":200},"summary":{"type":"string","minLength":1,"maxLength":20000},"problem":{"type":"string","minLength":1,"maxLength":20000},"userImpact":{"type":"string","minLength":1,"maxLength":20000},"currentBehavior":{"type":"string","minLength":1,"maxLength":20000},"desiredBehavior":{"type":"string","minLength":1,"maxLength":20000},"evidence":{"type":"array","items":{"type":"string","minLength":1,"maxLength":4000}},"gitCommitSha":{"type":"string","pattern":"^[0-9a-fA-F]{40}$"},"acceptanceCriteria":{"type":"array","minItems":1,"items":{"type":"string","minLength":1,"maxLength":4000}},"scope":{"type":"array","minItems":1,"items":{"type":"string","minLength":1,"maxLength":4000}},"boundaries":{"type":"array","items":{"type":"string","minLength":1,"maxLength":4000}},"excludedHotfixCategories":{"type":"array","items":{"type":"string","minLength":1,"maxLength":200}}}}}}"""
     }

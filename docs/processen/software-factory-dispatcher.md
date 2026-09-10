@@ -17,10 +17,12 @@ en `sourceStoryVersion` gelijk aan de bevestigde versie. Een `HOTFIX` gebruikt u
 bestaande dashboard-story-API met `hotfix=true` en de zichtbare marker
 `Product-Request: <uuid>:v<versie>`. Het dashboardtoken blijft buiten Runtime en prompts.
 
-De hotfixroute is operationeel fail-closed via `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED`. Productie houdt
-die schakelaar uit totdat een productieprobe aantoont dat de lijstendpoint de marker teruggeeft;
-zonder dat bewijs is retry na een mogelijk verloren create-response niet idempotent aantoonbaar.
-Details staan in het [Product Advisor-runbook](../platform/product-advisor-runbook.md).
+De hotfixroute is operationeel schakelbaar via `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED`. Productie heeft
+die schakelaar aan. Omdat de bestaande lijstendpoint de marker niet altijd teruggeeft, is retry na
+een mogelijk verloren create-response niet volledig idempotent. Product Factory begrenst dit tot
+maximaal twee verzendpogingen per exacte requestversie; maximaal één dubbele story is als bekend
+risico geaccepteerd. Details staan in het
+[Product Advisor-runbook](../platform/product-advisor-runbook.md).
 
 ## Verantwoordelijkheid
 

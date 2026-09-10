@@ -23,7 +23,8 @@ automatische approval, vragen en notificatie-events. Een gecontroleerde probe ma
 de detailroute bevestigde de volledige payload. De lijstendpoint toonde deze story echter niet en
 kon de unieke ProductRequest-marker dus niet terugvinden.
 
-Conclusie: status en create-contract zijn bruikbaar, maar automatische hotfixroutering voldoet nog
-niet aan de verplichte lost-response-idempotentie. De Product Factory-adapter, tokenstatus en rotatie
-zijn gereed; productie blijft fail-closed met `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=false`. Er zijn
-geen wijzigingen in Software Factory of PvdD gedaan.
+Conclusie: status en create-contract zijn bruikbaar, maar de lijstingang biedt geen volledige
+lost-response-idempotentie. Dit resterende risico is op 2026-09-10 geaccepteerd en begrensd tot
+maximaal twee POST-pogingen per exacte ProductRequest-versie. Productie gebruikt daarom
+`PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=true`; bij een verloren eerste response kan maximaal één
+dubbele story ontstaan. Er zijn geen wijzigingen in Software Factory of PvdD gedaan.

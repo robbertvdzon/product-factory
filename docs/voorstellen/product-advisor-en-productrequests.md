@@ -1,8 +1,9 @@
 # Voorstel — Product Advisor en Product Requests
 
-Status: gerealiseerd op 2026-09-09, behalve automatische hotfixactivering; die blijft fail-closed
-achter `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=false` totdat de bestaande Software Factory-lijstendpoint
-markerherstel productief aantoonbaar ondersteunt.
+Status: gerealiseerd op 2026-09-09 en automatisch hotfixen geactiveerd op 2026-09-10. Productie
+gebruikt `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=true` met maximaal twee verzendpogingen per exacte
+requestversie; bij een verloren eerste response is maximaal één dubbele story een geaccepteerd
+risico.
 Datum: 2026-09-09
 
 ## Samenvatting

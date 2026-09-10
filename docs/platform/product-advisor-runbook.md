@@ -7,8 +7,9 @@ Runtime v2 voor uitsluitend adviserende, strikt gestructureerde output. Externe 
 na een geauthenticeerd, versiegebonden en idempotent backendcommand.
 
 De gewone bugfixroute gebruikt het bestaande Software Factory-v2-token. De hotfixroute gebruikt een
-afzonderlijk kortlevend dashboardtoken, geeft dat nooit aan Runtime door en blijft fail-closed zolang
-`PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=false`.
+afzonderlijk kortlevend dashboardtoken en geeft dat nooit aan Runtime door. Productie gebruikt
+`PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=true` met maximaal twee verzendpogingen per exacte
+ProductRequest-versie.
 
 ## Dashboardtoken roteren
 
@@ -26,20 +27,19 @@ dagen geldig; roteer vóór verval en controleer als factory owner
 `GET /api/operations/product-advisor/hotfix-token`. Alleen `configured`, `reachable`, `checkedAt` en
 een veilige foutcode mogen zichtbaar zijn.
 
-## Hotfixguard activeren
+## Hotfixguard en at-least-once-risico
 
-Activeer de guard pas als een gecontroleerde productieprobe alle punten bewijst:
+Een gecontroleerde productieprobe heeft bewezen dat status, create en detail werken:
 
 1. `GET /api/v1/status` accepteert het doelgebonden token;
 2. `POST /api/v1/stories` maakt met `hotfix=true`, `start=true` en een unieke
    `Product-Request: <uuid>:v<versie>`-marker precies één story;
-3. `GET /api/v1/stories` retourneert die marker en storykey;
-4. dezelfde create-or-recoverbewerking retourneert daarna de bestaande story zonder tweede POST;
-5. geweigerd of verlopen token levert alleen een veilige foutcode op.
+3. geweigerd of verlopen token levert alleen een veilige foutcode op.
 
-Pas daarna mag `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED=true` in de productie-ConfigMap. Houd de guard
-uit als stap 3 niet slaagt: een timeout na succesvolle POST is dan niet veilig te onderscheiden van
-een niet-uitgevoerde POST.
+De lijstendpoint retourneerde de probestory niet. Daardoor is een timeout na een succesvolle POST
+niet veilig te onderscheiden van een niet-uitgevoerde POST. Dit bekende risico is geaccepteerd:
+Product Factory probeert per exacte requestversie maximaal twee keer. Er kan dus maximaal één
+dubbele story ontstaan; na de tweede mislukte poging stopt automatische routering.
 
 ## Fout en herstel
 
@@ -47,8 +47,9 @@ een niet-uitgevoerde POST.
   is gedaan. Laat het request zichtbaar op `ROUTING_FAILED` staan.
 - `HOTFIX_TOKEN_MISSING` of `HOTFIX_TOKEN_REJECTED`: roteer/seal/deploy het token en controleer de
   statusroute; log of kopieer het token nooit.
-- `HOTFIX_UNREACHABLE` of `HOTFIX_HTTP_5xx`: zet de guard uit. Controleer eerst markerherstel voordat
-  een request opnieuw wordt gerouteerd.
+- `HOTFIX_UNREACHABLE` of `HOTFIX_HTTP_5xx`: controleer beide mogelijke stories en herstel het
+  request handmatig als de twee automatische pogingen zijn verbruikt. Zet de guard uit bij een
+  aanhoudende storing.
 - Een gewone bugfix herstelt via de v2-idempotentiesleutel; een epickandidaat hervat via hetzelfde
   `DesignWorkItem` en dezelfde gekoppelde gebruikersvraag.
 

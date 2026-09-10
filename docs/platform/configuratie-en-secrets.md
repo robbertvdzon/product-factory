@@ -32,7 +32,7 @@ stoppen startup zonder waarden te loggen.
 | `PF_SOFTWARE_FACTORY_TOKEN` | ja | ja vanaf stap 8 | Bearer-token voor de echte adapter; dezelfde waarde heet aan Software Factory-zijde `SF_PRODUCT_FACTORY_TOKEN` |
 | `PF_SOFTWARE_FACTORY_DASHBOARD_URL` | nee | ja voor hotfixstatus | interne basis-URL van de bestaande dashboard-story-API |
 | `PF_SOFTWARE_FACTORY_DASHBOARD_TOKEN` | ja | ja voor hotfixstatus | kortlevend, doelgebonden dashboardtoken; nooit aan Agent Runtime of Product Advisor doorgeven |
-| `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED` | nee | ja | fail-closed featureguard; blijft `false` totdat create-responseherstel via de bestaande lijstendpoint is bewezen |
+| `PF_SOFTWARE_FACTORY_HOTFIX_ENABLED` | nee | ja | featureguard; productie gebruikt `true` met maximaal twee verzendpogingen per exacte requestversie |
 | `PF_AGENT_RUNTIME_URL` | nee | ja vanaf stap 4 | HTTPS-basis-URL van de Agent Runtime voor deze omgeving |
 | `PF_AGENT_RUNTIME_TOKEN` | ja | ja vanaf stap 4 | gescopete Product Factory-consumentcredential; nooit een worker- of admincredential |
 | `PF_AGENT_RUNTIME_TEST_CONTROL_TOKEN` | ja | nee | alleen integratie/acceptatie voor gescopete Runtime-mockfixtures; nooit in productie |
