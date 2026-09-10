@@ -173,6 +173,30 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `ontwerpgeheugen gebruikt dezelfde titelgrens als centraal agentgeheugen`() {
+        val memoryTitle = "Onderzochte broncontext ".repeat(9).trim()
+        assertThat(memoryTitle.length).isBetween(201, 300)
+        val result = validEpic().also {
+            it.withArray("memoryChanges").addObject().apply {
+                put("type", "ADD")
+                putNull("itemId")
+                putNull("expectedVersionId")
+                put("title", memoryTitle)
+                put("content", "Deze broncontext voorkomt dat een volgende ontwerpronde hetzelfde onderzoek opnieuw uitvoert.")
+                put("reason", "Bewaar reproduceerbaar onderzoek voor een volgende ontwerpronde.")
+            }
+        }
+
+        design.runProcessSession(productId)
+        completeOnlyJob(result)
+        design.runProcessSession(productId)
+
+        assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().status)
+            .isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(jdbc.queryForObject("SELECT title FROM pf_agent_memory_version", String::class.java)).isEqualTo(memoryTitle)
+    }
+
+    @Test
     fun `oude blokkade zonder lokaal resultaat hervat dezelfde taak zodra projectie gereed is`() {
         design.runProcessSession(productId)
         ai.dispatchPending()
@@ -338,6 +362,9 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
             .containsExactly("PRODUCT_ASSIGNMENT", "DECISION")
         assertThat(schema.at("/properties/epic/properties/researchSources/items/properties/status/enum").map(JsonNode::asText))
             .containsExactly("CANDIDATE", "VALIDATED", "BLOCKED")
+        assertThat(schema.at("/properties/memoryChanges/items/properties/title/maxLength").asInt()).isEqualTo(300)
+        assertThat(schema.at("/properties/memoryChanges/items/properties/content/maxLength").asInt()).isEqualTo(4000)
+        assertThat(schema.at("/properties/memoryChanges/items/properties/reason/maxLength").asInt()).isEqualTo(1000)
     }
 
     @Test
