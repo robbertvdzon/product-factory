@@ -17,7 +17,7 @@ Software Factory hoeft en mag daarom geen uitvoeringsvragen aan Product Factory 
 - De dispatcher gebruikt een afzonderlijk, intrekbaar en minimaal gescopeerd machinecredential voor
   het geversioneerde Software Factory-contract.
 - Het productiecontract heeft basis-URL
-  `https://dashboard.vdzonsoftware.nl/api/integrations/v2`. Product Factory configureert die als
+  `https://softwarefactory.vdzonsoftware.nl/api/integrations/v2`. Product Factory configureert die als
   `PF_SOFTWARE_FACTORY_URL` en leest het credential uit `PF_SOFTWARE_FACTORY_TOKEN`; Software
   Factory ontvangt dezelfde waarde als `SF_PRODUCT_FACTORY_TOKEN`.
 - Het contract ondersteunt alleen:

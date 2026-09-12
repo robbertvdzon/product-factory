@@ -38,7 +38,7 @@ tweede externe story. De dispatcher bevat geen AI, inhoudelijke planning of herp
 - Implementeer de enige dispatcherprovider achter het publieke dispatchercontract en registreer
   artifact, versie en broncommit in `ImplementationManifest`.
 - Voeg `PF_SOFTWARE_FACTORY_URL` als niet-geheim toe. Gebruik uitsluitend
-  `https://dashboard.vdzonsoftware.nl/api/integrations/v2` in productie, tenzij de normatieve
+  `https://softwarefactory.vdzonsoftware.nl/api/integrations/v2` in productie, tenzij de normatieve
   specificatie bewust wordt gewijzigd.
 - Activeer pas in deze stap `PF_SOFTWARE_FACTORY_MODE=REAL` en het bestaande
   `PF_SOFTWARE_FACTORY_TOKEN`. Breid alleen de gesloten keylijst van `deploy/seal-secrets.sh` uit;

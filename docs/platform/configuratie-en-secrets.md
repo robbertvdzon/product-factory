@@ -28,7 +28,7 @@ stoppen startup zonder waarden te loggen.
 | `PF_FACTORY_OWNER_EMAILS` | ja | ja | subset met globale `FACTORY_OWNER`-rechten; overige toegelaten gebruikers krijgen alleen expliciete productlidmaatschappen |
 | `PF_SESSION_SIGNING_SECRET` | ja | ja | nieuwe sleutel voor Product Factory-sessies |
 | `PF_SOFTWARE_FACTORY_MODE` | nee | ja | `DISABLED` vóór stap 8, `MOCKED` in acceptatie en `REAL` voor de echte productieadapter |
-| `PF_SOFTWARE_FACTORY_URL` | nee | ja vanaf stap 8 | HTTPS-basis-URL van het Software Factory v2-contract; productie gebruikt `https://dashboard.vdzonsoftware.nl/api/integrations/v2` |
+| `PF_SOFTWARE_FACTORY_URL` | nee | ja vanaf stap 8 | HTTPS-basis-URL van het Software Factory v2-contract; productie gebruikt `https://softwarefactory.vdzonsoftware.nl/api/integrations/v2` |
 | `PF_SOFTWARE_FACTORY_TOKEN` | ja | ja vanaf stap 8 | Bearer-token voor de echte adapter; dezelfde waarde heet aan Software Factory-zijde `SF_PRODUCT_FACTORY_TOKEN` |
 | `PF_SOFTWARE_FACTORY_DASHBOARD_URL` | nee | ja voor hotfixstatus | interne basis-URL van de bestaande dashboard-story-API |
 | `PF_SOFTWARE_FACTORY_DASHBOARD_TOKEN` | ja | ja voor hotfixstatus | kortlevend, doelgebonden dashboardtoken; nooit aan Agent Runtime of Product Advisor doorgeven |

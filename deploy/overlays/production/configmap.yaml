@@ -15,8 +15,8 @@ data:
   PF_AI_EXECUTION_MODE: SUBSCRIPTION
   PF_AGENT_RUNTIME_API_VERSION: v2
   PF_SOFTWARE_FACTORY_MODE: REAL
-  PF_SOFTWARE_FACTORY_URL: http://softwarefactory-dashboard-backend.software-factory.svc.cluster.local/api/integrations/v2
-  PF_SOFTWARE_FACTORY_DASHBOARD_URL: http://softwarefactory-dashboard-backend.software-factory.svc.cluster.local
+  PF_SOFTWARE_FACTORY_URL: http://software-factory-backend.software-factory.svc.cluster.local/api/integrations/v2
+  PF_SOFTWARE_FACTORY_DASHBOARD_URL: http://software-factory-backend.software-factory.svc.cluster.local
   PF_SOFTWARE_FACTORY_HOTFIX_ENABLED: "true"
   PF_EXTERNAL_MUTATIONS_ALLOWED: "false"
   PF_AGENT_RUNTIME_URL: http://agent-runtime-server.agent-runtime.svc.cluster.local

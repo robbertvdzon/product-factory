@@ -188,7 +188,7 @@ alleen in de tijdelijke agentcontainer leesbaar.
 `MockSoftwareFactory` implementeert het echte externe contract dat de dispatcher gebruikt. Hij
 heeft een eigen in-memory storyadministratie en ondersteunt dezelfde idempotentiesleutel en
 server-side pakkethash als de echte Software Factory. De productie-adapter gebruikt
-`https://dashboard.vdzonsoftware.nl/api/integrations/v2`; de mock implementeert semantisch exact de
+`https://softwarefactory.vdzonsoftware.nl/api/integrations/v2`; de mock implementeert semantisch exact de
 routevormen `GET /status`, `POST /stories`, `GET /stories/{storyKey}` en de twee ondersteunde
 `GET /stories`-queries uit de
 [dispatcherspecificatie](../processen/software-factory-dispatcher.md#extern-http-contract).

@@ -75,7 +75,7 @@ De productie-adapter gebruikt de geconfigureerde basis-URL `PF_SOFTWARE_FACTORY_
 productieomgeving is die waarde exact:
 
 ```text
-https://dashboard.vdzonsoftware.nl/api/integrations/v2
+https://softwarefactory.vdzonsoftware.nl/api/integrations/v2
 ```
 
 Het contract bestaat uitsluitend uit deze routes:

@@ -152,17 +152,17 @@ class RealSoftwareFactoryAdapter(
     private fun encode(value: String) = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
     companion object {
-        const val PRODUCTION_URL = "https://dashboard.vdzonsoftware.nl/api/integrations/v2"
+        const val PRODUCTION_URL = "https://softwarefactory.vdzonsoftware.nl/api/integrations/v2"
 
         /**
          * In-cluster alternatief voor [PRODUCTION_URL]: zelfde backend, rechtstreeks via de
-         * ClusterIP-service in namespace `software-factory` i.p.v. via Cloudflare + de
+         * ClusterIP-service `software-factory-backend` in namespace `software-factory` i.p.v. via Cloudflare + de
          * OpenShift-route + de dashboard-frontend's nginx-proxy (die zijn eigen 1MB
          * body-limiet had, waar een storypakket met attachments overheen ging). Bewust een
          * exact gepinde string, geen hostname-patroon: nieuwe interne adressen moeten hier
          * expliciet worden toegevoegd, niet impliciet worden vertrouwd.
          */
-        const val PRODUCTION_INTERNAL_URL = "http://softwarefactory-dashboard-backend.software-factory.svc.cluster.local/api/integrations/v2"
+        const val PRODUCTION_INTERNAL_URL = "http://software-factory-backend.software-factory.svc.cluster.local/api/integrations/v2"
     }
 }
 
