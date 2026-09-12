@@ -184,6 +184,42 @@ void main() {
     expect(appText('Kwaliteit'), findsWidgets);
   });
 
+  testWidgets('factory owner kan als product owner werken en terugschakelen', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1600, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final navigation = FakeNavigationLocation(Uri.parse('/beheer'));
+    final gateway = RoleSwitchingAuthenticationGateway();
+    await tester.pumpWidget(
+      ProductFactoryApp(
+        productGateway: const FakeProductGateway(),
+        navigationLocation: navigation,
+        authenticationGateway: gateway,
+        versionGateway: FakeVersionGateway(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(appText('Beheer'), findsOneWidget);
+    expect(appText('Terug naar factory owner'), findsNothing);
+
+    await tester.tap(appText('Factory owner'));
+    await tester.pumpAndSettle();
+    await tester.tap(appText('Werken als product owner'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.switchedTo, ['PRODUCT_OWNER']);
+    expect(gateway.csrfTokens, ['csrf-token']);
+    expect(appText('Product owner'), findsOneWidget);
+    expect(appText('Beheer'), findsNothing);
+    expect(navigation.current.path, '/');
+
+    await tester.tap(appText('Terug naar factory owner'));
+    await tester.pumpAndSettle();
+    expect(gateway.switchedTo, ['PRODUCT_OWNER', 'FACTORY_OWNER']);
+    expect(appText('Beheer'), findsOneWidget);
+  });
+
   testWidgets('gewone paginatekst kan met de muis worden geselecteerd', (
     tester,
   ) async {
@@ -1024,6 +1060,39 @@ class FakeAuthenticationGateway implements AuthenticationGateway {
 
   @override
   Future<AuthenticationStatus> session() => sessionResult;
+
+  @override
+  Future<void> setActingRole(String role, String? csrfToken) async {}
+}
+
+class RoleSwitchingAuthenticationGateway implements AuthenticationGateway {
+  String _actingRole = 'FACTORY_OWNER';
+  final List<String> switchedTo = [];
+  final List<String?> csrfTokens = [];
+
+  @override
+  Future<AuthenticationStatus> session() async => AuthenticationStatus(
+    authenticated: true,
+    authRequired: true,
+    stakeholderEmail: 'owner@example.com',
+    csrfToken: 'csrf-token',
+    globalRoles: _actingRole == 'FACTORY_OWNER' ? {'FACTORY_OWNER'} : {},
+    grantedGlobalRoles: const {'FACTORY_OWNER'},
+    actingRole: _actingRole,
+  );
+
+  @override
+  Future<AuthenticationStatus> googleLogin(String idToken) => session();
+
+  @override
+  Future<void> logout(String? csrfToken) async {}
+
+  @override
+  Future<void> setActingRole(String role, String? csrfToken) async {
+    switchedTo.add(role);
+    csrfTokens.add(csrfToken);
+    _actingRole = role;
+  }
 }
 
 class FakeTestControlGateway implements TestControlGateway {

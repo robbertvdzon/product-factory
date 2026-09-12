@@ -136,6 +136,14 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
     }
   }
 
+  Future<void> _switchRole(String role) async {
+    final csrfToken = _status?.csrfToken;
+    await _perform(() async {
+      await widget.gateway.setActingRole(role, csrfToken);
+      return widget.gateway.session();
+    });
+  }
+
   Future<void> _perform(
     Future<AuthenticationStatus> Function() operation,
   ) async {
@@ -185,8 +193,9 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
     }
     if (status?.authenticated == true) {
       return FoundationPage(
+        key: ValueKey(status!.actingRole),
         showAcceptanceBanner:
-            !status!.authRequired && status.environment == 'acceptance',
+            !status.authRequired && status.environment == 'acceptance',
         stakeholderEmail: status.stakeholderEmail,
         onLogout: status.authRequired ? _logout : null,
         versionGateway: widget.versionGateway,
@@ -202,6 +211,8 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
             !status.authRequired ||
             status.globalRoles.contains('FACTORY_OWNER'),
         productMemberships: status.productMemberships,
+        actingRole: status.actingRole,
+        onSwitchRole: status.canSwitchRole && !_busy ? _switchRole : null,
       );
     }
     return LoginPage(
@@ -307,6 +318,8 @@ class FoundationPage extends StatelessWidget {
     this.navigationLocation,
     this.isFactoryOwner = true,
     this.productMemberships = const {},
+    this.actingRole,
+    this.onSwitchRole,
     super.key,
   });
 
@@ -326,6 +339,8 @@ class FoundationPage extends StatelessWidget {
   final NavigationLocation? navigationLocation;
   final bool isFactoryOwner;
   final Set<String> productMemberships;
+  final String? actingRole;
+  final ValueChanged<String>? onSwitchRole;
 
   @override
   Widget build(BuildContext context) => ApplicationShell(
@@ -345,5 +360,7 @@ class FoundationPage extends StatelessWidget {
     navigationLocation: navigationLocation,
     isFactoryOwner: isFactoryOwner,
     productMemberships: productMemberships,
+    actingRole: actingRole,
+    onSwitchRole: onSwitchRole,
   );
 }

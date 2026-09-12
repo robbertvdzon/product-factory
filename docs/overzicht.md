@@ -12,7 +12,8 @@ queues en interne werking staan in de documenten onderaan.
 
 Menselijke productinput blijft de Stakeholder vertegenwoordigen, maar toegang wordt nu uit duurzame
 identiteiten afgeleid. Een `FACTORY_OWNER` beheert de hele factory en productlidmaatschappen. Een
-`PRODUCT_OWNER` werkt uitsluitend binnen expliciet toegewezen producten.
+`PRODUCT_OWNER` werkt uitsluitend binnen expliciet toegewezen producten. Een factory owner kan
+tijdelijk als product owner werken om Product Factory precies zo te gebruiken als een product owner.
 
 De Stakeholder communiceert met Product Factory via de gebruikersinterface. De UI vertaalt iedere
 actie naar een publiek command op de module die het betrokken productobject bezit; de Stakeholder

@@ -50,8 +50,8 @@ class UserIdentityRepository(
 
     fun get(userId: UserId): UserDetails {
         val base = jdbc.query(
-            "SELECT normalized_email,display_name,active FROM pf_user_account WHERE user_id=?",
-            { rs, _ -> Triple(rs.getString(1), rs.getString(2), rs.getBoolean(3)) }, userId.value,
+            "SELECT normalized_email,display_name,active,acting_role FROM pf_user_account WHERE user_id=?",
+            { rs, _ -> listOf(rs.getString(1), rs.getString(2), rs.getBoolean(3), rs.getString(4)) }, userId.value,
         ).singleOrNull() ?: throw IllegalArgumentException("Onbekende gebruiker.")
         val roles = jdbc.query(
             "SELECT role FROM pf_user_global_role WHERE user_id=?",
@@ -66,7 +66,23 @@ class UserIdentityRepository(
                 rs.getTimestamp(5)?.toInstant(), rs.getString(6), rs.getLong(7),
             ) }, userId.value,
         )
-        return UserDetails(userId, base.first, base.second, base.third, roles, memberships)
+        val actingRole = if (GlobalRole.FACTORY_OWNER in roles && base[3] != ActingRole.PRODUCT_OWNER.name) {
+            ActingRole.FACTORY_OWNER
+        } else {
+            ActingRole.PRODUCT_OWNER
+        }
+        return UserDetails(userId, base[0] as String, base[1] as String?, base[2] as Boolean, roles, memberships, actingRole)
+    }
+
+    /** Een factory owner kan zelf kiezen of hij als factory owner of als product owner werkt. */
+    fun setActingRole(userId: UserId, role: ActingRole) {
+        if (role == ActingRole.FACTORY_OWNER && GlobalRole.FACTORY_OWNER !in get(userId).globalRoles) {
+            throw InvalidCommand("Alleen een factory owner kan als factory owner werken.")
+        }
+        jdbc.update(
+            "UPDATE pf_user_account SET acting_role=?,updated_at=? WHERE user_id=?",
+            role.name, clock.instant(), userId.value,
+        )
     }
 
     fun findAll(): List<UserDetails> = jdbc.query(

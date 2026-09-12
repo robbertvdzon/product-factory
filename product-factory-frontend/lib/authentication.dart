@@ -15,6 +15,8 @@ class AuthenticationStatus {
     this.googleClientId,
     this.globalRoles = const {},
     this.productMemberships = const {},
+    this.grantedGlobalRoles = const {},
+    this.actingRole,
   });
 
   factory AuthenticationStatus.fromJson(Map<String, Object?> json) =>
@@ -31,6 +33,10 @@ class AuthenticationStatus {
         productMemberships: (json['productMemberships'] as List? ?? const [])
             .map((e) => '$e')
             .toSet(),
+        grantedGlobalRoles: (json['grantedGlobalRoles'] as List? ?? const [])
+            .map((e) => '$e')
+            .toSet(),
+        actingRole: json['actingRole'] as String?,
       );
 
   final bool authenticated;
@@ -41,12 +47,23 @@ class AuthenticationStatus {
   final String? googleClientId;
   final Set<String> globalRoles;
   final Set<String> productMemberships;
+
+  /// Rollen die de gebruiker werkelijk heeft, ongeacht de gekozen werkrol.
+  final Set<String> grantedGlobalRoles;
+
+  /// `FACTORY_OWNER` of `PRODUCT_OWNER`: de rol waarmee de gebruiker nu werkt.
+  final String? actingRole;
+
+  /// Alleen een factory owner kan kiezen tussen factory owner en product owner.
+  bool get canSwitchRole =>
+      authRequired && grantedGlobalRoles.contains('FACTORY_OWNER');
 }
 
 abstract interface class AuthenticationGateway {
   Future<AuthenticationStatus> session();
   Future<AuthenticationStatus> googleLogin(String idToken);
   Future<void> logout(String? csrfToken);
+  Future<void> setActingRole(String role, String? csrfToken);
 }
 
 class HttpAuthenticationGateway implements AuthenticationGateway {
@@ -84,6 +101,18 @@ class HttpAuthenticationGateway implements AuthenticationGateway {
       () => _client.post(
         _uri('/api/auth/logout'),
         headers: csrfToken == null ? const {} : {'X-PF-CSRF': csrfToken},
+      ),
+    );
+    if (response.statusCode != 204) throw _failure(response);
+  }
+
+  @override
+  Future<void> setActingRole(String role, String? csrfToken) async {
+    final response = await _send(
+      () => _client.put(
+        _uri('/api/me/acting-role'),
+        headers: {'Content-Type': 'application/json', 'X-PF-CSRF': ?csrfToken},
+        body: jsonEncode({'role': role}),
       ),
     );
     if (response.statusCode != 204) throw _failure(response);

@@ -10,6 +10,7 @@ import java.time.Instant
 @JvmInline value class DesignWorkItemId(val value: String)
 
 enum class GlobalRole { FACTORY_OWNER }
+enum class ActingRole { FACTORY_OWNER, PRODUCT_OWNER }
 enum class ProductMembershipRole { PRODUCT_OWNER }
 enum class MembershipStatus { ACTIVE, REVOKED }
 enum class ConversationStatus { OPEN, PROCESSING, WAITING_FOR_USER, PROPOSAL_READY, BLOCKED, CLOSED }
@@ -28,7 +29,12 @@ data class UserDetails(
     val active: Boolean,
     val globalRoles: Set<GlobalRole>,
     val memberships: List<ProductMembershipDetails>,
-)
+    val actingRole: ActingRole = if (GlobalRole.FACTORY_OWNER in globalRoles) ActingRole.FACTORY_OWNER else ActingRole.PRODUCT_OWNER,
+) {
+    /** Rollen die nu gelden: een factory owner die als product owner werkt, heeft geen globale rollen. */
+    val effectiveGlobalRoles: Set<GlobalRole>
+        get() = if (actingRole == ActingRole.PRODUCT_OWNER) emptySet() else globalRoles
+}
 data class ProductMembershipDetails(
     val productId: ProductId,
     val role: ProductMembershipRole,

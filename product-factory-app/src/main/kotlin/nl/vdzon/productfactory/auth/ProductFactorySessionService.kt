@@ -25,6 +25,8 @@ data class ResolvedSession(
     val globalRoles: Set<String>,
     val productMemberships: Set<String>,
     val csrfToken: String?,
+    val grantedGlobalRoles: Set<String> = globalRoles,
+    val actingRole: String? = null,
 )
 
 @Service
@@ -62,8 +64,10 @@ class ProductFactorySessionService(
         addCookie(response, CSRF_COOKIE, csrfToken, httpOnly = false, SESSION_LIFETIME)
         return AuthenticationStatus(
             true, true, user.email, csrfToken, userId = user.id.value,
-            globalRoles = user.globalRoles.map { it.name }.toSet(),
+            globalRoles = user.effectiveGlobalRoles.map { it.name }.toSet(),
             productMemberships = user.memberships.filter { it.status.name == "ACTIVE" }.map { it.productId.value }.toSet(),
+            grantedGlobalRoles = user.globalRoles.map { it.name }.toSet(),
+            actingRole = user.actingRole.name,
         )
     }
 
@@ -75,8 +79,10 @@ class ProductFactorySessionService(
             ?.takeIf { constantTimeEquals(sha256Hex(it), session.csrfTokenHash) }
         val user = users.get(nl.vdzon.productfactory.api.advisor.UserId(session.userId))
         return ResolvedSession(
-            session.sessionId, user.email, user.id.value, user.globalRoles.map { it.name }.toSet(),
+            session.sessionId, user.email, user.id.value, user.effectiveGlobalRoles.map { it.name }.toSet(),
             user.memberships.filter { it.status.name == "ACTIVE" }.map { it.productId.value }.toSet(), csrfToken,
+            grantedGlobalRoles = user.globalRoles.map { it.name }.toSet(),
+            actingRole = user.actingRole.name,
         )
     }
 

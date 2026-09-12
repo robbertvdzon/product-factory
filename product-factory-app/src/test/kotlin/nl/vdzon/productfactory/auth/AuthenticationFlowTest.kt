@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import java.time.Instant
 
 @SpringBootTest(
@@ -254,6 +255,84 @@ class AuthenticationFlowTest(
             1, "revoke-private-product",
         )
         mockMvc.get("/api/products/private-product/conversations") { cookie(session, csrf) }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `factory owner kan als product owner werken en weer terugschakelen`() {
+        val ownerLogin = login()
+        val session = cookie(ownerLogin, ProductFactorySessionService.SESSION_COOKIE)
+        val csrf = cookie(ownerLogin, ProductFactorySessionService.CSRF_COOKIE)
+        val token = objectMapper.readTree(ownerLogin.contentAsByteArray).get("csrfToken").asText()
+        fun createProduct(id: String) = mockMvc.post("/api/products") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, csrf)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"requestedId":"$id","name":"$id","idempotencyKey":"create-$id"}"""
+        }.andExpect { status { isCreated() } }
+        fun switchTo(role: String) = mockMvc.put("/api/me/acting-role") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, csrf)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"role":"$role"}"""
+        }
+        createProduct("role-own-product")
+        createProduct("role-other-product")
+        val factoryOwner = userIdentities.findByEmail("stakeholder@example.com")!!
+        userIdentities.grantProductOwner(
+            factoryOwner.id, nl.vdzon.productfactory.api.shared.ProductId("role-own-product"), factoryOwner.id,
+            0, "grant-role-own-product",
+        )
+
+        try {
+            switchTo("PRODUCT_OWNER").andExpect { status { isNoContent() } }
+
+            mockMvc.get("/api/auth/session") { cookie(session, csrf) }.andExpect {
+                status { isOk() }
+                jsonPath("$.actingRole") { value("PRODUCT_OWNER") }
+                jsonPath("$.globalRoles.length()") { value(0) }
+                jsonPath("$.grantedGlobalRoles[0]") { value("FACTORY_OWNER") }
+            }
+            mockMvc.get("/api/admin/users") { cookie(session, csrf) }.andExpect { status { isForbidden() } }
+            mockMvc.get("/api/products/role-other-product") { cookie(session, csrf) }.andExpect { status { isForbidden() } }
+            mockMvc.get("/api/products/role-own-product") { cookie(session, csrf) }.andExpect { status { isOk() } }
+            mockMvc.get("/api/products") { cookie(session, csrf) }.andExpect {
+                status { isOk() }
+                jsonPath("$[*].id") { value(org.hamcrest.Matchers.contains("role-own-product")) }
+            }
+
+            switchTo("FACTORY_OWNER").andExpect { status { isNoContent() } }
+
+            mockMvc.get("/api/auth/session") { cookie(session, csrf) }.andExpect {
+                jsonPath("$.actingRole") { value("FACTORY_OWNER") }
+                jsonPath("$.globalRoles[0]") { value("FACTORY_OWNER") }
+            }
+            mockMvc.get("/api/admin/users") { cookie(session, csrf) }.andExpect { status { isOk() } }
+            mockMvc.get("/api/products/role-other-product") { cookie(session, csrf) }.andExpect { status { isOk() } }
+        } finally {
+            userIdentities.setActingRole(factoryOwner.id, nl.vdzon.productfactory.api.advisor.ActingRole.FACTORY_OWNER)
+        }
+    }
+
+    @Test
+    fun `product owner kan zichzelf geen factory owner-rol geven`() {
+        val login = mockMvc.post("/api/auth/google") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"idToken":"unassigned-google-token"}"""
+        }.andReturn().response
+        val token = objectMapper.readTree(login.contentAsByteArray).get("csrfToken").asText()
+        mockMvc.put("/api/me/acting-role") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(
+                cookie(login, ProductFactorySessionService.SESSION_COOKIE),
+                cookie(login, ProductFactorySessionService.CSRF_COOKIE),
+            )
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"role":"FACTORY_OWNER"}"""
+        }.andExpect { status { isForbidden() } }
     }
 
     private fun login() = mockMvc.post("/api/auth/google") {

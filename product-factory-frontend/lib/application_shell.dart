@@ -87,6 +87,8 @@ class ApplicationShell extends StatefulWidget {
     this.csrfToken,
     this.isFactoryOwner = true,
     this.productMemberships = const {},
+    this.actingRole,
+    this.onSwitchRole,
     super.key,
   });
 
@@ -106,6 +108,12 @@ class ApplicationShell extends StatefulWidget {
   final String? csrfToken;
   final bool isFactoryOwner;
   final Set<String> productMemberships;
+
+  /// `FACTORY_OWNER` of `PRODUCT_OWNER`; bepaalt samen met [isFactoryOwner] het rollabel.
+  final String? actingRole;
+
+  /// Aanwezig wanneer de gebruiker tussen factory owner en product owner kan wisselen.
+  final ValueChanged<String>? onSwitchRole;
 
   @override
   State<ApplicationShell> createState() => _ApplicationShellState();
@@ -409,6 +417,17 @@ class _ApplicationShellState extends State<ApplicationShell> {
                     ),
                   ),
                 ),
+              if (desktop &&
+                  widget.onSwitchRole != null &&
+                  !widget.isFactoryOwner) ...[
+                const SizedBox(width: 10),
+                ActionChip(
+                  avatar: const Icon(Icons.visibility_outlined, size: 16),
+                  label: const Text('Terug naar factory owner'),
+                  tooltip: 'Je werkt nu als product owner',
+                  onPressed: () => widget.onSwitchRole!('FACTORY_OWNER'),
+                ),
+              ],
               if (!compact) ...[
                 const SizedBox(width: 10),
                 FilledButton.icon(
@@ -542,13 +561,7 @@ class _ApplicationShellState extends State<ApplicationShell> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    Text(
-                      widget.isFactoryOwner ? 'Factory owner' : 'Product owner',
-                      style: const TextStyle(
-                        color: Color(0xff90aaa4),
-                        fontSize: 12,
-                      ),
-                    ),
+                    _roleLabel(),
                   ],
                 ),
               ),
@@ -565,6 +578,50 @@ class _ApplicationShellState extends State<ApplicationShell> {
       ],
     ),
   );
+
+  Widget _roleLabel() {
+    final label = widget.isFactoryOwner ? 'Factory owner' : 'Product owner';
+    const style = TextStyle(color: Color(0xff90aaa4), fontSize: 12);
+    final onSwitchRole = widget.onSwitchRole;
+    if (onSwitchRole == null) return Text(label, style: style);
+    final current =
+        widget.actingRole ??
+        (widget.isFactoryOwner ? 'FACTORY_OWNER' : 'PRODUCT_OWNER');
+    return PopupMenuButton<String>(
+      tooltip: 'Rol wisselen',
+      initialValue: current,
+      onSelected: (role) {
+        if (role != current) onSwitchRole(role);
+      },
+      itemBuilder: (context) => [
+        for (final (role, title, subtitle) in const [
+          ('FACTORY_OWNER', 'Factory owner', 'Alle producten en beheer'),
+          ('PRODUCT_OWNER', 'Product owner', 'Alleen je eigen producten'),
+        ])
+          PopupMenuItem(
+            value: role,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                role == current ? Icons.check : null,
+                color: ProductFactoryColors.primary,
+              ),
+              title: Text('Werken als ${title.toLowerCase()}'),
+              subtitle: Text(subtitle),
+            ),
+          ),
+      ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(label, style: style, overflow: TextOverflow.ellipsis),
+          ),
+          const Icon(Icons.arrow_drop_down, size: 18, color: Color(0xff90aaa4)),
+        ],
+      ),
+    );
+  }
 
   Widget _navItem(
     _Destination destination,
@@ -618,18 +675,26 @@ class _ApplicationShellState extends State<ApplicationShell> {
 
   bool _isSelected(_Destination destination) {
     if (destination != _Destination.management) return _selected == destination;
-    return const {
-      _Destination.management,
-      _Destination.members,
-      _Destination.settings,
-      _Destination.decisions,
-      _Destination.memory,
-      _Destination.operation,
-      _Destination.system,
-    }.contains(_selected);
+    return _factoryOwnerDestinations.contains(_selected);
   }
 
-  void _select(_Destination destination) {
+  static const _factoryOwnerDestinations = {
+    _Destination.management,
+    _Destination.members,
+    _Destination.settings,
+    _Destination.decisions,
+    _Destination.memory,
+    _Destination.operation,
+    _Destination.system,
+  };
+
+  _Destination _allowed(_Destination destination) =>
+      !widget.isFactoryOwner && _factoryOwnerDestinations.contains(destination)
+      ? _Destination.overview
+      : destination;
+
+  void _select(_Destination requested) {
+    final destination = _allowed(requested);
     if (destination != _Destination.conversations) {
       _selectedConversationId = null;
     }
@@ -658,9 +723,13 @@ class _ApplicationShellState extends State<ApplicationShell> {
   }
 
   void _applyLocation(Uri location, {bool notify = true}) {
-    final destination = _destinationForPath(location.path);
+    final requested = _destinationForPath(location.path);
+    final destination = _allowed(requested);
     final productId = location.queryParameters['product']?.trim();
     final conversationId = location.queryParameters['conversation']?.trim();
+    if (destination != requested) {
+      _navigationLocation.replace(_locationFor(destination, productId));
+    }
     void apply() {
       _selected = destination;
       _selectedProductId = productId?.isEmpty == true ? null : productId;

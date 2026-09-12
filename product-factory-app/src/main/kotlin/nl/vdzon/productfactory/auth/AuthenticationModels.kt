@@ -18,6 +18,12 @@ data class AuthenticationStatus(
     val userId: String? = null,
     val globalRoles: Set<String> = emptySet(),
     val productMemberships: Set<String> = emptySet(),
+    val grantedGlobalRoles: Set<String> = emptySet(),
+    val actingRole: String? = null,
+)
+
+data class ActingRoleRequest(
+    val role: nl.vdzon.productfactory.api.advisor.ActingRole,
 )
 
 data class AuthenticationError(

@@ -30,7 +30,7 @@ class ProductAuthorizationService(
         current(authentication)?.id ?: users.resolveOrCreate("local@productfactory.invalid", true).id
 
     fun isFactoryOwner(authentication: Authentication? = SecurityContextHolder.getContext().authentication): Boolean =
-        !authRequired || current(authentication)?.globalRoles?.any { it.name == "FACTORY_OWNER" } == true
+        !authRequired || current(authentication)?.effectiveGlobalRoles?.any { it.name == "FACTORY_OWNER" } == true
 
     fun canReadProduct(productId: ProductId, authentication: Authentication? = SecurityContextHolder.getContext().authentication): Boolean {
         if (isFactoryOwner(authentication)) return true

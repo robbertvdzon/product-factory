@@ -637,10 +637,7 @@ class ProductAdvisorApplicationService(
                 "EPIC", rs.getString(1), rs.getTimestamp(4).toInstant(),
             ) }, userId.value,
         ).forEach(actions::add)
-        val factoryOwner = (jdbc.queryForObject(
-            "SELECT COUNT(*) FROM pf_user_global_role WHERE user_id=? AND role='FACTORY_OWNER'", Long::class.java, userId.value,
-        ) ?: 0L) > 0
-        if (factoryOwner) jdbc.query(
+        if (actsAsFactoryOwner(userId)) jdbc.query(
             """SELECT e.id,e.product_id,v.title,e.updated_at FROM pf_epic e
                 JOIN pf_epic_version v ON v.epic_id=e.id AND v.version=e.current_version
                 WHERE e.source_product_request_id IS NOT NULL AND v.status='AVAILABLE'
@@ -727,9 +724,13 @@ class ProductAdvisorApplicationService(
         try { jdbc.update("INSERT INTO pf_personal_notification(notification_id,recipient_user_id,product_id,event_key,kind,title,target_type,target_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)", UUID.randomUUID().toString(), userId.value, productId.value, eventKey.take(200), kind, title.take(300), targetType, targetId, clock.instant()) } catch (_: DuplicateKeyException) { }
     }
     private fun factoryOwners(): List<UserId> = jdbc.query("SELECT user_id FROM pf_user_global_role WHERE role='FACTORY_OWNER'", { rs, _ -> UserId(rs.getString(1)) })
+    private fun actsAsFactoryOwner(userId: UserId): Boolean = (jdbc.queryForObject(
+        """SELECT COUNT(*) FROM pf_user_global_role r JOIN pf_user_account u ON u.user_id=r.user_id
+            WHERE r.user_id=? AND r.role='FACTORY_OWNER' AND (u.acting_role IS NULL OR u.acting_role<>'PRODUCT_OWNER')""".trimIndent(),
+        Long::class.java, userId.value,
+    ) ?: 0L) > 0
     private fun allowedProducts(userId: UserId): Set<String> {
-        val factory = (jdbc.queryForObject("SELECT COUNT(*) FROM pf_user_global_role WHERE user_id=? AND role='FACTORY_OWNER'", Long::class.java, userId.value) ?: 0) > 0
-        return if (factory) jdbc.query("SELECT product_id FROM pf_product", { rs, _ -> rs.getString(1) }).toSet() else jdbc.query("SELECT product_id FROM pf_product_membership WHERE user_id=? AND status='ACTIVE'", { rs, _ -> rs.getString(1) }, userId.value).toSet()
+        return if (actsAsFactoryOwner(userId)) jdbc.query("SELECT product_id FROM pf_product", { rs, _ -> rs.getString(1) }).toSet() else jdbc.query("SELECT product_id FROM pf_product_membership WHERE user_id=? AND status='ACTIVE'", { rs, _ -> rs.getString(1) }, userId.value).toSet()
     }
     private fun findConversationsForProducts(productIds: Set<String>): List<ProductConversationDetails> = productIds.flatMap { findConversations(ProductId(it)) }
     private fun replayCommand(key: String, type: String, requestFingerprint: String): String? {

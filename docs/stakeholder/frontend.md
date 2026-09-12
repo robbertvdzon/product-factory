@@ -55,6 +55,17 @@ een `FACTORY_OWNER` ziet alle producten en krijgt daarnaast **Beheer → Gebruik
 factory owner gebruikers op e-mailadres registreren, lidmaatschappen toekennen en met reden en
 expliciete bevestiging intrekken. De backend controleert deze rechten bij iedere query en mutatie.
 
+Een factory owner kiest onderin de zijbalk, onder de eigen naam, als welke rol er gewerkt wordt: **Werken als
+factory owner** of **Werken als product owner**. In de rol product owner gelden exact de rechten van
+een gewone product owner: alleen producten met een eigen actief lidmaatschap, geen **Beheer** en geen
+factory-ownerapprovals. Een Beheer-URL leidt dan naar **Overzicht**; bovenin staat
+**Terug naar factory owner**. De keuze staat als `acting_role` op het gebruikersaccount, geldt dus
+op ieder apparaat en na opnieuw inloggen, en wordt via `PUT /api/me/acting-role` gewijzigd. De
+backend dwingt de gekozen rol af; alleen een gebruiker met de toegekende `FACTORY_OWNER`-rol kan
+terugschakelen. `GET /api/auth/session` geeft naast de geldende `globalRoles` ook
+`grantedGlobalRoles` en `actingRole`. Toewijzing van vragen en approvalnotificaties blijft op de
+toegekende rol gebaseerd.
+
 ## Product Advisor en persoonlijke acties
 
 Onder **Producten → Gesprekken** staan duurzame, productgebonden gesprekken. Een gekozen gesprek
