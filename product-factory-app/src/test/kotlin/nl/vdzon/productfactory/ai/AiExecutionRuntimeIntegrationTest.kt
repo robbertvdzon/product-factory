@@ -184,6 +184,22 @@ class AiExecutionRuntimeIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `definitief afgewezen aanvraag faalt de taak en wordt nooit opnieuw verstuurd`() {
+        val taskId = commands.requestAiTask(taskCommand("rejected-schema").copy(
+            responseSchema = """{"type":"object","properties":{"bewijs":{"oneOf":[{"type":"string"},{"type":"null"}]}}}""",
+        ))
+
+        implementation.dispatchPending(retryDelaySeconds = 0)
+        implementation.dispatchPending(retryDelaySeconds = 0)
+        implementation.dispatchPending(retryDelaySeconds = 0)
+
+        assertThat(queries.getAiTask(taskId).status).isEqualTo(AiTaskStatus.FAILED)
+        assertThat(queries.getAiTask(taskId).errorCode).isEqualTo("RESPONSE_SCHEMA_UNSUPPORTED")
+        assertThat(runtime.v2Requests).hasSize(1)
+        assertThat(runtime.jobCount()).isZero()
+    }
+
+    @Test
     fun `lokale schemavalidatie blokkeert afwijkend Runtime resultaat`() {
         val taskId = commands.requestAiTask(taskCommand("invalid-result"))
         implementation.dispatchPending()
@@ -296,6 +312,7 @@ class FakeRuntime : AgentRuntimeClient {
 
     override fun createJob(request: RuntimeCreateJobRequest): RuntimeJobView {
         requests += request
+        rejectNonPortableSchema(request.responseSchema)
         val existing = jobs.values.singleOrNull { it.id == idFor(request.idempotencyKey) }
         val job = existing ?: RuntimeJobView(idFor(request.idempotencyKey), "QUEUED", "QUEUED", 0, null, null, null, null, Instant.now(), Instant.now()).also { jobs[it.id] = it }
         if (loseFirstCreateResponse && !lost) {
@@ -357,6 +374,7 @@ class FakeRuntime : AgentRuntimeClient {
 
     override fun createV2Job(request: RuntimeV2CreateJobRequest): RuntimeJobView {
         v2Requests += request
+        rejectNonPortableSchema(request.output.resultSchema)
         if (rejectFirstJobForInput && !inputRejected) {
             inputRejected = true
             throw RuntimeCallException("INPUT_OBJECT_NOT_READY", "Inputobject is verlopen.")
@@ -388,6 +406,25 @@ class FakeRuntime : AgentRuntimeClient {
     fun uploadedText() = uploads.values.flatMap { it.content }.toByteArray().toString(Charsets.UTF_8)
     fun reset() { requests.clear(); v2Requests.clear(); jobs.clear(); environmentKeys.clear(); models.clear(); results.clear(); resultArtifacts.clear(); v2ResultArtifacts.clear(); attempts.clear(); uploads.clear(); loseFirstCreateResponse = false; loseFirstPatchResponse = false; rejectFirstJobForInput = false; artifactCopyFailuresRemaining = 0; createdUploadCount = 0; lost = false; patchLost = false; inputRejected = false }
     private fun upload(url: String) = uploads.getValue(url.substringAfterLast('/'))
+
+    // Spiegelt JsonResultValidator in de Agent Runtime: schema's buiten het portable profiel worden daar
+    // definitief afgewezen, dus elke test die zo'n schema aanbiedt moet hier ook stuklopen.
+    private fun rejectNonPortableSchema(schema: com.fasterxml.jackson.databind.JsonNode?) {
+        fun forbidden(node: com.fasterxml.jackson.databind.JsonNode): String? = when {
+            node.isObject -> node.properties().firstNotNullOfOrNull { (name, child) -> name.takeIf { it in NON_PORTABLE_SCHEMA_KEYWORDS } ?: forbidden(child) }
+            node.isArray -> node.firstNotNullOfOrNull(::forbidden)
+            else -> null
+        }
+        val keyword = schema?.let(::forbidden) ?: return
+        throw RuntimeCallException("RESPONSE_SCHEMA_UNSUPPORTED", "Response schema keyword $keyword is not in the portable profile.")
+    }
     private fun idFor(key: String) = UUID.nameUUIDFromBytes(key.toByteArray()).toString()
     private data class FakeUpload(val request: RuntimeCreateUploadRequest, val objectId: String, val content: MutableList<Byte> = mutableListOf())
+
+    companion object {
+        val NON_PORTABLE_SCHEMA_KEYWORDS = setOf(
+            "\$ref", "\$dynamicRef", "allOf", "anyOf", "oneOf", "not", "if", "then", "else",
+            "contains", "dependentSchemas", "patternProperties", "unevaluatedProperties", "unevaluatedItems",
+        )
+    }
 }

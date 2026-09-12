@@ -354,7 +354,7 @@ class AiExecutionApplicationService(
 
     fun dispatchPending(limit: Int = 20, retryDelaySeconds: Long = 10) {
         val ids = jdbc.query(
-            "SELECT task_id FROM pf_ai_runtime_outbox WHERE dispatched_at IS NULL AND (retry_after IS NULL OR retry_after<=?) ORDER BY created_at",
+            "SELECT task_id FROM pf_ai_runtime_outbox WHERE dispatched_at IS NULL AND dispatch_state<>'REJECTED' AND (retry_after IS NULL OR retry_after<=?) ORDER BY created_at",
             { rs, _ -> rs.getString(1) }, clock.instant(),
         ).take(limit)
         ids.forEach { dispatchOne(it, retryDelaySeconds) }
@@ -418,7 +418,7 @@ class AiExecutionApplicationService(
         val now = clock.instant()
         val claimed = jdbc.update(
             """UPDATE pf_ai_runtime_outbox SET claimed_by=?,claimed_until=?,updated_at=?
-                WHERE task_id=? AND dispatched_at IS NULL AND (claimed_until IS NULL OR claimed_until<? OR claimed_by=?)""".trimIndent(),
+                WHERE task_id=? AND dispatched_at IS NULL AND dispatch_state<>'REJECTED' AND (claimed_until IS NULL OR claimed_until<? OR claimed_by=?)""".trimIndent(),
             coordinatorId, now.plusSeconds(DISPATCH_CLAIM_SECONDS), now, taskId, now, coordinatorId,
         )
         if (claimed == 0) return
@@ -823,6 +823,8 @@ class AiExecutionApplicationService(
 
     private fun failBeforeSubmission(taskId: String, error: RuntimeCallException) {
         val now = clock.instant()
+        // Definitief afgewezen: nooit opnieuw versturen, anders blijft de dispatcher dezelfde aanvraag eindeloos aanbieden.
+        jdbc.update("UPDATE pf_ai_runtime_outbox SET dispatch_state='REJECTED',retry_after=NULL,updated_at=? WHERE task_id=?", now, taskId)
         jdbc.update("UPDATE pf_ai_task SET status='FAILED',error_code=?,safe_error_message=?,updated_at=? WHERE id=?", error.code, error.safeMessage, now, taskId)
         val exists = jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_task_result WHERE task_id=?", Long::class.java, taskId) ?: 0
         if (exists == 0L) jdbc.update(
@@ -864,7 +866,7 @@ class AiExecutionApplicationService(
         }
         jdbc.update(
             """DELETE FROM pf_ai_runtime_upload u WHERE u.updated_at<? AND EXISTS (
-                SELECT 1 FROM pf_ai_runtime_outbox o WHERE o.task_id=u.task_id AND (o.dispatched_at IS NOT NULL OR o.dispatch_state='CANCELLED'))""".trimIndent(),
+                SELECT 1 FROM pf_ai_runtime_outbox o WHERE o.task_id=u.task_id AND (o.dispatched_at IS NOT NULL OR o.dispatch_state IN ('CANCELLED','REJECTED')))""".trimIndent(),
             now.minusSeconds(UPLOAD_CORRELATION_RETENTION_SECONDS),
         )
     }
