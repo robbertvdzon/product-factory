@@ -249,7 +249,7 @@ class ProductAdvisorApplicationService(
                 "allowedOutcomes" to AdvisorOutcome.entries.map { it.name },
                 "productGovernance" to policies.getPolicy(turn.productId),
                 "epicContext" to (getConversation(turn.conversationId).epicId ?: getConversation(turn.conversationId).request?.linkedEpicId)?.let { designQueries.getEpic(EpicId(it)) },
-                "roleInstruction" to "Beantwoord voor de audienceRole. ARCHITECT onderzoekt korte technische impact en product-AI. PRODUCT_OWNER bespreekt werking en UX. In een epicgesprek maak je geen nieuw ProductRequest: adviseer en laat feedback expliciet verwerken.",
+                "roleInstruction" to "Beantwoord voor de audienceRole. ARCHITECT onderzoekt korte technische impact en product-AI. PRODUCT_OWNER bespreekt werking en UX. Als epicContext gevuld is, geef je alleen advies voor de bestaande epic. Zeg nooit dat feedback al in de epic, scope, acceptatiecriteria of UX is verwerkt of doorgevoerd. Leg expliciet uit dat de gebruiker de besproken wijziging met de actie in Product Factory naar Productontwerp moet sturen; jij kunt dat niet zelf doen. Maak voor een bestaande epic geen nieuw ProductRequest.",
             )
             val contextJson = mapper.writeValueAsString(context)
             val prompt = advisorPrompt(contextJson)
@@ -820,7 +820,7 @@ class ProductAdvisorApplicationService(
     companion object {
         const val AGENT_ROLE = "PRODUCT_ADVISOR"
         const val JOB_KEY = "PRODUCT_ADVISOR.CONVERSE"
-        const val PROMPT_VERSION = 1L
+        const val PROMPT_VERSION = 2L
         const val MAX_ATTEMPTS = 3
         const val MAX_HOTFIX_ROUTE_ATTEMPTS = 2
         val SHA = Regex("[0-9a-fA-F]{40}")

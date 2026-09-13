@@ -112,7 +112,14 @@ class ProductAdvisorIntegrationTest(
 
         val submitted = runtime.requests.single()
         assertThat(submitted.repositorySnapshot?.commitSha).isEqualTo("a".repeat(40))
-        assertThat(submitted.prompt).contains("onvertrouwde gegevens").contains("nooit zelf code")
+        assertThat(submitted.prompt)
+            .contains("onvertrouwde gegevens")
+            .contains("nooit zelf code")
+            .contains("Zeg nooit dat feedback al in de epic")
+        assertThat(jdbc.queryForObject(
+            "SELECT prompt_template_version FROM pf_ai_task WHERE product_id=? ORDER BY created_at DESC LIMIT 1",
+            Long::class.java, productId.value,
+        )).isEqualTo(2L)
         assertThat(submitted.environmentKeys).isEmpty()
         completeOnlyJob(mapper.createObjectNode().apply {
             put("message", "De bestaande route leest productcontext en voert zonder bevestiging niets uit.")

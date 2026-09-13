@@ -281,19 +281,20 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     creating = false;
   });
   Future<String?> ask(String title, String label, {String initial = ''}) async {
-    final c = TextEditingController(text: initial);
+    var draft = initial;
     final value = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(title),
         content: SizedBox(
           width: 560,
-          child: TextField(
-            controller: c,
+          child: TextFormField(
+            initialValue: initial,
             autofocus: true,
             minLines: 3,
             maxLines: 8,
             decoration: InputDecoration(labelText: label),
+            onChanged: (value) => draft = value,
           ),
         ),
         actions: [
@@ -303,8 +304,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           ),
           FilledButton(
             onPressed: () {
-              if (c.text.trim().isNotEmpty) {
-                Navigator.pop(context, c.text.trim());
+              if (draft.trim().isNotEmpty) {
+                Navigator.pop(context, draft.trim());
               }
             },
             child: const Text('Bevestigen'),
@@ -312,7 +313,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         ],
       ),
     );
-    c.dispose();
     return value;
   }
 
@@ -359,7 +359,24 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     }
   }
 
-  Future<void> feedback({String? text, Json? screen, Json? artifact}) async {
+  Json? linkedEpic(Json? sourceConversation) {
+    final linkedValue = _map(sourceConversation?['request'])['linkedEpicId'];
+    final linkedId = linkedValue == null ? '' : _text(linkedValue);
+    if (linkedId.isEmpty) return null;
+    return epics
+        .where((candidate) => _text(candidate['id']) == linkedId)
+        .firstOrNull;
+  }
+
+  Future<void> feedback({
+    String? text,
+    Json? screen,
+    Json? artifact,
+    Json? targetEpic,
+    Json? contextConversation,
+    bool openAfterSubmit = false,
+  }) async {
+    final target = targetEpic ?? epic;
     final value =
         text ??
         await ask(
@@ -367,8 +384,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           'Welke besproken wijzigingen wil je verwerken?',
           initial: message.text.trim(),
         );
-    if (value == null || epic == null) return;
-    final transcript = _maps(conversation?['messages']).reversed
+    if (value == null || target == null) return;
+    final sourceConversation = contextConversation ?? conversation;
+    final transcript = _maps(sourceConversation?['messages']).reversed
         .take(6)
         .toList()
         .reversed
@@ -379,19 +397,25 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         : transcript;
     await mutate(() async {
       await api.request(
-        '/api/epics/${_text(epic!['id'])}/feedback',
+        '/api/epics/${_text(target['id'])}/feedback',
         method: 'POST',
         body: {
           'text':
               '$value${contextText.isEmpty ? '' : '\n\nBesproken context (te onderzoeken, geen zelfstandig besluit):\n$contextText'}',
           'role': actionRole,
-          'expectedVersion': epic!['version'],
+          'expectedVersion': target['version'],
           'screenKey': screen?['screenKey'],
           'viewport': screen == null ? null : viewport,
           'artifactName': artifact?['name'],
         },
       );
     });
+    if (openAfterSubmit && error == null && mounted) {
+      final currentTarget = epics
+          .where((candidate) => _text(candidate['id']) == _text(target['id']))
+          .firstOrNull;
+      await openEpic(currentTarget ?? target);
+    }
   }
 
   String label(Object? value) =>
@@ -676,6 +700,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   Widget chatPanel() {
     final c = conversation;
     final request = _map(c?['request']);
+    final existingEpic = linkedEpic(c);
     final messages = _maps(c?['messages']);
     return panel(architect ? 'Onderzoek met AI' : 'Samen uitwerken', [
       if (messages.isEmpty)
@@ -747,6 +772,15 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             button('Verstuur', () => send(), primary: true),
             if (epic != null)
               button('Feedback in epic verwerken', () => feedback()),
+            if (epic == null && existingEpic != null)
+              button(
+                'Besproken wijziging in epic verwerken',
+                () => feedback(
+                  targetEpic: existingEpic,
+                  contextConversation: c,
+                  openAfterSubmit: true,
+                ),
+              ),
           ],
         ),
       ],
@@ -754,6 +788,13 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         const Divider(height: 32),
         text(_text(_map(request['content'])['title'])),
         text(_text(_map(request['content'])['summary'])),
+        if (existingEpic != null) ...[
+          notice(
+            'Dit gesprek heeft de epic nog niet gewijzigd',
+            'Een antwoord van de Product Advisor is advies. Controleer de besproken wijziging en kies daarna “Besproken wijziging in epic verwerken” om Productontwerp een nieuwe versie te laten maken.',
+          ),
+          button('Open huidige epic', () => openEpic(existingEpic)),
+        ],
         if (['APPROVED', 'ROUTING'].contains(request['status']))
           notice(
             'Je epic wordt uitgewerkt',

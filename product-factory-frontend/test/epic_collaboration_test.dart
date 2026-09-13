@@ -167,4 +167,150 @@ void main() {
       await tester.pump();
     });
   }
+
+  testWidgets(
+    'PO kan een besproken wijziging uit het oorspronkelijke gesprek in de gekoppelde epic verwerken',
+    (tester) async {
+      final submittedFeedback = <String, Object?>{};
+      final epic = <String, Object?>{
+        'id': 'epic-1',
+        'productId': 'hkh',
+        'title': 'Rustige homepage',
+        'status': 'AWAITING_PRODUCT_OWNER_APPROVAL',
+        'version': 2,
+        'contentVersion': 2,
+        'summary': 'Een rustige homepage.',
+        'problem': 'De homepage is druk.',
+        'solution': 'Breng een duidelijke hiërarchie aan.',
+        'acceptanceCriteria': ['De homepage is overzichtelijk.'],
+        'uxScreens': [],
+        'uxArtifacts': [],
+        'review': {
+          'productOwnerApproved': false,
+          'architectApproved': true,
+          'blockers': ['Functioneel akkoord ontbreekt.'],
+        },
+        'impact': {'items': [], 'productAi': <String, Object?>{}},
+      };
+      final conversationSummary = {
+        'id': 'conversation-1',
+        'title': 'Homepage bespreken',
+        'status': 'PROPOSAL_READY',
+        'epicId': null,
+      };
+      final conversation = {
+        ...conversationSummary,
+        'version': 7,
+        'messages': [
+          {
+            'sender': 'USER',
+            'text': 'Mijn dossiers ontbreekt in de ontwerpen.',
+          },
+          {
+            'sender': 'PRODUCT_ADVISOR',
+            'text': 'Geef Mijn dossiers een zichtbare plek.',
+          },
+        ],
+        'request': {
+          'id': 'request-1',
+          'status': 'ROUTED',
+          'linkedEpicId': 'epic-1',
+          'content': {
+            'title': 'Rustige homepage',
+            'summary': 'Het oorspronkelijke voorstel.',
+          },
+        },
+      };
+      http.Response jsonOk(Object value) => http.Response(
+        jsonEncode(value),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        if (request.method == 'POST' && path == '/api/epics/epic-1/feedback') {
+          submittedFeedback.addAll(
+            (jsonDecode(request.body) as Map).cast<String, Object?>(),
+          );
+          return http.Response('', 202);
+        }
+        if (path == '/api/products') {
+          return jsonOk([
+            {
+              'id': 'hkh',
+              'name': 'HKH',
+              'status': 'ACTIVE',
+              'dispatchingEnabled': false,
+              'version': 1,
+            },
+          ]);
+        }
+        if (path == '/api/products/hkh/epics') {
+          return jsonOk([epic]);
+        }
+        if (path == '/api/products/hkh/conversations') {
+          return jsonOk([conversationSummary]);
+        }
+        if (path == '/api/conversations/conversation-1') {
+          return jsonOk(conversation);
+        }
+        if (path.endsWith('/test-configuration')) {
+          return http.Response('{}', 404);
+        }
+        if (path.endsWith('/governance')) {
+          return jsonOk({'configured': true, 'version': 1});
+        }
+        if (path.endsWith('/progress')) {
+          return jsonOk({'steps': [], 'stories': []});
+        }
+        return jsonOk([]);
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EpicCollaborationPage(
+              products: HttpProductGateway(client: client),
+              role: 'PRODUCT_OWNER',
+              initialProductId: 'hkh',
+              api: CollaborationApi('csrf', client: client),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Homepage bespreken'));
+      await tester.tap(find.text('Homepage bespreken'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Dit gesprek heeft de epic nog niet gewijzigd'),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(
+        find.text('Besproken wijziging in epic verwerken'),
+      );
+      await tester.tap(find.text('Besproken wijziging in epic verwerken'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField).last,
+        'Voeg Mijn dossiers toe aan desktop en mobiel.',
+      );
+      await tester.tap(find.text('Bevestigen'));
+      await tester.pumpAndSettle();
+
+      expect(submittedFeedback['expectedVersion'], 2);
+      expect(submittedFeedback['role'], 'PRODUCT_OWNER');
+      expect(
+        submittedFeedback['text'],
+        contains('Voeg Mijn dossiers toe aan desktop en mobiel.'),
+      );
+      expect(
+        submittedFeedback['text'],
+        contains('Mijn dossiers ontbreekt in de ontwerpen.'),
+      );
+      expect(find.text('Rustige homepage'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
