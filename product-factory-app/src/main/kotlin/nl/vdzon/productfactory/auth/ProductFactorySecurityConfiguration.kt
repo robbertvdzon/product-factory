@@ -83,7 +83,11 @@ class ProductFactorySecurityConfiguration(
         val configuration = CorsConfiguration().apply {
             allowedOrigins = listOf(frontendUrl.removeSuffix("/"))
             allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-            allowedHeaders = listOf("Content-Type", ProductFactorySessionService.CSRF_HEADER)
+            allowedHeaders = listOf(
+                "Content-Type",
+                ProductFactorySessionService.CSRF_HEADER,
+                AuthenticationController.DEBUG_TOKEN_HEADER,
+            )
             allowCredentials = true
             maxAge = 3600
         }

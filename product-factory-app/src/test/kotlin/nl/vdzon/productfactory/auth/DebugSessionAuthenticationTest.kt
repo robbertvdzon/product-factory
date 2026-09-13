@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.options
 import org.springframework.test.web.servlet.post
 
 @SpringBootTest(
@@ -26,6 +27,19 @@ import org.springframework.test.web.servlet.post
 class DebugSessionAuthenticationTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
+    @Test
+    fun `debug-header is toegestaan vanaf de publieke frontend`() {
+        mockMvc.options("/api/auth/debug-session") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, AuthenticationController.DEBUG_TOKEN_HEADER)
+        }.andExpect {
+            status { isOk() }
+            header { string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, FRONTEND_ORIGIN) }
+            header { string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, AuthenticationController.DEBUG_TOKEN_HEADER) }
+        }
+    }
+
     @Test
     fun `debug-session met geldig token en toegestaan mailadres bootstrapt een echte sessie`() {
         mockMvc.post("/api/auth/debug-session") {
