@@ -182,25 +182,40 @@ class ProductDesignMvpService(
         // current memory for each new task, while preserving the repository/design snapshot.
         val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant())
         val questions = products.findStakeholderQuestions(StakeholderQuestionFilter(productId))
+        val signals = products.findUserSignals(UserSignalFilter(productId, statuses = setOf(UserSignalStatus.OPEN, UserSignalStatus.IN_REVIEW)))
+        val previous = getProcessSession(sessionId)
         val taskSnapshot = (mapper.readTree(snapshotJson) as ObjectNode).apply {
             set<JsonNode>("agentMemory", mapper.valueToTree(currentMemory))
             set<JsonNode>("stakeholderQuestions", mapper.valueToTree(questions))
+            set<JsonNode>("signals", mapper.valueToTree(signals))
+            remove("previousValidationError")
+            if (previous.errorCode in setOf("DESIGN_INPUT_INVALID", "DESIGN_VERSION_CONFLICT")) {
+                put("previousValidationError", previous.blockedReason)
+            }
         }
         val taskSnapshotJson = mapper.writeValueAsString(taskSnapshot)
-        val inputs = (frozenInputs(sessionId).filter { it.type !in setOf("MEMORY_VERSION", "STAKEHOLDER_QUESTION") } +
+        val inputs = (frozenInputs(sessionId).filter { it.type !in setOf("MEMORY_VERSION", "STAKEHOLDER_QUESTION", "USER_SIGNAL") } +
             currentMemory.map { SourceReference("MEMORY_VERSION", it.activeVersionId.value, 1) } +
-            questions.map { SourceReference("STAKEHOLDER_QUESTION", it.id.value, it.version) })
+            questions.map { SourceReference("STAKEHOLDER_QUESTION", it.id.value, it.version) } +
+            signals.map { SourceReference("USER_SIGNAL", it.id.value, it.version) })
             .sortedWith(compareBy(SourceReference::type, SourceReference::id, SourceReference::version))
         jdbc.update(
             "UPDATE pf_design_process_session SET snapshot_json=?,memory_version_ids_json=?,inputs_json=? WHERE id=?",
             taskSnapshotJson, mapper.writeValueAsString(currentMemory.map { it.activeVersionId }),
             mapper.writeValueAsString(inputs), sessionId.value,
         )
+        val responseSchema = mapper.readTree(RESPONSE_SCHEMA) as ObjectNode
+        (responseSchema.path("properties").path("processedSignalIds") as ObjectNode).apply {
+            put("maxItems", signals.size)
+            if (signals.isNotEmpty()) (path("items") as ObjectNode).putArray("enum").apply {
+                signals.forEach { add(it.id.value) }
+            }
+        }
         val configuration = aiQueries.getAiJobConfiguration(JOB_KEY)
         val taskId = ai.requestAiTask(RequestAiTaskCommand(
             JOB_KEY, productId, "product-design", sessionId, ROLE.value,
             configuration.execution, configuration.version, PROMPT_TEMPLATE_VERSION,
-            designPrompt(taskSnapshotJson), RESPONSE_SCHEMA, RepositorySnapshot(gitUrl, gitSha),
+            designPrompt(taskSnapshotJson), mapper.writeValueAsString(responseSchema), RepositorySnapshot(gitUrl, gitSha),
             outputArtifacts = UX_ARTIFACT_DECLARATIONS,
             executionTimeout = Duration.ofMinutes(30), idempotencyKey = "design-${sessionId.value}-$attempt",
         ))
@@ -1090,6 +1105,8 @@ REMOVE verwijdert het bewust met een concrete reden en ADD voegt een nieuw besta
 naar het gelijknamige pad /job/output/artifacts/ux-NN; schrijf behouden bestanden niet opnieuw. uxArtifactChanges moet exact overeenkomen met wat je daadwerkelijk schrijft:
 elk geschreven bestand (dus ook de aparte MOBILE-variant van elk scherm) staat met precies één ADD of REPLACE in uxArtifactChanges, zonder uitzondering. uxScreens beschrijft
 daarna altijd de volledige samengestelde eindset, niet alleen de wijzigingen.
+processedSignalIds bevat uitsluitend daadwerkelijk verwerkte ids uit signals; nooit ids van stakeholdervragen, antwoorden, epics of taken. Zonder signals is dit altijd [].
+Als previousValidationError aanwezig is, herstel die concrete fout in je nieuwe resultaat; herhaal niet dezelfde ongeldige uitvoer.
 Lever impact met DATABASE, MIGRATION, EXTERNAL_SYSTEM, FRONTEND, ACCESS en PRODUCT_AI, eventueel INFRASTRUCTURE.
 Elke regel: korte concrete summary, level NONE/COMPATIBLE/MATERIAL/UNKNOWN, bewijs uit code/besluiten, alternatieven.
 Een eerste database, tabelmigratie, nieuwe koppeling/frontend/login of nieuw/hoger product-AI-gebruik is MATERIAL.
@@ -1167,7 +1184,7 @@ $snapshotJson"""
         private val ROLE = AgentRoleKey("PRODUCT_DESIGNER_MVP")
         private val JOB_KEY = AiJobKey("PRODUCT_DESIGN.CREATE_EPIC")
         private val DESIGN_ACTOR = ActorReference(ActorType.PROCESS, "product-design-mvp")
-        private const val PROMPT_TEMPLATE_VERSION = 6L
+        private const val PROMPT_TEMPLATE_VERSION = 7L
         private val CALL_CLAIM = Duration.ofMinutes(5)
         private const val MAX_DESIGN_ITERATIONS = 3
         private const val MIN_VALIDATED_EXTERNAL_SOURCES = 2

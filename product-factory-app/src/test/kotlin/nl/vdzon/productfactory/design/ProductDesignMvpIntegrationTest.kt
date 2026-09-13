@@ -222,6 +222,25 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `vraag ids zijn geen signalen en een herhaling krijgt de validatiefout mee`() {
+        design.runProcessSession(productId)
+        completeOnlyJob(validEpic().apply { putArray("processedSignalIds").add("question-id-is-not-a-signal") })
+        design.runProcessSession(productId)
+        assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().errorCode)
+            .isEqualTo("DESIGN_INPUT_INVALID")
+        assertThat(queries.findEpics(EpicFilter(productId))).isEmpty()
+
+        design.runProcessSession(productId)
+        ai.dispatchPending()
+        assertThat(runtime.requests.last().prompt).contains("previousValidationError", "niet-bevroren signaal")
+        assertThat(runtime.requests.last().responseSchema!!.at("/properties/processedSignalIds/maxItems").asInt()).isZero()
+        completeOnlyJob(validEpic())
+        design.runProcessSession(productId)
+        assertThat(queries.findEpics(EpicFilter(productId))).hasSize(1)
+        assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+    }
+
+    @Test
     fun `ontwerpgeheugen gebruikt dezelfde titelgrens als centraal agentgeheugen`() {
         val memoryTitle = "Onderzochte broncontext ".repeat(9).trim()
         assertThat(memoryTitle.length).isBetween(201, 300)
