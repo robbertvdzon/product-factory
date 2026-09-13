@@ -203,7 +203,8 @@ class ProductAdvisorApplicationService(
             "SELECT turn_id FROM pf_product_advisor_turn WHERE status='PENDING' ORDER BY created_at",
             { rs, _ -> rs.getString(1) },
         ).take(limit).forEach { turnId ->
-            runCatching { startTurn(turnId) }.onFailure { error ->
+            runCatching { transactions.executeWithoutResult { startTurn(turnId) } }.onFailure { error ->
+                log.warn("advisor_start_failed turnId={} failureType={} location={}",turnId,error.javaClass.simpleName,error.stackTrace.firstOrNull())
                 transactions.executeWithoutResult { blockTurn(turnId, safeCode(error)) }
             }
         }
@@ -231,7 +232,7 @@ class ProductAdvisorApplicationService(
             val config = aiQueries.getAiJobConfiguration(AiJobKey(JOB_KEY))
             require(config.enabled) { "De Productadviseur is niet geactiveerd." }
             val assignment = products.getProductAssignment(turn.productId)
-            val testConfiguration = products.getTestableProduct(turn.productId)
+            val testConfiguration = products.findTestableProduct(turn.productId)
             val sha = git.resolveHead(assignment.publicGitUrl).also {
                 require(SHA.matches(it)) { "De publieke Git-repository leverde geen volledige commit-SHA." }
             }

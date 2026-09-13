@@ -8,7 +8,7 @@ Datum: 2026-09-13. Ontwerp en schermafspraken staan in
 ## Geautomatiseerd bewijs
 
 De volledige `./product-factory verify` is uitgevoerd met Java 21 en Flutter 3.44.6:
-167 backendtests geslaagd, inclusief echte PostgreSQL-migraties vanaf leeg en vanaf oudere
+168 backendtests geslaagd, inclusief echte PostgreSQL-migraties vanaf leeg en vanaf oudere
 releases, en 41 frontendtests geslaagd. Analyse en releasebuild zijn geslaagd.
 
 Nieuwe gerichte scenario's in `ProductDesignMvpIntegrationTest` bewijzen:

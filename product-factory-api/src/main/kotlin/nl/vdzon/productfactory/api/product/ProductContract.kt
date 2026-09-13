@@ -340,6 +340,7 @@ interface ProductQueryService {
     fun findProducts(): List<ProductDetails>
     fun getProductAssignment(productId: ProductId): ProductAssignmentDetails
     fun getTestableProduct(productId: ProductId): TestableProductDetails
+    fun findTestableProduct(productId: ProductId): TestableProductDetails?
     fun getProcessSchedule(productId: ProductId, process: ScheduledProcess): ProcessScheduleDetails
     fun getProcessSchedules(productId: ProductId): List<ProcessScheduleDetails>
     fun findScheduleRuns(productId: ProductId? = null, limit: Int? = null): List<ScheduleRunDetails>

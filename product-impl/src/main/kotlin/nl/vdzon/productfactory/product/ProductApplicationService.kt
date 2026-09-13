@@ -483,21 +483,16 @@ class ProductApplicationService(
     }
 
     @Transactional(readOnly = true)
-    override fun getTestableProduct(productId: ProductId): TestableProductDetails {
+    override fun getTestableProduct(productId: ProductId): TestableProductDetails = findTestableProduct(productId)
+        ?: throw AggregateNotFound("Testconfiguratie voor ${productId.value} is nog niet vastgelegd.")
+
+    @Transactional(readOnly = true)
+    override fun findTestableProduct(productId: ProductId): TestableProductDetails? {
         requireProduct(productId)
-        return try {
-            jdbc.queryForObject(
-                "SELECT * FROM pf_testable_product_configuration WHERE product_id=? ORDER BY version DESC LIMIT 1",
-                { rs, _ -> TestableProductDetails(
-                    productId,
-                    mapper.readValue(rs.getString("acceptance_json"), TestEnvironmentConfiguration::class.java),
-                    rs.getString("production_json")?.let { mapper.readValue(it, TestEnvironmentConfiguration::class.java) },
-                    rs.getLong("version"),
-                ) }, productId.value,
-            )!!
-        } catch (_: EmptyResultDataAccessException) {
-            throw AggregateNotFound("Testconfiguratie voor ${productId.value} is nog niet vastgelegd.")
-        }
+        return jdbc.query("SELECT * FROM pf_testable_product_configuration WHERE product_id=? ORDER BY version DESC LIMIT 1",
+            { rs, _ -> TestableProductDetails(productId,
+                mapper.readValue(rs.getString("acceptance_json"), TestEnvironmentConfiguration::class.java),
+                rs.getString("production_json")?.let { mapper.readValue(it, TestEnvironmentConfiguration::class.java) },rs.getLong("version")) }, productId.value).singleOrNull()
     }
 
     @Transactional(readOnly = true)

@@ -51,6 +51,7 @@ class ProductAdvisorIntegrationTest(
     @BeforeEach
     fun setup() {
         advisor.deleteAllOwnedData()
+        ai.deleteAllOwnedExecutionData()
         `when`(git.resolveHead(anyString())).thenReturn("a".repeat(40))
         factory.reset()
         runtime.reset()
@@ -67,6 +68,15 @@ class ProductAdvisorIntegrationTest(
             null, 0, SYSTEM, "test-config-${productId.value}",
         ))
         conversationId = advisor.createConversation(CreateConversationCommand(productId, "Hoe werkt dit?", owner.id, "conversation-${productId.value}"))
+    }
+
+    @Test
+    fun `idee uitwerken vereist nog geen gedeployde testomgeving`() {
+        jdbc.update("DELETE FROM pf_testable_product_configuration WHERE product_id=?",productId.value)
+        advisor.addMessage(AddConversationMessageCommand(conversationId,"Werk een nieuw idee uit.",1,owner.id,"without-environment"))
+        advisor.resumeAdvisorTurns()
+        assertThat(advisor.getConversation(conversationId).status).isEqualTo(ConversationStatus.PROCESSING)
+        assertThat(jdbc.queryForObject("SELECT status FROM pf_product_advisor_turn WHERE conversation_id=?",String::class.java,conversationId.value)).isEqualTo("WAITING_FOR_AI")
     }
 
     @Test
