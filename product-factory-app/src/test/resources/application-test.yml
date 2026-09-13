@@ -5,3 +5,7 @@ spring:
     password:
   flyway:
     locations: classpath:db/migration
+
+# Retentie wordt in tests expliciet via ProcessHistoryRetention.prune(now) getest; de gedeelde H2-database
+# mag niet halverwege een test door een geplande run van een andere (gecachete) testcontext worden opgeschoond.
+PF_HISTORY_RETENTION_ENABLED: false

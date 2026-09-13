@@ -2,9 +2,11 @@ package nl.vdzon.productfactory.dispatcher
 
 import nl.vdzon.productfactory.api.dispatcher.*
 import nl.vdzon.productfactory.api.shared.*
+import nl.vdzon.productfactory.foundation.processSessionFilter
 import org.springframework.context.annotation.Profile
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
+import java.time.Instant
 
 @RestController
 @RequestMapping("/api")
@@ -29,7 +31,10 @@ class DispatcherController(
     fun sessions(
         @PathVariable productId: String,
         @RequestParam(required = false) status: Set<ProcessSessionStatus>?,
-    ) = queries.findDispatchSessions(ProcessSessionFilter(ProductId(productId), status.orEmpty()))
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) before: Instant?,
+        @RequestParam(required = false) excludeNoOps: Boolean?,
+    ) = queries.findDispatchSessions(processSessionFilter(productId, status, limit, before, excludeNoOps))
 
     @GetMapping("/dispatcher/sessions/{sessionId}")
     fun session(@PathVariable sessionId: String) = queries.getDispatchSession(ProcessSessionId(sessionId))

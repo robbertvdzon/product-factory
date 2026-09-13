@@ -51,13 +51,19 @@ agenttoegang en veilige AI-taakoperatie via de normale geauthenticeerde sessie e
 Schedules worden duurzaam gevalideerd, weergegeven en in productie alleen uitgevoerd wanneer de
 Stakeholder ze voor het betreffende product bewust heeft geactiveerd. Acceptatie houdt automatische
 starts uit en gebruikt een bestuurbare klok en Test Control.
-Onder **Producten → Ontwerp** kan de Stakeholder dezelfde publieke ontwerpfunctie handmatig starten
-of hervatten en epics, versie-inhoud, bronnen, AI-taken, no-ops en blokkades volgen. Onder
-**Producten → Planning** staan backlog, stories, dependencies, prioriteitsredenen, workitems en
-processessies; daar kan planning worden gestart of gericht worden herpland. Onder **Kwaliteit**
-staan het actuele kwaliteitsbeeld, verificaties, bugs, bewijs, retries en Testersessies. Onder
-**Planning** kan de Stakeholder de dispatcher starten en storyKey, externe status, reservering,
-idempotentiesleutel, pakkethash, retries, veilige fouten en lokale commandeffecten volgen.
+Iedere productpagina begint met wat er nu loopt of vastzit. **Overzicht** toont de lopende epic als
+epic-reis (ontwerp → planning → bouw → verificatie → eventuele bugfix en hertest → afgerond), waar
+die epic op wacht en sinds wanneer, open aandachtspunten en het automatiseringsritme van de laatste
+24 uur. Een epic openen toont de volledige tijdlijn uit stories, leveringen, verificaties, bugs en
+mislukte of geblokkeerde processessies (`GET /api/epics/{epicId}/progress`). Onder **Ontwerp**
+staan epics per fase met de handmatige ontwerpstart; onder **Planning** wat nu bij Software Factory
+ligt, de backlog, per epic ingeklapte opgeleverde en geannuleerde stories en de dispatcher; onder
+**Kwaliteit** eerst open bugs, dan werk, verificaties met storytitels en Testersessies. Afgeronde
+processessies zijn overal ingeklapt en “succesvolle no-op”-runs worden niet als regel getoond.
+**Beheer → Operatie** filtert alle processessies server-side per proces en uitkomst
+(`?limit=&before=&excludeNoOps=`); `GET /api/products/{productId}/live` levert lopende sessies,
+schema's en uurtellingen. No-op-sessies ouder dan 48 uur en schedule-runs ouder dan 7 dagen worden
+periodiek opgeruimd.
 
 De actuele architectuur en uitvoerplannen staan in [`docs`](docs/overzicht.md). Het operationele
 overzicht en de bewijsregistratie staan in het

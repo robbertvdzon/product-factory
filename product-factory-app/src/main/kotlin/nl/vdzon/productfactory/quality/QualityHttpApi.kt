@@ -2,8 +2,10 @@ package nl.vdzon.productfactory.quality
 
 import nl.vdzon.productfactory.api.quality.*
 import nl.vdzon.productfactory.api.shared.*
+import nl.vdzon.productfactory.foundation.processSessionFilter
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
+import java.time.Instant
 
 @RestController
 @RequestMapping("/api")
@@ -52,8 +54,13 @@ class QualityController(
     fun history(@PathVariable productId: String) = queries.getQualityHistory(ProductId(productId), TimeRange())
 
     @GetMapping("/products/{productId}/quality/sessions")
-    fun sessions(@PathVariable productId: String, @RequestParam(required = false) status: Set<ProcessSessionStatus>?) =
-        queries.findProcessSessions(ProcessSessionFilter(ProductId(productId), status.orEmpty()))
+    fun sessions(
+        @PathVariable productId: String,
+        @RequestParam(required = false) status: Set<ProcessSessionStatus>?,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) before: Instant?,
+        @RequestParam(required = false) excludeNoOps: Boolean?,
+    ) = queries.findProcessSessions(processSessionFilter(productId, status, limit, before, excludeNoOps))
 
     @GetMapping("/quality/sessions/{sessionId}")
     fun session(@PathVariable sessionId: String) = queries.getProcessSession(ProcessSessionId(sessionId))

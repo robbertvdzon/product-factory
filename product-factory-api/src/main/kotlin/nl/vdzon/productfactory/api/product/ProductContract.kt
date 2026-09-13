@@ -340,7 +340,7 @@ interface ProductQueryService {
     fun getTestableProduct(productId: ProductId): TestableProductDetails
     fun getProcessSchedule(productId: ProductId, process: ScheduledProcess): ProcessScheduleDetails
     fun getProcessSchedules(productId: ProductId): List<ProcessScheduleDetails>
-    fun findScheduleRuns(productId: ProductId? = null): List<ScheduleRunDetails>
+    fun findScheduleRuns(productId: ProductId? = null, limit: Int? = null): List<ScheduleRunDetails>
     fun getUserSignal(userSignalId: UserSignalId): UserSignalDetails
     fun findUserSignals(filter: UserSignalFilter): List<UserSignalDetails>
     fun getStakeholderQuestion(questionId: StakeholderQuestionId): StakeholderQuestionDetails

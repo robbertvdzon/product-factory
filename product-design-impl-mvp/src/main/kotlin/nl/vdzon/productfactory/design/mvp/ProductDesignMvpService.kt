@@ -768,7 +768,8 @@ class ProductDesignMvpService(
     @Transactional(readOnly = true)
     override fun getEpicHistory(epicId: EpicId): List<EpicDetails> {
         getEpic(epicId)
-        return epicRows("WHERE e.id=?", epicId.value)
+        // Per versie is updatedAt het moment waarop die versie ontstond (niet de laatste wijziging van de epic-rij).
+        return epicRows("WHERE e.id=?", epicId.value, updatedAtColumn = "v.created_at")
     }
 
     @Transactional(readOnly = true)
@@ -779,7 +780,7 @@ class ProductDesignMvpService(
             (filter.timeRange.until == null || epic.createdAt.isBefore(filter.timeRange.until))
     }
 
-    private fun epicRows(where: String, vararg args: Any): List<EpicDetails> = jdbc.query(
+    private fun epicRows(where: String, vararg args: Any, updatedAtColumn: String = "e.updated_at"): List<EpicDetails> = jdbc.query(
         """SELECT e.id,e.product_id,v.title,v.summary,v.problem,v.solution,v.direction_references_json,v.ux_design,
             v.acceptance_criteria_json,v.slicability_rationale,
             CASE WHEN EXISTS (SELECT 1 FROM pf_epic_version newer WHERE newer.epic_id=v.epic_id AND newer.supersedes_version=v.version)
@@ -791,7 +792,7 @@ class ProductDesignMvpService(
                      SELECT 1 FROM pf_epic_approval_record a WHERE a.epic_id=e.id AND a.epic_version=v.version AND a.approval_role='FACTORY_OWNER'
                  ) THEN 'AWAITING_FACTORY_OWNER_APPROVAL'
                  ELSE v.status END,
-            v.version,e.created_at,e.updated_at,e.verification_id,v.research_sources_json,v.readiness_json,v.ux_artifacts_json,v.ux_screens_json,v.refinement_reason,
+            v.version,e.created_at,$updatedAtColumn,e.verification_id,v.research_sources_json,v.readiness_json,v.ux_artifacts_json,v.ux_screens_json,v.refinement_reason,
             e.source_product_request_id,e.source_product_request_version
             FROM pf_epic e JOIN pf_epic_version v ON v.epic_id=e.id $where ORDER BY e.updated_at DESC,v.version DESC""".trimIndent(),
         { rs, _ ->
@@ -814,26 +815,26 @@ class ProductDesignMvpService(
         ?: throw AggregateNotFound("Ontwerpsessie ${processSessionId.value} bestaat niet.")
 
     @Transactional(readOnly = true)
-    override fun findProcessSessions(filter: ProcessSessionFilter): List<ProcessSessionDetails> = sessionRows().filter { session ->
-        (filter.productId == null || session.productId == filter.productId) &&
-            (filter.statuses.isEmpty() || session.status in filter.statuses) &&
-            (filter.timeRange.from == null || !session.startedAt.isBefore(filter.timeRange.from)) &&
-            (filter.timeRange.until == null || session.startedAt.isBefore(filter.timeRange.until))
+    override fun findProcessSessions(filter: ProcessSessionFilter): List<ProcessSessionDetails> {
+        val query = filter.toSqlQuery()
+        return sessionRows(query.where, *query.args.toTypedArray(), limit = query.limit)
     }
 
-    private fun sessionRows(where: String = "", vararg args: Any): List<ProcessSessionDetails> = jdbc.query(
+    private fun sessionRows(where: String = "", vararg args: Any, limit: Int? = null): List<ProcessSessionDetails> = jdbc.query(
         """SELECT id,product_id,status,implementation_artifact,implementation_variant,implementation_version,implementation_revision,
             started_at,finished_at,inputs_json,ai_task_ids_json,publications_json,result_summary,blocked_reason,error_code,git_url,git_commit_sha
-            FROM pf_design_process_session $where ORDER BY started_at DESC""".trimIndent(),
+            FROM pf_design_process_session $where ORDER BY started_at DESC${limit?.let { " LIMIT $it" }.orEmpty()}""".trimIndent(),
         { rs, _ ->
+            val status = ProcessSessionStatus.valueOf(rs.getString(3))
             ProcessSessionDetails(
-                ProcessSessionId(rs.getString(1)), ProductId(rs.getString(2)), ProcessSessionStatus.valueOf(rs.getString(3)),
+                ProcessSessionId(rs.getString(1)), ProductId(rs.getString(2)), status,
                 ImplementationIdentity(rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7)),
                 rs.getTimestamp(8).toInstant(), rs.getTimestamp(9)?.toInstant(),
                 mapper.readValue(rs.getString(10), object : TypeReference<List<SourceReference>>() {}),
                 mapper.readValue(rs.getString(11), object : TypeReference<List<AiTaskId>>() {}),
                 mapper.readValue(rs.getString(12), object : TypeReference<List<SourceReference>>() {}),
                 rs.getString(13), rs.getString(14), rs.getString(15), rs.getString(16), rs.getString(17),
+                noOp = isNoOpProcessSession(status, rs.getString(13)),
             )
         }, *args,
     )

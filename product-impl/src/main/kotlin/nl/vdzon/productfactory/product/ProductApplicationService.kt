@@ -497,9 +497,10 @@ class ProductApplicationService(
     }
 
     @Transactional(readOnly = true)
-    override fun findScheduleRuns(productId: ProductId?): List<ScheduleRunDetails> = jdbc.query(
+    override fun findScheduleRuns(productId: ProductId?, limit: Int?): List<ScheduleRunDetails> = jdbc.query(
         """SELECT id,product_id,process,scheduled_for,status,result_summary,error_code,claimed_at,finished_at
-            FROM pf_schedule_run ${if (productId == null) "" else "WHERE product_id=?"} ORDER BY claimed_at DESC""".trimIndent(),
+            FROM pf_schedule_run ${if (productId == null) "" else "WHERE product_id=?"} ORDER BY claimed_at DESC
+            ${limit?.let { "LIMIT $it" }.orEmpty()}""".trimIndent(),
         { rs, _ -> ScheduleRunDetails(
             rs.getString(1), ProductId(rs.getString(2)), ScheduledProcess.valueOf(rs.getString(3)), rs.getTimestamp(4).toInstant(),
             ScheduleRunStatus.valueOf(rs.getString(5)), rs.getString(6), rs.getString(7), rs.getTimestamp(8).toInstant(), rs.getTimestamp(9)?.toInstant(),

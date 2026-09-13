@@ -152,6 +152,8 @@ class SoftwareFactoryDispatcherMvpService(
         validateWork(attempt, work)
         val externalStatus = ExternalStoryStatus.valueOf(work.status)
         var story = planningQueries.getStory(attempt.storyId)
+        val alreadyLinked = story.status != StoryStatus.TODO && attempt.status == DeliveryAttemptStatus.ACCEPTED &&
+            attempt.externalStatus == ExternalStoryStatus.OPEN && attempt.externalStoryId == work.storyKey
         if (story.status == StoryStatus.TODO) {
             updateLocalCommand(attempt.id, LocalCommandStatus.PENDING)
             try {
@@ -172,6 +174,7 @@ class SoftwareFactoryDispatcherMvpService(
             ExternalStoryStatus.OPEN -> {
                 updateAccepted(attempt.id, sessionId, work)
                 clearProductBlock(attempt.productId, attempt.id)
+                if (alreadyLinked) return "Story ${attempt.storyId.value} wacht bij Software Factory op ${work.storyKey} (OPEN); succesvolle no-op."
                 return "Story ${attempt.storyId.value} is idempotent gekoppeld aan ${work.storyKey}."
             }
             ExternalStoryStatus.DONE -> {
@@ -442,10 +445,9 @@ class SoftwareFactoryDispatcherMvpService(
         ?: throw AggregateNotFound("Dispatchersessie bestaat niet.")
 
     @Transactional(readOnly = true)
-    override fun findDispatchSessions(filter: ProcessSessionFilter): List<ProcessSessionDetails> = sessionRows().filter { row ->
-        (filter.productId == null || row.productId == filter.productId) && (filter.statuses.isEmpty() || row.status in filter.statuses) &&
-            (filter.timeRange.from == null || !row.startedAt.isBefore(filter.timeRange.from)) &&
-            (filter.timeRange.until == null || row.startedAt.isBefore(filter.timeRange.until))
+    override fun findDispatchSessions(filter: ProcessSessionFilter): List<ProcessSessionDetails> {
+        val query = filter.toSqlQuery()
+        return sessionRows(query.where, *query.args.toTypedArray(), limit = query.limit)
     }
 
     private fun attemptRows(where: String = "", vararg args: Any): List<AttemptRow> = jdbc.query(
@@ -460,15 +462,16 @@ class SoftwareFactoryDispatcherMvpService(
         ) }, *args,
     )
 
-    private fun sessionRows(where: String = "", vararg args: Any): List<ProcessSessionDetails> = jdbc.query(
+    private fun sessionRows(where: String = "", vararg args: Any, limit: Int? = null): List<ProcessSessionDetails> = jdbc.query(
         """SELECT id,product_id,status,implementation_artifact,implementation_variant,implementation_version,implementation_revision,
             started_at,finished_at,inputs_json,publications_json,result_summary,blocked_reason,error_code
-            FROM pf_dispatcher_process_session $where ORDER BY started_at DESC""".trimIndent(),
+            FROM pf_dispatcher_process_session $where ORDER BY started_at DESC${limit?.let { " LIMIT $it" }.orEmpty()}""".trimIndent(),
         { rs, _ -> ProcessSessionDetails(
             ProcessSessionId(rs.getString(1)), ProductId(rs.getString(2)), ProcessSessionStatus.valueOf(rs.getString(3)),
             ImplementationIdentity(rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7)), rs.getTimestamp(8).toInstant(),
             rs.getTimestamp(9)?.toInstant(), readJson(rs.getString(10)), publications = readJson(rs.getString(11)), resultSummary = rs.getString(12),
             blockedReason = rs.getString(13), errorCode = rs.getString(14),
+            noOp = isNoOpProcessSession(ProcessSessionStatus.valueOf(rs.getString(3)), rs.getString(12)),
         ) }, *args,
     )
 

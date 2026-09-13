@@ -3,9 +3,11 @@ package nl.vdzon.productfactory.planning
 import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.auth.ResolvedSession
+import nl.vdzon.productfactory.foundation.processSessionFilter
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
+import java.time.Instant
 
 data class ReprioritizeEpicRequest(val reason: String, val priority: Int, val idempotencyKey: String)
 data class ManualReplanRequest(val reason: String, val linkedObjects: List<SourceReference> = emptyList(), val idempotencyKey: String)
@@ -31,7 +33,14 @@ class PlanningController(
     @GetMapping("/products/{productId}/backlog") fun backlog(@PathVariable productId: String) = queries.getBacklog(ProductId(productId))
     @GetMapping("/stories/{storyId}") fun story(@PathVariable storyId: String) = queries.getStory(StoryId(storyId))
     @GetMapping("/products/{productId}/planning/work-items") fun workItems(@PathVariable productId: String, @RequestParam(required = false) status: WorkItemStatus?) = queries.findPlanningWorkItems(ProductId(productId), status)
-    @GetMapping("/products/{productId}/planning/sessions") fun sessions(@PathVariable productId: String, @RequestParam(required = false) status: Set<ProcessSessionStatus>?) = queries.findProcessSessions(ProcessSessionFilter(ProductId(productId), status.orEmpty()))
+    @GetMapping("/products/{productId}/planning/sessions")
+    fun sessions(
+        @PathVariable productId: String,
+        @RequestParam(required = false) status: Set<ProcessSessionStatus>?,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) before: Instant?,
+        @RequestParam(required = false) excludeNoOps: Boolean?,
+    ) = queries.findProcessSessions(processSessionFilter(productId, status, limit, before, excludeNoOps))
     @GetMapping("/planning/sessions/{sessionId}") fun session(@PathVariable sessionId: String) = queries.getProcessSession(ProcessSessionId(sessionId))
 
     @PostMapping("/products/{productId}/planning/replan") @ResponseStatus(HttpStatus.CREATED)

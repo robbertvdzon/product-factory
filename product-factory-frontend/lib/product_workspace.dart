@@ -7,6 +7,9 @@ import 'package:http/http.dart' as http;
 import 'configuration.dart';
 import 'http_client_factory.dart';
 import 'page_refresh.dart';
+import 'product_factory_theme.dart';
+
+part 'product_workspace_insights.dart';
 
 String _value(Object? value) {
   if (value is String) return value;
@@ -317,6 +320,8 @@ class ProductWorkspaceData {
     this.dispatcherStatus = const {},
     this.deliveryAttempts = const [],
     this.dispatcherSessions = const [],
+    this.live,
+    this.epicProgress = const {},
   });
   final ProductSummary product;
   final Map<String, Object?>? assignment;
@@ -344,6 +349,12 @@ class ProductWorkspaceData {
   final Map<String, Object?> dispatcherStatus;
   final List<Map<String, Object?>> deliveryAttempts;
   final List<Map<String, Object?>> dispatcherSessions;
+
+  /// Samenvatting van lopende sessies, schema's en de laatste 24 uur per proces.
+  final Map<String, Object?>? live;
+
+  /// Voortgang (fase, wacht op, tijdlijn) van open epics, op epic-id.
+  final Map<String, Map<String, Object?>> epicProgress;
 }
 
 String _fingerprintProducts(List<ProductSummary> products) => jsonEncode(
@@ -373,7 +384,6 @@ String _fingerprintWorkspace(ProductWorkspaceData data) => jsonEncode({
   'assignment': data.assignment,
   'testConfiguration': data.testConfiguration,
   'schedules': data.schedules,
-  'scheduleRuns': data.scheduleRuns,
   'signals': data.signals,
   'questions': data.questions,
   'meetings': data.meetings,
@@ -381,25 +391,36 @@ String _fingerprintWorkspace(ProductWorkspaceData data) => jsonEncode({
   'decisionArchive': data.decisionArchive,
   'epics': data.epics,
   'designSessions': data.designSessions,
-  'epicHistories': data.epicHistories,
   'stories': data.stories,
   'backlog': data.backlog,
   'planningWorkItems': data.planningWorkItems,
   'planningSessions': data.planningSessions,
   'qualitySnapshot': data.qualitySnapshot,
-  'qualityHistory': data.qualityHistory,
   'bugs': data.bugs,
   'verifications': data.verifications,
   'qualityWorkItems': data.qualityWorkItems,
   'qualitySessions': data.qualitySessions,
   'dispatcherStatus': data.dispatcherStatus,
   'deliveryAttempts': data.deliveryAttempts,
-  'dispatcherSessions': data.dispatcherSessions,
+  // generatedAt verandert bij iedere aanroep en mag geen herbouw forceren.
+  'live': data.live == null ? null : ({...data.live!}..remove('generatedAt')),
+  'epicProgress': data.epicProgress,
 });
 
 abstract interface class ProductGateway {
   Future<List<ProductSummary>> products();
-  Future<ProductWorkspaceData> workspace(ProductSummary product);
+  Future<ProductWorkspaceData> workspace(
+    ProductSummary product, {
+    ProductWorkspaceSection section = ProductWorkspaceSection.overview,
+  });
+  Future<Map<String, Object?>?> epicProgress(String epicId);
+  Future<List<Map<String, Object?>>> processSessions(
+    String productId,
+    String process, {
+    int limit = 25,
+    String? before,
+    bool excludeNoOps = true,
+  });
   Future<void> createProduct(String name, String? requestedId);
   Future<void> setStatus(ProductSummary product, String status);
   Future<void> setDispatching(ProductSummary product, bool enabled);
@@ -500,77 +521,192 @@ class HttpProductGateway implements ProductGateway {
           )
           .toList();
 
+  static const _sessionPage = '?limit=20&excludeNoOps=true';
+
+  static Set<String> _endpointsFor(ProductWorkspaceSection section) => {
+    'assignment',
+    'epics',
+    'stories',
+    'backlog',
+    'dispatcherStatus',
+    'live',
+    ...switch (section) {
+      ProductWorkspaceSection.overview => const {
+        'signals',
+        'questions',
+        'bugs',
+        'qualityWorkItems',
+        'epicProgress',
+      },
+      ProductWorkspaceSection.design => const {
+        'designSessions',
+        'epicProgress',
+      },
+      ProductWorkspaceSection.planning => const {
+        'planningWorkItems',
+        'planningSessions',
+        'deliveryAttempts',
+        'bugs',
+      },
+      ProductWorkspaceSection.quality => const {
+        'qualitySnapshot',
+        'bugs',
+        'verifications',
+        'qualityWorkItems',
+        'qualitySessions',
+      },
+      ProductWorkspaceSection.signals => const {'signals'},
+      ProductWorkspaceSection.meetings => const {'questions', 'meetings'},
+      ProductWorkspaceSection.decisions => const {
+        'decisions',
+        'decisionArchive',
+      },
+      ProductWorkspaceSection.settings => const {
+        'testConfiguration',
+        'schedules',
+      },
+      ProductWorkspaceSection.operation => const {'deliveryAttempts'},
+    },
+  };
+
   @override
-  Future<ProductWorkspaceData> workspace(ProductSummary product) async {
-    final id = Uri.encodeComponent(product.id);
-    final values = await Future.wait([
-      _optional('/api/products/$id/assignment'),
-      _optional('/api/products/$id/test-configuration'),
-      _get('/api/products/$id/schedules'),
-      _get('/api/products/$id/signals'),
-      _get('/api/products/$id/questions'),
-      _get('/api/products/$id/meetings'),
-      _get('/api/products/$id/decisions'),
-      _get('/api/products/$id/decisions/archive'),
-      _get('/api/products/$id/epics'),
-      _get('/api/products/$id/design/sessions'),
-      _get('/api/products/$id/stories'),
-      _get('/api/products/$id/backlog'),
-      _get('/api/products/$id/planning/work-items'),
-      _get('/api/products/$id/planning/sessions'),
-      _optional('/api/products/$id/quality/current'),
-      _get('/api/products/$id/quality/history'),
-      _get('/api/products/$id/bugs'),
-      _get('/api/products/$id/verifications'),
-      _get('/api/products/$id/quality/work-items'),
-      _get('/api/products/$id/quality/sessions'),
-      _get('/api/products/$id/dispatcher/status'),
-      _get('/api/products/$id/dispatcher/attempts'),
-      _get('/api/products/$id/dispatcher/sessions'),
-      _get('/api/products/$id/schedule-runs'),
-    ]);
-    List<Map<String, Object?>> list(int index) =>
-        ((values[index] as List?) ?? const [])
+  Future<ProductWorkspaceData> workspace(
+    ProductSummary product, {
+    ProductWorkspaceSection section = ProductWorkspaceSection.overview,
+  }) async {
+    final id = product.id;
+    final wanted = _endpointsFor(section);
+    final loaders = <String, Future<Object?> Function()>{
+      'assignment': () => _optional('/api/products/$id/assignment'),
+      'testConfiguration': () =>
+          _optional('/api/products/$id/test-configuration'),
+      'schedules': () => _get('/api/products/$id/schedules'),
+      'signals': () => _get('/api/products/$id/signals'),
+      'questions': () => _get('/api/products/$id/questions'),
+      'meetings': () => _get('/api/products/$id/meetings'),
+      'decisions': () => _get('/api/products/$id/decisions'),
+      'decisionArchive': () => _get('/api/products/$id/decisions/archive'),
+      'epics': () => _get('/api/products/$id/epics'),
+      'designSessions': () =>
+          _get('/api/products/$id/design/sessions$_sessionPage'),
+      'stories': () => _get('/api/products/$id/stories'),
+      'backlog': () => _get('/api/products/$id/backlog'),
+      'planningWorkItems': () => _get('/api/products/$id/planning/work-items'),
+      'planningSessions': () =>
+          _get('/api/products/$id/planning/sessions$_sessionPage'),
+      'qualitySnapshot': () => _optional('/api/products/$id/quality/current'),
+      'bugs': () => _get('/api/products/$id/bugs'),
+      'verifications': () => _get('/api/products/$id/verifications'),
+      'qualityWorkItems': () => _get('/api/products/$id/quality/work-items'),
+      'qualitySessions': () =>
+          _get('/api/products/$id/quality/sessions$_sessionPage'),
+      'dispatcherStatus': () => _get('/api/products/$id/dispatcher/status'),
+      'deliveryAttempts': () => _get('/api/products/$id/dispatcher/attempts'),
+      // Het live-overzicht is aanvullend: een storing mag de pagina niet breken.
+      'live': () async {
+        try {
+          return await _get('/api/products/$id/live');
+        } catch (_) {
+          return null;
+        }
+      },
+    };
+    final keys = loaders.keys.where(wanted.contains).toList();
+    final values = await Future.wait(keys.map((key) => loaders[key]!()));
+    final loaded = Map.fromIterables(keys, values);
+    List<Map<String, Object?>> list(String key) =>
+        (loaded[key] as List? ?? const [])
             .map((e) => (e as Map).cast<String, Object?>())
             .toList();
-    final epics = list(8);
-    final historyEntries = await Future.wait(
-      epics.map((epic) async {
-        final epicId = Uri.encodeComponent(_value(epic['id']));
-        final versions = ((await _get('/api/epics/$epicId/history')) as List)
-            .map((e) => (e as Map).cast<String, Object?>())
-            .toList();
-        return MapEntry(_value(epic['id']), versions);
-      }),
-    );
+    Map<String, Object?>? map(String key) =>
+        (loaded[key] as Map?)?.cast<String, Object?>();
+
+    final epics = list('epics');
+    final progress = <String, Map<String, Object?>>{};
+    if (wanted.contains('epicProgress')) {
+      final open = epics
+          .where((epic) => !_terminalEpicStatuses.contains(epic['status']))
+          .take(5)
+          .map((epic) => _value(epic['id']))
+          .toList();
+      final entries = await Future.wait(
+        open.map(
+          (epicId) async => MapEntry(epicId, await epicProgress(epicId)),
+        ),
+      );
+      for (final entry in entries) {
+        if (entry.value != null) progress[entry.key] = entry.value!;
+      }
+    }
+
     return ProductWorkspaceData(
       product: product,
-      assignment: (values[0] as Map?)?.cast<String, Object?>(),
-      testConfiguration: (values[1] as Map?)?.cast<String, Object?>(),
-      schedules: list(2),
-      signals: list(3),
-      questions: list(4),
-      meetings: list(5),
-      decisions: list(6),
-      decisionArchive: list(7),
+      assignment: map('assignment'),
+      testConfiguration: map('testConfiguration'),
+      schedules: list('schedules'),
+      signals: list('signals'),
+      questions: list('questions'),
+      meetings: list('meetings'),
+      decisions: list('decisions'),
+      decisionArchive: list('decisionArchive'),
       epics: epics,
-      designSessions: list(9),
-      epicHistories: Map.fromEntries(historyEntries),
-      stories: list(10),
-      backlog: list(11),
-      planningWorkItems: list(12),
-      planningSessions: list(13),
-      qualitySnapshot: (values[14] as Map?)?.cast<String, Object?>(),
-      qualityHistory: list(15),
-      bugs: list(16),
-      verifications: list(17),
-      qualityWorkItems: list(18),
-      qualitySessions: list(19),
-      dispatcherStatus: (values[20] as Map).cast<String, Object?>(),
-      deliveryAttempts: list(21),
-      dispatcherSessions: list(22),
-      scheduleRuns: list(23),
+      designSessions: list('designSessions'),
+      epicHistories: const {},
+      stories: list('stories'),
+      backlog: list('backlog'),
+      planningWorkItems: list('planningWorkItems'),
+      planningSessions: list('planningSessions'),
+      qualitySnapshot: map('qualitySnapshot'),
+      qualityHistory: const [],
+      bugs: list('bugs'),
+      verifications: list('verifications'),
+      qualityWorkItems: list('qualityWorkItems'),
+      qualitySessions: list('qualitySessions'),
+      dispatcherStatus: map('dispatcherStatus') ?? const {},
+      deliveryAttempts: list('deliveryAttempts'),
+      live: map('live'),
+      epicProgress: progress,
     );
+  }
+
+  @override
+  Future<Map<String, Object?>?> epicProgress(String epicId) async {
+    try {
+      return ((await _get('/api/epics/${Uri.encodeComponent(epicId)}/progress'))
+              as Map?)
+          ?.cast<String, Object?>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> processSessions(
+    String productId,
+    String process, {
+    int limit = 25,
+    String? before,
+    bool excludeNoOps = true,
+  }) async {
+    final path = switch (process) {
+      'PRODUCT_DESIGN' => 'design',
+      'PRODUCT_PLANNING' => 'planning',
+      'QUALITY_ASSURANCE' => 'quality',
+      'SOFTWARE_FACTORY_DISPATCHER' => 'dispatcher',
+      _ => throw const ProductFailure(400, 'Onbekend proces.'),
+    };
+    final query = Uri(
+      queryParameters: {
+        'limit': '$limit',
+        'excludeNoOps': '$excludeNoOps',
+        if (before != null && before.isNotEmpty) 'before': before,
+      },
+    ).query;
+    return ((await _get('/api/products/$productId/$path/sessions?$query'))
+                as List? ??
+            const [])
+        .map((e) => (e as Map).cast<String, Object?>())
+        .toList();
   }
 
   @override
@@ -1479,6 +1615,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     if (oldWidget.initialProductId != widget.initialProductId &&
         widget.initialProductId != _selected?.id) {
       unawaited(_loadProducts(widget.initialProductId));
+    } else if (oldWidget.section != widget.section) {
+      // Iedere pagina laadt alleen zijn eigen gegevens.
+      _data = null;
+      unawaited(_loadProducts(_selected?.id ?? widget.initialProductId));
     }
   }
 
@@ -1499,7 +1639,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           : products.where((product) => product.id == selected.id).firstOrNull;
       final refreshedData = refreshedSelected == null
           ? null
-          : await widget.gateway.workspace(refreshedSelected);
+          : await widget.gateway.workspace(
+              refreshedSelected,
+              section: widget.section,
+            );
       if (!mounted) return;
       final productsFingerprint = _fingerprintProducts(products);
       final workspaceFingerprint = refreshedData == null
@@ -1543,7 +1686,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           (products.isEmpty ? null : products.first);
       final data = selected == null
           ? null
-          : await widget.gateway.workspace(selected);
+          : await widget.gateway.workspace(selected, section: widget.section);
       if (mounted) {
         setState(() {
           _products = products;
@@ -1779,151 +1922,201 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     ),
   };
 
+  Map<String, Object?>? _currentEpic(ProductWorkspaceData data) {
+    const order = [
+      'VERIFYING',
+      'ACTIVE',
+      'IN_PLANNING',
+      'AVAILABLE',
+      'AWAITING_FACTORY_OWNER_APPROVAL',
+      'AWAITING_PRODUCT_OWNER_APPROVAL',
+      'AWAITING_APPROVAL',
+      'NEEDS_REFINEMENT',
+      'NEEDS_RESEARCH',
+    ];
+    for (final status in order) {
+      final epic = data.epics
+          .where((candidate) => candidate['status'] == status)
+          .firstOrNull;
+      if (epic != null) return epic;
+    }
+    return null;
+  }
+
+  Future<void> _openEpic(
+    ProductWorkspaceData data,
+    Map<String, Object?> epic,
+  ) => showDialog<void>(
+    context: context,
+    builder: (_) => _EpicDetailDialog(
+      epic: epic,
+      gateway: widget.gateway,
+      initialProgress: data.epicProgress[_value(epic['id'])],
+      contentBuilder: (dialogContext) =>
+          _epicContent(data, epic, dialogContext),
+    ),
+  );
+
+  /// Laatste afgekeurde verificatie uit de epic-tijdlijn: het "waarom niet klaar".
+  Map<String, Object?>? _latestFailure(Map<String, Object?>? progress) =>
+      _asMaps(
+        progress?['timeline'],
+      ).where((event) => event['kind'] == 'VERIFICATION_FAILED').firstOrNull;
+
   Widget _overview(ProductWorkspaceData data) {
-    final assignment = data.assignment;
-    final goal = assignment?['goal']?.toString().trim();
-    final currentEpic = data.epics.where((epic) {
-      return const {
-        'ACTIVE',
-        'IN_PLANNING',
-        'VERIFYING',
-      }.contains(epic['status']);
-    }).firstOrNull;
-    final currentStory = data.backlog.where((story) {
-      return story['status'] == 'IN_PROGRESS';
-    }).firstOrNull;
+    final goal = data.assignment?['goal']?.toString().trim();
+    final currentEpic = _currentEpic(data);
+    final progress = currentEpic == null
+        ? null
+        : data.epicProgress[_value(currentEpic['id'])];
+    final waiting = _asMap(progress?['waitingOn']);
+    final failure = _latestFailure(progress);
+    final currentStory = data.backlog
+        .where((story) => story['status'] == 'IN_PROGRESS')
+        .firstOrNull;
     final epicStories = currentEpic == null
         ? const <Map<String, Object?>>[]
         : data.stories
               .where(
-                (story) => _value(story['epicId']) == _value(currentEpic['id']),
+                (story) =>
+                    _value(story['epicId']) == _value(currentEpic['id']) &&
+                    story['status'] != 'CANCELLED',
               )
               .toList();
     final done = epicStories.where((story) => story['status'] == 'DONE').length;
-    final progress = epicStories.isEmpty ? 0.0 : done / epicStories.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xffedf8f1), Color(0xfff8fbf7)],
+        ..._liveBanners(data.live),
+        _InsightCard(
+          children: [
+            _Eyebrow(
+              'Nu',
+              trailing: currentEpic == null
+                  ? null
+                  : _ToneChip(
+                      _epicStatusLabel(_value(currentEpic['status'])),
+                      tone: _epicTone(_value(currentEpic['status'])),
+                    ),
             ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xffd3e7da)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+            if (currentEpic == null)
               SelectableText(
-                'PRODUCTDOEL',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.4,
+                'Nog geen actieve epic',
+                style: Theme.of(context).textTheme.titleLarge,
+              )
+            else ...[
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _openEpic(data, currentEpic),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: _value(currentEpic['title']),
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const TextSpan(
+                        text: '  details →',
+                        style: TextStyle(
+                          color: ProductFactoryColors.primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              SelectableText(
-                goal?.isNotEmpty == true
-                    ? goal!
-                    : 'Leg het productdoel vast bij Instellingen.',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+              const SizedBox(height: 14),
+              if (progress != null)
+                _JourneyView(steps: _asMaps(progress['steps']))
+              else ...[
+                SelectableText(
+                  '$done van ${epicStories.length} stories opgeleverd',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: epicStories.isEmpty ? 0 : done / epicStories.length,
+                    minHeight: 7,
+                    backgroundColor: const Color(0xffe8ede9),
+                  ),
+                ),
+              ],
+              if (waiting != null) _WaitingCallout(waitingOn: waiting),
+              if (failure != null) ...[
+                const SizedBox(height: 10),
+                SelectableText.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: 'Waarom nog niet klaar: ',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      TextSpan(
+                        text:
+                            '${_value(failure['title'])} (${_shortInstant(failure['at'])}). ${_localizeInstants(_value(failure['detail']))}',
+                      ),
+                    ],
+                  ),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: ProductFactoryColors.muted,
+                  ),
+                ),
+              ],
             ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            if (currentStory != null && waiting == null) ...[
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xfff2f6f2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
                   children: [
+                    const Icon(Icons.north_east, size: 20),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SelectableText(
-                            'NU',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.4,
-                                ),
+                            'Software Factory bouwt',
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          const SizedBox(height: 6),
                           SelectableText(
-                            currentEpic?['title']?.toString() ??
-                                'Nog geen actieve epic',
-                            style: Theme.of(context).textTheme.titleLarge,
+                            '#${currentStory['sequenceNumber']} · ${currentStory['title']}',
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
                         ],
                       ),
                     ),
-                    if (currentEpic != null)
-                      Chip(label: Text('${currentEpic['status']}')),
+                    const _ToneChip('In uitvoering', tone: _Tone.warn),
                   ],
                 ),
-                if (currentEpic != null) ...[
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    '${_value(currentEpic['id'])} · $done van ${epicStories.length} stories opgeleverd',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 14),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 7,
-                      backgroundColor: const Color(0xffe8ede9),
-                    ),
-                  ),
-                ],
-                if (currentStory != null) ...[
-                  const SizedBox(height: 18),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xfff2f6f2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.north_east, size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SelectableText(
-                                'Software Factory bouwt',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              SelectableText(
-                                '${_value(currentStory['id'])} · ${currentStory['title']}',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Chip(label: Text('In uitvoering')),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+              ),
+            ],
+          ],
         ),
+        if (goal?.isNotEmpty == true || data.assignment != null)
+          _InsightCard(
+            color: const Color(0xfff6fbf7),
+            borderColor: const Color(0xffd3e7da),
+            children: [
+              const _Eyebrow('Productdoel'),
+              SelectableText(
+                goal?.isNotEmpty == true
+                    ? goal!
+                    : 'Leg het productdoel vast bij Instellingen.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -1939,82 +2132,216 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       return const {'BLOCKED', 'FAILED'}.contains(item['status']);
     }).toList();
     final approvalEpics = data.epics
-        .where((epic) => epic['status'] == 'AWAITING_APPROVAL')
+        .where(
+          (epic) => const {
+            'AWAITING_APPROVAL',
+            'AWAITING_PRODUCT_OWNER_APPROVAL',
+            'AWAITING_FACTORY_OWNER_APPROVAL',
+          }.contains(epic['status']),
+        )
         .toList();
+    final openBugs = data.bugs.where(_isOpenBug).toList();
     final total =
         openSignals.length +
         openQuestions.length +
         blockedWork.length +
-        approvalEpics.length;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SelectableText(
-              'AANDACHT',
-              style: Theme.of(context).textTheme.labelSmall,
+        approvalEpics.length +
+        openBugs.length;
+    final completed = data.epics
+        .where((epic) => epic['status'] == 'COMPLETED')
+        .take(3)
+        .toList();
+    final attention = _InsightCard(
+      children: [
+        _Eyebrow('Vraagt aandacht', trailing: Text('$total')),
+        if (total == 0)
+          const SelectableText(
+            'Er zijn nu geen blokkades, vragen, bugs of open signalen.',
+          )
+        else ...[
+          ...approvalEpics.map(
+            (epic) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              onTap: () => _openEpic(data, epic),
+              leading: const Icon(Icons.approval_outlined),
+              title: SelectableText('${epic['title']}'),
+              subtitle: SelectableText(
+                _epicStatusLabel(_value(epic['status'])),
+              ),
+              trailing: const _ToneChip('Wacht op jou', tone: _Tone.live),
             ),
-            const SizedBox(height: 6),
-            SelectableText(
-              total == 0 ? 'Geen open punten' : '$total open punten',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            if (total == 0)
-              const SelectableText(
-                'Er zijn nu geen blokkades, vragen of open signalen.',
-              )
-            else ...[
-              ...approvalEpics.map(
-                (epic) => ListTile(
+          ),
+          ...openBugs
+              .take(3)
+              .map(
+                (bug) => ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.approval_outlined),
-                  title: SelectableText('${epic['title']}'),
-                  subtitle: const SelectableText(
-                    'Epic wacht op jouw goedkeuring voordat de planner stories maakt.',
+                  leading: _ToneChip(_value(bug['severity']), tone: _Tone.crit),
+                  title: SelectableText(_value(bug['title'])),
+                  subtitle: SelectableText(
+                    'Open bug · sinds ${_shortInstant(bug['createdAt'])}',
                   ),
-                  trailing: const Chip(label: Text('Wacht op jou')),
                 ),
               ),
-              ...blockedWork
-                  .take(3)
-                  .map(
-                    (item) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.error_outline),
-                      title: SelectableText(
-                        '${item['type']} · ${item['status']}',
-                      ),
-                      subtitle: SelectableText('${item['explanation']}'),
-                    ),
+          ...blockedWork
+              .take(3)
+              .map(
+                (item) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.error_outline),
+                  title: SelectableText('${item['type']} · ${item['status']}'),
+                  subtitle: SelectableText(
+                    _value(item['blockedReason'] ?? item['result']),
                   ),
-              ...openQuestions
-                  .take(3)
-                  .map(
-                    (question) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.question_answer_outlined),
-                      title: SelectableText(_value(question['question'])),
-                      subtitle: const SelectableText('Vraag van een agent'),
-                    ),
-                  ),
-              ...openSignals
-                  .take(3)
-                  .map(
-                    (signal) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.radio_button_unchecked),
-                      title: SelectableText(_value(signal['text'])),
-                      subtitle: const SelectableText('Open gebruikerssignaal'),
-                    ),
-                  ),
-            ],
-          ],
-        ),
-      ),
+                ),
+              ),
+          ...openQuestions
+              .take(3)
+              .map(
+                (question) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.question_answer_outlined),
+                  title: SelectableText(_value(question['question'])),
+                  subtitle: const SelectableText('Vraag van een agent'),
+                ),
+              ),
+          ...openSignals
+              .take(3)
+              .map(
+                (signal) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.radio_button_unchecked),
+                  title: SelectableText(_value(signal['text']), maxLines: 3),
+                  subtitle: const SelectableText('Open gebruikerssignaal'),
+                ),
+              ),
+        ],
+      ],
     );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final recent = _InsightCard(
+              children: [
+                const _Eyebrow('Recent afgerond'),
+                if (completed.isEmpty)
+                  const SelectableText('Nog geen afgeronde epics.')
+                else
+                  ...completed.map(
+                    (epic) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      onTap: () => _openEpic(data, epic),
+                      leading: const _ToneChip('✓', tone: _Tone.ok),
+                      title: Text(
+                        _value(epic['title']),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(_shortInstant(epic['updatedAt'])),
+                    ),
+                  ),
+              ],
+            );
+            if (constraints.maxWidth < 860) {
+              return Column(children: [attention, recent]);
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: attention),
+                const SizedBox(width: 14),
+                Expanded(flex: 2, child: recent),
+              ],
+            );
+          },
+        ),
+        if (data.live != null)
+          _InsightCard(
+            children: [
+              const _Eyebrow('Automatisering · laatste 24 uur'),
+              _AutomationStrip(live: data.live!),
+            ],
+          ),
+      ],
+    );
+  }
+
+  bool _isOpenBug(Map<String, Object?> bug) => !const {
+    'RESOLVED',
+    'CLOSED',
+    'REJECTED',
+    'DUPLICATE',
+    'WONT_FIX',
+  }.contains(bug['status']);
+
+  /// Procesblok onderaan een pagina: ritme, onopgeloste blokkades en ingeklapte historie.
+  List<Widget> _processBlock(
+    ProductWorkspaceData data,
+    String process,
+    List<Map<String, Object?>> sessions,
+    Widget Function(Map<String, Object?> session) tile,
+  ) {
+    final live = _liveProcess(data.live, process);
+    final runningShownAbove = _asMap(live?['running']) != null;
+    final lastSucceeded = sessions.indexWhere(
+      (session) => session['status'] == 'SUCCEEDED',
+    );
+    final pinned = <Map<String, Object?>>[];
+    final history = <Map<String, Object?>>[];
+    for (var i = 0; i < sessions.length; i++) {
+      final session = sessions[i];
+      final active = _activeProcessStatuses.contains(session['status']);
+      final unresolvedFailure =
+          _isFailedSession(session) &&
+          (lastSucceeded == -1 || i < lastSucceeded);
+      if (active && runningShownAbove) continue;
+      if (active || unresolvedFailure) {
+        pinned.add(session);
+      } else {
+        history.add(session);
+      }
+    }
+    return [
+      const Divider(height: 32),
+      Row(
+        children: [
+          Expanded(
+            child: SelectableText(
+              '${_processLabel(process)}sproces',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          if (live != null)
+            _ToneChip(
+              _scheduleRhythm(live),
+              tone: live['enabled'] == true ? _Tone.ok : _Tone.neutral,
+            ),
+        ],
+      ),
+      if (live != null) ...[
+        const SizedBox(height: 4),
+        SelectableText(
+          '${_lastRunLine(live)} · laatste 24 uur: ${_last24hLine(live)}',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 6),
+        _RunTicks(hourly: _asMaps(live['hourly'])),
+      ],
+      const SizedBox(height: 8),
+      ...pinned.map(tile),
+      _CollapsibleHistory(
+        title: 'Sessies met resultaat',
+        subtitle: history.isEmpty
+            ? 'nog geen'
+            : '${history.length} recent · “niets te doen” verborgen',
+        childrenBuilder: () => history.isEmpty
+            ? const [SelectableText('Nog geen sessies met resultaat.')]
+            : history.map(tile).toList(),
+      ),
+    ];
   }
 
   Widget _productControls(ProductWorkspaceData data) => Card(
@@ -2078,75 +2405,255 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     ),
   );
 
-  Widget _operation(
-    ProductWorkspaceData data,
-  ) => _section('Operatie', Icons.monitor_heart_outlined, [
-    SelectableText(
-      'Processessies',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    const SizedBox(height: 8),
-    ...[
-      ...data.designSessions.map((session) => ('Ontwerp', session)),
-      ...data.planningSessions.map((session) => ('Planning', session)),
-      ...data.qualitySessions.map((session) => ('Kwaliteit', session)),
-      ...data.dispatcherSessions.map((session) => ('Dispatcher', session)),
-    ].map(
-      (entry) => _ProcessSessionTile(
-        session: entry.$2,
-        label: entry.$1,
-        icon: _activeProcessStatuses.contains(entry.$2['status'])
-            ? Icons.play_circle_outline
-            : Icons.history,
-        details:
-            '${entry.$2['resultSummary'] ?? entry.$2['blockedReason'] ?? 'Geen resultaatsamenvatting.'}',
-      ),
-    ),
-    const Divider(height: 32),
-    SelectableText(
-      'Software Factory-dispatch',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    const SizedBox(height: 8),
-    ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        data.dispatcherStatus['blocked'] == true
-            ? Icons.error_outline
-            : Icons.sync_alt,
-      ),
-      title: SelectableText(
-        data.dispatcherStatus['blocked'] == true
-            ? 'Dispatch geblokkeerd'
-            : 'Dispatcher gereed',
-      ),
-      subtitle: SelectableText(
-        '${data.dispatcherStatus['blockedReason'] ?? 'Geen blijvende technische blokkade.'}',
-      ),
-    ),
-    ...data.deliveryAttempts.map(
-      (attempt) => ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        title: Text(
-          '${attempt['status']} · ${attempt['externalStoryId'] ?? _value(attempt['storyId'])}',
-        ),
-        subtitle: Text('Poging ${attempt['attemptCount']}'),
-        childrenPadding: const EdgeInsets.only(bottom: 16),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SelectableText('Reservering ${attempt['reservationId']}'),
-          SelectableText(
-            'Externe status ${attempt['externalStatus'] ?? 'onbekend'}',
-          ),
-          SelectableText('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
-          if (attempt['lastErrorCode'] != null)
-            SelectableText(
-              '${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}',
-            ),
+  Widget _operation(ProductWorkspaceData data) =>
+      _section('Operatie', Icons.monitor_heart_outlined, [
+        ..._liveBanners(data.live),
+        if (data.live != null) ...[
+          _AutomationStrip(live: data.live!),
+          const SizedBox(height: 14),
         ],
+        _OperationSessionsPanel(
+          key: ValueKey('operation-${data.product.id}'),
+          gateway: widget.gateway,
+          productId: data.product.id,
+          live: data.live,
+          refreshController: widget.refreshController,
+        ),
+        ..._dispatcherOverview(data),
+      ]);
+
+  List<Widget> _dispatcherOverview(ProductWorkspaceData data) {
+    final open = data.deliveryAttempts
+        .where(
+          (attempt) =>
+              !const {'COMPLETED', 'CANCELLED'}.contains(attempt['status']),
+        )
+        .toList();
+    final closed = data.deliveryAttempts
+        .where((attempt) => !open.contains(attempt))
+        .toList();
+    return [
+      const Divider(height: 32),
+      SelectableText(
+        'Software Factory-dispatcher',
+        style: Theme.of(context).textTheme.titleMedium,
       ),
+      const SizedBox(height: 8),
+      Card(
+        color: data.dispatcherStatus['blocked'] == true
+            ? Theme.of(context).colorScheme.errorContainer
+            : null,
+        child: ListTile(
+          leading: Icon(
+            data.dispatcherStatus['blocked'] == true
+                ? Icons.error_outline
+                : Icons.sync_alt,
+          ),
+          title: SelectableText(
+            data.dispatcherStatus['blocked'] == true
+                ? 'Dispatch geblokkeerd'
+                : 'Dispatcher gereed',
+          ),
+          subtitle: SelectableText(
+            '${data.dispatcherStatus['blockedReason'] ?? 'Geen blijvende technische blokkade.'}\n'
+            'Extern ${data.dispatcherStatus['externalStoryId'] ?? 'geen story'} · ${data.dispatcherStatus['externalStatus'] ?? 'geen status'} · retry ${data.dispatcherStatus['retryAfter'] ?? 'niet gepland'}',
+          ),
+          isThreeLine: true,
+        ),
+      ),
+      ...open.map(_deliveryAttemptTile),
+      if (closed.isNotEmpty)
+        _CollapsibleHistory(
+          title: 'Afgeronde leveringen',
+          subtitle: '${closed.length}',
+          childrenBuilder: () => closed.map(_deliveryAttemptTile).toList(),
+        ),
+    ];
+  }
+
+  Widget _deliveryAttemptTile(Map<String, Object?> attempt) => ExpansionTile(
+    leading: const Icon(Icons.local_shipping_outlined),
+    title: Text(
+      '${attempt['externalStoryId'] ?? 'nog geen storyKey'} · ${attempt['status']}',
     ),
-  ]);
+    subtitle: Text(
+      'Poging ${attempt['attemptCount']} · lokaal ${attempt['localCommandStatus']} · ${_shortInstant(attempt['createdAt'])}',
+    ),
+    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    expandedCrossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SelectableText('Story ${_value(attempt['storyId'])}'),
+      SelectableText('Reservering ${attempt['reservationId']}'),
+      SelectableText('Idempotentiesleutel ${attempt['idempotencyKey']}'),
+      SelectableText('Pakkethash ${attempt['packageHash']}'),
+      SelectableText(
+        'Externe status ${attempt['externalStatus'] ?? 'onbekend'}',
+      ),
+      SelectableText('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
+      if (attempt['lastErrorCode'] != null)
+        SelectableText(
+          '${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}',
+        ),
+      if (attempt['deliveredCommitSha'] != null)
+        SelectableText('Oplevercommit ${attempt['deliveredCommitSha']}'),
+    ],
+  );
+
+  Widget _planningSessionTile(Map<String, Object?> session) {
+    final blocked = session['status'] == 'BLOCKED';
+    final code = _value(session['errorCode']);
+    final reason = _value(session['blockedReason']);
+    final explanation = switch (code) {
+      'PLANNING_PUBLICATION_CONFLICT' =>
+        'Het AI-plan is wel gemaakt, maar kon nog niet in de backlog worden opgeslagen. Er is niets gedeeltelijk gepubliceerd. Klik op ‘Planning starten of hervatten’ om hetzelfde plan opnieuw te publiceren.',
+      'PLANNING_VERSION_CONFLICT' =>
+        'De epic of backlog veranderde tijdens het plannen. Er is niets gedeeltelijk gepubliceerd. Hervat de planning zodat de actuele versie opnieuw wordt gecontroleerd.',
+      'PLANNING_RESULT_INVALID' =>
+        'Het AI-resultaat voldeed niet aan alle veiligheidscontroles en is daarom niet gepubliceerd. Hervat de planning voor een nieuwe poging.',
+      _ when blocked =>
+        '${reason.isEmpty ? 'De planning kon door een technische fout niet worden afgerond.' : reason} Er is niets gedeeltelijk gepubliceerd. Hervat de planning om het veilig opnieuw te proberen.',
+      _ =>
+        '${session['resultSummary'] ?? session['blockedReason'] ?? 'Planner-AI wordt duurzaam gevolgd.'}',
+    };
+    final tile = _ProcessSessionTile(
+      session: session,
+      dense: true,
+      label: blocked ? 'Planning kon niet worden afgerond' : null,
+      icon: blocked ? Icons.error_outline : Icons.schema_outlined,
+      details:
+          '$explanation${blocked && code.isNotEmpty ? '\nFoutcode: $code' : ''}\n'
+          '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
+    );
+    if (!blocked) return tile;
+    return Card(
+      color: Theme.of(context).colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: tile,
+      ),
+    );
+  }
+
+  List<Widget> _inFlightStories(ProductWorkspaceData data) {
+    final inProgress = data.backlog
+        .where((story) => story['status'] == 'IN_PROGRESS')
+        .toList();
+    return inProgress.map((story) {
+      final attempt = data.deliveryAttempts
+          .where(
+            (candidate) =>
+                _value(candidate['storyId']) == _value(story['id']) &&
+                !const {'COMPLETED', 'CANCELLED'}.contains(candidate['status']),
+          )
+          .firstOrNull;
+      final since = _parseInstant(attempt?['createdAt']);
+      final epic = data.epics
+          .where(
+            (candidate) => _value(candidate['id']) == _value(story['epicId']),
+          )
+          .firstOrNull;
+      final externalStatus = _value(
+        attempt?['externalStatus'] ?? data.dispatcherStatus['externalStatus'],
+      );
+      return _InsightCard(
+        borderColor: const Color(0xfff1dcc0),
+        children: [
+          _Eyebrow(
+            'Nu bij Software Factory',
+            trailing: since == null
+                ? null
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'wacht ',
+                        style: TextStyle(color: Color(0xff95540e)),
+                      ),
+                      _ElapsedSince(
+                        since,
+                        style: const TextStyle(
+                          color: Color(0xff95540e),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                backgroundColor: const Color(0xffe3f3ea),
+                child: Text('${story['sequenceNumber']}'),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SelectableText(
+                      _value(story['title']),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    SelectableText(
+                      [
+                        if (story['type'] == 'BUGFIX') 'Bugfix',
+                        if (epic != null) 'epic “${epic['title']}”',
+                      ].join(' · '),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 24,
+                      runSpacing: 6,
+                      children: [
+                        _labelValue(
+                          'Software Factory',
+                          _value(
+                                story['externalStoryId'] ??
+                                    attempt?['externalStoryId'],
+                              ).isEmpty
+                              ? 'nog niet aangemaakt'
+                              : _value(
+                                  story['externalStoryId'] ??
+                                      attempt?['externalStoryId'],
+                                ),
+                        ),
+                        _labelValue(
+                          'Status daar',
+                          externalStatus == 'OPEN'
+                              ? 'OPEN · nog niet opgeleverd'
+                              : externalStatus.isEmpty
+                              ? 'onbekend'
+                              : externalStatus,
+                        ),
+                        if (since != null)
+                          _labelValue('Verstuurd', _shortDateTime(since)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }).toList();
+  }
+
+  Widget _labelValue(String label, String value) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(fontSize: 12, color: ProductFactoryColors.muted),
+      ),
+      SelectableText(
+        value,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    ],
+  );
 
   Widget _planning(
     ProductWorkspaceData data,
@@ -2178,6 +2685,22 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ],
     ),
     const SizedBox(height: 12),
+    ..._liveBanners(
+      data.live,
+      processes: const {'PRODUCT_PLANNING', 'SOFTWARE_FACTORY_DISPATCHER'},
+    ),
+    ..._inFlightStories(data),
+    if (data.dispatcherStatus['blocked'] == true)
+      Card(
+        color: Theme.of(context).colorScheme.errorContainer,
+        child: ListTile(
+          leading: const Icon(Icons.error_outline),
+          title: const SelectableText('Dispatch geblokkeerd'),
+          subtitle: SelectableText(
+            '${data.dispatcherStatus['blockedReason'] ?? 'Onbekende blokkade.'}',
+          ),
+        ),
+      ),
     SelectableText(
       'Productbrede backlog',
       style: Theme.of(context).textTheme.titleMedium,
@@ -2186,142 +2709,138 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       const SelectableText('De backlog is leeg.')
     else
       ..._groupedBacklog(data),
-    const Divider(height: 28),
-    SelectableText(
-      'Geannuleerd en opgeleverd',
-      style: Theme.of(context).textTheme.titleMedium,
+    ..._finishedStoriesByEpic(data),
+    ..._planningWork(data),
+    ..._processBlock(
+      data,
+      'PRODUCT_PLANNING',
+      data.planningSessions,
+      _planningSessionTile,
     ),
-    ...data.stories
-        .where(
-          (story) => !const {'TODO', 'IN_PROGRESS'}.contains(story['status']),
-        )
-        .map(
-          (story) => ListTile(
-            leading: Icon(
-              story['status'] == 'DONE'
-                  ? Icons.done_all
-                  : Icons.cancel_outlined,
-            ),
-            title: SelectableText('${story['title']} · ${story['status']}'),
-            subtitle: SelectableText(
-              '${story['cancellationReason'] ?? story['deliveredCommitSha'] ?? story['summary']}',
-            ),
-          ),
-        ),
-    const Divider(height: 28),
-    SelectableText(
-      'Werkqueue en sessies',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    ...data.planningWorkItems.map(
-      (item) => ListTile(
-        dense: true,
-        leading: const Icon(Icons.playlist_add_check),
-        title: SelectableText('${item['type']} · ${item['status']}'),
-        subtitle: SelectableText('${item['explanation']}'),
-      ),
-    ),
-    ...data.planningSessions.map((session) {
-      final blocked = session['status'] == 'BLOCKED';
-      final code = _value(session['errorCode']);
-      final reason = _value(session['blockedReason']);
-      final explanation = switch (code) {
-        'PLANNING_PUBLICATION_CONFLICT' =>
-          'Het AI-plan is wel gemaakt, maar kon nog niet in de backlog worden opgeslagen. Er is niets gedeeltelijk gepubliceerd. Klik op ‘Planning starten of hervatten’ om hetzelfde plan opnieuw te publiceren.',
-        'PLANNING_VERSION_CONFLICT' =>
-          'De epic of backlog veranderde tijdens het plannen. Er is niets gedeeltelijk gepubliceerd. Hervat de planning zodat de actuele versie opnieuw wordt gecontroleerd.',
-        'PLANNING_RESULT_INVALID' =>
-          'Het AI-resultaat voldeed niet aan alle veiligheidscontroles en is daarom niet gepubliceerd. Hervat de planning voor een nieuwe poging.',
-        _ when blocked =>
-          '${reason.isEmpty ? 'De planning kon door een technische fout niet worden afgerond.' : reason} Er is niets gedeeltelijk gepubliceerd. Hervat de planning om het veilig opnieuw te proberen.',
-        _ =>
-          '${session['resultSummary'] ?? session['blockedReason'] ?? 'Planner-AI wordt duurzaam gevolgd.'}',
-      };
-      final tile = _ProcessSessionTile(
-        session: session,
-        dense: true,
-        label: blocked ? 'Planning kon niet worden afgerond' : null,
-        icon: blocked ? Icons.error_outline : Icons.schema_outlined,
-        details:
-            '$explanation${blocked && code.isNotEmpty ? '\nFoutcode: $code' : ''}\n'
-            '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
-      );
-      if (!blocked) return tile;
-      return Card(
-        color: Theme.of(context).colorScheme.errorContainer,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: tile,
-        ),
-      );
-    }),
-    const Divider(height: 28),
-    SelectableText(
-      'Software Factory-dispatcher',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    Card(
-      color: data.dispatcherStatus['blocked'] == true
-          ? Theme.of(context).colorScheme.errorContainer
-          : null,
-      child: ListTile(
-        leading: Icon(
-          data.dispatcherStatus['blocked'] == true
-              ? Icons.error_outline
-              : Icons.sync_alt,
-        ),
-        title: SelectableText(
-          data.dispatcherStatus['blocked'] == true
-              ? 'Dispatch geblokkeerd'
-              : 'Dispatcher gereed',
-        ),
-        subtitle: SelectableText(
-          '${data.dispatcherStatus['blockedReason'] ?? 'Geen blijvende technische blokkade.'}\n'
-          'Extern ${data.dispatcherStatus['externalStoryId'] ?? 'geen story'} · ${data.dispatcherStatus['externalStatus'] ?? 'geen status'} · retry ${data.dispatcherStatus['retryAfter'] ?? 'niet gepland'}',
-        ),
-        isThreeLine: true,
-      ),
-    ),
-    ...data.deliveryAttempts.map(
-      (attempt) => ExpansionTile(
-        leading: const Icon(Icons.local_shipping_outlined),
-        title: Text(
-          '${attempt['status']} · ${attempt['externalStoryId'] ?? 'nog geen storyKey'}',
-        ),
-        subtitle: Text(
-          'Story ${_value(attempt['storyId'])} · poging ${attempt['attemptCount']} · lokaal ${attempt['localCommandStatus']}',
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SelectableText('Reservering ${attempt['reservationId']}'),
-          SelectableText('Idempotentiesleutel ${attempt['idempotencyKey']}'),
-          SelectableText('Pakkethash ${attempt['packageHash']}'),
-          SelectableText(
-            'Externe status ${attempt['externalStatus'] ?? 'onbekend'}',
-          ),
-          SelectableText('Retry ${attempt['retryAfter'] ?? 'niet gepland'}'),
-          if (attempt['lastErrorCode'] != null)
-            SelectableText(
-              '${attempt['lastErrorCode']}: ${attempt['lastErrorMessage']}',
-            ),
-          if (attempt['deliveredCommitSha'] != null)
-            SelectableText('Oplevercommit ${attempt['deliveredCommitSha']}'),
-        ],
-      ),
-    ),
-    ...data.dispatcherSessions.map(
-      (session) => _ProcessSessionTile(
-        session: session,
-        dense: true,
-        icon: Icons.history,
-        label: 'Dispatcher',
-        details:
-            '${session['resultSummary'] ?? session['blockedReason'] ?? 'Dispatchersessie actief.'}\n'
-            '${(session['implementation'] as Map?)?['artifact'] ?? 'software-factory-dispatcher-impl'}',
-      ),
-    ),
+    ..._dispatcherOverview(data),
   ]);
+
+  List<Widget> _finishedStoriesByEpic(ProductWorkspaceData data) {
+    final finished = data.stories
+        .where((story) => const {'DONE', 'CANCELLED'}.contains(story['status']))
+        .toList();
+    if (finished.isEmpty) return const [];
+    final byEpic = <String, List<Map<String, Object?>>>{};
+    for (final story in finished) {
+      byEpic.putIfAbsent(_value(story['epicId']), () => []).add(story);
+    }
+    final done = finished.where((story) => story['status'] == 'DONE').length;
+    return [
+      const Divider(height: 32),
+      SelectableText(
+        'Afgerond en geannuleerd',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      SelectableText(
+        '$done opgeleverd · ${finished.length - done} geannuleerd',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      ...byEpic.entries.map((entry) {
+        final epic = data.epics
+            .where((candidate) => _value(candidate['id']) == entry.key)
+            .firstOrNull;
+        final delivered = entry.value
+            .where((story) => story['status'] == 'DONE')
+            .length;
+        final stories = [...entry.value]
+          ..sort(
+            (a, b) => ((b['sequenceNumber'] as num?) ?? 0).compareTo(
+              (a['sequenceNumber'] as num?) ?? 0,
+            ),
+          );
+        return _CollapsibleHistory(
+          title: epic == null ? 'Epic ${entry.key}' : _value(epic['title']),
+          subtitle:
+              '$delivered opgeleverd · ${entry.value.length - delivered} geannuleerd',
+          childrenBuilder: () => stories
+              .map(
+                (story) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 40,
+                        child: Text(
+                          '#${story['sequenceNumber']}',
+                          style: const TextStyle(
+                            color: ProductFactoryColors.muted,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SelectableText(_value(story['title'])),
+                            SelectableText(
+                              story['status'] == 'DONE'
+                                  ? [
+                                      _value(story['externalStoryId']),
+                                      _value(story['deliveredCommitSha']),
+                                    ].where((v) => v.isNotEmpty).join(' · ')
+                                  : _value(story['cancellationReason']),
+                              maxLines: 2,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _ToneChip(
+                        _storyStatusLabel(_value(story['status'])),
+                        tone: _storyTone(_value(story['status'])),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      }),
+    ];
+  }
+
+  List<Widget> _planningWork(ProductWorkspaceData data) {
+    final open = data.planningWorkItems
+        .where((item) => item['status'] != 'DONE')
+        .toList();
+    final done = data.planningWorkItems.length - open.length;
+    Widget tile(Map<String, Object?> item) => ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.playlist_add_check),
+      title: SelectableText('${item['type']} · ${item['status']}'),
+      subtitle: SelectableText('${item['explanation']}'),
+    );
+    return [
+      const Divider(height: 32),
+      SelectableText(
+        'Planningswerk',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      if (open.isEmpty)
+        SelectableText(
+          'Geen open planningswerk${done > 0 ? ' · $done afgerond' : ''}.',
+        )
+      else
+        ...open.map(tile),
+      if (done > 0 && open.isNotEmpty)
+        _CollapsibleHistory(
+          title: 'Afgerond planningswerk',
+          subtitle: '$done',
+          childrenBuilder: () => data.planningWorkItems
+              .where((item) => item['status'] == 'DONE')
+              .map(tile)
+              .toList(),
+        ),
+    ];
+  }
 
   List<Widget> _groupedBacklog(ProductWorkspaceData data) {
     final storiesByEpic = <String, List<Map<String, Object?>>>{};
@@ -2351,7 +2870,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
 
   Widget _planningStoryTile(Map<String, Object?> story) => ExpansionTile(
     leading: CircleAvatar(child: Text('${story['sequenceNumber']}')),
-    title: Text('${story['title']} · ${story['status']}'),
+    title: Text(
+      '${story['title']} · ${_storyStatusLabel(_value(story['status']))}',
+    ),
     subtitle: Text('${story['summary']}'),
     childrenPadding: const EdgeInsets.fromLTRB(72, 0, 16, 16),
     expandedCrossAxisAlignment: CrossAxisAlignment.start,
@@ -2493,475 +3014,444 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     }
   }
 
-  Widget _quality(
+  String _verificationSubject(
     ProductWorkspaceData data,
-  ) => _section('Kwaliteitsbewaking', Icons.verified_outlined, [
-    Align(
-      alignment: Alignment.centerRight,
-      child: FilledButton.icon(
-        onPressed: () =>
-            _mutate(() => widget.gateway.runQuality(data.product.id)),
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Kwaliteit starten of hervatten'),
-      ),
-    ),
-    if (data.qualitySnapshot == null)
-      const SelectableText('Nog geen werkelijk getest kwaliteitsbeeld.')
-    else
-      Card(
-        child: ListTile(
-          leading: const Icon(Icons.fact_check_outlined),
-          title: SelectableText(
-            '${data.qualitySnapshot!['environment']} · ${data.qualitySnapshot!['capturedAt']}',
-          ),
-          subtitle: SelectableText(
-            'Geteste revision ${data.qualitySnapshot!['productRevision']}\n'
-            'Open bugs: ${data.qualitySnapshot!['openBugsBySeverity']}\n'
-            'Risico’s: ${(data.qualitySnapshot!['risks'] as List? ?? const []).join(', ')}',
-          ),
-          isThreeLine: true,
-        ),
-      ),
-    const Divider(height: 28),
-    SelectableText(
-      'Werk en retries',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    if (data.qualityWorkItems.isEmpty)
-      const SelectableText('Geen kwaliteitswerk in de queue.')
-    else
-      ...data.qualityWorkItems.map(
-        (item) => ListTile(
-          leading: Icon(
-            item['status'] == 'DONE'
-                ? Icons.check_circle_outline
-                : item['status'] == 'BLOCKED' || item['status'] == 'FAILED'
-                ? Icons.warning_amber_outlined
-                : Icons.hourglass_top,
-          ),
-          title: SelectableText(
-            '${item['type']} · ${item['status']}${item['attentionNeeded'] == true ? ' · Aandacht nodig' : ''}',
-          ),
-          subtitle: SelectableText(
-            '${item['blockedReason'] ?? item['result'] ?? 'Gericht testwerk staat klaar.'}\n'
-            'Poging ${item['attemptCount']} · retry ${item['retryAfter'] ?? 'niet gepland'}',
-          ),
-          trailing: item['retryable'] == true
-              ? TextButton(
-                  onPressed: () => _mutate(
-                    () =>
-                        widget.gateway.retryQualityWorkItem(_value(item['id'])),
-                  ),
-                  child: const Text('Retry now'),
-                )
-              : null,
-          isThreeLine: true,
-        ),
-      ),
-    const Divider(height: 28),
-    SelectableText(
-      'Verificaties',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    ...data.verifications.map(
-      (verification) => ExpansionTile(
-        title: Text(
-          '${verification['targetType']} · ${verification['outcome']}',
-        ),
-        subtitle: Text(
-          '${_value(verification['targetId'])} v${verification['targetVersion']} · ${verification['environment']}',
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SelectableText(
-            'Verificatie ${_value(verification['id'])} · geteste revision ${verification['testedRevision'] ?? 'niet beschikbaar'}',
-          ),
-          SelectableText(
-            'Controles: ${(verification['checks'] as List? ?? const []).join(', ')}',
-          ),
-          SelectableText(
-            'Bewijs: ${(verification['evidence'] as Map?)?['description'] ?? 'Geen publiek bewijs'}',
-          ),
-          if (verification['blockedReason'] != null)
-            SelectableText('Blokkade: ${verification['blockedReason']}'),
-        ],
-      ),
-    ),
-    const Divider(height: 28),
-    SelectableText('Bugs', style: Theme.of(context).textTheme.titleMedium),
-    ...data.bugs.map(
-      (bug) => ExpansionTile(
-        title: Text('${bug['title']} · ${bug['severity']} · ${bug['status']}'),
-        subtitle: Text('${bug['summary']}'),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SelectableText('Werkelijk: ${bug['actualBehaviour']}'),
-          SelectableText('Verwacht: ${bug['expectedBehaviour']}'),
-          SelectableText(
-            'Reproduceren: ${(bug['reproductionSteps'] as List? ?? const []).join(' → ')}',
-          ),
-          SelectableText(
-            'Bewijs: ${(bug['evidence'] as Map?)?['description'] ?? 'Geen publiek bewijs'}',
-          ),
-        ],
-      ),
-    ),
-    const Divider(height: 28),
-    SelectableText(
-      'Processessies',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    ...data.qualitySessions.map(
-      (session) => _ProcessSessionTile(
-        session: session,
-        icon: Icons.science_outlined,
-        details:
-            '${session['resultSummary'] ?? session['blockedReason'] ?? 'Tester-AI wordt duurzaam gevolgd.'}\n'
-            '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
-      ),
-    ),
-  ]);
+    Map<String, Object?> verification,
+  ) {
+    final targetId = _value(verification['targetId']);
+    final story = data.stories
+        .where((candidate) => _value(candidate['id']) == targetId)
+        .firstOrNull;
+    if (story != null) return '#${story['sequenceNumber']} ${story['title']}';
+    final epic = data.epics
+        .where((candidate) => _value(candidate['id']) == targetId)
+        .firstOrNull;
+    if (epic != null) return 'Epic · ${epic['title']}';
+    final bug = data.bugs
+        .where((candidate) => _value(candidate['id']) == targetId)
+        .firstOrNull;
+    if (bug != null) return 'Bug · ${bug['title']}';
+    return '${verification['targetType']} $targetId';
+  }
 
-  Widget _design(
+  Widget _verificationTile(
     ProductWorkspaceData data,
-  ) => _section('Ontwerp', Icons.architecture_outlined, [
-    if (widget.isFactoryOwner)
-      Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FilledButton.icon(
-            onPressed: () =>
-                _mutate(() => widget.gateway.runProductDesign(data.product.id)),
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Productontwerp starten of hervatten'),
-          ),
-        ],
+    Map<String, Object?> verification,
+  ) {
+    final passed = verification['outcome'] == 'PASSED';
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      leading: _ToneChip(
+        passed
+            ? 'Geslaagd'
+            : _value(verification['outcome']) == 'FAILED'
+            ? 'Afgekeurd'
+            : _value(verification['outcome']),
+        tone: passed ? _Tone.ok : _Tone.crit,
       ),
-    const SizedBox(height: 12),
-    SelectableText('Epics', style: Theme.of(context).textTheme.titleMedium),
-    if (data.epics.isEmpty)
-      const SelectableText('Nog geen epics gepubliceerd.')
-    else
-      ...data.epics.map(
-        (epic) => ExpansionTile(
-          leading: const Icon(Icons.view_agenda_outlined),
-          title: Text(
-            '${epic['title']} · ${_epicStatusLabel(_value(epic['status']))}',
+      title: Text(
+        _verificationSubject(data, verification),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        '${_shortInstant(verification['createdAt'])} · ${verification['environment']} · revisie ${_value(verification['testedRevision']).isEmpty ? 'onbekend' : _value(verification['testedRevision']).substring(0, _value(verification['testedRevision']).length.clamp(0, 7))}',
+      ),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SelectableText(
+          'Verificatie ${_value(verification['id'])} · ${verification['targetType']} v${verification['targetVersion']}',
+        ),
+        ...(verification['checks'] as List? ?? const []).map(
+          (check) => SelectableText('• $check'),
+        ),
+        SelectableText(
+          'Bewijs: ${(verification['evidence'] as Map?)?['description'] ?? 'Geen publiek bewijs'}',
+        ),
+        ...(verification['missingCoverage'] as List? ?? const []).map(
+          (gap) => SelectableText('Niet gedekt: $gap'),
+        ),
+        if (verification['blockedReason'] != null)
+          SelectableText('Blokkade: ${verification['blockedReason']}'),
+      ],
+    );
+  }
+
+  Widget _bugCard(ProductWorkspaceData data, Map<String, Object?> bug) {
+    final fix = data.stories
+        .where((story) => _value(story['bugId']) == _value(bug['id']))
+        .lastOrNull;
+    return _InsightCard(
+      borderColor: const Color(0xffefc9bf),
+      children: [
+        _Eyebrow(
+          'Open bug · sinds ${_shortInstant(bug['createdAt'])}',
+          trailing: _ToneChip(_value(bug['severity']), tone: _Tone.crit),
+        ),
+        SelectableText(
+          _value(bug['title']),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        SelectableText('Werkelijk: ${bug['actualBehaviour']}'),
+        SelectableText('Verwacht: ${bug['expectedBehaviour']}'),
+        if ((bug['reproductionSteps'] as List? ?? const []).isNotEmpty)
+          SelectableText(
+            'Reproduceren: ${(bug['reproductionSteps'] as List).join(' → ')}',
           ),
-          subtitle: Text('${epic['summary']}'),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: 8),
+        SelectableText(
+          fix == null
+              ? 'Nog geen bugfix-story gepland.'
+              : 'Fix: #${fix['sequenceNumber']} ${fix['title']} · ${_storyStatusLabel(_value(fix['status']))}${_value(fix['externalStoryId']).isEmpty ? '' : ' · ${fix['externalStoryId']}'}',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+
+  Widget _quality(ProductWorkspaceData data) {
+    final snapshot = data.qualitySnapshot;
+    final openBugs = data.bugs.where(_isOpenBug).toList();
+    final resolvedBugs = data.bugs.where((bug) => !_isOpenBug(bug)).toList();
+    final openWork = data.qualityWorkItems
+        .where((item) => item['status'] != 'DONE')
+        .toList();
+    final doneWork = data.qualityWorkItems
+        .where((item) => item['status'] == 'DONE')
+        .toList();
+    final verifications = [
+      ...data.verifications,
+    ]..sort((a, b) => _value(b['createdAt']).compareTo(_value(a['createdAt'])));
+    Widget workTile(Map<String, Object?> item) => ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        item['status'] == 'DONE'
+            ? Icons.check_circle_outline
+            : item['status'] == 'BLOCKED' || item['status'] == 'FAILED'
+            ? Icons.warning_amber_outlined
+            : Icons.hourglass_top,
+      ),
+      title: SelectableText(
+        '${item['type']} · ${item['status']}${item['attentionNeeded'] == true ? ' · Aandacht nodig' : ''}',
+      ),
+      subtitle: SelectableText(
+        '${item['blockedReason'] ?? item['result'] ?? 'Gericht testwerk staat klaar.'}\n'
+        'Poging ${item['attemptCount']} · retry ${item['retryAfter'] ?? 'niet gepland'}',
+      ),
+      trailing: item['retryable'] == true
+          ? TextButton(
+              onPressed: () => _mutate(
+                () => widget.gateway.retryQualityWorkItem(_value(item['id'])),
+              ),
+              child: const Text('Retry now'),
+            )
+          : null,
+      isThreeLine: true,
+    );
+    return _section('Kwaliteitsbewaking', Icons.verified_outlined, [
+      Align(
+        alignment: Alignment.centerRight,
+        child: FilledButton.icon(
+          onPressed: () =>
+              _mutate(() => widget.gateway.runQuality(data.product.id)),
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Kwaliteit starten of hervatten'),
+        ),
+      ),
+      const SizedBox(height: 8),
+      ..._liveBanners(data.live, processes: const {'QUALITY_ASSURANCE'}),
+      if (snapshot == null)
+        const SelectableText('Nog geen werkelijk getest kwaliteitsbeeld.')
+      else
+        _InsightCard(
           children: [
-            SelectableText(
-              'Epic ${_value(epic['id'])} · versie ${epic['version']}',
+            Wrap(
+              spacing: 32,
+              runSpacing: 12,
+              children: [
+                _labelValue('Omgeving', _value(snapshot['environment'])),
+                _labelValue(
+                  'Laatst getest',
+                  _shortInstant(snapshot['capturedAt']),
+                ),
+                _labelValue(
+                  'Revisie',
+                  _value(snapshot['productRevision']).length > 7
+                      ? _value(snapshot['productRevision']).substring(0, 7)
+                      : _value(snapshot['productRevision']),
+                ),
+                _labelValue(
+                  'Open bugs',
+                  openBugs.isEmpty
+                      ? 'geen'
+                      : openBugs
+                            .map((bug) => _value(bug['severity']))
+                            .join(', '),
+                ),
+              ],
             ),
-            if (epic['sourceProductRequestId'] != null)
+            if ((snapshot['risks'] as List? ?? const []).isNotEmpty) ...[
+              const SizedBox(height: 10),
               SelectableText(
-                'Bronverzoek ${epic['sourceProductRequestId']} · requestversie ${epic['sourceProductRequestVersion']}',
-              ),
-            if (epic['status'] == 'NEEDS_RESEARCH') ...[
-              const SizedBox(height: 8),
-              Card(
-                color: Theme.of(context).colorScheme.tertiaryContainer,
-                child: const ListTile(
-                  leading: Icon(Icons.manage_search_outlined),
-                  title: SelectableText('Nog niet klaar voor planning'),
-                  subtitle: SelectableText(
-                    'Productontwerp werkt eerst bronnen, open vragen en UX-modellen uit. Productplanning kan deze epic nog niet claimen.',
-                  ),
-                ),
+                'Risico’s: ${(snapshot['risks'] as List).join(', ')}',
               ),
             ],
-            if (epic['status'] == 'NEEDS_REFINEMENT') ...[
-              const SizedBox(height: 8),
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: ListTile(
-                  leading: const Icon(Icons.edit_note_outlined),
-                  title: const SelectableText(
-                    'Teruggestuurd voor verdere uitwerking',
-                  ),
-                  subtitle: SelectableText(
-                    _value(epic['refinementReason']).isEmpty
-                        ? 'De ontwerper moet deze epic verder uitwerken.'
-                        : _value(epic['refinementReason']),
-                  ),
-                ),
-              ),
-            ],
-            if (epic['status'] == 'AWAITING_APPROVAL') ...[
-              const SizedBox(height: 8),
-              Card(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                child: const ListTile(
-                  leading: Icon(Icons.approval_outlined),
-                  title: SelectableText('Wacht op jouw goedkeuring'),
-                  subtitle: SelectableText(
-                    'Controleer vooral of UX, databronnen, toegang en technische haalbaarheid concreet genoeg zijn. Na goedkeuring kan de planner direct stories maken.',
-                  ),
-                ),
-              ),
-            ],
-            if (epic['status'] == 'AWAITING_PRODUCT_OWNER_APPROVAL') ...[
-              const SizedBox(height: 8),
-              Card(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                child: const ListTile(
-                  leading: Icon(Icons.fact_check_outlined),
-                  title: SelectableText(
-                    'Productinhoudelijke beoordeling nodig',
-                  ),
-                  subtitle: SelectableText(
-                    'De aangewezen product owner controleert deze exacte epicversie eerst. Daarna volgt de eindgoedkeuring.',
-                  ),
-                ),
-              ),
-            ],
-            if (epic['status'] == 'AWAITING_FACTORY_OWNER_APPROVAL') ...[
-              const SizedBox(height: 8),
-              Card(
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                child: const ListTile(
-                  leading: Icon(Icons.verified_user_outlined),
-                  title: SelectableText('Eindgoedkeuring nodig'),
-                  subtitle: SelectableText(
-                    'De product owner heeft deze versie goedgekeurd. De factory owner beoordeelt nu de technische en bredere gevolgen.',
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            SelectableText(
-              'Probleem',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            SelectableText('${epic['problem']}'),
-            const SizedBox(height: 8),
-            SelectableText(
-              'Oplossing',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            SelectableText('${epic['solution']}'),
-            if (epic['uxDesign'] != null) ...[
-              const SizedBox(height: 8),
-              SelectableText(
-                'UX-ontwerp',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              SelectableText('${epic['uxDesign']}'),
-            ],
-            if ((epic['uxScreens'] as List? ?? const []).isNotEmpty) ...[
-              const SizedBox(height: 8),
-              SelectableText(
-                'Volledige UX-schermset',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              ...(epic['uxScreens'] as List).map((raw) {
-                final screen = (raw as Map).cast<String, Object?>();
-                final variants =
-                    ((screen['artifacts'] as Map?)?.keys ?? const [])
-                        .map((value) => '$value')
-                        .join(', ');
-                return SelectableText(
-                  '• ${screen['screenKey']} · ${screen['state']} · $variants\n'
-                  '  ${screen['purpose']}',
-                );
-              }),
-            ],
-            ..._uxArtifactGallery(
-              context,
-              (epic['uxArtifacts'] as List? ?? const <Object?>[])
-                  .cast<Object?>(),
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
-              'Gereedheid',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            SelectableText(
-              (epic['readiness'] as Map?)?['readyForPlanning'] == true
-                  ? 'Gereed voor Productplanning'
-                  : 'Nog niet gereed voor Productplanning',
-            ),
-            ...((epic['readiness'] as Map?)?['unmetConditions'] as List? ??
-                    const [])
-                .map((condition) => SelectableText('• $condition')),
-            ...((epic['readiness'] as Map?)?['openQuestions'] as List? ??
-                    const [])
-                .map((question) => SelectableText('Open vraag: $question')),
-            const SizedBox(height: 8),
-            SelectableText(
-              'Onderzochte bronnen',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            if ((epic['researchSources'] as List? ?? const []).isEmpty)
-              const SelectableText(
-                'Nog geen concrete externe bronnen onderzocht.',
-              )
-            else
-              ...(epic['researchSources'] as List).map((raw) {
-                final source = (raw as Map).cast<String, Object?>();
-                return ListTile(
+          ],
+        ),
+      ...openBugs.map((bug) => _bugCard(data, bug)),
+      const Divider(height: 28),
+      SelectableText(
+        'Werk en retries',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      if (openWork.isEmpty)
+        SelectableText(
+          'Geen kwaliteitswerk in de queue${doneWork.isEmpty ? '' : ' · ${doneWork.length} afgerond'}.',
+        )
+      else
+        ...openWork.map(workTile),
+      if (doneWork.isNotEmpty)
+        _CollapsibleHistory(
+          title: 'Afgerond kwaliteitswerk',
+          subtitle: '${doneWork.length}',
+          childrenBuilder: () => doneWork.map(workTile).toList(),
+        ),
+      const Divider(height: 28),
+      SelectableText(
+        'Verificaties',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      if (verifications.isEmpty)
+        const SelectableText('Nog geen verificaties.')
+      else
+        ...verifications.take(5).map((v) => _verificationTile(data, v)),
+      if (verifications.length > 5)
+        _CollapsibleHistory(
+          title: 'Oudere verificaties',
+          subtitle: '${verifications.length - 5}',
+          childrenBuilder: () => verifications
+              .skip(5)
+              .map((v) => _verificationTile(data, v))
+              .toList(),
+        ),
+      if (resolvedBugs.isNotEmpty)
+        _CollapsibleHistory(
+          title: 'Opgeloste bugs',
+          subtitle: '${resolvedBugs.length}',
+          childrenBuilder: () => resolvedBugs
+              .map(
+                (bug) => ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    source['status'] == 'VALIDATED'
-                        ? Icons.verified_outlined
-                        : source['status'] == 'BLOCKED'
-                        ? Icons.block_outlined
-                        : Icons.travel_explore_outlined,
+                  leading: _ToneChip(_value(bug['severity'])),
+                  title: SelectableText(_value(bug['title'])),
+                  subtitle: SelectableText('${bug['summary']}'),
+                ),
+              )
+              .toList(),
+        ),
+      ..._processBlock(
+        data,
+        'QUALITY_ASSURANCE',
+        data.qualitySessions,
+        (session) => _ProcessSessionTile(
+          session: session,
+          icon: _isFailedSession(session)
+              ? Icons.error_outline
+              : Icons.science_outlined,
+          details:
+              '${session['resultSummary'] ?? session['blockedReason'] ?? 'Tester-AI wordt duurzaam gevolgd.'}\n'
+              '${(session['aiTaskIds'] as List? ?? const []).length} AI-taak/taken · Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
+        ),
+      ),
+    ]);
+  }
+
+  String? _designTab;
+
+  static const _approvalStatuses = {
+    'AWAITING_APPROVAL',
+    'AWAITING_PRODUCT_OWNER_APPROVAL',
+    'AWAITING_FACTORY_OWNER_APPROVAL',
+  };
+
+  String _epicTabOf(Map<String, Object?> epic) {
+    final status = _value(epic['status']);
+    if (_approvalStatuses.contains(status)) return 'approval';
+    if (_terminalEpicStatuses.contains(status)) return 'closed';
+    return 'open';
+  }
+
+  Widget _epicCard(ProductWorkspaceData data, Map<String, Object?> epic) {
+    final id = _value(epic['id']);
+    final stories = data.stories
+        .where((story) => _value(story['epicId']) == id)
+        .toList();
+    final delivered = stories
+        .where((story) => story['status'] == 'DONE')
+        .length;
+    final active = stories
+        .where(
+          (story) => const {'TODO', 'IN_PROGRESS'}.contains(story['status']),
+        )
+        .length;
+    final waiting = _asMap(data.epicProgress[id]?['waitingOn']);
+    final since = _parseInstant(waiting?['since']);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _openEpic(data, epic),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      _value(epic['title']),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                  title: SelectableText(
-                    '${source['name']} · ${source['status']}',
+                  const SizedBox(width: 12),
+                  _ToneChip(
+                    _epicStatusLabel(_value(epic['status'])),
+                    tone: _epicTone(_value(epic['status'])),
                   ),
-                  subtitle: SelectableText(
-                    '${source['provider']}\n${source['coverage']}\n'
-                    'Toegang: ${source['accessMethod']} · Licentie: ${source['license']}\n'
-                    '${source['validationEvidence']}\n${source['uri']}',
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _value(epic['summary']),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xff4d6663)),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 18,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    stories.isEmpty
+                        ? 'Nog geen stories'
+                        : '$delivered opgeleverd${active > 0 ? ' · $active open' : ''}',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-                );
-              }),
-            const SizedBox(height: 8),
-            SelectableText(
-              'Acceptatiecriteria',
-              style: Theme.of(context).textTheme.labelLarge,
+                  Text(
+                    'versie ${epic['version']} · ${_shortInstant(epic['updatedAt'])}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (waiting != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.hourglass_top,
+                          size: 15,
+                          color: Color(0xff95540e),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_value(waiting['title'])}${since == null ? '' : ' · '}',
+                          style: const TextStyle(
+                            color: Color(0xff95540e),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        if (since != null)
+                          _ElapsedSince(
+                            since,
+                            style: const TextStyle(
+                              color: Color(0xff95540e),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _design(ProductWorkspaceData data) {
+    final counts = <String, int>{'open': 0, 'approval': 0, 'closed': 0};
+    for (final epic in data.epics) {
+      counts[_epicTabOf(epic)] = counts[_epicTabOf(epic)]! + 1;
+    }
+    final tab =
+        _designTab ??
+        (counts['open']! > 0
+            ? 'open'
+            : counts['approval']! > 0
+            ? 'approval'
+            : 'closed');
+    final visible = data.epics.where((epic) => _epicTabOf(epic) == tab);
+    const labels = {
+      'open': 'Lopend',
+      'approval': 'Wacht op goedkeuring',
+      'closed': 'Afgerond en gestopt',
+    };
+    return _section('Ontwerp', Icons.architecture_outlined, [
+      if (widget.isFactoryOwner)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            FilledButton.icon(
+              onPressed: () => _mutate(
+                () => widget.gateway.runProductDesign(data.product.id),
+              ),
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Productontwerp starten of hervatten'),
             ),
-            ...(epic['acceptanceCriteria'] as List? ?? const []).map(
-              (criterion) => SelectableText('• $criterion'),
-            ),
-            const SizedBox(height: 8),
-            SelectableText('Behapbaarheid: ${epic['slicabilityRationale']}'),
-            SelectableText(
-              'Bronnen: ${(epic['directionReferences'] as List? ?? const []).length} richtingsreferentie(s)',
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
-              'Versiehistorie',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            ...(data.epicHistories[_value(epic['id'])] ?? const []).map(
-              (version) => SelectableText(
-                'v${version['version']} · ${_epicStatusLabel(_value(version['status']))} · ${version['title']}',
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (widget.isFactoryOwner && epic['status'] == 'AWAITING_APPROVAL')
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () => _approveEpic(epic),
-                  icon: const Icon(Icons.check),
-                  label: const Text('Goedkeuren voor planning'),
-                ),
-              ),
-            if (epic['status'] == 'AWAITING_PRODUCT_OWNER_APPROVAL' &&
-                widget.productMemberships.contains(data.product.id))
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () =>
-                      _approveProductRequestEpic(epic, factoryOwner: false),
-                  icon: const Icon(Icons.fact_check_outlined),
-                  label: const Text('Productinhoud goedkeuren'),
-                ),
-              ),
-            if (widget.isFactoryOwner &&
-                epic['status'] == 'AWAITING_FACTORY_OWNER_APPROVAL')
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () =>
-                      _approveProductRequestEpic(epic, factoryOwner: true),
-                  icon: const Icon(Icons.verified_user_outlined),
-                  label: const Text('Eindgoedkeuring geven'),
-                ),
-              ),
-            if (const {
-              'AWAITING_PRODUCT_OWNER_APPROVAL',
-              'AWAITING_FACTORY_OWNER_APPROVAL',
-            }.contains(epic['status']))
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
-                  onPressed: () => _requestProductRequestEpicRefinement(epic),
-                  icon: const Icon(Icons.undo_outlined),
-                  label: const Text('Terugsturen'),
-                ),
-              ),
-            if (widget.isFactoryOwner &&
-                const {
-                  'AWAITING_APPROVAL',
-                  'AVAILABLE',
-                  'IN_PLANNING',
-                  'ACTIVE',
-                  'VERIFYING',
-                  'COMPLETED',
-                  'NOT_SUCCESSFUL',
-                }.contains(epic['status']))
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
-                  onPressed: () => _requestEpicRefinement(epic),
-                  icon: const Icon(Icons.undo_outlined),
-                  label: const Text('Terugsturen voor verdere uitwerking'),
-                ),
-              ),
-            if (widget.isFactoryOwner &&
-                const {
-                  'NEEDS_RESEARCH',
-                  'NEEDS_REFINEMENT',
-                  'AWAITING_APPROVAL',
-                  'AVAILABLE',
-                }.contains(epic['status']))
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => _epicReasonAction(epic, cancel: false),
-                  icon: const Icon(Icons.archive_outlined),
-                  label: const Text('Epic intrekken'),
-                ),
-              ),
-            if (widget.isFactoryOwner &&
-                const {
-                  'IN_PLANNING',
-                  'ACTIVE',
-                  'VERIFYING',
-                }.contains(epic['status']))
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => _epicReasonAction(epic, cancel: true),
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('Epic annuleren'),
-                ),
-              ),
-            if (widget.isFactoryOwner &&
-                const {
-                  'AVAILABLE',
-                  'IN_PLANNING',
-                  'ACTIVE',
-                }.contains(epic['status']))
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => _reprioritizeEpic(epic),
-                  icon: const Icon(Icons.priority_high),
-                  label: const Text('Voorrang geven'),
-                ),
+          ],
+        ),
+      const SizedBox(height: 12),
+      ..._liveBanners(data.live, processes: const {'PRODUCT_DESIGN'}),
+      SelectableText('Epics', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 8),
+      if (data.epics.isEmpty)
+        const SelectableText('Nog geen epics gepubliceerd.')
+      else ...[
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final entry in labels.entries)
+              ChoiceChip(
+                label: Text('${entry.value} · ${counts[entry.key]}'),
+                selected: tab == entry.key,
+                onSelected: (_) => setState(() => _designTab = entry.key),
               ),
           ],
         ),
-      ),
-    const Divider(height: 28),
-    SelectableText(
-      'Processessies',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    if (data.designSessions.isEmpty)
-      const SelectableText('Nog geen ontwerpsessies gestart.')
-    else
-      ...data.designSessions.map(
+        const SizedBox(height: 12),
+        if (visible.isEmpty)
+          SelectableText(switch (tab) {
+            'approval' => 'Er wachten geen epics op goedkeuring.',
+            'open' => 'Er loopt nu geen epic.',
+            _ => 'Nog geen afgeronde of gestopte epics.',
+          })
+        else
+          ...visible.map((epic) => _epicCard(data, epic)),
+      ],
+      ..._processBlock(
+        data,
+        'PRODUCT_DESIGN',
+        data.designSessions,
         (session) => _ProcessSessionTile(
           session: session,
           icon: session['status'] == 'SUCCEEDED'
@@ -2976,7 +3466,282 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               'Git ${session['repositoryCommitSha'] ?? 'nog niet bevroren'}',
         ),
       ),
-  ]);
+    ]);
+  }
+
+  /// Volledige epicinhoud en acties; getoond in het epicdetailvenster.
+  List<Widget> _epicContent(
+    ProductWorkspaceData data,
+    Map<String, Object?> epic,
+    BuildContext dialogContext,
+  ) {
+    VoidCallback closeThen(Future<void> Function() action) => () {
+      Navigator.pop(dialogContext);
+      unawaited(action());
+    };
+    return [
+      SelectableText('Epic ${_value(epic['id'])} · versie ${epic['version']}'),
+      if (epic['sourceProductRequestId'] != null)
+        SelectableText(
+          'Bronverzoek ${epic['sourceProductRequestId']} · requestversie ${epic['sourceProductRequestVersion']}',
+        ),
+      if (epic['status'] == 'NEEDS_RESEARCH') ...[
+        const SizedBox(height: 8),
+        Card(
+          color: Theme.of(context).colorScheme.tertiaryContainer,
+          child: const ListTile(
+            leading: Icon(Icons.manage_search_outlined),
+            title: SelectableText('Nog niet klaar voor planning'),
+            subtitle: SelectableText(
+              'Productontwerp werkt eerst bronnen, open vragen en UX-modellen uit. Productplanning kan deze epic nog niet claimen.',
+            ),
+          ),
+        ),
+      ],
+      if (epic['status'] == 'NEEDS_REFINEMENT') ...[
+        const SizedBox(height: 8),
+        Card(
+          color: Theme.of(context).colorScheme.errorContainer,
+          child: ListTile(
+            leading: const Icon(Icons.edit_note_outlined),
+            title: const SelectableText(
+              'Teruggestuurd voor verdere uitwerking',
+            ),
+            subtitle: SelectableText(
+              _value(epic['refinementReason']).isEmpty
+                  ? 'De ontwerper moet deze epic verder uitwerken.'
+                  : _value(epic['refinementReason']),
+            ),
+          ),
+        ),
+      ],
+      if (epic['status'] == 'AWAITING_APPROVAL') ...[
+        const SizedBox(height: 8),
+        Card(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          child: const ListTile(
+            leading: Icon(Icons.approval_outlined),
+            title: SelectableText('Wacht op jouw goedkeuring'),
+            subtitle: SelectableText(
+              'Controleer vooral of UX, databronnen, toegang en technische haalbaarheid concreet genoeg zijn. Na goedkeuring kan de planner direct stories maken.',
+            ),
+          ),
+        ),
+      ],
+      if (epic['status'] == 'AWAITING_PRODUCT_OWNER_APPROVAL') ...[
+        const SizedBox(height: 8),
+        Card(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          child: const ListTile(
+            leading: Icon(Icons.fact_check_outlined),
+            title: SelectableText('Productinhoudelijke beoordeling nodig'),
+            subtitle: SelectableText(
+              'De aangewezen product owner controleert deze exacte epicversie eerst. Daarna volgt de eindgoedkeuring.',
+            ),
+          ),
+        ),
+      ],
+      if (epic['status'] == 'AWAITING_FACTORY_OWNER_APPROVAL') ...[
+        const SizedBox(height: 8),
+        Card(
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          child: const ListTile(
+            leading: Icon(Icons.verified_user_outlined),
+            title: SelectableText('Eindgoedkeuring nodig'),
+            subtitle: SelectableText(
+              'De product owner heeft deze versie goedgekeurd. De factory owner beoordeelt nu de technische en bredere gevolgen.',
+            ),
+          ),
+        ),
+      ],
+      const SizedBox(height: 8),
+      SelectableText('Probleem', style: Theme.of(context).textTheme.labelLarge),
+      SelectableText('${epic['problem']}'),
+      const SizedBox(height: 8),
+      SelectableText(
+        'Oplossing',
+        style: Theme.of(context).textTheme.labelLarge,
+      ),
+      SelectableText('${epic['solution']}'),
+      if (epic['uxDesign'] != null) ...[
+        const SizedBox(height: 8),
+        SelectableText(
+          'UX-ontwerp',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        SelectableText('${epic['uxDesign']}'),
+      ],
+      if ((epic['uxScreens'] as List? ?? const []).isNotEmpty) ...[
+        const SizedBox(height: 8),
+        SelectableText(
+          'Volledige UX-schermset',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        ...(epic['uxScreens'] as List).map((raw) {
+          final screen = (raw as Map).cast<String, Object?>();
+          final variants = ((screen['artifacts'] as Map?)?.keys ?? const [])
+              .map((value) => '$value')
+              .join(', ');
+          return SelectableText(
+            '• ${screen['screenKey']} · ${screen['state']} · $variants\n'
+            '  ${screen['purpose']}',
+          );
+        }),
+      ],
+      ..._uxArtifactGallery(
+        context,
+        (epic['uxArtifacts'] as List? ?? const <Object?>[]).cast<Object?>(),
+      ),
+      const SizedBox(height: 8),
+      SelectableText(
+        'Gereedheid',
+        style: Theme.of(context).textTheme.labelLarge,
+      ),
+      SelectableText(
+        (epic['readiness'] as Map?)?['readyForPlanning'] == true
+            ? 'Gereed voor Productplanning'
+            : 'Nog niet gereed voor Productplanning',
+      ),
+      ...((epic['readiness'] as Map?)?['unmetConditions'] as List? ?? const [])
+          .map((condition) => SelectableText('• $condition')),
+      ...((epic['readiness'] as Map?)?['openQuestions'] as List? ?? const [])
+          .map((question) => SelectableText('Open vraag: $question')),
+      const SizedBox(height: 8),
+      SelectableText(
+        'Onderzochte bronnen',
+        style: Theme.of(context).textTheme.labelLarge,
+      ),
+      if ((epic['researchSources'] as List? ?? const []).isEmpty)
+        const SelectableText('Nog geen concrete externe bronnen onderzocht.')
+      else
+        ...(epic['researchSources'] as List).map((raw) {
+          final source = (raw as Map).cast<String, Object?>();
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              source['status'] == 'VALIDATED'
+                  ? Icons.verified_outlined
+                  : source['status'] == 'BLOCKED'
+                  ? Icons.block_outlined
+                  : Icons.travel_explore_outlined,
+            ),
+            title: SelectableText('${source['name']} · ${source['status']}'),
+            subtitle: SelectableText(
+              '${source['provider']}\n${source['coverage']}\n'
+              'Toegang: ${source['accessMethod']} · Licentie: ${source['license']}\n'
+              '${source['validationEvidence']}\n${source['uri']}',
+            ),
+          );
+        }),
+      const SizedBox(height: 8),
+      SelectableText(
+        'Acceptatiecriteria',
+        style: Theme.of(context).textTheme.labelLarge,
+      ),
+      ...(epic['acceptanceCriteria'] as List? ?? const []).map(
+        (criterion) => SelectableText('• $criterion'),
+      ),
+      const SizedBox(height: 8),
+      SelectableText('Behapbaarheid: ${epic['slicabilityRationale']}'),
+      SelectableText(
+        'Bronnen: ${(epic['directionReferences'] as List? ?? const []).length} richtingsreferentie(s)',
+      ),
+      const SizedBox(height: 16),
+      Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          if (widget.isFactoryOwner && epic['status'] == 'AWAITING_APPROVAL')
+            FilledButton.icon(
+              onPressed: closeThen(() => _approveEpic(epic)),
+              icon: const Icon(Icons.check),
+              label: const Text('Goedkeuren voor planning'),
+            ),
+          if (epic['status'] == 'AWAITING_PRODUCT_OWNER_APPROVAL' &&
+              widget.productMemberships.contains(data.product.id))
+            FilledButton.icon(
+              onPressed: closeThen(
+                () => _approveProductRequestEpic(epic, factoryOwner: false),
+              ),
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('Productinhoud goedkeuren'),
+            ),
+          if (widget.isFactoryOwner &&
+              epic['status'] == 'AWAITING_FACTORY_OWNER_APPROVAL')
+            FilledButton.icon(
+              onPressed: closeThen(
+                () => _approveProductRequestEpic(epic, factoryOwner: true),
+              ),
+              icon: const Icon(Icons.verified_user_outlined),
+              label: const Text('Eindgoedkeuring geven'),
+            ),
+          if (const {
+            'AWAITING_PRODUCT_OWNER_APPROVAL',
+            'AWAITING_FACTORY_OWNER_APPROVAL',
+          }.contains(epic['status']))
+            OutlinedButton.icon(
+              onPressed: closeThen(
+                () => _requestProductRequestEpicRefinement(epic),
+              ),
+              icon: const Icon(Icons.undo_outlined),
+              label: const Text('Terugsturen'),
+            ),
+          if (widget.isFactoryOwner &&
+              const {
+                'AWAITING_APPROVAL',
+                'AVAILABLE',
+                'IN_PLANNING',
+                'ACTIVE',
+                'VERIFYING',
+                'COMPLETED',
+                'NOT_SUCCESSFUL',
+              }.contains(epic['status']))
+            OutlinedButton.icon(
+              onPressed: closeThen(() => _requestEpicRefinement(epic)),
+              icon: const Icon(Icons.undo_outlined),
+              label: const Text('Terugsturen voor verdere uitwerking'),
+            ),
+          if (widget.isFactoryOwner &&
+              const {
+                'NEEDS_RESEARCH',
+                'NEEDS_REFINEMENT',
+                'AWAITING_APPROVAL',
+                'AVAILABLE',
+              }.contains(epic['status']))
+            TextButton.icon(
+              onPressed: closeThen(
+                () => _epicReasonAction(epic, cancel: false),
+              ),
+              icon: const Icon(Icons.archive_outlined),
+              label: const Text('Epic intrekken'),
+            ),
+          if (widget.isFactoryOwner &&
+              const {
+                'IN_PLANNING',
+                'ACTIVE',
+                'VERIFYING',
+              }.contains(epic['status']))
+            TextButton.icon(
+              onPressed: closeThen(() => _epicReasonAction(epic, cancel: true)),
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Epic annuleren'),
+            ),
+          if (widget.isFactoryOwner &&
+              const {
+                'AVAILABLE',
+                'IN_PLANNING',
+                'ACTIVE',
+              }.contains(epic['status']))
+            TextButton.icon(
+              onPressed: closeThen(() => _reprioritizeEpic(epic)),
+              icon: const Icon(Icons.priority_high),
+              label: const Text('Voorrang geven'),
+            ),
+        ],
+      ),
+    ];
+  }
 
   Widget _assignment(ProductWorkspaceData data) {
     final a = data.assignment;
@@ -3446,17 +4211,33 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       'Ieder proces heeft een eigen ritme. Uitgeschakeld betekent alleen dat het niet automatisch start; Nu starten blijft beschikbaar.',
     ),
     const SizedBox(height: 8),
-    ...data.schedules.map(
-      (s) => Card(
+    ...data.schedules.map((s) {
+      final live = _liveProcess(data.live, _value(s['process']));
+      final next = _parseInstant(s['nextRunAt']);
+      return Card(
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: ListTile(
-            title: SelectableText(_value(s['process']).replaceAll('_', ' ')),
-            subtitle: SelectableText(
-              '${_humanPattern((s['pattern'] as Map?)?.cast<String, Object?>())}\n'
-              '${s['timezone']} · volgende start ${s['nextRunAt'] ?? 'uitgeschakeld'} · versie ${s['version']}',
+            title: SelectableText(_processLabel(_value(s['process']))),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SelectableText(
+                  '${_humanPattern((s['pattern'] as Map?)?.cast<String, Object?>())} · ${s['timezone']} · '
+                  'volgende start ${next == null ? 'uitgeschakeld' : _shortDateTime(next)}',
+                ),
+                if (live != null) ...[
+                  SelectableText(
+                    '${_lastRunLine(live)} · laatste 24 uur: ${_last24hLine(live)}',
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: 320,
+                    child: _RunTicks(hourly: _asMaps(live['hourly'])),
+                  ),
+                ],
+              ],
             ),
-            isThreeLine: true,
             trailing: Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
@@ -3478,31 +4259,12 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             ),
           ),
         ),
-      ),
+      );
+    }),
+    const SizedBox(height: 8),
+    const SelectableText(
+      'Alle afzonderlijke runs en sessies staan onder Beheer → Operatie.',
     ),
-    const Divider(height: 28),
-    SelectableText(
-      'Recente automatische starts',
-      style: Theme.of(context).textTheme.titleMedium,
-    ),
-    if (data.scheduleRuns.isEmpty)
-      const SelectableText('Nog geen automatische start geclaimd.')
-    else
-      ...data.scheduleRuns.map(
-        (run) => ListTile(
-          leading: Icon(
-            run['status'] == 'SUCCEEDED'
-                ? Icons.check_circle_outline
-                : run['status'] == 'SKIPPED'
-                ? Icons.skip_next_outlined
-                : Icons.error_outline,
-          ),
-          title: SelectableText('${run['process']} · ${run['status']}'),
-          subtitle: SelectableText(
-            'Gepland ${run['scheduledFor']} · ${run['resultSummary'] ?? run['errorCode'] ?? 'geclaimd'}',
-          ),
-        ),
-      ),
   ]);
 
   String _humanPattern(Map<String, Object?>? pattern) {

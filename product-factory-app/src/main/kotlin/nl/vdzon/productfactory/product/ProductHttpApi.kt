@@ -5,6 +5,7 @@ import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.auth.ResolvedSession
 import nl.vdzon.productfactory.auth.ProductAuthorizationService
+import nl.vdzon.productfactory.foundation.MAX_LIST_LIMIT
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
@@ -103,7 +104,8 @@ class ProductController(
     )
 
     @GetMapping("/{productId}/schedules") fun schedules(@PathVariable productId: String) = queries.getProcessSchedules(ProductId(productId))
-    @GetMapping("/{productId}/schedule-runs") fun scheduleRuns(@PathVariable productId: String) = queries.findScheduleRuns(ProductId(productId))
+    @GetMapping("/{productId}/schedule-runs") fun scheduleRuns(@PathVariable productId: String, @RequestParam(required = false) limit: Int?) =
+        queries.findScheduleRuns(ProductId(productId), limit?.coerceIn(1, MAX_LIST_LIMIT))
     @PutMapping("/{productId}/schedules/{process}") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun schedule(@PathVariable productId: String, @PathVariable process: ScheduledProcess, @RequestBody request: ScheduleRequest, authentication: Authentication?) = commands.updateProcessSchedule(
         UpdateProcessScheduleCommand(ProductId(productId), process, request.enabled, request.timezone, request.pattern, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),

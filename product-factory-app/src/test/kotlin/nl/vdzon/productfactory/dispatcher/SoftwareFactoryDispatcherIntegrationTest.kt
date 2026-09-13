@@ -96,6 +96,13 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
             .contains("pixel-perfecte kopie is niet vereist")
         assertThat(planningQueries.getStory(firstStory).status).isEqualTo(StoryStatus.IN_PROGRESS)
         assertThat(planningQueries.getBacklog(productId).map { it.sequenceNumber }).containsExactly(1, 2)
+
+        val sessions = queries.findDispatchSessions(ProcessSessionFilter(productId))
+        val storyKey = attempts.single().externalStoryId!!
+        assertThat(sessions).hasSize(2)
+        assertThat(sessions.single { !it.noOp }.resultSummary).isEqualTo("Story ${firstStory.value} is idempotent gekoppeld aan $storyKey.")
+        assertThat(sessions.single { it.noOp }.resultSummary)
+            .isEqualTo("Story ${firstStory.value} wacht bij Software Factory op $storyKey (OPEN); succesvolle no-op.")
     }
 
     @Test

@@ -3,9 +3,11 @@ package nl.vdzon.productfactory.design
 import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.auth.ResolvedSession
+import nl.vdzon.productfactory.foundation.processSessionFilter
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
+import java.time.Instant
 
 data class DesignVersionedRequest(val expectedVersion: Long, val idempotencyKey: String)
 data class MarkEpicActiveRequest(val plannedEpicVersion: Long, val expectedVersion: Long, val idempotencyKey: String)
@@ -33,8 +35,13 @@ class DesignController(
     fun history(@PathVariable epicId: String) = queries.getEpicHistory(EpicId(epicId))
 
     @GetMapping("/products/{productId}/design/sessions")
-    fun sessions(@PathVariable productId: String, @RequestParam(required = false) status: Set<ProcessSessionStatus>?) =
-        queries.findProcessSessions(ProcessSessionFilter(ProductId(productId), status.orEmpty()))
+    fun sessions(
+        @PathVariable productId: String,
+        @RequestParam(required = false) status: Set<ProcessSessionStatus>?,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) before: Instant?,
+        @RequestParam(required = false) excludeNoOps: Boolean?,
+    ) = queries.findProcessSessions(processSessionFilter(productId, status, limit, before, excludeNoOps))
 
     @GetMapping("/design/sessions/{sessionId}")
     fun session(@PathVariable sessionId: String) = queries.getProcessSession(ProcessSessionId(sessionId))

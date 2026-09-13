@@ -770,21 +770,21 @@ class ProductPlanningMvpService(
         ?: throw AggregateNotFound("Planningssessie bestaat niet.")
 
     @Transactional(readOnly = true)
-    override fun findProcessSessions(filter: ProcessSessionFilter): List<ProcessSessionDetails> = sessionRows().filter { session ->
-        (filter.productId == null || session.productId == filter.productId) && (filter.statuses.isEmpty() || session.status in filter.statuses) &&
-            (filter.timeRange.from == null || !session.startedAt.isBefore(filter.timeRange.from)) &&
-            (filter.timeRange.until == null || session.startedAt.isBefore(filter.timeRange.until))
+    override fun findProcessSessions(filter: ProcessSessionFilter): List<ProcessSessionDetails> {
+        val query = filter.toSqlQuery()
+        return sessionRows(query.where, *query.args.toTypedArray(), limit = query.limit)
     }
 
-    private fun sessionRows(where: String = "", vararg args: Any): List<ProcessSessionDetails> = jdbc.query(
+    private fun sessionRows(where: String = "", vararg args: Any, limit: Int? = null): List<ProcessSessionDetails> = jdbc.query(
         """SELECT id,product_id,status,implementation_artifact,implementation_variant,implementation_version,implementation_revision,started_at,
             finished_at,inputs_json,ai_task_ids_json,publications_json,result_summary,blocked_reason,error_code,git_url,git_commit_sha
-            FROM pf_planning_process_session $where ORDER BY started_at DESC""".trimIndent(),
+            FROM pf_planning_process_session $where ORDER BY started_at DESC${limit?.let { " LIMIT $it" }.orEmpty()}""".trimIndent(),
         { rs, _ -> ProcessSessionDetails(
             ProcessSessionId(rs.getString(1)), ProductId(rs.getString(2)), ProcessSessionStatus.valueOf(rs.getString(3)),
             ImplementationIdentity(rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7)), rs.getTimestamp(8).toInstant(),
             rs.getTimestamp(9)?.toInstant(), readJson(rs.getString(10)), readJson(rs.getString(11)), readJson(rs.getString(12)),
             rs.getString(13), rs.getString(14), rs.getString(15), rs.getString(16), rs.getString(17),
+            noOp = isNoOpProcessSession(ProcessSessionStatus.valueOf(rs.getString(3)), rs.getString(13)),
         ) }, *args,
     )
 

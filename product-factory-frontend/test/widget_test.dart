@@ -337,8 +337,13 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(appTextContaining('duur 3 min 12 sec'), findsOneWidget);
+    // Lopende sessies staan altijd open; afgeronde historie is ingeklapt.
     expect(appTextContaining('actief: ja'), findsOneWidget);
+    expect(appTextContaining('duur 3 min 12 sec'), findsNothing);
+    await tester.ensureVisible(appText('Toon'));
+    await tester.tap(appText('Toon'));
+    await tester.pump();
+    expect(appTextContaining('duur 3 min 12 sec'), findsOneWidget);
     expect(appTextContaining('Gestart 27-08-2026'), findsNWidgets(2));
   });
 
@@ -633,8 +638,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(appText('Bronnen verbinden · Onderzoek nodig'));
-    await tester.pump();
+    expect(appText('Onderzoek nodig'), findsOneWidget);
+    await tester.tap(appText('Bronnen verbinden'));
+    await tester.pumpAndSettle();
 
     expect(appText('Nog niet klaar voor planning'), findsOneWidget);
     expect(appText('UX-modellen'), findsOneWidget);
@@ -715,10 +721,97 @@ void main() {
     expect(gateway.dispatchingChanges, 1);
     expect(gateway.dispatchRuns, 1);
 
-    await tester.tap(appTextContaining('Story met UX-model · TODO'));
+    await tester.tap(appTextContaining('Story met UX-model · Te doen'));
     await tester.pump();
     expect(appText('UX-modellen bij deze story'), findsOneWidget);
     expect(find.byTooltip('Open UX-model en zoom in'), findsOneWidget);
+  });
+
+  testWidgets('overzicht toont epic-reis en waar de lopende epic op wacht', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1300, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProductWorkspacePage(
+            gateway: ProgressProductGateway(),
+            initialProductId: 'hkh-autopilot',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(appText('Onderwerpen ontdekken'), findsNothing);
+    expect(appTextContaining('Onderwerpen ontdekken'), findsNothing);
+    expect(
+      find.textContaining('Onderwerpen ontdekken', findRichText: true),
+      findsWidgets,
+    );
+    expect(appText('Bugfix'), findsOneWidget);
+    expect(appText('Hertest'), findsOneWidget);
+    expect(appText('Wacht op Software Factory'), findsOneWidget);
+    expect(
+      appTextContaining('Bugfix-story #29 is als hkh-208 verstuurd'),
+      findsOneWidget,
+    );
+    expect(appTextContaining('Waarom nog niet klaar'), findsNothing);
+    expect(
+      find.textContaining('Waarom nog niet klaar', findRichText: true),
+      findsOneWidget,
+    );
+    expect(appText('Planning'), findsWidgets);
+    expect(
+      appTextContaining('1 met resultaat · 30 niets te doen'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('operatie filtert sessies server-side en verbergt no-ops', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1300, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gateway = ProgressProductGateway();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProductWorkspacePage(
+            gateway: gateway,
+            section: ProductWorkspaceSection.operation,
+            initialProductId: 'hkh-autopilot',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(gateway.sessionRequests, isNotEmpty);
+    expect(gateway.sessionRequests.every((r) => r.$3), isTrue);
+    expect(
+      appTextContaining('Story #29 verstuurd als hkh-208'),
+      findsOneWidget,
+    );
+    expect(appTextContaining('succesvolle no-op'), findsNothing);
+
+    await tester.tap(find.text('Toon “niets te doen”'));
+    await tester.pump();
+    await tester.pump();
+    expect(gateway.sessionRequests.last.$3, isFalse);
+    expect(appTextContaining('succesvolle no-op'), findsWidgets);
+
+    gateway.sessionRequests.clear();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Dispatcher'));
+    await tester.pump();
+    await tester.pump();
+    expect(gateway.sessionRequests.map((r) => r.$2).toSet(), {
+      'SOFTWARE_FACTORY_DISPATCHER',
+    });
   });
 
   testWidgets('Runtime-catalogus gebruikt de gekozen projectprefix', (
@@ -1137,8 +1230,20 @@ class FakeProductGateway implements ProductGateway {
   @override
   Future<List<ProductSummary>> products() async => const [];
   @override
-  Future<ProductWorkspaceData> workspace(ProductSummary product) =>
-      throw UnimplementedError();
+  Future<ProductWorkspaceData> workspace(
+    ProductSummary product, {
+    ProductWorkspaceSection section = ProductWorkspaceSection.overview,
+  }) => throw UnimplementedError();
+  @override
+  Future<Map<String, Object?>?> epicProgress(String epicId) async => null;
+  @override
+  Future<List<Map<String, Object?>>> processSessions(
+    String productId,
+    String process, {
+    int limit = 25,
+    String? before,
+    bool excludeNoOps = true,
+  }) async => const [];
   @override
   Future<void> addMeetingMessage(
     String meetingId,
@@ -1324,7 +1429,10 @@ class ResearchProductGateway extends FakeProductGateway {
   }
 
   @override
-  Future<ProductWorkspaceData> workspace(ProductSummary product) async {
+  Future<ProductWorkspaceData> workspace(
+    ProductSummary product, {
+    ProductWorkspaceSection section = ProductWorkspaceSection.overview,
+  }) async {
     workspaceReads++;
     return ProductWorkspaceData(
       product: product,
@@ -1436,6 +1544,144 @@ class ResearchProductGateway extends FakeProductGateway {
       qualityWorkItems: const [],
       qualitySessions: const [],
     );
+  }
+}
+
+class ProgressProductGateway extends ResearchProductGateway {
+  final List<(String, String, bool)> sessionRequests = [];
+
+  static const _epicId = 'epic-onderwerp';
+
+  @override
+  Future<ProductWorkspaceData> workspace(
+    ProductSummary product, {
+    ProductWorkspaceSection section = ProductWorkspaceSection.overview,
+  }) async {
+    workspaceReads++;
+    return ProductWorkspaceData(
+      product: product,
+      assignment: const {'goal': 'Historie toegankelijk maken.'},
+      testConfiguration: null,
+      schedules: const [],
+      signals: const [],
+      questions: const [],
+      meetings: const [],
+      decisions: const [],
+      decisionArchive: const [],
+      epics: const [
+        {
+          'id': _epicId,
+          'title': 'Onderwerpen ontdekken',
+          'summary': 'Zoek op onderwerp.',
+          'status': 'ACTIVE',
+          'version': 5,
+          'updatedAt': '2026-09-12T21:57:40Z',
+        },
+      ],
+      designSessions: const [],
+      epicHistories: const {},
+      stories: const [],
+      backlog: const [],
+      planningWorkItems: const [],
+      planningSessions: const [],
+      qualitySnapshot: null,
+      qualityHistory: const [],
+      bugs: const [],
+      verifications: const [],
+      qualityWorkItems: const [],
+      qualitySessions: const [],
+      live: {
+        'generatedAt': '2026-09-13T07:30:00Z',
+        'processes': [
+          for (final process in const [
+            'PRODUCT_DESIGN',
+            'PRODUCT_PLANNING',
+            'QUALITY_ASSURANCE',
+            'SOFTWARE_FACTORY_DISPATCHER',
+          ])
+            {
+              'process': process,
+              'enabled': process != 'PRODUCT_DESIGN',
+              'intervalMinutes': 10,
+              'running': null,
+              'lastSession': {
+                'id': 'laatste-$process',
+                'status': 'SUCCEEDED',
+                'startedAt': '2026-09-13T07:25:00Z',
+                'resultSummary': 'Niets; succesvolle no-op.',
+                'noOp': true,
+              },
+              'last24h': process == 'PRODUCT_PLANNING'
+                  ? {'total': 31, 'noOps': 30, 'failed': 0, 'meaningful': 1}
+                  : {'total': 0, 'noOps': 0, 'failed': 0, 'meaningful': 0},
+              'hourly': [
+                for (var hour = 0; hour < 24; hour++)
+                  {'hourStart': '', 'total': 6, 'noOps': 6, 'failed': 0},
+              ],
+            },
+        ],
+      },
+      epicProgress: const {
+        _epicId: {
+          'epicId': _epicId,
+          'phase': 'BUGFIX',
+          'steps': [
+            {'key': 'DESIGN', 'label': 'Ontwerp', 'state': 'DONE'},
+            {'key': 'PLANNING', 'label': 'Planning', 'state': 'DONE'},
+            {'key': 'BUILD', 'label': 'Bouw', 'state': 'DONE'},
+            {'key': 'VERIFICATION', 'label': 'Verificatie', 'state': 'FAILED'},
+            {'key': 'BUGFIX', 'label': 'Bugfix', 'state': 'CURRENT'},
+            {'key': 'RETEST', 'label': 'Hertest', 'state': 'PENDING'},
+            {'key': 'DONE', 'label': 'Afgerond', 'state': 'PENDING'},
+          ],
+          'waitingOn': {
+            'actor': 'SOFTWARE_FACTORY',
+            'title': 'Wacht op Software Factory',
+            'detail':
+                'Bugfix-story #29 is als hkh-208 verstuurd en staat daar op OPEN.',
+            'since': '2026-09-13T02:06:18Z',
+          },
+          'timeline': [
+            {
+              'at': '2026-09-12T21:57:40Z',
+              'kind': 'VERIFICATION_FAILED',
+              'severity': 'ERROR',
+              'title': 'Epic-verificatie afgekeurd',
+              'detail': 'Europeana geeft geen resultaten.',
+            },
+          ],
+        },
+      },
+    );
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> processSessions(
+    String productId,
+    String process, {
+    int limit = 25,
+    String? before,
+    bool excludeNoOps = true,
+  }) async {
+    sessionRequests.add((productId, process, excludeNoOps));
+    if (process != 'SOFTWARE_FACTORY_DISPATCHER') return const [];
+    return [
+      {
+        'id': 'verstuurd',
+        'status': 'SUCCEEDED',
+        'startedAt': '2026-09-13T02:06:00Z',
+        'resultSummary': 'Story #29 verstuurd als hkh-208.',
+      },
+      if (!excludeNoOps)
+        {
+          'id': 'leeg',
+          'status': 'SUCCEEDED',
+          'startedAt': '2026-09-13T07:26:00Z',
+          'resultSummary':
+              'Geen uitvoerbare story beschikbaar; succesvolle no-op.',
+          'noOp': true,
+        },
+    ];
   }
 }
 

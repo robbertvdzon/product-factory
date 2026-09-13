@@ -36,7 +36,45 @@ data class ProcessSessionFilter(
     val productId: ProductId? = null,
     val statuses: Set<ProcessSessionStatus> = emptySet(),
     val timeRange: TimeRange = TimeRange(),
+    /** Maximaal aantal sessies (nieuwste eerst); null = alles. */
+    val limit: Int? = null,
+    /** Alleen sessies met startedAt strikt vóór dit tijdstip (paginering). */
+    val before: Instant? = null,
+    /** Laat succesvolle no-op-sessies weg (zie [isNoOpProcessSession]). */
+    val excludeNoOps: Boolean = false,
 )
+
+/** Marker in resultSummary waarmee een processessie aangeeft dat er niets te doen was. */
+const val NO_OP_RESULT_MARKER = "succesvolle no-op."
+
+/** Eén definitie van een no-op-sessie: SUCCEEDED en resultSummary bevat [NO_OP_RESULT_MARKER]. */
+fun isNoOpProcessSession(status: ProcessSessionStatus, resultSummary: String?): Boolean =
+    status == ProcessSessionStatus.SUCCEEDED && resultSummary?.contains(NO_OP_RESULT_MARKER) == true
+
+/** SQL-variant van [isNoOpProcessSession] voor tabellen met de kolommen status en result_summary. */
+const val NO_OP_PROCESS_SESSION_SQL = "(status='SUCCEEDED' AND COALESCE(result_summary,'') LIKE '%$NO_OP_RESULT_MARKER%')"
+
+data class ProcessSessionSqlQuery(val where: String, val args: List<Any>, val limit: Int?)
+
+/**
+ * Vertaalt het filter naar een WHERE-clausule voor de sessietabellen van de procesmodules
+ * (kolommen product_id, status, started_at en result_summary), zodat filteren en begrenzen in SQL gebeurt.
+ */
+fun ProcessSessionFilter.toSqlQuery(): ProcessSessionSqlQuery {
+    val conditions = mutableListOf<String>()
+    val args = mutableListOf<Any>()
+    productId?.let { conditions += "product_id=?"; args += it.value }
+    if (statuses.isNotEmpty()) {
+        conditions += "status IN (${statuses.joinToString(",") { "?" }})"
+        args.addAll(statuses.sortedBy { it.ordinal }.map { it.name })
+    }
+    timeRange.from?.let { conditions += "started_at>=?"; args += it }
+    timeRange.until?.let { conditions += "started_at<?"; args += it }
+    before?.let { conditions += "started_at<?"; args += it }
+    if (excludeNoOps) conditions += "NOT $NO_OP_PROCESS_SESSION_SQL"
+    val where = if (conditions.isEmpty()) "" else conditions.joinToString(" AND ", prefix = "WHERE ")
+    return ProcessSessionSqlQuery(where, args, limit)
+}
 
 data class ProcessSessionDetails(
     val id: ProcessSessionId,
@@ -53,6 +91,8 @@ data class ProcessSessionDetails(
     val errorCode: String? = null,
     val repositoryUrl: String? = null,
     val repositoryCommitSha: String? = null,
+    /** Berekend bij het lezen: true voor een succesvolle no-op-sessie. */
+    val noOp: Boolean = false,
 )
 
 class ProcessAlreadyRunning(val productId: ProductId) : RuntimeException("Er draait al een processessie voor ${productId.value}")
