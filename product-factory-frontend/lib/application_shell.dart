@@ -226,7 +226,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
     final memory =
         widget.memoryAiGateway ??
         HttpMemoryAiGateway(csrfToken: widget.csrfToken);
-    if (_selected == _Destination.governance || !widget.isFactoryOwner) {
+    if (_selected == _Destination.governance ||
+        (!widget.isFactoryOwner && _selected != _Destination.settings) ||
+        _selected == _Destination.design) {
       return EpicCollaborationPage(
         key: ValueKey('collaboration-${widget.actingRole}-${_selected.name}'),
         products: products,
@@ -326,12 +328,15 @@ class _ApplicationShellState extends State<ApplicationShell> {
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
+        actingRole: widget.actingRole ?? 'PRODUCT_OWNER',
         productMemberships: widget.productMemberships,
-        trailingContent: MemoryAiManagementPanel(
-          gateway: memory,
-          view: MemoryAiView.settings,
-          refreshController: _pageRefresh,
-        ),
+        trailingContent: widget.isFactoryOwner
+            ? MemoryAiManagementPanel(
+                gateway: memory,
+                view: MemoryAiView.settings,
+                refreshController: _pageRefresh,
+              )
+            : null,
       ),
       _Destination.decisions => ProductWorkspacePage(
         gateway: products,
@@ -510,6 +515,12 @@ class _ApplicationShellState extends State<ApplicationShell> {
               'Productafspraken',
               closeAfterSelection,
             ),
+          _navItem(
+            _Destination.settings,
+            Icons.settings_outlined,
+            'Productinstellingen',
+            closeAfterSelection,
+          ),
         ] else ...[
           _navItem(
             _Destination.overview,
@@ -755,7 +766,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
 
   _Destination _allowed(_Destination destination) =>
       !widget.isFactoryOwner &&
-          (_factoryOwnerDestinations.contains(destination) ||
+          ((_factoryOwnerDestinations.contains(destination) &&
+                  destination != _Destination.settings) ||
               (destination == _Destination.governance &&
                   widget.actingRole != 'ARCHITECT'))
       ? _Destination.overview

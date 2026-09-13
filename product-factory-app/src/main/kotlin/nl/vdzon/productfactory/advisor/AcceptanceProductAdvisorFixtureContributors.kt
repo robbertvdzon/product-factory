@@ -66,7 +66,6 @@ class AcceptanceProductAdvisorScenarioContributor(
             productId = productId,
             audience = assignment.audience,
             goal = assignment.goal,
-            hardBoundaries = assignment.hardBoundaries,
             publicGitUrl = PVD_D_GIT_URL,
             expectedVersion = assignment.version,
             actor = SYSTEM,

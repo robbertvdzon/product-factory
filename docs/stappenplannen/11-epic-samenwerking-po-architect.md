@@ -10,7 +10,7 @@ menselijke PO-/architectflow en de autonome variant werkend. Een PO zoals Marc w
 aan functionele epics, ziet schermontwerpen en volgt vragen en implementatiestatus. Een architect
 zoals Robbert beoordeelt korte concrete technische impact en het AI-gebruik van het product,
 inclusief budgetten en uitzonderingen. De factory owner beheert de factory en is geen extra
-epicgoedkeurder.
+verplichte epicgoedkeurder, maar kan als superuser iedere PO- of architectactie uitvoeren.
 
 Dit plan bewaart de oorspronkelijke opdracht en acceptatiematrix. De actuele werking,
 migratiegrenzen en verificatie staan in het bewijsrecord en runbook.
@@ -39,8 +39,8 @@ Voeg `ARCHITECT` als productrol toe aan contracten, opslag, authenticatie, gebru
 effectieve rolkeuze. Ondersteun meerdere rollen per gebruiker/product. Voeg geversioneerd beleid
 voor menselijke/automatische PO- en architectverantwoordelijkheid en uitzonderingen toe.
 
-Oplevering: beheerscherm, backendautorisatie en migraties. Een factory owner is niet vanzelf
-architect; een PO ziet geen operationeel beheer. Intrekken van een rol werkt ook voor bestaande
+Oplevering: beheerscherm, backendautorisatie en migraties. Een factory owner heeft alle
+product-owner- en architectrechten; een PO ziet geen operationeel beheer. Intrekken van een rol werkt ook voor bestaande
 sessies en deep links. Automatische besturing heeft expliciet mandaat.
 
 ### PF-EA-02 — Epicimpact en product-AI-beoordeling
@@ -77,7 +77,7 @@ gebruik bestaande Fluttercomponenten en Product Factory-theming.
 ### PF-EA-05 — Architectwerkplek en productafspraken
 
 Implementeer Te beoordelen, Epicimpact, een toelichting/AI-gesprek per impactpunt en beslisacties.
-Maak product-AI-beleid, grenzen en uitzonderingen door de architect bewerkbaar. Toon bij ieder
+Maak product-AI-beleid, budgetten en uitzonderingen door de architect bewerkbaar. Toon bij ieder
 besluit precies welke inhoud/impact wordt beoordeeld en wat nog ontbreekt.
 
 Oplevering: architect kan het voorbeeld ‘iedere tien minuten AI’ beoordelen zonder de volledige
@@ -131,10 +131,10 @@ synthetische gebruikers en gemockte AI; browsercontrole van het prototype vervan
 | EA-17 | Software Factory DONE, verificatie nog open | Geen voortijdige melding dat de epic is geslaagd of in productie beschikbaar is |
 | EA-18 | Bug/hertest na levering | PO ziet begrijpelijke reden en voortgang; geen technische logdump |
 | EA-19 | Verificatie geslaagd en doelomgeving beschikbaar | Oplevering toont wijziging, omgeving en bruikbare link |
-| EA-20 | Robbert wisselt architect/factory owner | Alleen werkelijk toegekende rolbevoegdheden; besluit registreert rol en product |
+| EA-20 | Robbert werkt als factory owner | Alle product- en factoryfuncties zijn beschikbaar; een review registreert de gekozen PO- of architectrol en het product |
 | EA-21 | Directe API-call, deep link of ingetrokken rol | Backend weigert onbevoegde inzage/mutatie; geen vertrouwen op verborgen knoppen |
 | EA-22 | Autonoom HKH, epic binnen mandaat | AI doorloopt uitwerking, beoordeling, planning en uitvoering zonder menselijk akkoord |
-| EA-23 | Buiten mandaat / ontbrekende menselijke architect | Uitlegbare blokkade en juiste uitzonderingsroute; geen impliciete factory-ownerapproval |
+| EA-23 | Buiten mandaat / ontbrekende menselijke architect | Uitlegbare blokkade en juiste uitzonderingsroute; factory owner kan als superuser beslissen |
 | EA-24 | Migratie met oude factory-ownerapprovals | Historie behouden; geen automatische architectrol of onbedoelde dispatchvrijgave |
 | EA-25 | Herstart, dubbele callback/antwoord of netwerkfout | Bestaande taken/vragen/approvals hervatten idempotent |
 | EA-26 | 320px, toetsenbord, 200% zoom | Inhoud en primaire acties bereikbaar; juiste focus, labels en leesbare foutmeldingen |
@@ -165,7 +165,7 @@ de daadwerkelijke implementatieopdracht. Dit overdrachtsdocument voert geen van 
 > `docs/ux/epic-samenwerking/README.md`. Open ook het bijbehorende `index.html`-prototype
 > en bekijk de schermbeelden. Bouw voort op de bestaande code en werk de zeven deelstappen
 > uit tot een volledige, geteste flow. De architect beheert architectuur, product-AI,
-> budgetten en uitzonderingen; de factory owner is geen epicgoedkeurder. Zorg zowel voor
+> budgetten en uitzonderingen; de factory owner is superuser en kan iedere PO- of architectactie uitvoeren. Zorg zowel voor
 > de menselijke PO-/architectflow als de volledig autonome variant. Gebruik de
 > acceptatiematrix om te bewijzen wat werkt en houd de actuele documentatie in lijn met
 > de implementatie. De prototypegegevens en AI-antwoorden zijn uitsluitend voorbeelden.

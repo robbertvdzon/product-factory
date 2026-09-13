@@ -5,6 +5,7 @@ import nl.vdzon.productfactory.api.advisor.*
 import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.shared.*
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -36,9 +37,10 @@ class EpicGovernanceApplicationService(private val jdbc: JdbcTemplate, private v
             val last=current.lastOrNull { it.role==role } ?: return false
             if (last.decision != ReviewDecision.APPROVE) return false
             if (last.automatic) return true
-            return runCatching { identities.getIdentity(UserId(last.actorId)) }.getOrNull()?.let { u -> u.active && u.memberships.any {
-                it.productId==s.productId && it.role==role && it.status==MembershipStatus.ACTIVE
-            } } == true
+            return runCatching { identities.getIdentity(UserId(last.actorId)) }.getOrNull()?.let { u -> u.active &&
+                (GlobalRole.FACTORY_OWNER in u.globalRoles || u.memberships.any {
+                    it.productId==s.productId && it.role==role && it.status==MembershipStatus.ACTIVE
+                }) } == true
         }
         val missing=ImpactCategory.entries.take(6).any { c -> s.impact.items.none { it.category==c } }
         val unknown=missing || s.impact.items.any { it.level==ImpactLevel.UNKNOWN || it.summary.isBlank() || (it.evidence.isEmpty() || it.evidence.any(String::isBlank)) }
@@ -76,6 +78,7 @@ class EpicGovernanceApplicationService(private val jdbc: JdbcTemplate, private v
             record(id,s,p.version,ProductMembershipRole.PRODUCT_OWNER,"PRODUCT_DESIGNER_MVP",ReviewDecision.APPROVE,"Complete functionele uitwerking en UX gevalideerd binnen de productopdracht.",true,"auto-po-${id.value}-${s.content}-${p.version}")
         if (!state.architectRequired && state.records.none { it.contentVersion==s.content && it.policyVersion==p.version && it.role==ProductMembershipRole.ARCHITECT })
             record(id,s,p.version,ProductMembershipRole.ARCHITECT,"PRODUCT_DESIGNER_MVP",ReviewDecision.APPROVE,"De onderbouwde impact past binnen de geversioneerde productafspraken.",true,"auto-arch-${id.value}-${s.content}-${p.version}")
+        queuePlanningIfReady(id)
     }
 
     @Transactional
@@ -83,7 +86,8 @@ class EpicGovernanceApplicationService(private val jdbc: JdbcTemplate, private v
         val user=identities.getIdentity(command.userId)
         jdbc.query("SELECT id FROM pf_epic WHERE id=? FOR UPDATE",{rs,_->rs.getString(1)},command.epicId.value)
         val s=snapshot(command.epicId)
-        if (!user.active || user.actingRole.name!=command.role.name || user.memberships.none { it.productId==s.productId && it.role==command.role && it.status==MembershipStatus.ACTIVE })
+        val factoryOwner = user.active && user.actingRole==ActingRole.FACTORY_OWNER && GlobalRole.FACTORY_OWNER in user.globalRoles
+        if (!factoryOwner && (!user.active || user.actingRole.name!=command.role.name || user.memberships.none { it.productId==s.productId && it.role==command.role && it.status==MembershipStatus.ACTIVE }))
             throw InvalidCommand("Je hebt geen actieve bevoegdheid voor deze productrol.")
         val fingerprint=fingerprint(command)
         jdbc.query("SELECT fingerprint FROM pf_epic_review WHERE idempotency_key=?",{rs,_->rs.getString(1)},command.idempotencyKey).singleOrNull()?.let {
@@ -99,6 +103,19 @@ class EpicGovernanceApplicationService(private val jdbc: JdbcTemplate, private v
             (ImpactCategory.entries.take(6).any { c->s.impact.items.none { it.category==c } } || s.impact.items.any { it.level==ImpactLevel.UNKNOWN }))
             throw InvalidCommand("Onderzoek eerst de onbekende architectuurimpact.")
         record(command.epicId,s,p.version,command.role,user.id.value,command.decision,command.reason.trim(),false,command.idempotencyKey,fingerprint)
+        queuePlanningIfReady(command.epicId)
+    }
+
+    private fun queuePlanningIfReady(id: EpicId) {
+        val state=reviewState(id)
+        if (!state.ready) return
+        val s=snapshot(id)
+        try {
+            jdbc.update("""INSERT INTO pf_approved_epic_planning_trigger(epic_id,product_id,content_version,policy_version,status,attempt_count,next_attempt_at,created_at,updated_at)
+                VALUES (?,?,?,?, 'PENDING',0,?,?,?)""",id.value,s.productId.value,s.content,state.policyVersion,clock.instant(),clock.instant(),clock.instant())
+        } catch (_: DuplicateKeyException) {
+            // Exact dezelfde goedgekeurde inhoud is al voor planning aangeboden.
+        }
     }
 
     private fun record(id: EpicId,s: Snapshot,policyVersion: Long,role: ProductMembershipRole,actor: String,decision: ReviewDecision,reason: String,automatic: Boolean,key: String,hash: String=fingerprint(listOf(id,s.content,policyVersion,role,decision))) {

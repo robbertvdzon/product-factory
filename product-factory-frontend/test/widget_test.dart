@@ -396,7 +396,7 @@ void main() {
   });
 
   testWidgets(
-    'productopdracht gebruikt een paginabrede editor met losse harde grenzen',
+    'productopdracht gebruikt een paginabrede editor zonder harde grenzen',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -404,7 +404,6 @@ void main() {
         assignment: const {
           'audience': 'Historisch geïnteresseerden',
           'goal': 'Historische bronnen toegankelijk maken.',
-          'hardBoundaries': ['Eerste grens', 'Tweede grens'],
           'publicGitUrl': 'https://github.com/example/product.git',
           'version': 3,
         },
@@ -427,32 +426,13 @@ void main() {
 
       expect(find.byType(AlertDialog), findsNothing);
       expect(appText('Productopdracht bewerken'), findsOneWidget);
-      expect(find.byKey(const ValueKey('hard-boundary-0')), findsOneWidget);
-      expect(find.byKey(const ValueKey('hard-boundary-1')), findsOneWidget);
-
-      await tester.enterText(
-        find.byKey(const ValueKey('hard-boundary-0')),
-        'Eerste grens\nmet een tweede regel',
-      );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('add-hard-boundary')),
-      );
-      await tester.tap(find.byKey(const ValueKey('add-hard-boundary')));
-      await tester.pump();
-      await tester.enterText(
-        find.byKey(const ValueKey('hard-boundary-2')),
-        'Derde grens',
-      );
+      expect(find.textContaining('Harde grenzen'), findsNothing);
       await tester.ensureVisible(find.byKey(const ValueKey('save-assignment')));
       await tester.tap(find.byKey(const ValueKey('save-assignment')));
       await tester.pumpAndSettle();
 
       expect(gateway.savedAssignment?['expectedVersion'], 3);
-      expect(gateway.savedAssignment?['hardBoundaries'], [
-        'Eerste grens\nmet een tweede regel',
-        'Tweede grens',
-        'Derde grens',
-      ]);
+      expect(gateway.savedAssignment?.containsKey('hardBoundaries'), isFalse);
       expect(appText('Productopdracht en testomgevingen'), findsOneWidget);
     },
   );
@@ -1284,6 +1264,8 @@ class FakeProductGateway implements ProductGateway {
   @override
   Future<void> createProduct(String name, String? requestedId) async {}
   @override
+  Future<void> deleteProduct(String productId) async {}
+  @override
   Future<void> createSignal(String productId, String text) async {}
   @override
   Future<void> reviewSignal(String signalId, int version) async {}
@@ -1300,6 +1282,11 @@ class FakeProductGateway implements ProductGateway {
   Future<void> saveAssignment(
     String productId,
     Map<String, Object?> body,
+  ) async {}
+  @override
+  Future<void> saveGovernance(
+    String productId,
+    Map<String, Object?> policy,
   ) async {}
   @override
   Future<void> saveSchedule(

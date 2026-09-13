@@ -62,7 +62,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
         storyId = StoryId(UUID.randomUUID().toString())
         productCommands.createProduct(CreateProductCommand(productId, "Quality test", actor = STAKEHOLDER, idempotencyKey = "create-${productId.value}"))
         productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
-            productId, "Stakeholders", "Bewijs werkende gebruikerswaarde", listOf("Geen echte persoonsgegevens"),
+            productId, "Stakeholders", "Bewijs werkende gebruikerswaarde",
             "https://github.com/robbertvdzon/hkh-autopilot.git", 0, STAKEHOLDER, "assignment-${productId.value}",
         ))
         productCommands.configureTestableProduct(ConfigureTestableProductCommand(

@@ -219,6 +219,50 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
+  Future<void> _deleteUser(Map<String, Object?> user) async {
+    final email = _value(user['email']);
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gebruiker verwijderen'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'De gebruiker kan niet meer inloggen en verdwijnt uit deze lijst. Historische handelingen blijven als auditbewijs bewaard.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'Typ $email ter bevestiging',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuleren'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              context,
+              controller.text.trim().toLowerCase() == email,
+            ),
+            child: const Text('Verwijderen'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (confirmed == true) {
+      await _mutate(() => _gateway.delete(_value(user['id']), email));
+    }
+  }
+
   Future<void> _mutate(Future<void> Function() action) async {
     setState(() => _busy = true);
     try {
@@ -304,12 +348,22 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     ),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: OutlinedButton.icon(
-                        onPressed: _products.isEmpty
-                            ? null
-                            : () => _grant(user),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Product koppelen'),
+                      child: Wrap(
+                        spacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _products.isEmpty
+                                ? null
+                                : () => _grant(user),
+                            icon: const Icon(Icons.add),
+                            label: const Text('Product koppelen'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => _deleteUser(user),
+                            icon: const Icon(Icons.person_remove_outlined),
+                            label: const Text('Gebruiker verwijderen'),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -362,6 +416,11 @@ class _UserGateway {
     'email': email,
     'idempotencyKey': _key('create-user'),
   });
+  Future<void> delete(String userId, String email) => _send(
+    'DELETE',
+    '/api/admin/users/$userId',
+    {'confirmation': email, 'reason': 'Verwijderd via gebruikersbeheer'},
+  );
   Future<void> grant(
     String userId,
     String productId,

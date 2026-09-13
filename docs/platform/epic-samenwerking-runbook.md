@@ -14,14 +14,15 @@ Een ingetrokken rol verliest meteen toegang; bestaande sessies geven geen blijve
 Via **Productbesturing** kiest factorybeheer menselijke of AI-besturing voor beide rollen.
 De architect legt via **Productafspraken** architectuurregels, product-AI-regels, maandbudget,
 extra jobs per dag, groeigrens en expliciet automatisch toegestane impactcategorieën vast.
-Lege AI-grenzen geven geen onbeperkt mandaat. Een persoon met meerdere rollen wisselt expliciet;
-factorybeheer zelf neemt geen inhoudelijk epicbesluit en wijzigt geen productbudgetten.
+Lege AI-grenzen geven geen onbeperkt mandaat. De factory owner is superuser en kan alle
+productinstellingen, budgetten en PO-/architectbesluiten beheren.
 
 Voor PvdD wordt Marc product owner en Robbert architect. E-mailadressen en repositorygegevens
 worden bij inrichting ingevuld; de implementatie bevat geen hardgecodeerde voorbeeldtoewijzingen.
 Voor autonome producten staan beide besturingsrollen op AI. Binnen het vastgelegde mandaat legt
 de backend automatische beoordelingen vast; buiten het mandaat blijft een verklaarde blokkade.
-Een AI-rol verleent geen impliciete menselijke rechten aan de factory owner.
+De factory owner kan in iedere menselijke productrol handelen; automatische AI-besluiten blijven
+gebonden aan het vastgelegde mandaat.
 
 ## Van idee naar uitvoering
 
@@ -69,10 +70,12 @@ epicverificatie wordt afzonderlijk benoemd. Architect- en PO-notificaties worden
 | `GET /api/epics/{id}/ux-artifacts?name=...` | Alleen een bewaard rasterbeeld van deze epic |
 | `GET /api/epics/{id}/progress` | Implementatie, vragen, blokkades en verificatie |
 | `GET /api/my/notifications` | Meldingen binnen de actuele producttoegang |
+| `DELETE /api/products/{id}` | Product en alle lokale Product Factory-data definitief verwijderen |
+| `DELETE /api/admin/users/{id}` | Gebruiker deactiveren, sessies en lidmaatschappen intrekken |
 
 Mutaties gebruiken sessie, Origin, CSRF, verwachte versie en idempotentiesleutel. Productrollen
-worden bij de backend gecontroleerd. Een directe call naar de oude factory-ownerapproval wordt
-geweigerd. Het algemene oude approvalcommand kan de nieuwe governance niet omzeilen.
+worden bij de backend gecontroleerd. De factory owner mag reviews expliciet als product owner of
+architect vastleggen. Het algemene oude approvalcommand kan de nieuwe governance niet omzeilen.
 
 ## Migratie en herstel
 

@@ -274,7 +274,7 @@ idempotent opnieuw worden geprobeerd. Een tweede klik maakt geen tweede voorstel
 
 Product Factory stelt de taakinput samen uit vertrouwde gegevens en bevriest de gebruikte versies:
 
-- `ProductAssignment`: doelgroep, productdoel, harde grenzen en Git-URL;
+- `ProductAssignment`: doelgroep, productdoel en Git-URL;
 - geldige `Decision`s;
 - relevante epics, stories, bugs, verificaties en gebruikerssignalen;
 - het actuele geheugen van uitsluitend `PRODUCT_ADVISOR` voor dit product;
@@ -397,9 +397,9 @@ Beide personen kunnen de epic met een verplichte vrije tekstreden terugsturen na
 `NEEDS_REFINEMENT`. Productontwerp maakt daarna een nieuwe epicversie. Alle goedkeuringen horen bij
 de oude versie en gelden niet voor de nieuwe versie.
 
-Een factory owner kan de product owner-goedkeuring niet stilzwijgend invullen. Voor een product
-waar Robbert beide rollen vervult, zijn het nog steeds twee expliciete acties of wordt per product
-bewust een ander goedkeuringsbeleid ingesteld.
+Dit beschrijft de oorspronkelijke Product Advisor-keten. Stap 11 vervangt haar door
+product-owner- en architectreviews; de factory owner kan sindsdien beide rollen als superuser
+expliciet uitvoeren.
 
 Na de tweede goedkeuring wordt de epic `AVAILABLE`. De bestaande Productplanning-sessie kan hem
 claimen, in stories verdelen en via de bestaande dispatcher naar Software Factory sturen.

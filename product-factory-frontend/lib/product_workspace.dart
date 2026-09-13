@@ -296,6 +296,7 @@ class ProductWorkspaceData {
   const ProductWorkspaceData({
     required this.product,
     required this.assignment,
+    this.governance = const {},
     required this.testConfiguration,
     required this.schedules,
     this.scheduleRuns = const [],
@@ -325,6 +326,7 @@ class ProductWorkspaceData {
   });
   final ProductSummary product;
   final Map<String, Object?>? assignment;
+  final Map<String, Object?> governance;
   final Map<String, Object?>? testConfiguration;
   final List<Map<String, Object?>> schedules;
   final List<Map<String, Object?>> scheduleRuns;
@@ -382,6 +384,7 @@ String _fingerprintWorkspace(ProductWorkspaceData data) => jsonEncode({
     'epicApprovalMode': data.product.epicApprovalMode,
   },
   'assignment': data.assignment,
+  'governance': data.governance,
   'testConfiguration': data.testConfiguration,
   'schedules': data.schedules,
   'signals': data.signals,
@@ -422,10 +425,12 @@ abstract interface class ProductGateway {
     bool excludeNoOps = true,
   });
   Future<void> createProduct(String name, String? requestedId);
+  Future<void> deleteProduct(String productId);
   Future<void> setStatus(ProductSummary product, String status);
   Future<void> setDispatching(ProductSummary product, bool enabled);
   Future<void> setEpicApprovalMode(ProductSummary product, String mode);
   Future<void> saveAssignment(String productId, Map<String, Object?> body);
+  Future<void> saveGovernance(String productId, Map<String, Object?> policy);
   Future<void> saveTestConfiguration(
     String productId,
     Map<String, Object?> body,
@@ -564,6 +569,7 @@ class HttpProductGateway implements ProductGateway {
       ProductWorkspaceSection.settings => const {
         'testConfiguration',
         'schedules',
+        'governance',
       },
       ProductWorkspaceSection.operation => const {'deliveryAttempts'},
     },
@@ -578,6 +584,7 @@ class HttpProductGateway implements ProductGateway {
     final wanted = _endpointsFor(section);
     final loaders = <String, Future<Object?> Function()>{
       'assignment': () => _optional('/api/products/$id/assignment'),
+      'governance': () => _get('/api/products/$id/governance'),
       'testConfiguration': () =>
           _optional('/api/products/$id/test-configuration'),
       'schedules': () => _get('/api/products/$id/schedules'),
@@ -642,6 +649,7 @@ class HttpProductGateway implements ProductGateway {
     return ProductWorkspaceData(
       product: product,
       assignment: map('assignment'),
+      governance: map('governance') ?? const {},
       testConfiguration: map('testConfiguration'),
       schedules: list('schedules'),
       signals: list('signals'),
@@ -718,6 +726,9 @@ class HttpProductGateway implements ProductGateway {
         'idempotencyKey': _key('product'),
       });
   @override
+  Future<void> deleteProduct(String productId) =>
+      _send('DELETE', '/api/products/$productId', {'confirmation': productId});
+  @override
   Future<void> setStatus(ProductSummary product, String status) =>
       _send('PATCH', '/api/products/${product.id}/status', {
         'status': status,
@@ -743,6 +754,12 @@ class HttpProductGateway implements ProductGateway {
       _send('PUT', '/api/products/$productId/assignment', {
         ...body,
         'idempotencyKey': _key('assignment'),
+      });
+  @override
+  Future<void> saveGovernance(String productId, Map<String, Object?> policy) =>
+      _send('PUT', '/api/products/$productId/governance', {
+        'policy': policy,
+        'idempotencyKey': _key('governance'),
       });
   @override
   Future<void> saveTestConfiguration(
@@ -1282,12 +1299,14 @@ const Map<String, List<String>> _softwareFactoryModelsBySupplier = {
 class _AssignmentEditor extends StatefulWidget {
   const _AssignmentEditor({
     required this.assignment,
+    required this.canEditTechnical,
     required this.onCancel,
     required this.onSave,
     super.key,
   });
 
   final Map<String, Object?>? assignment;
+  final bool canEditTechnical;
   final VoidCallback onCancel;
   final Future<bool> Function(Map<String, Object?> values) onSave;
 
@@ -1299,7 +1318,6 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
   late final TextEditingController _audience;
   late final TextEditingController _goal;
   late final TextEditingController _git;
-  late final List<TextEditingController> _boundaries;
   bool _saving = false;
   String? _validationError;
   String? _aiSupplier;
@@ -1312,10 +1330,6 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
     _audience = TextEditingController(text: _value(assignment?['audience']));
     _goal = TextEditingController(text: _value(assignment?['goal']));
     _git = TextEditingController(text: _value(assignment?['publicGitUrl']));
-    _boundaries = (assignment?['hardBoundaries'] as List? ?? const [])
-        .map((boundary) => TextEditingController(text: boundary.toString()))
-        .toList();
-    if (_boundaries.isEmpty) _boundaries.add(TextEditingController());
     _aiSupplier = assignment?['aiSupplier'] as String?;
     _aiModel = assignment?['aiModel'] as String?;
   }
@@ -1325,38 +1339,17 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
     _audience.dispose();
     _goal.dispose();
     _git.dispose();
-    for (final boundary in _boundaries) {
-      boundary.dispose();
-    }
     super.dispose();
   }
 
-  void _addBoundary() {
-    setState(() {
-      _boundaries.add(TextEditingController());
-      _validationError = null;
-    });
-  }
-
-  void _removeBoundary(int index) {
-    if (_boundaries.length == 1) return;
-    final removed = _boundaries.removeAt(index);
-    removed.dispose();
-    setState(() => _validationError = null);
-  }
-
   Future<void> _save() async {
-    final boundaries = _boundaries
-        .map((controller) => controller.text.trim())
-        .where((boundary) => boundary.isNotEmpty)
-        .toList();
     if (_audience.text.trim().isEmpty ||
         _goal.text.trim().isEmpty ||
-        _git.text.trim().isEmpty ||
-        boundaries.isEmpty) {
+        (widget.canEditTechnical && _git.text.trim().isEmpty)) {
       setState(
-        () => _validationError =
-            'Vul doelgroep, productdoel, minimaal één harde grens en de Git-URL in.',
+        () => _validationError = widget.canEditTechnical
+            ? 'Vul doelgroep, productdoel en de Git-URL in.'
+            : 'Vul doelgroep en productdoel in.',
       );
       return;
     }
@@ -1367,7 +1360,6 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
     final saved = await widget.onSave({
       'audience': _audience.text.trim(),
       'goal': _goal.text.trim(),
-      'hardBoundaries': boundaries,
       'publicGitUrl': _git.text.trim(),
       'aiSupplier': _aiSupplier,
       'aiModel': _aiModel,
@@ -1379,9 +1371,7 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const SelectableText(
-        'Werk de productopdracht hier op volledige paginabreedte bij. Iedere harde grens is één zelfstandig item en mag meerdere regels tekst bevatten.',
-      ),
+      const SelectableText('Werk de doelgroep en het productdoel bij.'),
       const SizedBox(height: 20),
       TextField(
         key: const ValueKey('assignment-audience'),
@@ -1397,130 +1387,60 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
         keyboardType: TextInputType.multiline,
         decoration: const InputDecoration(labelText: 'Productdoel'),
       ),
-      const SizedBox(height: 24),
-      Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 16,
-        runSpacing: 8,
-        children: [
-          SelectableText(
-            'Harde grenzen',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          OutlinedButton.icon(
-            key: const ValueKey('add-hard-boundary'),
-            onPressed: _saving ? null : _addBoundary,
-            icon: const Icon(Icons.add),
-            label: const Text('Grens toevoegen'),
-          ),
-        ],
-      ),
-      const SizedBox(height: 6),
-      const SelectableText(
-        'Gebruik een nieuwe grens voor een afzonderlijke, niet-onderhandelbare regel. Regeleinden binnen een grens blijven behouden.',
-      ),
-      const SizedBox(height: 12),
-      for (var index = 0; index < _boundaries.length; index++) ...[
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 16),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: SelectableText(
-                      'Grens ${index + 1}',
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                  ),
-                  IconButton(
-                    key: ValueKey('remove-hard-boundary-$index'),
-                    tooltip: 'Grens ${index + 1} verwijderen',
-                    onPressed: _saving || _boundaries.length == 1
-                        ? null
-                        : () => _removeBoundary(index),
-                    icon: const Icon(Icons.delete_outline),
-                  ),
-                ],
-              ),
-              TextField(
-                key: ValueKey('hard-boundary-$index'),
-                controller: _boundaries[index],
-                minLines: 2,
-                maxLines: 8,
-                keyboardType: TextInputType.multiline,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  labelText: 'Niet-onderhandelbare regel',
-                  alignLabelWithHint: true,
-                ),
-              ),
-            ],
-          ),
+      if (widget.canEditTechnical) ...[
+        const SizedBox(height: 24),
+        TextField(
+          key: const ValueKey('assignment-git-url'),
+          controller: _git,
+          decoration: const InputDecoration(labelText: 'Publieke Git-URL'),
+        ),
+        const SizedBox(height: 24),
+        SelectableText(
+          'AI voor Software Factory',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 6),
+        const SelectableText(
+          'Standaard laat Software Factory zelf de supplier/model kiezen (Claude, Opus 5). Kies hier expliciet een andere combinatie voor dit product.',
         ),
         const SizedBox(height: 12),
+        DropdownButtonFormField<String?>(
+          key: const ValueKey('assignment-ai-supplier'),
+          initialValue: _aiSupplier,
+          decoration: const InputDecoration(labelText: 'AI-supplier'),
+          items: [
+            const DropdownMenuItem(
+              value: null,
+              child: Text('Standaard van Software Factory'),
+            ),
+            for (final supplier in _softwareFactoryModelsBySupplier.keys)
+              DropdownMenuItem(value: supplier, child: Text(supplier)),
+          ],
+          onChanged: (value) => setState(() {
+            _aiSupplier = value;
+            _aiModel = null;
+          }),
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String?>(
+          key: const ValueKey('assignment-ai-model'),
+          initialValue: _aiModel,
+          decoration: const InputDecoration(labelText: 'AI-model'),
+          items: [
+            const DropdownMenuItem(
+              value: null,
+              child: Text('Standaard van Software Factory'),
+            ),
+            for (final model
+                in _softwareFactoryModelsBySupplier[_aiSupplier] ??
+                    const <String>[])
+              DropdownMenuItem(value: model, child: Text(model)),
+          ],
+          onChanged: _aiSupplier == null
+              ? null
+              : (value) => setState(() => _aiModel = value),
+        ),
       ],
-      const SizedBox(height: 8),
-      TextField(
-        key: const ValueKey('assignment-git-url'),
-        controller: _git,
-        decoration: const InputDecoration(labelText: 'Publieke Git-URL'),
-      ),
-      const SizedBox(height: 24),
-      SelectableText(
-        'AI voor Software Factory',
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
-      const SizedBox(height: 6),
-      const SelectableText(
-        'Standaard laat Software Factory zelf de supplier/model kiezen (Claude, Opus 5). Kies hier expliciet een andere combinatie voor dit product.',
-      ),
-      const SizedBox(height: 12),
-      DropdownButtonFormField<String?>(
-        key: const ValueKey('assignment-ai-supplier'),
-        initialValue: _aiSupplier,
-        decoration: const InputDecoration(labelText: 'AI-supplier'),
-        items: [
-          const DropdownMenuItem(
-            value: null,
-            child: Text('Standaard van Software Factory'),
-          ),
-          for (final supplier in _softwareFactoryModelsBySupplier.keys)
-            DropdownMenuItem(value: supplier, child: Text(supplier)),
-        ],
-        onChanged: (value) => setState(() {
-          _aiSupplier = value;
-          _aiModel = null;
-        }),
-      ),
-      const SizedBox(height: 16),
-      DropdownButtonFormField<String?>(
-        key: const ValueKey('assignment-ai-model'),
-        initialValue: _aiModel,
-        decoration: const InputDecoration(labelText: 'AI-model'),
-        items: [
-          const DropdownMenuItem(
-            value: null,
-            child: Text('Standaard van Software Factory'),
-          ),
-          for (final model
-              in _softwareFactoryModelsBySupplier[_aiSupplier] ??
-                  const <String>[])
-            DropdownMenuItem(value: model, child: Text(model)),
-        ],
-        onChanged: _aiSupplier == null
-            ? null
-            : (value) => setState(() => _aiModel = value),
-      ),
       if (_validationError != null) ...[
         const SizedBox(height: 12),
         SelectableText(
@@ -1557,6 +1477,401 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
   );
 }
 
+class _EnvironmentDraft {
+  _EnvironmentDraft(Map<String, Object?>? value, String fallbackName)
+    : name = TextEditingController(
+        text: _value(value?['name']).isEmpty
+            ? fallbackName
+            : _value(value?['name']),
+      ),
+      baseUrl = TextEditingController(text: _value(value?['baseUrl'])),
+      revisionEndpoint = TextEditingController(
+        text: _value(value?['revisionEndpoint']).isEmpty
+            ? '/api/version'
+            : _value(value?['revisionEndpoint']),
+      ),
+      revisionJsonPath = TextEditingController(
+        text: _value(value?['revisionJsonPath']).isEmpty
+            ? 'commit'
+            : _value(value?['revisionJsonPath']),
+      ),
+      routes = TextEditingController(
+        text: (value?['allowedRoutes'] as List? ?? const ['/', '/api/version'])
+            .join('\n'),
+      ),
+      data = TextEditingController(
+        text: (value?['dataBoundaries'] as List? ?? const []).join('\n'),
+      ),
+      access = TextEditingController(
+        text: (value?['accessBoundaries'] as List? ?? const []).join('\n'),
+      );
+
+  final TextEditingController name,
+      baseUrl,
+      revisionEndpoint,
+      revisionJsonPath,
+      routes,
+      data,
+      access;
+  List<String> lines(TextEditingController controller) => controller.text
+      .split('\n')
+      .map((v) => v.trim())
+      .where((v) => v.isNotEmpty)
+      .toList();
+  Map<String, Object?> toJson() => {
+    'name': name.text.trim(),
+    'baseUrl': baseUrl.text.trim(),
+    'allowedRoutes': lines(routes),
+    'revisionEndpoint': revisionEndpoint.text.trim(),
+    'revisionJsonPath': revisionJsonPath.text.trim(),
+    'dataBoundaries': lines(data),
+    'accessBoundaries': lines(access),
+  };
+  void dispose() {
+    for (final c in [
+      name,
+      baseUrl,
+      revisionEndpoint,
+      revisionJsonPath,
+      routes,
+      data,
+      access,
+    ]) {
+      c.dispose();
+    }
+  }
+}
+
+class _TestConfigurationDialog extends StatefulWidget {
+  const _TestConfigurationDialog({required this.configuration});
+  final Map<String, Object?>? configuration;
+  @override
+  State<_TestConfigurationDialog> createState() =>
+      _TestConfigurationDialogState();
+}
+
+class _TestConfigurationDialogState extends State<_TestConfigurationDialog> {
+  late final _EnvironmentDraft acceptance;
+  late final _EnvironmentDraft production;
+  late bool hasProduction;
+  String? error;
+  @override
+  void initState() {
+    super.initState();
+    acceptance = _EnvironmentDraft(
+      (widget.configuration?['acceptance'] as Map?)?.cast<String, Object?>(),
+      'Acceptatie',
+    );
+    final rawProduction = (widget.configuration?['production'] as Map?)
+        ?.cast<String, Object?>();
+    production = _EnvironmentDraft(rawProduction, 'Productie');
+    hasProduction = rawProduction != null;
+  }
+
+  @override
+  void dispose() {
+    acceptance.dispose();
+    production.dispose();
+    super.dispose();
+  }
+
+  Widget environment(String title, _EnvironmentDraft draft) => ExpansionTile(
+    initiallyExpanded: title == 'Acceptatie',
+    tilePadding: EdgeInsets.zero,
+    title: Text(title),
+    children: [
+      TextField(
+        controller: draft.name,
+        decoration: const InputDecoration(labelText: 'Naam'),
+      ),
+      const SizedBox(height: 10),
+      TextField(
+        controller: draft.baseUrl,
+        decoration: const InputDecoration(labelText: 'Basis-URL (HTTPS)'),
+      ),
+      const SizedBox(height: 10),
+      TextField(
+        controller: draft.revisionEndpoint,
+        decoration: const InputDecoration(labelText: 'Revision-endpoint'),
+      ),
+      const SizedBox(height: 10),
+      TextField(
+        controller: draft.revisionJsonPath,
+        decoration: const InputDecoration(labelText: 'Revision JSON-pad'),
+      ),
+      const SizedBox(height: 10),
+      TextField(
+        controller: draft.routes,
+        minLines: 2,
+        maxLines: 6,
+        decoration: const InputDecoration(
+          labelText: 'Toegestane routes · één per regel',
+        ),
+      ),
+      const SizedBox(height: 10),
+      TextField(
+        controller: draft.data,
+        minLines: 2,
+        maxLines: 6,
+        decoration: const InputDecoration(
+          labelText: 'Data-afspraken · één per regel',
+        ),
+      ),
+      const SizedBox(height: 10),
+      TextField(
+        controller: draft.access,
+        minLines: 2,
+        maxLines: 6,
+        decoration: const InputDecoration(
+          labelText: 'Toegangsafspraken · één per regel',
+        ),
+      ),
+      const SizedBox(height: 12),
+    ],
+  );
+  void submit() {
+    if (acceptance.baseUrl.text.trim().isEmpty ||
+        acceptance.revisionEndpoint.text.trim().isEmpty ||
+        acceptance.revisionJsonPath.text.trim().isEmpty ||
+        acceptance.lines(acceptance.routes).isEmpty ||
+        (hasProduction &&
+            (production.baseUrl.text.trim().isEmpty ||
+                production.lines(production.routes).isEmpty))) {
+      setState(
+        () => error =
+            'Vul voor iedere omgeving de URL, revisionvelden en minimaal één toegestane route in.',
+      );
+      return;
+    }
+    Navigator.pop(context, <String, Object?>{
+      'acceptance': acceptance.toJson(),
+      if (hasProduction) 'production': production.toJson(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Testomgevingen beheren'),
+    content: SizedBox(
+      width: 720,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            environment('Acceptatie', acceptance),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Productieomgeving instellen'),
+              value: hasProduction,
+              onChanged: (v) => setState(() => hasProduction = v),
+            ),
+            if (hasProduction) environment('Productie', production),
+            if (error != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuleren'),
+      ),
+      FilledButton(onPressed: submit, child: const Text('Opslaan')),
+    ],
+  );
+}
+
+class _GovernanceSettingsDialog extends StatefulWidget {
+  const _GovernanceSettingsDialog({
+    required this.policy,
+    required this.canEditModes,
+  });
+  final Map<String, Object?> policy;
+  final bool canEditModes;
+  @override
+  State<_GovernanceSettingsDialog> createState() =>
+      _GovernanceSettingsDialogState();
+}
+
+class _GovernanceSettingsDialogState extends State<_GovernanceSettingsDialog> {
+  late String poMode = _value(widget.policy['productOwnerMode']).isEmpty
+      ? 'HUMAN'
+      : _value(widget.policy['productOwnerMode']);
+  late String architectMode = _value(widget.policy['architectMode']).isEmpty
+      ? 'HUMAN'
+      : _value(widget.policy['architectMode']);
+  late final architecture = TextEditingController(
+    text: _value(widget.policy['architectureRules']),
+  );
+  late final productAi = TextEditingController(
+    text: _value(widget.policy['productAiRules']),
+  );
+  late final jobs = TextEditingController(
+    text: _value(widget.policy['maximumAdditionalJobsPerDay']),
+  );
+  late final budget = TextEditingController(
+    text: _value(widget.policy['monthlyProductBudgetEuro']),
+  );
+  late final growth = TextEditingController(
+    text: _value(widget.policy['maximumGrowthPercent']),
+  );
+  late final categories =
+      (widget.policy['automaticCategories'] as List? ?? const [])
+          .map((v) => '$v')
+          .toSet();
+  @override
+  void dispose() {
+    for (final c in [architecture, productAi, jobs, budget, growth]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Productbesturing en afspraken'),
+    content: SizedBox(
+      width: 720,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: poMode,
+              decoration: const InputDecoration(labelText: 'Product owner'),
+              items: const [
+                DropdownMenuItem(
+                  value: 'HUMAN',
+                  child: Text('Mens met AI-ondersteuning'),
+                ),
+                DropdownMenuItem(value: 'AI', child: Text('Automatisch')),
+              ],
+              onChanged: widget.canEditModes
+                  ? (v) => setState(() => poMode = v!)
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: architectMode,
+              decoration: const InputDecoration(labelText: 'Architect'),
+              items: const [
+                DropdownMenuItem(
+                  value: 'HUMAN',
+                  child: Text('Mens beoordeelt impact'),
+                ),
+                DropdownMenuItem(
+                  value: 'AI',
+                  child: Text('Automatisch binnen afspraken'),
+                ),
+              ],
+              onChanged: widget.canEditModes
+                  ? (v) => setState(() => architectMode = v!)
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: architecture,
+              minLines: 3,
+              maxLines: 8,
+              decoration: const InputDecoration(
+                labelText: 'Architectuurafspraken',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: productAi,
+              minLines: 3,
+              maxLines: 8,
+              decoration: const InputDecoration(
+                labelText: 'AI-gebruik van het product',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: jobs,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Maximale extra AI-jobs per dag',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: budget,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Productbudget per maand (€)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: growth,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Maximale groei AI-gebruik (%)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Automatisch toegestaan bij materiële impact'),
+            ),
+            for (final entry in const {
+              'DATABASE': 'Database',
+              'MIGRATION': 'Migratie',
+              'EXTERNAL_SYSTEM': 'Externe koppeling',
+              'FRONTEND': 'Frontend',
+              'ACCESS': 'Toegang',
+              'PRODUCT_AI': 'Product-AI',
+              'INFRASTRUCTURE': 'Infrastructuur',
+            }.entries)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(entry.value),
+                value: categories.contains(entry.key),
+                onChanged: (v) => setState(() {
+                  if (v == true) {
+                    categories.add(entry.key);
+                  } else {
+                    categories.remove(entry.key);
+                  }
+                }),
+              ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuleren'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, <String, Object?>{
+          ...widget.policy,
+          'productOwnerMode': poMode,
+          'architectMode': architectMode,
+          'architectureRules': architecture.text.trim(),
+          'productAiRules': productAi.text.trim(),
+          'maximumAdditionalJobsPerDay': int.tryParse(jobs.text.trim()),
+          'monthlyProductBudgetEuro': budget.text.trim().isEmpty
+              ? null
+              : budget.text.trim(),
+          'maximumGrowthPercent': int.tryParse(growth.text.trim()),
+          'automaticCategories': categories.toList(),
+        }),
+        child: const Text('Opslaan'),
+      ),
+    ],
+  );
+}
+
 class ProductWorkspacePage extends StatefulWidget {
   const ProductWorkspacePage({
     required this.gateway,
@@ -1566,6 +1881,7 @@ class ProductWorkspacePage extends StatefulWidget {
     this.onProductSelected,
     this.refreshController,
     this.isFactoryOwner = true,
+    this.actingRole = 'FACTORY_OWNER',
     this.productMemberships = const {},
     super.key,
   });
@@ -1576,6 +1892,7 @@ class ProductWorkspacePage extends StatefulWidget {
   final ValueChanged<String>? onProductSelected;
   final PageRefreshController? refreshController;
   final bool isFactoryOwner;
+  final String actingRole;
   final Set<String> productMemberships;
   @override
   State<ProductWorkspacePage> createState() => _ProductWorkspacePageState();
@@ -1899,11 +2216,15 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     ProductWorkspaceSection.settings => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _productControls(data),
-        const SizedBox(height: 20),
+        if (widget.isFactoryOwner) ...[
+          _productControls(data),
+          const SizedBox(height: 20),
+        ],
         _assignment(data),
         const SizedBox(height: 20),
-        _schedules(data),
+        _governance(data),
+        const SizedBox(height: 20),
+        if (widget.isFactoryOwner) _schedules(data),
         if (widget.trailingContent != null) ...[
           const SizedBox(height: 20),
           widget.trailingContent!,
@@ -2399,10 +2720,55 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             avatar: Icon(Icons.auto_awesome_outlined),
             label: Text('Ontwerp, planning en kwaliteit actief'),
           ),
+          OutlinedButton.icon(
+            onPressed: () => _deleteProduct(data),
+            icon: const Icon(Icons.delete_forever_outlined),
+            label: const Text('Product verwijderen'),
+          ),
         ],
       ),
     ),
   );
+
+  Widget _governance(ProductWorkspaceData data) {
+    final policy = data.governance;
+    final categories = (policy['automaticCategories'] as List? ?? const [])
+        .join(', ');
+    return _section(
+      'Productbesturing en productafspraken',
+      Icons.rule_outlined,
+      [
+        SelectableText(
+          'Product owner: ${_value(policy['productOwnerMode']).isEmpty ? 'HUMAN' : policy['productOwnerMode']}',
+        ),
+        SelectableText(
+          'Architect: ${_value(policy['architectMode']).isEmpty ? 'HUMAN' : policy['architectMode']}',
+        ),
+        const SizedBox(height: 10),
+        SelectableText(
+          'Architectuurafspraken:\n${_value(policy['architectureRules']).isEmpty ? 'Nog niet vastgelegd.' : policy['architectureRules']}',
+        ),
+        const SizedBox(height: 10),
+        SelectableText(
+          'AI-gebruik van het product:\n${_value(policy['productAiRules']).isEmpty ? 'Nog niet vastgelegd.' : policy['productAiRules']}',
+        ),
+        const SizedBox(height: 10),
+        SelectableText(
+          'Extra AI-jobs per dag: ${policy['maximumAdditionalJobsPerDay'] ?? 'geen limiet'} · maandbudget: ${policy['monthlyProductBudgetEuro'] ?? 'geen limiet'} · maximale groei: ${policy['maximumGrowthPercent'] ?? 'geen limiet'}%',
+        ),
+        SelectableText(
+          'Automatische impactcategorieën: ${categories.isEmpty ? 'geen' : categories}',
+        ),
+      ],
+      action: TextButton.icon(
+        onPressed: widget.isFactoryOwner || widget.actingRole == 'ARCHITECT'
+            ? () => _editGovernance(data)
+            : null,
+        icon: const Icon(Icons.edit_outlined),
+        label: const Text('Alles bewerken'),
+      ),
+    );
+  }
 
   Widget _operation(ProductWorkspaceData data) =>
       _section('Operatie', Icons.monitor_heart_outlined, [
@@ -3745,9 +4111,6 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   Widget _assignment(ProductWorkspaceData data) {
     final a = data.assignment;
     final t = data.testConfiguration;
-    final hardBoundaries = (a?['hardBoundaries'] as List? ?? const [])
-        .map((boundary) => boundary.toString())
-        .toList();
     return _section(
       _editingAssignment
           ? 'Productopdracht bewerken'
@@ -3758,6 +4121,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           _AssignmentEditor(
             key: ValueKey('assignment-editor-${data.product.id}'),
             assignment: a,
+            canEditTechnical: widget.isFactoryOwner,
             onCancel: () => setState(() => _editingAssignment = false),
             onSave: (values) => _saveAssignment(data, values),
           )
@@ -3767,29 +4131,6 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           SelectableText('Doelgroep: ${a['audience']}'),
           SelectableText('Doel: ${a['goal']}'),
           const SizedBox(height: 8),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            title: SelectableText(
-              '${hardBoundaries.length} harde ${hardBoundaries.length == 1 ? 'grens' : 'grenzen'}',
-            ),
-            children: [
-              for (var index = 0; index < hardBoundaries.length; index++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 28,
-                        child: SelectableText('${index + 1}.'),
-                      ),
-                      Expanded(child: SelectableText(hardBoundaries[index])),
-                    ],
-                  ),
-                ),
-            ],
-          ),
           SelectableText('Git: ${a['publicGitUrl']}'),
           SelectableText('Versie ${a['version']}'),
         ],
@@ -3797,7 +4138,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: () => setState(() => _editingAssignment = true),
+              onPressed:
+                  widget.isFactoryOwner || widget.actingRole == 'PRODUCT_OWNER'
+                  ? () => setState(() => _editingAssignment = true)
+                  : null,
               icon: const Icon(Icons.edit),
               label: const Text('Opdracht bewerken'),
             ),
@@ -3822,7 +4166,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: () => _editTestConfiguration(data),
+              onPressed:
+                  widget.isFactoryOwner || widget.actingRole == 'ARCHITECT'
+                  ? () => _editTestConfiguration(data)
+                  : null,
               icon: const Icon(Icons.settings_outlined),
               label: const Text('Omgevingen beheren'),
             ),
@@ -4207,7 +4554,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     ProductWorkspaceData data,
   ) => _section('Instellingen · Automatisering', Icons.schedule_outlined, [
     const SelectableText(
-      'Ieder proces heeft een eigen ritme. Uitgeschakeld betekent alleen dat het niet automatisch start; Nu starten blijft beschikbaar.',
+      'Ieder proces heeft een eigen controleritme. Een definitief goedgekeurde epic start planning direct, ook als het planningsschema uitstaat.',
     ),
     const SizedBox(height: 8),
     ...data.schedules.map((s) {
@@ -4363,43 +4710,42 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     return saved;
   }
 
-  Future<void> _editTestConfiguration(ProductWorkspaceData data) async {
-    final t = data.testConfiguration;
-    final acceptance = (t?['acceptance'] as Map?)?.cast<String, Object?>();
-    final production = (t?['production'] as Map?)?.cast<String, Object?>();
-    final acceptanceUrl = TextEditingController(
-      text: _value(acceptance?['baseUrl']),
-    );
-    final productionUrl = TextEditingController(
-      text: _value(production?['baseUrl']),
-    );
-    final ok = await showDialog<bool>(
+  Future<void> _editGovernance(ProductWorkspaceData data) async {
+    final policy = await showDialog<Map<String, Object?>>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const SelectableText('Testomgevingen beheren'),
-        content: SizedBox(
-          width: 560,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: acceptanceUrl,
-                decoration: const InputDecoration(
-                  labelText: 'Acceptatie-URL (HTTPS)',
-                ),
+      builder: (_) => _GovernanceSettingsDialog(
+        policy: data.governance,
+        canEditModes: widget.isFactoryOwner,
+      ),
+    );
+    if (policy != null) {
+      await _mutate(
+        () => widget.gateway.saveGovernance(data.product.id, policy),
+      );
+    }
+  }
+
+  Future<void> _deleteProduct(ProductWorkspaceData data) async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Product definitief verwijderen'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Alle lokale epics, stories, gesprekken, runs en instellingen verdwijnen. Werk dat al naar Software Factory is gestuurd blijft daar bestaan.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'Typ ${data.product.id} ter bevestiging',
               ),
-              TextField(
-                controller: productionUrl,
-                decoration: const InputDecoration(
-                  labelText: 'Productie-URL (optioneel)',
-                ),
-              ),
-              const SizedBox(height: 8),
-              const SelectableText(
-                'Veilige routes: / en /api/version · revision JSON-pad: commit',
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -4407,27 +4753,31 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             child: const Text('Annuleren'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Opslaan'),
+            onPressed: () => Navigator.pop(
+              context,
+              controller.text.trim() == data.product.id,
+            ),
+            child: const Text('Definitief verwijderen'),
           ),
         ],
       ),
     );
-    if (ok == true) {
-      Map<String, Object?> environment(String name, String url) => {
-        'name': name,
-        'baseUrl': url,
-        'allowedRoutes': ['/', '/api/version'],
-        'revisionEndpoint': '/api/version',
-        'revisionJsonPath': 'commit',
-        'dataBoundaries': ['Geen productiegegevens wijzigen'],
-        'accessBoundaries': ['Alleen geautoriseerde browsertests'],
-      };
+    controller.dispose();
+    if (confirmed == true) {
+      await _mutate(() => widget.gateway.deleteProduct(data.product.id));
+    }
+  }
+
+  Future<void> _editTestConfiguration(ProductWorkspaceData data) async {
+    final t = data.testConfiguration;
+    final values = await showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (_) => _TestConfigurationDialog(configuration: t),
+    );
+    if (values != null) {
       await _mutate(
         () => widget.gateway.saveTestConfiguration(data.product.id, {
-          'acceptance': environment('Acceptatie', acceptanceUrl.text),
-          if (productionUrl.text.trim().isNotEmpty)
-            'production': environment('Productie', productionUrl.text),
+          ...values,
           'expectedVersion': (t?['version'] as num?)?.toInt() ?? 0,
         }),
       );

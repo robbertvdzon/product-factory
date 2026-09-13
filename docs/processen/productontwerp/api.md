@@ -85,7 +85,7 @@ Productontwerp-implementatie.
 
 | Contract | Eigenaar | Gebruik |
 |---|---|---|
-| `ProductAssignmentDetails` | productmodule | doelgroep, productdoel, harde grenzen en publieke Git-URL van het product |
+| `ProductAssignmentDetails` | productmodule | doelgroep, productdoel en publieke Git-URL van het product |
 | `DecisionDto` | Besluitenregister-query voor het huidige tijdstip | grote, blijvende Stakeholder- en Factorybesluiten die het ontwerp begrenzen |
 | `UserSignalDetails` | productmodule | oorspronkelijke feedback plus actuele status, uitkomst en resultaatkoppelingen |
 | `StakeholderQuestionDetails` | product-/overlegmodule | open vragen en beantwoorde vragen die door precies de uitgevoerde ontwerp-rol zijn gesteld |
@@ -338,8 +338,11 @@ De aanvullende publieke contracten staan in `GovernanceContract.kt`. Product beh
 geversioneerde besturingsrollen en architectafspraken; Productontwerp beheert impact,
 inhoudsversies en reviewhistorie. Menselijk akkoord vereist een actief productlidmaatschap
 in de handelende rol. Automatisch akkoord vereist geldige onderbouwde inhoud en mandaat.
-De factory owner is geen inhoudelijk epicgoedkeurder.
+De factory owner is superuser en kan zowel de product-owner- als architectbeoordeling uitvoeren.
 
 Planningclaim en nieuwe dispatch toetsen inhoudsversie en actuele beleidsversie. Statusovergangen
 behouden inhoudelijke goedkeuringen; nieuwe inhoud of nieuw beleid vereist herbeoordeling.
+Zodra beide vereiste beoordelingen geldig zijn, wordt een duurzame plannertrigger geschreven.
+De planner pakt die trigger direct op, ook als het productschema uitstaat; het schema blijft bestaan
+voor periodiek inhaalwerk. Een lopende planningssessie laat de trigger wachten tot een volgende poging.
 Zie [het runbook](../../platform/epic-samenwerking-runbook.md) voor endpoints en legacy-migratie.

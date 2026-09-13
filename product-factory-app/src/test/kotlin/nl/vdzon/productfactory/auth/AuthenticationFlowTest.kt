@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.auth
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.http.Cookie
+import nl.vdzon.productfactory.api.advisor.MembershipStatus
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -16,6 +17,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
@@ -373,6 +375,45 @@ class AuthenticationFlowTest(
         mockMvc.post("/api/auth/google") {
             header(HttpHeaders.ORIGIN,FRONTEND_ORIGIN);contentType=MediaType.APPLICATION_JSON;content="""{"idToken":"invited-token"}"""
         }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `factory owner verwijdert gebruiker en alle actieve toegang`() {
+        val factoryLogin = login()
+        val factory = userIdentities.findByEmail("stakeholder@example.com")!!
+        val suffix = java.util.UUID.randomUUID().toString().take(8)
+        val email = "remove-$suffix@example.test"
+        val productId = nl.vdzon.productfactory.api.shared.ProductId("remove-$suffix")
+        val target = userIdentities.createForAdministration(email, "invite-remove-$suffix")
+        val token = objectMapper.readTree(factoryLogin.contentAsByteArray).path("csrfToken").asText()
+        mockMvc.post("/api/products") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(
+                cookie(factoryLogin, ProductFactorySessionService.SESSION_COOKIE),
+                cookie(factoryLogin, ProductFactorySessionService.CSRF_COOKIE),
+            )
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"requestedId":"${productId.value}","name":"Verwijdertest","idempotencyKey":"create-remove-$suffix"}"""
+        }.andExpect { status { isCreated() } }
+        userIdentities.grantProductOwner(target.id, productId, factory.id, 0, "grant-remove-$suffix")
+
+        mockMvc.delete("/api/admin/users/${target.id.value}") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(
+                cookie(factoryLogin, ProductFactorySessionService.SESSION_COOKIE),
+                cookie(factoryLogin, ProductFactorySessionService.CSRF_COOKIE),
+            )
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(mapOf("confirmation" to email, "reason" to "Testopruiming"))
+        }.andExpect { status { isNoContent() } }
+
+        assertThat(userIdentities.findAll().map { it.id }).doesNotContain(target.id)
+        val removed = userIdentities.get(target.id)
+        assertThat(removed.active).isFalse()
+        assertThat(removed.globalRoles).isEmpty()
+        assertThat(removed.memberships.single().status).isEqualTo(MembershipStatus.REVOKED)
     }
 
     private fun login() = mockMvc.post("/api/auth/google") {

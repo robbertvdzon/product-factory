@@ -67,7 +67,7 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
         productId = ProductId("mvp-${UUID.randomUUID().toString().take(8)}")
         productCommands.createProduct(CreateProductCommand(productId, "MVP happy flow", actor = STAKEHOLDER, idempotencyKey = "happy-product-${productId.value}"))
         productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
-            productId, "HKH-gebruikers", "Maak afspraken aantoonbaar eenvoudiger", listOf("Geen echte persoonsgegevens"),
+            productId, "HKH-gebruikers", "Maak afspraken aantoonbaar eenvoudiger",
             "https://github.com/robbertvdzon/hkh-autopilot.git", 0, STAKEHOLDER, "happy-assignment",
         ))
         productCommands.configureTestableProduct(ConfigureTestableProductCommand(

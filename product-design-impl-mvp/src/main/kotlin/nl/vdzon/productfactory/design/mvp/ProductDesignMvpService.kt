@@ -900,6 +900,7 @@ class ProductDesignMvpService(
 
     @Transactional
     fun deleteAllOwnedData() {
+        jdbc.update("DELETE FROM pf_approved_epic_planning_trigger")
         jdbc.update("DELETE FROM pf_epic_review")
         jdbc.update("DELETE FROM pf_design_cancellation_operation")
         jdbc.update("DELETE FROM pf_design_command")

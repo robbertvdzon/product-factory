@@ -29,7 +29,7 @@ class AcceptanceProductFixtureContributor(
         service.createProduct(CreateProductCommand(productId, "Synthetische geschiedenis", ProductStatus.ACTIVE, SYSTEM, key(context, "product-primary")))
         service.updateProductAssignment(UpdateProductAssignmentCommand(
             productId, "Nieuwsgierige inwoners en onderzoekers", "Maak synthetische geschiedenis toegankelijk.",
-            listOf("Alle data is synthetisch", "Bronvermelding is verplicht"), "https://github.com/example/synthetic-history.git",
+            "https://github.com/example/synthetic-history.git",
             0, SYSTEM, key(context, "assignment-primary"),
         ))
         service.configureTestableProduct(ConfigureTestableProductCommand(
@@ -95,7 +95,7 @@ class AcceptanceProductFixtureContributor(
         val productId = ProductId("synthetic-archive")
         service.createProduct(CreateProductCommand(productId, "Synthetisch archief", ProductStatus.INACTIVE, SYSTEM, key(context, "product-secondary")))
         service.updateProductAssignment(UpdateProductAssignmentCommand(
-            productId, "Archiefbeheerders", "Bewijs meerdere productconfiguraties.", listOf("Geen automatische verwerking"),
+            productId, "Archiefbeheerders", "Bewijs meerdere productconfiguraties.",
             "https://github.com/example/synthetic-archive.git", 0, SYSTEM, key(context, "assignment-secondary"),
         ))
     }

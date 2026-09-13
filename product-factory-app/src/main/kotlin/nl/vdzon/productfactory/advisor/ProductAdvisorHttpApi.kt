@@ -105,7 +105,7 @@ class ProductAdvisorController(
         val productId = epicProduct(epicId)
         authorization.requireRole(productId, ProductMembershipRole.PRODUCT_OWNER, authentication)
         val user = authorization.current(authentication)
-        if (user != null && user.memberships.none { it.productId == productId && it.status == MembershipStatus.ACTIVE && it.role == ProductMembershipRole.PRODUCT_OWNER }) {
+        if (user != null && !authorization.isFactoryOwner(authentication) && user.memberships.none { it.productId == productId && it.status == MembershipStatus.ACTIVE && it.role == ProductMembershipRole.PRODUCT_OWNER }) {
             throw AccessDeniedException("Een actief product owner-lidmaatschap is vereist.")
         }
         service.approveEpic(epicId, ApprovalRole.PRODUCT_OWNER, authorization.currentUserId(authentication), request.expectedVersion, request.idempotencyKey)

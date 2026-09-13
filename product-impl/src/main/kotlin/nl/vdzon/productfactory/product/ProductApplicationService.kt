@@ -69,15 +69,14 @@ class ProductApplicationService(
         val nextVersion = current + 1
         val audience = requiredText(command.audience, "Doelgroep")
         val goal = requiredText(command.goal, "Productdoel")
-        val boundaries = normalizedTextList(command.hardBoundaries, "Harde grenzen")
         val gitUrl = validatePublicGitUrl(command.publicGitUrl)
         val aiSupplier = command.aiSupplier?.trim()?.ifBlank { null }
         val aiModel = command.aiModel?.trim()?.ifBlank { null }
         val now = clock.instant()
         jdbc.update(
-            """INSERT INTO pf_product_assignment(product_id,version,audience,goal,hard_boundaries_json,public_git_url,created_at,actor_type,actor_id,ai_supplier,ai_model)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            command.productId.value, nextVersion, audience, goal, json(boundaries), gitUrl, now,
+            """INSERT INTO pf_product_assignment(product_id,version,audience,goal,public_git_url,created_at,actor_type,actor_id,ai_supplier,ai_model)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            command.productId.value, nextVersion, audience, goal, gitUrl, now,
             command.actor.type.name, command.actor.id, aiSupplier, aiModel,
         )
         remember(command.idempotencyKey, "UPDATE_PRODUCT_ASSIGNMENT", command.productId.value, fingerprint, null, command.actor, now)
@@ -473,8 +472,8 @@ class ProductApplicationService(
             jdbc.queryForObject(
                 "SELECT * FROM pf_product_assignment WHERE product_id=? ORDER BY version DESC LIMIT 1",
                 { rs, _ -> ProductAssignmentDetails(
-                    productId, rs.getString("audience"), rs.getString("goal"), readStringList(rs.getString("hard_boundaries_json")),
-                    rs.getString("public_git_url"), rs.getLong("version"), rs.getString("ai_supplier"), rs.getString("ai_model"),
+                    productId, rs.getString("audience"), rs.getString("goal"), rs.getString("public_git_url"),
+                    rs.getLong("version"), rs.getString("ai_supplier"), rs.getString("ai_model"),
                 ) }, productId.value,
             )!!
         } catch (_: EmptyResultDataAccessException) {

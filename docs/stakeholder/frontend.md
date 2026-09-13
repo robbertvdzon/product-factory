@@ -53,7 +53,17 @@ De frontend:
 Een gebruiker ziet alleen producten waarvoor een actief `PRODUCT_OWNER`-lidmaatschap bestaat;
 een `FACTORY_OWNER` ziet alle producten en krijgt daarnaast **Beheer → Gebruikers**. Daar kan de
 factory owner gebruikers op e-mailadres registreren, lidmaatschappen toekennen en met reden en
-expliciete bevestiging intrekken. De backend controleert deze rechten bij iedere query en mutatie.
+expliciete bevestiging intrekken. Een gebruiker kan na het exact intypen van het e-mailadres worden
+verwijderd: sessies en rollen worden ingetrokken en het account verdwijnt uit het beheer. De backend
+controleert deze rechten bij iedere query en mutatie.
+
+De factory-ownerrol is de superuserrol. Zij kan iedere productinstelling zien en bewerken en ook
+alle product-owner- en architectacties uitvoeren. De instellingenpagina groepeert de basisgegevens,
+productopdracht, governance en AI-afspraken, testomgevingen, schedules en dispatchinstellingen.
+Een product owner kan daar doelgroep en productdoel aanpassen; een architect beheert governance,
+AI-afspraken en testomgevingen. Alleen de factory owner kan een product definitief uit Product Factory
+verwijderen door de product-ID exact in te typen. Reeds naar Software Factory verstuurd werk blijft
+daar bestaan.
 
 Een factory owner kiest onderin de zijbalk, onder de eigen naam, als welke rol er gewerkt wordt: **Werken als
 factory owner** of **Werken als product owner**. In de rol product owner gelden exact de rechten van
@@ -136,7 +146,7 @@ Het hoofdscherm blijft bewust rustig. Het laat voor het gekozen product alleen z
 - enkele concrete aandachtspunten, zoals een vastgelopen kwaliteitsretry of nieuw signaal;
 - korte links naar de bijbehorende detailschermen.
 
-De productstatus, dispatchinstelling, harde grenzen, volledige epic- en backloglijsten, bugs,
+De productstatus, dispatchinstelling, volledige epic- en backloglijsten, bugs,
 kwaliteitshistorie, signalen, besluiten, geheugen en overleggen blijven allemaal bereikbaar via hun
 eigen scherm. Ze worden niet nogmaals als compacte dashboards op het hoofdscherm gepropt.
 
@@ -245,7 +255,7 @@ Epics vormen in Planning groepskoppen en staan niet als tweede losse backlog. He
 titel en samenvatting. Op epicdetail kan de
 Stakeholder, wanneer de status dat toestaat, de epic goedkeuren of met een vrije reden terugsturen,
 herprioriteren, intrekken of annuleren. **Overzicht** toont epics die op goedkeuring wachten. Onder
-**Instellingen** kiest de Stakeholder per product automatische of handmatige epicgoedkeuring.
+**Instellingen** kiest de bevoegde rol per product automatische of handmatige epicgoedkeuring.
 Planning toont bij een handmatige prioriteitsactie de reden en de zichtbare doorwerking
 op nog niet verstuurde stories.
 

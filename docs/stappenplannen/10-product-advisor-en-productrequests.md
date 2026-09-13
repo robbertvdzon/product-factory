@@ -536,6 +536,9 @@ daarna een factory owner dezelfde versie hebben goedgekeurd.
 
 ### Acceptatiecriteria
 
+Deze criteria beschrijven de oorspronkelijke stap-10-keten. Stap 11 vervangt de vaste
+factory-ownerapproval door product-owner- en architectreviews en maakt de factory owner superuser.
+
 - Een factory owner kan niet vóór de product owner dezelfde epicversie goedkeuren.
 - Een product owner kan niet de factory owner-stap uitvoeren.
 - Productplanning kan geen epic in een van beide wachtstatussen claimen.
@@ -775,9 +778,10 @@ is:
 
 ## Definitie van klaar
 
-Stap 10 is klaar wanneer een product owner uitsluitend binnen toegewezen producten duurzame
+Voor de oorspronkelijke stap-10-oplevering gold: een product owner kon uitsluitend binnen toegewezen producten duurzame
 gesprekken met `PRODUCT_ADVISOR` kan voeren; vragen zonder wijziging kan afronden; een exacte hotfix,
 bugfix of epickandidaat kan bevestigen; vragen uit gerichte uitwerking kan beantwoorden; en een epic
-samen met de factory owner versiegebonden kan goedkeuren. De drie uitvoerroutes zijn idempotent,
+samen met de factory owner versiegebonden goedkeuren. Stap 11 heeft deze vaste keten daarna vervangen.
+De drie uitvoerroutes zijn idempotent,
 herstelbaar en zichtbaar, alle regressie- en ketenbewijzen zijn groen, en uitsluitend Product
 Factory is voor deze functionaliteit gewijzigd.

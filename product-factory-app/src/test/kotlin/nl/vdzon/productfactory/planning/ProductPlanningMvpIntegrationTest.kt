@@ -57,7 +57,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         productId = ProductId("planning-${UUID.randomUUID().toString().take(8)}")
         productCommands.createProduct(CreateProductCommand(productId, "Planning test", actor = STAKEHOLDER, idempotencyKey = "create-${productId.value}"))
         productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
-            productId, "Stakeholders", "Lever waarde in kleine zelfstandige stappen", listOf("Geen credentials"),
+            productId, "Stakeholders", "Lever waarde in kleine zelfstandige stappen",
             "https://github.com/robbertvdzon/hkh-autopilot.git", 0, STAKEHOLDER, "assignment-${productId.value}",
         ))
         epic = publishEpic()

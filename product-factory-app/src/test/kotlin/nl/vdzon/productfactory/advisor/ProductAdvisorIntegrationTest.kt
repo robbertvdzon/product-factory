@@ -59,7 +59,7 @@ class ProductAdvisorIntegrationTest(
         owner = users.resolveOrCreate("owner-${productId.value}@example.test", true)
         products.createProduct(CreateProductCommand(productId, "Advisor product", actor = SYSTEM, idempotencyKey = "create-${productId.value}"))
         products.updateProductAssignment(UpdateProductAssignmentCommand(
-            productId, "Gebruikers", "Betrouwbaar advies", listOf("Geen geheimen"), "https://github.com/example/product.git", 0,
+            productId, "Gebruikers", "Betrouwbaar advies", "https://github.com/example/product.git", 0,
             SYSTEM, "assignment-${productId.value}", "openai", "gpt-5.6-sol",
         ))
         products.configureTestableProduct(ConfigureTestableProductCommand(

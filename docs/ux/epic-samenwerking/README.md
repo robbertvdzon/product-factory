@@ -1,6 +1,6 @@
 # UX — Epicontwikkeling voor PO, architect en factory owner
 
-Datum: 2026-09-13. Status: besproken UX-ontwerp voor de nog te bouwen uitbreiding.
+Datum: 2026-09-13. Status: UX-referentie voor de geïmplementeerde uitbreiding.
 
 ## Bestanden en gebruik
 
@@ -28,7 +28,7 @@ architectuurimpactlijst; de werkelijke beoordeling moet met repo- en beleidsbewi
 3. Ontwerpen zijn zichtbaar en bespreekbaar per scherm en toestand.
 4. De architect leest eerst korte concrete impactregels en vraagt zelf nadere uitleg aan AI.
 5. Product-AI, productbudgetten en uitzonderingen vallen onder de architect.
-6. De factory owner houdt operationeel overzicht, zonder een extra epicakkoord.
+6. De factory owner is superuser, ziet alle werkplekken en is geen verplichte extra akkoordstap.
 7. Een functioneel afgeronde epic blijft voor de PO zichtbaar tot en na implementatie.
 8. Vragen tonen wie aan zet is, waarom het antwoord nodig is en welk werk erop wacht.
 
@@ -78,7 +78,7 @@ De bestaande login gaat aan deze schermen vooraf; deze opdracht introduceert gee
 4. Kies Vraag aanpassing. Het voorbeeld maakt een illustratieve versie 3, nog zonder akkoord.
 5. Wissel naar Marc; open de epic, lees de wijziging en geef Akkoord met versie 3.
 6. Wissel terug naar Architect; open impact, geef een reden en Akkoord op deze versie.
-7. Alle benodigde akkoorden zijn er; het moment wordt Planning. De factory owner komt niet voor.
+7. Alle benodigde akkoorden zijn er; het moment wordt Planning. De factory owner hoefde niet in te grijpen.
 
 Bij willekeurige andere wijzigingsverzoeken toont dit prototype dezelfde voorbeeldrevisie.
 De echte implementatie moet de gevraagde verandering via AI onderzoeken, uitvoeren en valideren.
@@ -98,7 +98,8 @@ levering en verificatie; gebruikers kunnen de voortgang niet zelf vooruitzetten.
 
 Wissel naar Factory owner. Bekijk producten, rollen, runs, planning, kwaliteit en instellingen.
 Het voorbeeld toont PvdD met menselijke PO/architect en HKH Autopilot met automatische rollen.
-De factory owner kan toewijzingen beheren maar geeft geen inhoudelijk productakkoord.
+De factory owner kan alle productinstellingen beheren en indien nodig zowel functioneel als
+architectonisch akkoord geven.
 
 ## Toestanden die naast de hoofdroute gebouwd moeten worden
 

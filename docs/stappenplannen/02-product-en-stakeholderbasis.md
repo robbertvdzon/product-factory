@@ -52,7 +52,7 @@ het definitieve publieke contract afgehandeld, maar nog zonder Meeting Agent of 
 Voeg voorwaartse Flywaymigraties, constraints en indexen toe voor:
 
 - `Product` met stabiel ID, naam, `ACTIVE`/`INACTIVE`, `dispatchingEnabled`, versie en auditvelden;
-- geversioneerde `ProductAssignment` met doelgroep, productdoel, harde grenzen en publieke Git-URL;
+- geversioneerde `ProductAssignment` met doelgroep, productdoel en publieke Git-URL;
 - geversioneerde `TestableProductConfiguration` met omgevingen, veilige routes, data-/toegangsgrenzen
   en revisionendpoint, maar zonder opgeslagen secretwaarden;
 - precies één geversioneerde `ProcessScheduleConfiguration` per product en `ScheduledProcess`;

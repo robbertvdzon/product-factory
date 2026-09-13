@@ -39,8 +39,6 @@ class ProductGovernanceApplicationService(private val jdbc: JdbcTemplate, privat
         if (jdbc.query("SELECT product_id FROM pf_product WHERE product_id=? FOR UPDATE", { rs, _ -> rs.getString(1) }, p.productId.value).isEmpty()) throw AggregateNotFound("Product bestaat niet.")
         val current = getPolicy(p.productId)
         if (current.version != p.version) throw VersionConflict("Productafspraken zijn intussen gewijzigd.")
-        if (!architect && p.copy(configured=current.configured, productOwnerMode=current.productOwnerMode, architectMode=current.architectMode) != current)
-            throw InvalidCommand("Productafspraken en budgetten worden uitsluitend door de architect beheerd.")
         if (!factory && (p.productOwnerMode != current.productOwnerMode || p.architectMode != current.architectMode))
             throw InvalidCommand("Besturingsrollen worden door factorybeheer toegewezen.")
         require(p.architectureRules.length <= 20000 && p.productAiRules.length <= 20000)

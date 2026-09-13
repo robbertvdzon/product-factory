@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.jdbc.core.JdbcTemplate
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalTime
@@ -23,7 +24,28 @@ class ProductAndDecisionIntegrationTest(
     @Autowired private val productQueries: ProductQueryService,
     @Autowired private val decisions: DecisionService,
     @Autowired private val decisionQueries: DecisionQueryService,
+    @Autowired private val deletion: ProductDeletionService,
+    @Autowired private val jdbc: JdbcTemplate,
 ) {
+    @Test
+    fun `product wordt met alle lokale configuratie en historie definitief verwijderd`() {
+        val id = createProduct("product-delete")
+        products.updateProductAssignment(UpdateProductAssignmentCommand(
+            id, "Gebruikers", "Tijdelijk testproduct", "https://github.com/example/test.git", 0, STAKEHOLDER, "delete-assignment-${id.value}",
+        ))
+        products.submitUserSignal(SubmitUserSignalCommand(
+            id, UserSignalCategory.FEEDBACK, UserSignalUrgency.NORMAL, "test", "Mag na de test verdwijnen", actor=STAKEHOLDER, idempotencyKey="delete-signal-${id.value}",
+        ))
+        decisions.createDecision(CreateDecisionCommand(id,"Testbesluit",DecisionOrigin.STAKEHOLDER,STAKEHOLDER,"delete-decision-${id.value}"))
+
+        deletion.delete(id)
+
+        assertThatThrownBy { productQueries.getProduct(id) }.isInstanceOf(AggregateNotFound::class.java)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_product_assignment WHERE product_id=?",Long::class.java,id.value)).isZero()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_user_signal WHERE product_id=?",Long::class.java,id.value)).isZero()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_decision WHERE product_id=?",Long::class.java,id.value)).isZero()
+    }
+
     @Test
     fun `product heeft vier uitgeschakelde schedules en bewaakt versies en idempotentie`() {
         val id = createProduct("product-version")

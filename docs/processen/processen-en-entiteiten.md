@@ -82,7 +82,7 @@ Er is geen verplichte Stakeholdergoedkeuring tussen epic, planning en dispatch.
 
 | Levering door de Stakeholder | Vastlegging | Doorwerking |
 |---|---|---|
-| productdoel en harde grenzen | `ProductAssignment` | verplichte context voor alle processen |
+| productdoel en doelgroep | `ProductAssignment` | verplichte context voor alle processen |
 | groot, blijvend besluit uit een overleg | `Decision` met `origin = STAKEHOLDER` | notulenagent registreert het; processen lezen de geldige momentopname |
 | feedback, probleem, kans, risico of kwaliteitszorg | `UserSignal` | ontwerp of kwaliteit onderzoekt dit later; een kwaliteitszorg kan een `QualityWorkItem` opleveren |
 | handmatige hoge prioriteit voor een epic | direct UI-command `requestEpicReprioritization(...)` | Productplanning bewaart gericht planwerk; dit is geen besluit |

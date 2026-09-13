@@ -28,7 +28,7 @@ schrijft nooit rechtstreeks in de database.
 
 De Stakeholder:
 
-- geeft het productdoel en de harde grenzen;
+- geeft het productdoel en de doelgroep;
 - kan feedback, zorgen, kansen en testtoegang leveren;
 - kan de richting en prioriteit op ieder moment corrigeren;
 - neemt grote beslissingen die langdurig richting geven;
@@ -48,7 +48,7 @@ werkdocumenten, prompts en agentadministratie horen hier niet bij.
 | Begrip | Eenvoudige betekenis |
 |---|---|
 | `Product` | Het product waaraan Product Factory werkt, inclusief of het actief is en dispatching aanstaat. |
-| `ProductAssignment` | Het doel, de doelgroep, de harde grenzen en de publieke Git-URL van het product. |
+| `ProductAssignment` | Het doel, de doelgroep en de publieke Git-URL van het product. |
 | `UserSignal` | Feedback, een probleem, zorg, kans of observatie, met zichtbare verwerking en uitkomst. |
 | `Decision` | Een grote, blijvende keuze die meerdere toekomstige sessies richting geeft. |
 | `Epic` | Titel en korte samenvatting plus een concreet probleem met een duidelijke oplossing, richting, eventuele UX, testbare acceptatiecriteria en uitleg over behapbaarheid. |
@@ -75,7 +75,8 @@ vervolgvraag bevatten of een voorstel maken; AI-output voert nooit zelf een muta
 
 Na bevestiging gaat een `BUGFIX` rechtstreeks via Software Factory v2, een `EPIC_CANDIDATE` als
 gericht workitem naar Productontwerp en een `HOTFIX` via een aparte bestaande dashboardroute. De
-epicroute vereist product-owner- en daarna factory-ownerapproval op exact dezelfde versie. De
+epicroute vereist de geldende product-owner- en architectbeoordelingen op exact dezelfde inhouds-
+en beleidsversie. De factory owner kan beide rollen als superuser uitvoeren. De
 hotfixroute is op 2026-09-10 bewust in productie geactiveerd. Omdat de bestaande externe
 lijstendpoint markergebaseerd herstel na een verloren response niet volledig ondersteunt, zijn
 maximaal twee verzendpogingen per exacte requestversie toegestaan. Daarmee is maximaal één dubbele
@@ -85,7 +86,7 @@ story na een verloren eerste response een geaccepteerd risico.
 
 In gewone taal gebeurt het volgende:
 
-1. De Stakeholder legt uit voor wie het product is, wat het moet bereiken en welke grenzen gelden.
+1. De product owner legt uit voor wie het product is en wat het moet bereiken.
 2. Feedback, zorgen en kansen worden als gebruikerssignalen bewaard.
 3. Productontwerp onderzoekt het product en maakt een complete epic; UX is onderdeel van de epic
    wanneer zichtbaar gedrag of interactie verandert.
@@ -447,7 +448,7 @@ Bij afsluiting maakt een notulenagent leesbare notulen en verwerkt hij gecontrol
 
 - feedback, een correctie, wens of kwaliteitszorg wordt `UserSignal`;
 - alleen een grote, blijvende keuze wordt `Decision`;
-- een wijziging van doel of harde grens past `ProductAssignment` aan;
+- een wijziging van doelgroep of productdoel past `ProductAssignment` aan;
 - een gewone epic-, story-, bug-, annulerings- of prioriteitsactie wordt een direct command op de
   eigenaarsmodule;
 - beantwoorde agentvragen krijgen antwoord, meeting en bericht als bron;

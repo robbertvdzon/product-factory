@@ -195,9 +195,10 @@ sessie-uitkomst in één transactie. Een herziene versie maakt de vorige beschik
 intussen door Productplanning is geclaimd, faalt de publicatie gesloten.
 
 Verwerkte gebruikerssignalen worden daarna via de publieke commands van de productmodule aan de
-gepubliceerde epic gekoppeld. Er gaat geen request naar Productplanning; haar eigen schedule ontdekt
-de `AVAILABLE` epic. Bij producten met handmatige epicgoedkeuring publiceert Productontwerp eerst
-`AWAITING_APPROVAL`; alleen de Stakeholder zet die versie op `AVAILABLE`.
+gepubliceerde epic gekoppeld. Zodra de geldende product-owner- en architectbeoordelingen compleet
+zijn, schrijft Productontwerp een duurzame trigger voor Productplanning. Die start onafhankelijk van
+het productschema. Bij handmatige besturing blijft de epic wachten tot de bevoegde mensen of de
+factory owner de vereiste beoordelingen hebben vastgelegd.
 
 ## Wat bewust niet in de MVP zit
 

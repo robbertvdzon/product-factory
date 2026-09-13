@@ -49,6 +49,7 @@ class ProductAuthorizationService(
 
     fun requireRole(productId: ProductId, role: ProductMembershipRole, authentication: Authentication? = SecurityContextHolder.getContext().authentication) {
         if (!authRequired) return
+        if (isFactoryOwner(authentication)) return
         val user = current(authentication)
         if (user == null || !user.active || user.actingRole.name != role.name || user.memberships.none {
             it.productId == productId && it.role == role && it.status.name == "ACTIVE"
@@ -82,7 +83,8 @@ class ProductAuthorizationInterceptor(
         if (path.startsWith("/api/admin/") || path.startsWith("/api/operations/") || path.startsWith("/api/ai/") ||
             path.startsWith("/api/foundation/schedules")) return true
         if (method == "POST" && path == "/api/products") return true
-        if (method != "GET" && Regex("^/api/products/[^/]+/(assignment|test-configuration|status|dispatching|epic-approval-mode|schedules)(/.*)?$").matches(path)) return true
+        if (method == "DELETE" && Regex("^/api/products/[^/]+$").matches(path)) return true
+        if (method != "GET" && Regex("^/api/products/[^/]+/(status|dispatching|epic-approval-mode|schedules)(/.*)?$").matches(path)) return true
         if (method != "GET" && (path.contains("/sessions/run") || path.contains("agent-environment-keys"))) return true
         if (method != "GET" && (path.startsWith("/api/planning/") || path.startsWith("/api/quality/") ||
                 path.startsWith("/api/dispatcher/") || Regex("^/api/stories/[^/]+/(developed|cancelled)$").matches(path) ||

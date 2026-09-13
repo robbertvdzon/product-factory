@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*
 data class CreateOrFindUserRequest(val email: String, val idempotencyKey: String)
 data class MembershipMutationRequest(val expectedVersion: Long, val idempotencyKey: String, val role: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER)
 data class RevokeMembershipRequest(val reason: String, val confirmation: Boolean, val expectedVersion: Long, val idempotencyKey: String, val role: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER)
+data class DeleteUserRequest(val confirmation: String, val reason: String = "Verwijderd door factory owner")
 
 @RestController
 @RequestMapping("/api/admin/users")
@@ -26,6 +27,17 @@ class UserManagementController(
     @ResponseStatus(HttpStatus.CREATED)
     fun create(@RequestBody request: CreateOrFindUserRequest, authentication: Authentication?) =
         authorization.requireFactoryOwner(authentication).let { users.createForAdministration(request.email, request.idempotencyKey) }
+
+    @DeleteMapping("/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(@PathVariable userId: String, @RequestBody request: DeleteUserRequest, authentication: Authentication?) {
+        authorization.requireFactoryOwner(authentication)
+        val target = users.get(UserId(userId))
+        if (request.confirmation.trim().lowercase() != target.email) throw IllegalArgumentException("Typ het exacte e-mailadres om de gebruiker te verwijderen.")
+        val actor = authorization.currentUserId(authentication)
+        if (actor == target.id) throw IllegalArgumentException("Je kunt je eigen actieve factory-owneraccount niet verwijderen.")
+        users.deleteForAdministration(target.id, actor, request.reason)
+    }
 
     @PutMapping("/{userId}/memberships/{productId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

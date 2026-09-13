@@ -48,7 +48,7 @@ bijvoorbeeld:
 Geheugen is geen vervanging voor publieke productwaarheid. De volgende informatie blijft bij haar
 eigen domeineigenaar:
 
-- productdoel en harde grenzen in `ProductAssignment`;
+- productdoel en doelgroep in `ProductAssignment`;
 - grote blijvende keuzes in `Decision`;
 - feedback en observaties in `UserSignal`;
 - tijdelijke vragen en antwoorden in `StakeholderQuestion` en `Meeting`;

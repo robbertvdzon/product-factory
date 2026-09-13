@@ -147,7 +147,7 @@ De module:
 4. bepaalt urgentie op basis van nieuwe kennis, kwaliteitssignalen, beschikbare epics,
    productopdracht, geldige besluiten en gebruikerssignalen;
 5. kiest één hoofdtaak en een begrensd tijd- en tokenbudget;
-6. controleert toegangsrechten en harde productgrenzen.
+6. controleert toegangsrechten, architectuurafspraken en AI-beleid.
 
 ### Stap 2 — onderzoeken en bewijs vormen
 

@@ -54,14 +54,14 @@ MVP-eisen en worden niet in code of productieseed hardgecodeerd.
 De stappen 1 tot en met 9 zijn uitgevoerd. Het technische MVP is afgesloten met automatische
 schedules, de volledige keten, negentien vaste Testbedscenario's en een normatief bewijsrecord.
 
-## Geplande uitbreiding na het MVP
+## Uitbreiding na het MVP
 
 Voor de volgende uitbreiding staat een volledig overdrachtspakket klaar:
 [stap 11 — Epicontwikkeling met PO en architect](11-epic-samenwerking-po-architect.md),
 met [functionele specificatie](../voorstellen/epic-samenwerking-po-architect.md) en
-[klikbare UX en schermbeelden](../ux/epic-samenwerking/README.md). Dit is nog niet geïmplementeerd.
+[klikbare UX en schermbeelden](../ux/epic-samenwerking/README.md). Deze uitbreiding is geïmplementeerd.
 De architect neemt daarin architectuur, product-AI, budgetten en uitzonderingen op zich;
-de huidige verplichte factory-ownerapproval vervalt voor die nieuwe flow.
+de factory owner is superuser en vormt geen verplichte extra approvalstap.
 
 | Stap | Plan | Resultaat |
 |---|---|---|

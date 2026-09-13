@@ -105,6 +105,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   final message = TextEditingController(), idea = TextEditingController();
   bool get architect => widget.role == 'ARCHITECT';
   bool get factory => widget.role == 'FACTORY_OWNER';
+  String get actionRole => architect ? 'ARCHITECT' : 'PRODUCT_OWNER';
   List<Json> get openQuestions =>
       questions.where((q) => q['status'] == 'OPEN').toList();
   @override
@@ -263,7 +264,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             'title': epic == null
                 ? text.substring(0, text.length.clamp(0, 150))
                 : '${architect ? 'Architectuur' : 'Uitwerking'}: ${_text(epic!['title']).substring(0, _text(epic!['title']).length.clamp(0, 140))}',
-            if (epic != null) 'role': widget.role,
+            if (epic != null) 'role': actionRole,
           },
         ),
       );
@@ -315,10 +316,12 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     return value;
   }
 
-  Future<void> review(String decision) async {
+  Future<void> review(String decision, {String? asRole}) async {
+    final reviewRole = asRole ?? actionRole;
+    final reviewingAsArchitect = reviewRole == 'ARCHITECT';
     final text = await ask(
       decision == 'APPROVE'
-          ? architect
+          ? reviewingAsArchitect
                 ? 'Architectuur akkoord'
                 : 'Functioneel akkoord'
           : decision == 'REQUEST_CHANGE'
@@ -326,7 +329,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           : 'Onderzoek vragen',
       'Toelichting',
       initial: decision == 'APPROVE'
-          ? architect
+          ? reviewingAsArchitect
                 ? 'De beschreven impact en product-AI-afspraken zijn akkoord.'
                 : 'Werking, scope en schermen zijn akkoord.'
           : '',
@@ -337,7 +340,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         '/api/epics/${_text(epic!['id'])}/reviews',
         method: 'POST',
         body: {
-          'role': widget.role,
+          'role': reviewRole,
           'decision': decision,
           'reason': text,
           'expectedVersion': epic!['version'],
@@ -381,7 +384,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         body: {
           'text':
               '$value${contextText.isEmpty ? '' : '\n\nBesproken context (te onderzoeken, geen zelfstandig besluit):\n$contextText'}',
-          'role': widget.role,
+          'role': actionRole,
           'expectedVersion': epic!['version'],
           'screenKey': screen?['screenKey'],
           'viewport': screen == null ? null : viewport,
@@ -589,7 +592,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           ? 'Technische impact en het AI-gebruik van het product.'
           : 'Van jouw idee naar een verbetering. Hier zie je wat loopt en wat jouw aandacht nodig heeft.',
     ),
-    if (!architect && !factory)
+    if (!architect)
       Align(
         alignment: Alignment.centerLeft,
         child: button(
@@ -790,8 +793,16 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   List<Widget> epicPanel() {
     final e = epic!;
     final review = _map(e['review']);
-    final tabs = architect
-        ? ['Impact', 'Gesprek', 'Uitwerking', 'Goedkeuring', 'Voortgang']
+    final tabs = architect || factory
+        ? [
+            'Impact',
+            'Gesprek',
+            'Uitwerking',
+            'Schermen',
+            'Aandachtspunten',
+            'Goedkeuring',
+            'Voortgang',
+          ]
         : [
             'Uitwerking',
             'Schermen',
@@ -1101,6 +1112,33 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
               button('Vraag onderzoek', () => review('REQUEST_RESEARCH')),
           ],
         ),
+      if (factory)
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (r['productOwnerApproved'] != true)
+              button(
+                'Functioneel akkoord als superuser',
+                () => review('APPROVE', asRole: 'PRODUCT_OWNER'),
+                primary: true,
+              ),
+            if (r['architectApproved'] != true)
+              button(
+                'Architectuur akkoord als superuser',
+                () => review('APPROVE', asRole: 'ARCHITECT'),
+                primary: true,
+              ),
+            button(
+              'Vraag functionele aanpassing',
+              () => review('REQUEST_CHANGE', asRole: 'PRODUCT_OWNER'),
+            ),
+            button(
+              'Vraag architectuuronderzoek',
+              () => review('REQUEST_RESEARCH', asRole: 'ARCHITECT'),
+            ),
+          ],
+        ),
       const SizedBox(height: 16),
       ..._maps(r['records']).reversed.map(
         (record) => ListTile(
@@ -1340,8 +1378,8 @@ class _GovernancePolicyEditorState extends State<GovernancePolicyEditor> {
           const SizedBox(height: 12),
           Text(
             widget.factory
-                ? 'Wijs de menselijke of automatische rollen toe. Personen koppel je via Beheer → Leden. Inhoudelijke afspraken en productbudgetten beheert de architect.'
-                : 'Deze afspraken betreffen architectuur en AI-gebruik van het product. Een lege grens geeft geen onbeperkt mandaat.',
+                ? 'Beheer als factory owner de rollen, architectuurafspraken en afspraken over AI-gebruik van het product.'
+                : 'Deze afspraken betreffen architectuur en AI-gebruik van het product.',
           ),
           const SizedBox(height: 20),
           if (widget.factory) ...[
@@ -1376,7 +1414,9 @@ class _GovernancePolicyEditorState extends State<GovernancePolicyEditor> {
               ],
               onChanged: (v) => setState(() => archMode = v!),
             ),
-          ] else ...[
+          ],
+          if (widget.factory) const SizedBox(height: 16),
+          ...[
             TextField(
               controller: architecture,
               minLines: 3,
@@ -1452,13 +1492,12 @@ class _GovernancePolicyEditorState extends State<GovernancePolicyEditor> {
               onPressed: widget.saving
                   ? null
                   : () {
-                      if (!widget.factory &&
-                          ((jobs.text.isNotEmpty &&
-                                  int.tryParse(jobs.text) == null) ||
-                              (growth.text.isNotEmpty &&
-                                  int.tryParse(growth.text) == null) ||
-                              (budget.text.isNotEmpty &&
-                                  double.tryParse(budget.text) == null))) {
+                      if ((jobs.text.isNotEmpty &&
+                              int.tryParse(jobs.text) == null) ||
+                          (growth.text.isNotEmpty &&
+                              int.tryParse(growth.text) == null) ||
+                          (budget.text.isNotEmpty &&
+                              double.tryParse(budget.text) == null)) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
@@ -1478,19 +1517,17 @@ class _GovernancePolicyEditorState extends State<GovernancePolicyEditor> {
                             'architectMode': archMode.isEmpty
                                 ? 'HUMAN'
                                 : archMode,
-                          } else ...{
-                            'architectureRules': architecture.text,
-                            'productAiRules': ai.text,
-                            'maximumAdditionalJobsPerDay': int.tryParse(
-                              jobs.text,
-                            ),
-                            'monthlyProductBudgetEuro':
-                                budget.text.trim().isEmpty
-                                ? null
-                                : budget.text.trim(),
-                            'maximumGrowthPercent': int.tryParse(growth.text),
-                            'automaticCategories': categories.toList(),
                           },
+                          'architectureRules': architecture.text,
+                          'productAiRules': ai.text,
+                          'maximumAdditionalJobsPerDay': int.tryParse(
+                            jobs.text,
+                          ),
+                          'monthlyProductBudgetEuro': budget.text.trim().isEmpty
+                              ? null
+                              : budget.text.trim(),
+                          'maximumGrowthPercent': int.tryParse(growth.text),
+                          'automaticCategories': categories.toList(),
                         }),
                       );
                     },

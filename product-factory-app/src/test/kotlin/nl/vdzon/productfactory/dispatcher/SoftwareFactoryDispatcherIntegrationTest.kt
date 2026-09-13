@@ -60,7 +60,7 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         productId = ProductId("dispatcher-${UUID.randomUUID().toString().take(8)}")
         productCommands.createProduct(CreateProductCommand(productId, "Dispatcher test", actor = STAKEHOLDER, idempotencyKey = "create-${productId.value}"))
         productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
-            productId, "Gebruikers", "Lever precies één zelfstandige story", listOf("Geen credentials"),
+            productId, "Gebruikers", "Lever precies één zelfstandige story",
             "https://github.com/robbertvdzon/hkh-autopilot.git", 0, STAKEHOLDER, "assignment-${productId.value}",
         ))
         productCommands.setProductDispatching(SetProductDispatchingCommand(productId, true, 1, STAKEHOLDER, "dispatching-${productId.value}"))
@@ -117,7 +117,7 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
     @Test
     fun `ingestelde AI-supplier en -model op de productopdracht komen terug in de verstuurde story`() {
         productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
-            productId, "Gebruikers", "Lever precies één zelfstandige story", listOf("Geen credentials"),
+            productId, "Gebruikers", "Lever precies één zelfstandige story",
             "https://github.com/robbertvdzon/hkh-autopilot.git", 1, STAKEHOLDER, "assignment-ai-${productId.value}",
             aiSupplier = "copilot", aiModel = "claude-sonnet-4.5",
         ))

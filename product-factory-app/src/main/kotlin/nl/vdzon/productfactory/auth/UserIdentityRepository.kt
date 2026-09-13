@@ -92,7 +92,7 @@ class UserIdentityRepository(
     }
 
     fun findAll(): List<UserDetails> = jdbc.query(
-        "SELECT user_id FROM pf_user_account ORDER BY normalized_email",
+        "SELECT user_id FROM pf_user_account WHERE active=TRUE ORDER BY normalized_email",
         { rs, _ -> UserId(rs.getString(1)) },
     ).map(::get)
 
@@ -118,6 +118,24 @@ class UserIdentityRepository(
         val user = resolveOrCreate(normalized, false)
         recordCommand(idempotencyKey, "CREATE_USER", requestFingerprint, user.id.value)
         return user
+    }
+
+    @Transactional
+    fun deleteForAdministration(userId: UserId, actor: UserId, reason: String) {
+        val target = get(userId)
+        if (!target.active) return
+        val now = clock.instant()
+        target.memberships.filter { it.status == MembershipStatus.ACTIVE }.forEach { membership ->
+            jdbc.update(
+                """UPDATE pf_product_membership SET status='REVOKED',revoked_at=?,revoked_by=?,revoke_reason=?,version=version+1
+                    WHERE user_id=? AND product_id=? AND role=? AND status='ACTIVE'""".trimIndent(),
+                now, actor.value, reason.take(1000), userId.value, membership.productId.value, membership.role.name,
+            )
+            recordHistory(userId, membership.productId, "REVOKED", reason.take(1000), actor, membership.role)
+        }
+        jdbc.update("UPDATE authentication_session SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL", now, userId.value)
+        jdbc.update("DELETE FROM pf_user_global_role WHERE user_id=?", userId.value)
+        jdbc.update("UPDATE pf_user_account SET active=FALSE,acting_role=NULL,updated_at=? WHERE user_id=?", now, userId.value)
     }
 
     @Transactional

@@ -123,7 +123,7 @@ classificeert hij iedere expliciete uitkomst:
 
 | Uitkomst uit het overleg | Vastlegging | Betekenis |
 |---|---|---|
-| productdoel of harde grens verandert | `updateProductAssignment(...)` | nieuwe verplichte context voor alle processen |
+| doelgroep of productdoel verandert | `updateProductAssignment(...)` | nieuwe richting voor alle processen |
 | feedback, correctie, wens, probleem, kans, risico of kwaliteitszorg | `submitUserSignal(...)` | onderzoekbare melding; nog geen bewezen bug of opdracht |
 | grote, blijvende keuze | command op het Besluitenregister | geversioneerd Stakeholderbesluit |
 | epic intrekken of actieve epic annuleren | `withdrawEpic(...)` of `cancelEpic(...)` | directe actie op Productontwerp, met meeting-ID en reden |

@@ -642,6 +642,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         val cmd=decision(epic,po,ProductMembershipRole.PRODUCT_OWNER)
         governance.review(cmd);governance.review(cmd)
         assertThat(governance.reviewState(epic.id).records).hasSize(2)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_approved_epic_planning_trigger WHERE epic_id=? AND status='PENDING'",Long::class.java,epic.id.value)).isEqualTo(1)
         assertThat(queries.getEpic(epic.id).status).isEqualTo(EpicStatus.AVAILABLE)
         design.claimEpicForPlanning(ClaimEpicForPlanningCommand(epic.id,epic.version,PROCESS,"claim"))
         val claimed=queries.getEpic(epic.id)
@@ -710,19 +711,17 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `factory owner en ingetrokken lidmaatschap kunnen reviews niet omzeilen`() {
-        val (po,arch)=setupGovernance()
+    fun `factory owner is superuser voor reviews en productafspraken`() {
+        setupGovernance()
         val epic=governedEpic(ImpactCategory.ACCESS)
         val factory=users.resolveOrCreate("other-factory-${productId.value}@example.test",true).id
-        assertThatThrownBy { governance.review(decision(epic,factory,ProductMembershipRole.ARCHITECT)) }.isInstanceOf(InvalidCommand::class.java)
-        assertThatThrownBy { design.approveEpic(ApproveEpicCommand(epic.id,epic.version,STAKEHOLDER,"bypass")) }.isInstanceOf(InvalidCommand::class.java)
-        assertThatThrownBy { policies.updatePolicy(UpdateGovernancePolicyCommand(policies.getPolicy(productId).copy(monthlyProductBudgetEuro="100"),factory,"budget-bypass")) }.isInstanceOf(InvalidCommand::class.java)
-        governance.review(decision(epic,po,ProductMembershipRole.PRODUCT_OWNER))
-        governance.review(decision(epic,arch,ProductMembershipRole.ARCHITECT))
+        governance.review(decision(epic,factory,ProductMembershipRole.PRODUCT_OWNER))
+        governance.review(decision(epic,factory,ProductMembershipRole.ARCHITECT))
         assertThat(governance.reviewState(epic.id).ready).isTrue()
-        users.revokeProductOwner(arch,productId,"Andere architect",factory,1,"revoke",ProductMembershipRole.ARCHITECT)
+        assertThatThrownBy { design.approveEpic(ApproveEpicCommand(epic.id,epic.version,STAKEHOLDER,"bypass")) }.isInstanceOf(InvalidCommand::class.java)
+        policies.updatePolicy(UpdateGovernancePolicyCommand(policies.getPolicy(productId).copy(monthlyProductBudgetEuro="100"),factory,"budget-superuser"))
+        assertThat(policies.getPolicy(productId).monthlyProductBudgetEuro).isEqualTo("100")
         assertThat(governance.reviewState(epic.id).ready).isFalse()
-        assertThatThrownBy { users.setActingRole(po,ActingRole.ARCHITECT) }.isInstanceOf(InvalidCommand::class.java)
     }
 
     @Test
@@ -861,7 +860,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         val product = ProductId(id)
         products.createProduct(CreateProductCommand(product, id, actor = STAKEHOLDER, idempotencyKey = "create-$id"))
         products.updateProductAssignment(UpdateProductAssignmentCommand(
-            product, "Stakeholders", "Maak productvoortgang aantoonbaar", listOf("Geen credentials"),
+            product, "Stakeholders", "Maak productvoortgang aantoonbaar",
             "https://github.com/robbertvdzon/hkh-autopilot.git", 0, STAKEHOLDER, "assignment-$id",
         ))
         assertThat(productQueries.getProductAssignment(product).version).isEqualTo(1)

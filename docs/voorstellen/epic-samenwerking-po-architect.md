@@ -17,7 +17,8 @@ expliciet zijn besproken, zijn die hieronder als ontwerpkeuze gemarkeerd.
 
 Voor deze uitbreiding vervangt dit ontwerp de oude verplichte keten **PO → factory owner**
 uit [Product Advisor en Product Requests](product-advisor-en-productrequests.md). De factory owner
-is geen inhoudelijke epicbeoordelaar. Bestaande specificaties blijven leidend voor alle overige
+is superuser en kan zo nodig als PO of architect beslissen, maar vormt geen verplichte extra stap.
+Bestaande specificaties blijven leidend voor alle overige
 modulegrenzen, uitvoering, beveiliging en integraties. Werk de actuele specificaties bij zodra
 de implementatie werkelijk verandert; presenteer dit voorstel niet als bestaande functionaliteit.
 
@@ -39,18 +40,17 @@ menselijke productrollen. Namen en product-ID's in deze documenten zijn voorbeel
 |---|---|---|
 | Product owner, per product | Doel, functionaliteit, scope, prioriteit, UX en functioneel akkoord; vragen tijdens ontwerp, planning en bouw beantwoorden | Mijn werk, Mijn epics, Vragen |
 | Architect, per product | Architectuur, AI-gebruik van het gewijzigde product, productbudgetten, productbeleid en uitzonderingen | Te beoordelen, Epicimpact, Productafspraken |
-| Factory owner, globaal | Gebruikers en roltoewijzing, factory-inrichting, globale AI-uitvoering van de factory, runs, planning, kwaliteit en operatie | Factoryoverzicht, Runs, Planning, Kwaliteit, Instellingen |
+| Factory owner, globaal | Superuser voor alle product- en factoryfuncties; gebruikers, rollen, inrichting, globale AI-uitvoering, runs, planning, kwaliteit en operatie | Alle werkplekken en Instellingen |
 
-- De factory owner krijgt geen impliciet PO- of architectakkoord en geen verplichte
-  eindgoedkeuring. Productbesluiten gaan naar de bevoegde productrol.
+- De factory owner kan ieder PO- of architectbesluit uitvoeren. Er is geen verplichte
+  extra eindgoedkeuring door de factory owner.
 - Eén persoon kan meerdere rollen hebben. Robbert kan zowel architect als factory owner zijn.
   Een besluit registreert in welke rol en voor welk product hij handelde.
 - Een productlidmaatschap kan zowel `PRODUCT_OWNER` als `ARCHITECT` bevatten. Leid de rol niet
   alleen af uit het bestaan van een lidmaatschap.
 - Marc ziet uitsluitend toegewezen producten. Een architect krijgt uitsluitend de benodigde
   toegang tot toegewezen producten; globale beheerbevoegdheden ontstaan niet uit deze rol.
-- De factory owner behoudt breed operationeel inzicht. Productinhoud bekijken is iets anders
-  dan haar namens de PO of architect goedkeuren.
+- De factory owner behoudt volledig productinhoudelijk en operationeel inzicht en bewerkrecht.
 - Het AI-gebruik in dit ontwerp betreft **AI binnen PvdD/HKH**, niet de tokens die Product
   Factory verbruikt om epics te ontwerpen of software te laten bouwen.
 
@@ -69,8 +69,8 @@ architectverantwoordelijkheid invult: `HUMAN` of `AI`. De UI kan presets aanbied
 - Leg productbeleid, architectuurafspraken en mandaat geversioneerd vast. Het beleid bepaalt
   welke wijzigingen automatisch afhandelbaar zijn en welke een uitzondering zijn.
 - Buiten het mandaat volgt de ingestelde uitzonderingsroute. Ontbreekt een bevoegde beslisser
-  of passend mandaat, dan blijft het betrokken werk zichtbaar geblokkeerd. Escaleer niet
-  stilzwijgend naar de factory owner en ken geen automatische onbeperkte bevoegdheid toe.
+  of passend mandaat, dan blijft het betrokken werk zichtbaar geblokkeerd totdat een architect
+  of factory owner beslist.
 
 ## 4. Eén werkplek van idee tot oplevering
 
@@ -119,8 +119,8 @@ Vragen kunnen ontstaan tijdens ontwerp, planning, bouw of verificatie. Een vraag
 product, epic, eventuele story, bronfase, vraagtekst, context, gevraagde rol, antwoordstatus en
 gevolg voor de voortgang. Een antwoord wordt versiegebonden en idempotent opgeslagen en hervat
 het betrokken werk. Bewaar geschiedenis, voorkom dubbele vragen/notificaties en wijs opnieuw
-toe als een lidmaatschap vervalt. De factory owner kan de roltoewijzing herstellen zonder de
-inhoudelijke beslissing over te nemen.
+toe als een lidmaatschap vervalt. De factory owner kan de roltoewijzing herstellen of als
+superuser de inhoudelijke beslissing overnemen.
 
 Stories zijn voor Marc leesbaar: titel, bedoelde verbetering, acceptatiecriteria, status en open
 vragen. Technische logs, prompts, tokens, dispatchknoppen en SQL-details staan niet in zijn

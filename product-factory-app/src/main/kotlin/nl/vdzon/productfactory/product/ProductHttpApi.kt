@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.product
 
 import nl.vdzon.productfactory.api.decisions.*
+import nl.vdzon.productfactory.api.advisor.ProductMembershipRole
 import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.auth.ResolvedSession
@@ -39,7 +40,8 @@ internal fun Authentication?.stakeholderActor(): ActorReference {
 }
 
 data class CreateProductRequest(val requestedId: String? = null, val name: String, val status: ProductStatus = ProductStatus.ACTIVE, val idempotencyKey: String)
-data class AssignmentRequest(val audience: String, val goal: String, val hardBoundaries: List<String>, val publicGitUrl: String, val expectedVersion: Long, val idempotencyKey: String, val aiSupplier: String? = null, val aiModel: String? = null)
+data class DeleteProductRequest(val confirmation: String)
+data class AssignmentRequest(val audience: String, val goal: String, val publicGitUrl: String, val expectedVersion: Long, val idempotencyKey: String, val aiSupplier: String? = null, val aiModel: String? = null)
 data class TestConfigurationRequest(val acceptance: TestEnvironmentConfiguration, val production: TestEnvironmentConfiguration? = null, val expectedVersion: Long, val idempotencyKey: String)
 data class ProductStatusRequest(val status: ProductStatus, val expectedVersion: Long, val idempotencyKey: String)
 data class DispatchingRequest(val enabled: Boolean, val expectedVersion: Long, val idempotencyKey: String)
@@ -63,6 +65,7 @@ class ProductController(
     private val queries: ProductQueryService,
     private val meetingAi: MeetingAiOrchestrator,
     private val authorization: ProductAuthorizationService,
+    private val deletion: ProductDeletionService,
 ) {
     @GetMapping fun products(authentication: Authentication?) = queries.findProducts().filter { authorization.canReadProduct(it.id, authentication) }
     @GetMapping("/{productId}") fun product(@PathVariable productId: String) = queries.getProduct(ProductId(productId))
@@ -73,20 +76,40 @@ class ProductController(
         commands.createProduct(CreateProductCommand(request.requestedId?.let(::ProductId), request.name, request.status, authentication.stakeholderActor(), request.idempotencyKey)).value,
     )
 
+    @DeleteMapping("/{productId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(@PathVariable productId: String, @RequestBody request: DeleteProductRequest, authentication: Authentication?) {
+        authorization.requireFactoryOwner(authentication)
+        if (request.confirmation != productId) throw InvalidCommand("Typ de exacte product-ID om definitief te verwijderen.")
+        deletion.delete(ProductId(productId))
+    }
+
     @GetMapping("/{productId}/assignment") fun assignment(@PathVariable productId: String) = queries.getProductAssignment(ProductId(productId))
     @PutMapping("/{productId}/assignment") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun assignment(@PathVariable productId: String, @RequestBody request: AssignmentRequest, authentication: Authentication?) = commands.updateProductAssignment(
-        UpdateProductAssignmentCommand(
-            ProductId(productId), request.audience, request.goal, request.hardBoundaries, request.publicGitUrl, request.expectedVersion,
+    fun assignment(@PathVariable productId: String, @RequestBody request: AssignmentRequest, authentication: Authentication?) {
+        val id = ProductId(productId)
+        if (!authorization.isFactoryOwner(authentication)) {
+            authorization.requireRole(id, ProductMembershipRole.PRODUCT_OWNER, authentication)
+            val current = queries.getProductAssignment(id)
+            if (request.publicGitUrl != current.publicGitUrl || request.aiSupplier != current.aiSupplier || request.aiModel != current.aiModel) {
+                throw org.springframework.security.access.AccessDeniedException("Een product owner mag alleen doelgroep en productdoel wijzigen.")
+            }
+        }
+        commands.updateProductAssignment(UpdateProductAssignmentCommand(
+            ProductId(productId), request.audience, request.goal, request.publicGitUrl, request.expectedVersion,
             authentication.stakeholderActor(), request.idempotencyKey, request.aiSupplier, request.aiModel,
-        ),
-    )
+        ))
+    }
 
     @GetMapping("/{productId}/test-configuration") fun testConfiguration(@PathVariable productId: String) = queries.getTestableProduct(ProductId(productId))
     @PutMapping("/{productId}/test-configuration") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun testConfiguration(@PathVariable productId: String, @RequestBody request: TestConfigurationRequest, authentication: Authentication?) = commands.configureTestableProduct(
-        ConfigureTestableProductCommand(ProductId(productId), request.acceptance, request.production, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),
-    )
+    fun testConfiguration(@PathVariable productId: String, @RequestBody request: TestConfigurationRequest, authentication: Authentication?) {
+        val id = ProductId(productId)
+        if (!authorization.isFactoryOwner(authentication)) authorization.requireRole(id, ProductMembershipRole.ARCHITECT, authentication)
+        commands.configureTestableProduct(
+            ConfigureTestableProductCommand(id, request.acceptance, request.production, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),
+        )
+    }
 
     @PatchMapping("/{productId}/status") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun status(@PathVariable productId: String, @RequestBody request: ProductStatusRequest, authentication: Authentication?) = commands.setProductStatus(
@@ -161,7 +184,7 @@ class ProductController(
         val question = queries.getStakeholderQuestion(StakeholderQuestionId(questionId))
         val actor = authorization.current(authentication)
         authorization.requireRole(question.productId, question.requestedRole, authentication)
-        if (actor != null && question.requestedRespondentUserId != null && question.requestedRespondentUserId != actor.id) {
+        if (actor != null && !authorization.isFactoryOwner(authentication) && question.requestedRespondentUserId != null && question.requestedRespondentUserId != actor.id) {
             throw org.springframework.security.access.AccessDeniedException("Deze vraag is aan een andere gebruiker gericht.")
         }
     }

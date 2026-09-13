@@ -75,7 +75,7 @@ uitleesbaar. De dispatcher-scheduler kiest geen producten op basis van een losse
 claimt vervallen `SOFTWARE_FACTORY_DISPATCHER`-schema's. De dispatchersessie valideert daarna
 nogmaals dat exact dat ene product actief is en dispatching aanstaat.
 
-`ProductAssignment` bevat minimaal doelgroep, productdoel, harde grenzen en de publieke Git-URL.
+`ProductAssignment` bevat minimaal doelgroep, productdoel en de publieke Git-URL.
 `TestableProductConfiguration` bevat de acceptatieomgeving en eventueel veilige
 productie-informatie, toegestane routes en data- en toegangsgrenzen. Iedere testbare omgeving heeft
 daarnaast een revisionendpoint en een vaste regel
@@ -90,6 +90,10 @@ credentialnamen of -waarden in de testomgevingconfiguratie.
 De globale Stakeholder mag ieder product en de bijbehorende opdracht en testconfiguratie beheren.
 Een proces leest steeds een exacte versie en legt die bronversie op zijn processessie vast.
 
+`DELETE /api/products/{productId}` is alleen beschikbaar voor de factory owner en vereist dat de
+product-ID exact in de requestbody wordt bevestigd. De transactie verwijdert alle productgebonden
+Product Factory-data. Eventueel eerder verstuurd werk in Software Factory valt buiten die transactie.
+
 ## Procesconfiguratie en schedules
 
 De Stakeholder beheert per product een afzonderlijk schedule voor:
@@ -98,6 +102,10 @@ De Stakeholder beheert per product een afzonderlijk schedule voor:
 - `PRODUCT_PLANNING` — roept `runProcessSession(productId)` op Productplanning aan;
 - `QUALITY_ASSURANCE` — roept `runProcessSession(productId)` op Kwaliteitsbewaking aan;
 - `SOFTWARE_FACTORY_DISPATCHER` — roept `runDispatchSession(productId)` aan.
+
+Een productschema is periodiek inhaalwerk. Een epic waarvan alle vereiste beoordelingen geldig zijn,
+plaatst daarnaast meteen een duurzame plannertrigger. Daardoor start Productplanning ook wanneer het
+productschema uitstaat.
 
 `ProcessScheduleConfiguration` bevat minimaal product-ID, proces, `enabled`, IANA-tijdzone,
 schedulepatroon, berekende `nextRunAt`, wijzigingsmoment en versie. Het patroon is precies één van:

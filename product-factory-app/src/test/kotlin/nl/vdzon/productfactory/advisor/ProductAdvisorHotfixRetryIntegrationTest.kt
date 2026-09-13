@@ -49,7 +49,7 @@ class ProductAdvisorHotfixRetryIntegrationTest(
         val owner = users.resolveOrCreate("owner-${productId.value}@example.test", true)
         products.createProduct(CreateProductCommand(productId, "Hotfix product", actor = SYSTEM, idempotencyKey = "create-${productId.value}"))
         products.updateProductAssignment(UpdateProductAssignmentCommand(
-            productId, "Gebruikers", "Betrouwbare hotfix", listOf("Geen wijzigingen buiten de hotfix"), "https://github.com/example/product.git", 0,
+            productId, "Gebruikers", "Betrouwbare hotfix", "https://github.com/example/product.git", 0,
             SYSTEM, "assignment-${productId.value}", "openai", "gpt-5.6-sol",
         ))
         val conversationId = advisor.createConversation(CreateConversationCommand(
