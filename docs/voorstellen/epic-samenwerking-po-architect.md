@@ -1,6 +1,6 @@
 # Epicontwikkeling met een product owner en architect
 
-Datum: 2026-09-13. Status: overdrachtsontwerp voor implementatie; nog niet gebouwd.
+Datum: 2026-09-13. Status: geïmplementeerd; zie het [bewijsrecord](../epic-samenwerking-bewijsrecord.md) en [runbook](../platform/epic-samenwerking-runbook.md).
 
 Dit document legt de met de factory owner besproken richting en het positief ontvangen
 UX-ontwerp vast. Het bevat ook concrete voorgestelde implementatiekeuzes; waar keuzes niet

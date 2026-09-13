@@ -22,7 +22,7 @@ Nieuwe gerichte scenario's in `ProductDesignMvpIntegrationTest` bewijzen:
 - onbekende technische impact kan niet worden goedgekeurd;
 - late verfijning blokkeert oude geplande inhoud;
 - nieuwe inhoud vraagt nieuwe goedkeuring, met behoud van besluithistorie;
-- rolgerichte planningsvraag blokkeert dispatch tot een idempotent antwoord;
+- rolgerichte planningsvraag verwerkt een idempotent antwoord eerst in nieuwe uitwerking;
 - factory-owner-, idempotentie-, versie- en ingetrokken-rolcontroles.
 
 `AuthenticationFlowTest` bewijst login van een uitgenodigde architect buiten de serverallowlist,

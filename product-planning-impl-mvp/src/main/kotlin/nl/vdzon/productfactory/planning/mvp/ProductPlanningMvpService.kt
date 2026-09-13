@@ -451,7 +451,7 @@ class ProductPlanningMvpService(
         result.path("stakeholderQuestion").takeIf { it.isObject }?.let { question ->
             productCommands.askStakeholder(AskStakeholderCommand(
                 session.productId, ROLE.value, requiredText(question, "question", 5, 1000), requiredText(question, "context", 5, 2000),
-                session.id, ids.values.map { SourceReference("STORY", it.value, 1) }, PROCESS_ACTOR, "planning-question-${session.id.value}",
+                session.id, ids.values.map { SourceReference("STORY", it.value, 1) } + ids.values.map { getStory(it) }.map { SourceReference("EPIC",it.epicId.value,it.epicVersion) }.distinct(), PROCESS_ACTOR, "planning-question-${session.id.value}",
                 epicLinkId=ids.values.map { getStory(it).epicId }.distinct().singleOrNull(),
                 requestedRole=nl.vdzon.productfactory.api.advisor.ProductMembershipRole.valueOf(question.path("requestedRole").asText("PRODUCT_OWNER")),
             ))

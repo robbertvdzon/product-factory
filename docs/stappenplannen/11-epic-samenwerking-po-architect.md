@@ -1,6 +1,6 @@
 # Stap 11 — Epicontwikkeling met PO en architect
 
-Status: klaar als overdrachtsplan; implementatie niet gestart. Datum: 2026-09-13.
+Status: geïmplementeerd en lokaal geverifieerd; zie het [bewijsrecord](../epic-samenwerking-bewijsrecord.md) voor de productiecontrole. Datum: 2026-09-13.
 
 ## Opdracht voor de uitvoerende AI-agent
 
@@ -12,8 +12,8 @@ zoals Robbert beoordeelt korte concrete technische impact en het AI-gebruik van 
 inclusief budgetten en uitzonderingen. De factory owner beheert de factory en is geen extra
 epicgoedkeurder.
 
-Dit plan beschrijft toekomstig implementatiewerk; de aanwezigheid van documenten en een prototype
-is geen bewijs dat een stap of capability al is gerealiseerd.
+Dit plan bewaart de oorspronkelijke opdracht en acceptatiematrix. De actuele werking,
+migratiegrenzen en verificatie staan in het bewijsrecord en runbook.
 
 ## Bronnen en startcontrole
 

@@ -6,6 +6,7 @@ import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.advisor.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.api.quality.*
+import nl.vdzon.productfactory.api.design.*
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.dao.DuplicateKeyException
@@ -26,6 +27,8 @@ class ProductApplicationService(
     private val mapper: ObjectMapper,
     private val clock: Clock,
     private val quality: ObjectProvider<QualityService>,
+    private val design: ObjectProvider<ProductDesignService>,
+    private val designQueries: ObjectProvider<ProductDesignQueryService>,
 ) : ProductCommandService, ProductQueryService {
 
     override fun createProduct(command: CreateProductCommand): ProductId {
@@ -319,6 +322,7 @@ class ProductApplicationService(
         )
         if (updated != 1) throw VersionConflict("Stakeholdervraag is intussen gewijzigd.")
         remember(command.idempotencyKey, "RECORD_STAKEHOLDER_ANSWER", command.questionId.value, fingerprint, null, command.actor, now)
+        incorporatePlanningAnswer(question, command.answer, command.actor)
     }
 
     override fun answerStakeholderQuestionDirectly(command: AnswerStakeholderQuestionDirectlyCommand) {
@@ -338,6 +342,24 @@ class ProductApplicationService(
         )
         if (updated != 1) throw VersionConflict("Stakeholdervraag is intussen gewijzigd.")
         remember(command.idempotencyKey, "ANSWER_STAKEHOLDER_QUESTION_DIRECTLY", command.questionId.value, fingerprint, null, command.actor, now)
+        incorporatePlanningAnswer(question, command.answer, command.actor)
+    }
+
+    /** A planning answer changes the basis of a draft package; consume it before dispatch resumes. */
+    private fun incorporatePlanningAnswer(question: StakeholderQuestionDetails, answer: String, actor: ActorReference) {
+        if (question.agentRole != "PLANNER_MVP") return
+        val epicIds=(listOfNotNull(question.epicLinkId) + question.linkedObjects.filter { it.type=="EPIC" }.map { EpicId(it.id) }).distinct()
+        var refined=false
+        for(id in epicIds) {
+            val epic=designQueries.ifAvailable?.getEpic(id) ?: continue
+            if(epic.productId!=question.productId || epic.status !in setOf(EpicStatus.AVAILABLE,EpicStatus.IN_PLANNING,EpicStatus.ACTIVE,EpicStatus.AWAITING_APPROVAL,
+                EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL,EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL)) continue
+            design.ifAvailable?.requestEpicRefinement(RequestEpicRefinementCommand(id,
+                "Verwerk het antwoord van ${question.requestedRole} op planningsvraag ${question.id.value}: ${question.question}\nAntwoord: $answer".take(10000),
+                epic.version,actor,"planning-answer-${question.id.value}-${question.version}-${id.value}"))
+            refined=true
+        }
+        if(refined) design.ifAvailable?.runProcessSession(question.productId)
     }
 
     override fun withdrawStakeholderQuestion(command: WithdrawStakeholderQuestionCommand) {

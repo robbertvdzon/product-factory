@@ -660,11 +660,11 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `rolgerichte planningsvraag blokkeert gekoppelde dispatch tot idempotent antwoord`() {
+    fun `rolgerichte planningsvraag verwerkt antwoord eerst in nieuwe uitwerking`() {
         val (_,arch)=setupGovernance(automatic=true)
         val epic=governedEpic()
         design.claimEpicForPlanning(ClaimEpicForPlanningCommand(epic.id,epic.version,PROCESS,"question-claim"))
-        val question=products.askStakeholder(AskStakeholderCommand(productId,"PRODUCT_PLANNER_MVP","Mag deze koppeling worden gebruikt?",
+        val question=products.askStakeholder(AskStakeholderCommand(productId,"PLANNER_MVP","Mag deze koppeling worden gebruikt?",
             "Architectuurvraag tijdens planning",ProcessSessionId("question-session"),listOf(SourceReference("EPIC",epic.id.value,epic.version)),
             PROCESS,"question-create",epicLinkId=epic.id,requestedRole=ProductMembershipRole.ARCHITECT))
         val details=productQueries.getStakeholderQuestion(question)
@@ -672,8 +672,13 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         assertThat(details.requestedRespondentUserId).isEqualTo(arch)
         assertThat(governance.canDispatch(epic.id,epic.version)).isFalse()
         val answer=AnswerStakeholderQuestionDirectlyCommand(question,"Ja, binnen de vastgelegde grenzen.",details.version,STAKEHOLDER,"question-answer")
-        products.answerStakeholderQuestionDirectly(answer);products.answerStakeholderQuestionDirectly(answer)
-        assertThat(governance.canDispatch(epic.id,epic.version)).isTrue()
+        products.answerStakeholderQuestionDirectly(answer)
+        val updated=queries.getEpic(epic.id)
+        products.answerStakeholderQuestionDirectly(answer)
+        assertThat(queries.getEpic(epic.id).version).isEqualTo(updated.version)
+        assertThat(updated.status).isEqualTo(EpicStatus.NEEDS_REFINEMENT)
+        assertThat(governance.canDispatch(epic.id,epic.version)).isFalse()
+        assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).any { it.status==ProcessSessionStatus.WAITING_FOR_AI }).isTrue()
     }
 
     private fun completeOnlyJob(result: ObjectNode) {

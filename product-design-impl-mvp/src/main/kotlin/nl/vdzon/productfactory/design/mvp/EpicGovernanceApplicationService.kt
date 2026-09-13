@@ -41,7 +41,7 @@ class EpicGovernanceApplicationService(private val jdbc: JdbcTemplate, private v
             } } == true
         }
         val missing=ImpactCategory.entries.take(6).any { c -> s.impact.items.none { it.category==c } }
-        val unknown=missing || s.impact.items.any { it.level==ImpactLevel.UNKNOWN || it.summary.isBlank() || it.evidence.isEmpty() }
+        val unknown=missing || s.impact.items.any { it.level==ImpactLevel.UNKNOWN || it.summary.isBlank() || (it.evidence.isEmpty() || it.evidence.any(String::isBlank)) }
         val outside=s.impact.items.any { it.level==ImpactLevel.MATERIAL && it.category !in policy.automaticCategories }
         val ai=s.impact.productAi
         val aiOutside=ai.changed && (ai.estimatedAdditionalJobsPerDay?.let { it < 0 } == true ||

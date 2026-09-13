@@ -123,7 +123,7 @@ class ProductDesignMvpService(
         val gitSha = git.resolveHead(assignment.publicGitUrl)
         val validDecisions = decisions.getDecisions(productId, clock.instant())
         val signals = products.findUserSignals(UserSignalFilter(productId, statuses = setOf(UserSignalStatus.OPEN, UserSignalStatus.IN_REVIEW)))
-        val questions = products.findStakeholderQuestions(StakeholderQuestionFilter(productId, ROLE.value))
+        val questions = products.findStakeholderQuestions(StakeholderQuestionFilter(productId))
         val existingEpics = findEpics(EpicFilter(productId))
         // Geannuleerde stories zijn losgelaten scope; ze meesturen leverde bij een epic met veel
         // geschiedenis genoeg promptruimte op om de 200k-tekenlimiet te overschrijden (zelfde
@@ -376,7 +376,7 @@ class ProductDesignMvpService(
         if (impact.items.isNotEmpty()) {
             if (impact.items.map { it.category }.distinct().size != impact.items.size ||
                 ImpactCategory.entries.take(6).any { c -> impact.items.none { it.category == c } } ||
-                impact.items.any { it.summary.length !in 5..500 || it.evidence.isEmpty() }) throw InvalidCommand("Impact vereist zes unieke, onderbouwde categorieën.")
+                impact.items.any { it.summary.length !in 5..500 || (it.evidence.isEmpty() || it.evidence.any(String::isBlank)) }) throw InvalidCommand("Impact vereist zes unieke, onderbouwde categorieën.")
         }
         return EpicDraft(title, summary, problem, solution, directions, ux, criteria, rationale, researchSources, readiness, uxArtifacts, uxScreens, impact)
     }

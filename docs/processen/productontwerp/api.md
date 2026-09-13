@@ -331,3 +331,15 @@ De MVP en iedere latere implementatie moeten garanderen dat:
 - [Maven en Spring Modulith](../../platform/maven-en-spring-modulith.md)
 - [Overzicht](../../overzicht.md)
 - [Processen en entiteiten](../processen-en-entiteiten.md)
+
+## PO- en architectbeoordelingen
+
+De aanvullende publieke contracten staan in `GovernanceContract.kt`. Product beheert
+geversioneerde besturingsrollen en architectafspraken; Productontwerp beheert impact,
+inhoudsversies en reviewhistorie. Menselijk akkoord vereist een actief productlidmaatschap
+in de handelende rol. Automatisch akkoord vereist geldige onderbouwde inhoud en mandaat.
+De factory owner is geen inhoudelijk epicgoedkeurder.
+
+Planningclaim en nieuwe dispatch toetsen inhoudsversie en actuele beleidsversie. Statusovergangen
+behouden inhoudelijke goedkeuringen; nieuwe inhoud of nieuw beleid vereist herbeoordeling.
+Zie [het runbook](../../platform/epic-samenwerking-runbook.md) voor endpoints en legacy-migratie.

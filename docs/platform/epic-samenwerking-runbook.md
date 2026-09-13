@@ -46,8 +46,9 @@ na beleidswijzigingen opnieuw bepaald. Onbekende technische impact blijft geblok
 Planningclaim en iedere nieuwe dispatch toetsen de actuele beoordelingen. Nieuwe impact wordt
 via verfijning teruggestuurd; afhankelijk toekomstig werk stopt. Reeds bestaand extern werk wordt
 als zodanig gevolgd en krijgt geen verzonnen annulering of nieuwe identiteit. Vragen hebben een
-productrol en epic-/storycontext. Open vragen blokkeren gekoppelde nieuwe dispatch; antwoorden
-maken het werk weer beschikbaar voor de bestaande scheduler. Er is geen nieuwe Software
+productrol en epic-/storycontext. Open vragen blokkeren gekoppelde nieuwe dispatch. Een planningsantwoord stuurt de gekoppelde
+epic eerst terug naar uitwerking en retireert het toekomstige pakket; het antwoord wordt in de
+nieuwe inhoud verwerkt, waarna beoordeling en planning opnieuw volgen. Er is geen nieuwe Software
 Factory-vragencallback toegevoegd: alleen reeds beschikbare signalen en vraagcommands worden gebruikt.
 
 De PO houdt zicht op stories, bugs, hertests en verificatie. **Code geleverd** is geen claim dat
