@@ -15,6 +15,7 @@ import nl.vdzon.productfactory.api.planning.StoryType
 import nl.vdzon.productfactory.api.quality.*
 import nl.vdzon.productfactory.api.shared.*
 import org.springframework.stereotype.Service
+import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -381,9 +382,11 @@ class EpicProgressService(
             val latest = group.last()
             val at = latest.finishedAt ?: latest.startedAt
             val message = sessionMessage(latest)
+            val longest = group.mapNotNull { session -> session.finishedAt?.let { Duration.between(session.startedAt, it) } }.maxOrNull()
+            val runtime = longest?.takeIf { it.toHours() >= 1 }?.let { " · liep ${it.toHours()} uur" }.orEmpty()
             EpicTimelineEvent(
                 at, kind, if (latest.status == ProcessSessionStatus.FAILED) EpicTimelineSeverity.ERROR else EpicTimelineSeverity.WARNING, title,
-                if (group.size == 1) message else shorten("${group.size}× · laatst $at${message?.let { " · $it" }.orEmpty()}"),
+                if (group.size == 1) shorten("${message.orEmpty()}$runtime") else shorten("${group.size}× · laatst $at$runtime${message?.let { " · $it" }.orEmpty()}"),
             )
         }
     }

@@ -344,6 +344,7 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
   List<Map<String, Object?>> _items = const [];
   List<Map<String, Object?>> _ai = const [];
   List<Map<String, Object?>> _tasks = const [];
+  bool _showAllTasks = false;
   List<Map<String, Object?>> _catalog = const [];
   List<Map<String, Object?>> _productKeys = const [];
   Map<String, Object?>? _budget;
@@ -754,7 +755,19 @@ class _MemoryAiManagementPanelState extends State<MemoryAiManagementPanel> {
             const Card(
               child: ListTile(title: SelectableText('Nog geen AI-taken.')),
             ),
-          ..._tasks.map(_taskCard),
+          ..._tasks.take(_showAllTasks ? _tasks.length : 10).map(_taskCard),
+          if (_tasks.length > 10)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => setState(() => _showAllTasks = !_showAllTasks),
+                child: Text(
+                  _showAllTasks
+                      ? 'Alleen de nieuwste 10 tonen'
+                      : 'Alle ${_tasks.length} AI-taken tonen',
+                ),
+              ),
+            ),
         ],
       ],
     );

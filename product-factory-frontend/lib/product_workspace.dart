@@ -2109,11 +2109,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             borderColor: const Color(0xffd3e7da),
             children: [
               const _Eyebrow('Productdoel'),
-              SelectableText(
+              _ExpandableText(
                 goal?.isNotEmpty == true
                     ? goal!
                     : 'Leg het productdoel vast bij Instellingen.',
-                style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
           ),

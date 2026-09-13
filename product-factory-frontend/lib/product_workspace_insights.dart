@@ -1406,3 +1406,53 @@ class _Figure extends StatelessWidget {
     ],
   );
 }
+
+/// Lange tekst die ingeklapt drie regels toont.
+class _ExpandableText extends StatefulWidget {
+  const _ExpandableText(this.text);
+
+  final String text;
+
+  @override
+  State<_ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<_ExpandableText> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyLarge;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          maxLines: 3,
+          textDirection: Directionality.of(context),
+        )..layout(maxWidth: constraints.maxWidth);
+        final overflows = painter.didExceedMaxLines;
+        painter.dispose();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_open || !overflows)
+              SelectableText(widget.text, style: style)
+            else
+              Text(
+                widget.text,
+                style: style,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            if (overflows)
+              TextButton(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                onPressed: () => setState(() => _open = !_open),
+                child: Text(_open ? 'Minder tonen' : 'Alles tonen'),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
