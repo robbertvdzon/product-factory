@@ -12,6 +12,10 @@
     <name>Product Factory Product Implementation</name>
     <dependencies>
         <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>nl.vdzon.productfactory</groupId>
             <artifactId>product-factory-api</artifactId>
         </dependency>

@@ -1,5 +1,12 @@
 # Product Factory v2 — overzicht
 
+> Volgende uitbreiding (ontwerp, nog niet geïmplementeerd):
+> [epicontwikkeling met een PO en architect](voorstellen/epic-samenwerking-po-architect.md),
+> inclusief [implementatieplan](stappenplannen/11-epic-samenwerking-po-architect.md) en
+> [UX-prototype en schermbeelden](ux/epic-samenwerking/README.md).
+> In die flow beoordeelt de architect technische impact en product-AI; de factory owner
+> heeft geen inhoudelijke epicgoedkeuring. Onderstaande beschrijving betreft de huidige basis.
+
 Product Factory helpt één of meer producten steeds verder te verbeteren. Er is precies één
 **Stakeholder** voor de hele Product Factory. Deze klant geeft voor alle producten het doel en de
 richting aan. Product Factory onderzoekt, ontwerpt, plant en controleert het werk. Software Factory
@@ -590,3 +597,5 @@ Details staan in [Integratie- en acceptatietesten](platform/integratie-en-accept
 - [Kwaliteitsbewaking-API](processen/kwaliteitsbewaking/api.md)
 - [Kwaliteitsbewaking — MVP](processen/kwaliteitsbewaking/mvp.md)
 - [Kwaliteitsbewaking — uitgebreide implementatie](processen/kwaliteitsbewaking/uitgebreid.md)
+
+- [Runbook epic-samenwerking en architectrol](platform/epic-samenwerking-runbook.md)

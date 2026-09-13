@@ -20,7 +20,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 enum class EpicProgressStepState { DONE, FAILED, CURRENT, PENDING }
-enum class EpicWaitingActor { PRODUCT_DESIGN, FACTORY_OWNER, PRODUCT_OWNER, PRODUCT_PLANNING, DISPATCHER, SOFTWARE_FACTORY, QUALITY }
+enum class EpicWaitingActor { PRODUCT_DESIGN, ARCHITECT, FACTORY_OWNER, PRODUCT_OWNER, PRODUCT_PLANNING, DISPATCHER, SOFTWARE_FACTORY, QUALITY }
 enum class EpicTimelineSeverity { INFO, SUCCESS, WARNING, ERROR }
 
 data class EpicProgress(
@@ -69,6 +69,7 @@ class EpicProgressService(
     private val planning: ProductPlanningQueryService,
     private val quality: QualityQueryService,
     private val dispatcher: SoftwareFactoryDispatcherQueryService,
+    private val products: nl.vdzon.productfactory.api.product.ProductQueryService,
 ) {
     fun progress(epicId: EpicId): EpicProgress {
         val epic = design.getEpic(epicId)
@@ -93,7 +94,15 @@ class EpicProgressService(
             version = epic.version,
             phase = phase,
             steps = steps,
-            waitingOn = waitingOn(context),
+            waitingOn = products.findStakeholderQuestions(nl.vdzon.productfactory.api.product.StakeholderQuestionFilter(epic.productId)).firstOrNull {
+                it.status==nl.vdzon.productfactory.api.product.StakeholderQuestionStatus.OPEN &&
+                    (it.epicLinkId==epic.id || it.storyLinkId in storyIds || it.linkedObjects.any { ref -> (ref.type=="EPIC" && ref.id==epic.id.value) || (ref.type=="STORY" && ref.id in targetIds) })
+            }?.let { EpicWaitingOn(if(it.requestedRole.name=="ARCHITECT") EpicWaitingActor.ARCHITECT else EpicWaitingActor.PRODUCT_OWNER,
+                "Antwoord nodig",it.question,it.createdAt,it.id.value,"Beantwoord de vraag om het gekoppelde werk te hervatten.") }
+                ?: epic.review?.takeIf { !it.ready && epic.status in setOf(EpicStatus.IN_PLANNING,EpicStatus.ACTIVE,EpicStatus.VERIFYING) }?.let {
+                    EpicWaitingOn(if(!it.productOwnerApproved) EpicWaitingActor.PRODUCT_OWNER else EpicWaitingActor.ARCHITECT,
+                        "Beoordeling nodig",it.blockers.joinToString("\n"),epic.updatedAt,epic.id.value,"Bekijk de actuele inhoud en productafspraken.")
+                } ?: waitingOn(context),
             stories = stories.map {
                 EpicProgressStory(
                     it.id.value, it.sequenceNumber, it.title, it.type, it.status, it.externalStoryId, it.deliveredCommitSha,
@@ -212,12 +221,12 @@ class EpicProgressService(
                 epic.updatedAt, null, "Na de verfijning volgt opnieuw goedkeuring.",
             )
             EpicStatus.AWAITING_APPROVAL, EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL -> EpicWaitingOn(
-                EpicWaitingActor.FACTORY_OWNER, "Wacht op goedkeuring factory owner", "De epic is uitgewerkt en wacht op goedkeuring.",
+                EpicWaitingActor.ARCHITECT, "Wacht op architectbeoordeling", "De architect beoordeelt technische impact en product-AI.",
                 epic.updatedAt, null, "Na goedkeuring pakt Productplanning de epic op.",
             )
             EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL -> EpicWaitingOn(
                 EpicWaitingActor.PRODUCT_OWNER, "Wacht op goedkeuring product owner", "De epic is uitgewerkt en wacht op goedkeuring.",
-                epic.updatedAt, null, "Daarna volgt goedkeuring door de factory owner.",
+                epic.updatedAt, null, "Daarna volgt zo nodig architectbeoordeling en vervolgens planning.",
             )
             EpicStatus.AVAILABLE -> EpicWaitingOn(
                 EpicWaitingActor.PRODUCT_PLANNING, "Wacht op Productplanning", "De epic is goedgekeurd en wacht tot planning hem oppakt.",
@@ -437,7 +446,7 @@ class EpicProgressService(
             EpicStatus.NEEDS_REFINEMENT to "verfijning nodig",
             EpicStatus.AWAITING_APPROVAL to "wacht op goedkeuring",
             EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL to "wacht op goedkeuring product owner",
-            EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL to "wacht op goedkeuring factory owner",
+            EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL to "wacht op architectbeoordeling",
             EpicStatus.AVAILABLE to "beschikbaar voor planning",
             EpicStatus.IN_PLANNING to "in planning",
             EpicStatus.ACTIVE to "in uitvoering",

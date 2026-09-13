@@ -10,8 +10,8 @@ import java.time.Instant
 @JvmInline value class DesignWorkItemId(val value: String)
 
 enum class GlobalRole { FACTORY_OWNER }
-enum class ActingRole { FACTORY_OWNER, PRODUCT_OWNER }
-enum class ProductMembershipRole { PRODUCT_OWNER }
+enum class ActingRole { FACTORY_OWNER, PRODUCT_OWNER, ARCHITECT }
+enum class ProductMembershipRole { PRODUCT_OWNER, ARCHITECT }
 enum class MembershipStatus { ACTIVE, REVOKED }
 enum class ConversationStatus { OPEN, PROCESSING, WAITING_FOR_USER, PROPOSAL_READY, BLOCKED, CLOSED }
 enum class ConversationSender { USER, PRODUCT_ADVISOR, SYSTEM }
@@ -31,9 +31,11 @@ data class UserDetails(
     val memberships: List<ProductMembershipDetails>,
     val actingRole: ActingRole = if (GlobalRole.FACTORY_OWNER in globalRoles) ActingRole.FACTORY_OWNER else ActingRole.PRODUCT_OWNER,
 ) {
+    val availableRoles: Set<String>
+        get() = globalRoles.map { it.name }.toSet() + memberships.filter { it.status == MembershipStatus.ACTIVE }.map { it.role.name }
     /** Rollen die nu gelden: een factory owner die als product owner werkt, heeft geen globale rollen. */
     val effectiveGlobalRoles: Set<GlobalRole>
-        get() = if (actingRole == ActingRole.PRODUCT_OWNER) emptySet() else globalRoles
+        get() = if (actingRole != ActingRole.FACTORY_OWNER) emptySet() else globalRoles
 }
 data class ProductMembershipDetails(
     val productId: ProductId,
@@ -73,6 +75,8 @@ data class ProductConversationDetails(
     val updatedAt: Instant,
     val messages: List<ProductConversationMessageDetails> = emptyList(),
     val request: ProductRequestDetails? = null,
+    val epicId: String? = null,
+    val audienceRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER,
 )
 data class ProductRequestVersionDetails(
     val version: Long,
@@ -131,7 +135,8 @@ data class NotificationDetails(
     val version: Long,
 )
 
-data class CreateConversationCommand(val productId: ProductId, val title: String, val userId: UserId, val idempotencyKey: String)
+data class CreateConversationCommand(val productId: ProductId, val title: String, val userId: UserId, val idempotencyKey: String,
+    val epicId: String? = null, val audienceRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER)
 data class AddConversationMessageCommand(val conversationId: ProductConversationId, val text: String, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
 data class CloseConversationCommand(val conversationId: ProductConversationId, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
 data class ApproveProductRequestCommand(val requestId: ProductRequestId, val requestVersion: Long, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)

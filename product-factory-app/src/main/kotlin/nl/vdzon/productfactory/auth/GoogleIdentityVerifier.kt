@@ -44,6 +44,7 @@ class SpringGoogleIdentityVerifier(
     @Value("\${PF_GOOGLE_CLIENT_ID}") private val clientId: String,
     @Value("\${PF_STAKEHOLDER_EMAILS}") stakeholderEmails: String,
     private val clock: Clock,
+    private val users: UserIdentityRepository? = null,
 ) : GoogleIdentityVerifier {
     private val allowedEmails = stakeholderEmails
         .split(',', ';')
@@ -66,7 +67,10 @@ class SpringGoogleIdentityVerifier(
         } catch (_: RuntimeException) {
             reject()
         }
-        if (email !in allowedEmails) reject()
+        val invited=users?.findByEmail(email)?.let { user -> user.active && user.memberships.any {
+            it.status == nl.vdzon.productfactory.api.advisor.MembershipStatus.ACTIVE
+        } } == true
+        if (email !in allowedEmails && !invited) reject()
         return VerifiedGoogleIdentity(
             subject = jwt.subject?.takeIf { it.isNotBlank() } ?: reject(),
             email = email,

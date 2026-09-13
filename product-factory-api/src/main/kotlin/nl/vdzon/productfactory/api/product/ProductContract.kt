@@ -205,6 +205,7 @@ data class AskStakeholderCommand(
     val productRequestId: ProductRequestId? = null,
     val epicLinkId: EpicId? = null,
     val storyLinkId: StoryId? = null,
+    val requestedRole: nl.vdzon.productfactory.api.advisor.ProductMembershipRole = nl.vdzon.productfactory.api.advisor.ProductMembershipRole.PRODUCT_OWNER,
 )
 data class RecordStakeholderAnswerCommand(
     val questionId: StakeholderQuestionId,
@@ -255,6 +256,7 @@ data class StakeholderQuestionDetails(
     val productRequestId: ProductRequestId? = null,
     val epicLinkId: EpicId? = null,
     val storyLinkId: StoryId? = null,
+    val requestedRole: nl.vdzon.productfactory.api.advisor.ProductMembershipRole = nl.vdzon.productfactory.api.advisor.ProductMembershipRole.PRODUCT_OWNER,
 )
 
 data class StartMeetingCommand(

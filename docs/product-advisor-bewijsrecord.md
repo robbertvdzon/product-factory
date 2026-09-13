@@ -2,6 +2,9 @@
 
 Datum: 2026-09-10
 
+Aanvulling: de hieronder beschreven oude PO/factory-ownerketen is vervangen door
+[versiegebonden PO-/architectbeoordelingen](platform/epic-samenwerking-runbook.md).
+
 ## Opgeleverd
 
 - duurzame identiteit, `FACTORY_OWNER` en geversioneerde product-ownerlidmaatschappen met

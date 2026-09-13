@@ -1,14 +1,15 @@
 package nl.vdzon.productfactory.auth
 
 import nl.vdzon.productfactory.api.advisor.UserId
+import nl.vdzon.productfactory.api.advisor.ProductMembershipRole
 import nl.vdzon.productfactory.api.shared.ProductId
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 
 data class CreateOrFindUserRequest(val email: String, val idempotencyKey: String)
-data class MembershipMutationRequest(val expectedVersion: Long, val idempotencyKey: String)
-data class RevokeMembershipRequest(val reason: String, val confirmation: Boolean, val expectedVersion: Long, val idempotencyKey: String)
+data class MembershipMutationRequest(val expectedVersion: Long, val idempotencyKey: String, val role: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER)
+data class RevokeMembershipRequest(val reason: String, val confirmation: Boolean, val expectedVersion: Long, val idempotencyKey: String, val role: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER)
 
 @RestController
 @RequestMapping("/api/admin/users")
@@ -36,7 +37,7 @@ class UserManagementController(
     ) {
         authorization.requireFactoryOwner(authentication)
         users.grantProductOwner(
-            UserId(userId), ProductId(productId), authorization.currentUserId(authentication), request.expectedVersion, request.idempotencyKey,
+            UserId(userId), ProductId(productId), authorization.currentUserId(authentication), request.expectedVersion, request.idempotencyKey, request.role,
         )
     }
 
@@ -51,7 +52,7 @@ class UserManagementController(
         authorization.requireFactoryOwner(authentication)
         require(request.confirmation) { "Expliciete bevestiging is verplicht." }
         users.revokeProductOwner(
-            UserId(userId), ProductId(productId), request.reason, authorization.currentUserId(authentication), request.expectedVersion, request.idempotencyKey,
+            UserId(userId), ProductId(productId), request.reason, authorization.currentUserId(authentication), request.expectedVersion, request.idempotencyKey, request.role,
         )
     }
 }

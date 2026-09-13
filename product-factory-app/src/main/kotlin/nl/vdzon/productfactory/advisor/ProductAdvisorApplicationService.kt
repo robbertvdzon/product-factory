@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import nl.vdzon.productfactory.api.advisor.*
 import nl.vdzon.productfactory.api.ai.*
 import nl.vdzon.productfactory.api.decisions.DecisionQueryService
-import nl.vdzon.productfactory.api.design.ProductDesignService
+import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.design.RequestEpicRefinementCommand
 import nl.vdzon.productfactory.api.foundation.PublicGitRevisionResolver
 import nl.vdzon.productfactory.api.memory.AgentMemoryQueryService
@@ -41,6 +41,10 @@ class ProductAdvisorApplicationService(
     private val ai: AiExecutionService,
     private val aiQueries: AiExecutionQueryService,
     private val productDesign: ProductDesignService,
+    private val designQueries: ProductDesignQueryService,
+    private val governance: EpicGovernanceService,
+    private val policies: ProductGovernanceService,
+    private val identities: ProductIdentityQuery,
     private val git: PublicGitRevisionResolver,
     adapters: List<SoftwareFactoryAdapter>,
     private val hotfix: DashboardHotfixGateway,
@@ -64,6 +68,7 @@ class ProductAdvisorApplicationService(
                 VALUES (?,?,?,?,'OPEN',?,?,1)""".trimIndent(),
             id.value, command.productId.value, command.title.trim(), command.userId.value, now, now,
         )
+        jdbc.update("UPDATE pf_product_conversation SET epic_id=?,audience_role=? WHERE conversation_id=?", command.epicId,command.audienceRole.name,id.value)
         recordCommand(command.idempotencyKey, "CREATE_CONVERSATION", fingerprint, id.value)
         return id
     }
@@ -241,6 +246,9 @@ class ProductAdvisorApplicationService(
                 "repository" to mapOf("url" to assignment.publicGitUrl, "commitSha" to sha),
                 "testConfiguration" to testConfiguration,
                 "allowedOutcomes" to AdvisorOutcome.entries.map { it.name },
+                "productGovernance" to policies.getPolicy(turn.productId),
+                "epicContext" to (getConversation(turn.conversationId).epicId ?: getConversation(turn.conversationId).request?.linkedEpicId)?.let { designQueries.getEpic(EpicId(it)) },
+                "roleInstruction" to "Beantwoord voor de audienceRole. ARCHITECT onderzoekt korte technische impact en product-AI. PRODUCT_OWNER bespreekt werking en UX. In een epicgesprek maak je geen nieuw ProductRequest: adviseer en laat feedback expliciet verwerken.",
             )
             val contextJson = mapper.writeValueAsString(context)
             val prompt = advisorPrompt(contextJson)
@@ -294,7 +302,7 @@ class ProductAdvisorApplicationService(
         val targetStatus = when (outcome) {
             AdvisorOutcome.ANSWER, AdvisorOutcome.ASK_FOLLOW_UP -> ConversationStatus.WAITING_FOR_USER
             AdvisorOutcome.PROPOSE_CHANGE -> {
-                applyProposal(conversation, result.path("proposal"), requireNotNull(row.third), now)
+                if (getConversation(row.first).epicId == null && getConversation(row.first).request?.linkedEpicId == null) applyProposal(conversation, result.path("proposal"), requireNotNull(row.third), now)
                 ConversationStatus.PROPOSAL_READY
             }
         }
@@ -342,6 +350,9 @@ class ProductAdvisorApplicationService(
             requestId.value, version, type.name, title, summary, problem, userImpact, currentBehavior, desiredBehavior,
             json(evidence), sha, json(criteria), json(scope), json(boundaries), json(exclusions), now,
         )
+        if (type == ProductRequestType.EPIC_CANDIDATE && policies.getPolicy(conversation.productId).let { it.configured && it.productOwnerMode == ResponsibilityMode.AI }) {
+            jdbc.update("UPDATE pf_product_request SET status='APPROVED' WHERE request_id=?",requestId.value)
+        }
         notify(conversation.createdBy, conversation.productId, "proposal:$requestId:$version", "PROPOSAL_READY", "Voorstel gereed: $title", "PRODUCT_REQUEST", requestId.value)
     }
 
@@ -523,6 +534,11 @@ class ProductAdvisorApplicationService(
 
     @Transactional
     fun approveEpic(epicId: String, role: ApprovalRole, userId: UserId, expectedVersion: Long, idempotencyKey: String) {
+        if (policies.getPolicy(designQueries.getEpic(EpicId(epicId)).productId).configured) {
+            if (role == ApprovalRole.FACTORY_OWNER) throw InvalidCommand("Factory owners geven geen epicgoedkeuring. Gebruik de architectrol.")
+            governance.review(ReviewEpicCommand(EpicId(epicId),expectedVersion,ProductMembershipRole.PRODUCT_OWNER,userId,ReviewDecision.APPROVE,"Functioneel akkoord",idempotencyKey))
+            return
+        }
         val existing = jdbc.query(
             "SELECT epic_id,epic_version,approval_role,user_id FROM pf_epic_approval_record WHERE idempotency_key=?",
             { rs, _ -> listOf(rs.getString(1), rs.getLong(2), rs.getString(3), rs.getString(4)) }, idempotencyKey,
@@ -576,7 +592,8 @@ class ProductAdvisorApplicationService(
             ) }, id.value,
         )
         val request = jdbc.query("SELECT request_id FROM pf_product_request WHERE conversation_id=?", { rs, _ -> ProductRequestId(rs.getString(1)) }, id.value).singleOrNull()?.let(::getRequest)
-        return ProductConversationDetails(row.id, row.productId, row.title, row.createdBy, row.status, row.version, row.createdAt, row.updatedAt, messages, request)
+        val context = jdbc.query("SELECT epic_id,audience_role FROM pf_product_conversation WHERE conversation_id=?",{rs,_->rs.getString(1) to ProductMembershipRole.valueOf(rs.getString(2))},id.value).single()
+        return ProductConversationDetails(row.id, row.productId, row.title, row.createdBy, row.status, row.version, row.createdAt, row.updatedAt, messages, request, context.first, context.second)
     }
 
     override fun findRequests(productId: ProductId?): List<ProductRequestDetails> = jdbc.query(
@@ -608,53 +625,65 @@ class ProductAdvisorApplicationService(
         val products = allowedProducts(userId)
         if (products.isEmpty()) return emptyList()
         val actions = mutableListOf<PersonalActionDetails>()
-        findRequests().filter { it.productId.value in products }.forEach { request ->
+        val actionRole=identities.getIdentity(userId).actingRole
+        findRequests().filter { it.productId.value in products && actionRole==ActingRole.PRODUCT_OWNER }.forEach { request ->
             when (request.status) {
                 ProductRequestStatus.PROPOSED -> actions += PersonalActionDetails("proposal:${request.id.value}", request.productId, "PROPOSAL_READY", request.content.title, "PRODUCT_REQUEST", request.id.value, request.updatedAt)
                 ProductRequestStatus.ROUTING_FAILED -> actions += PersonalActionDetails("routing:${request.id.value}", request.productId, "ROUTING_FAILED", request.content.title, "PRODUCT_REQUEST", request.id.value, request.updatedAt)
                 else -> Unit
             }
         }
-        findConversationsForProducts(products).filter { it.status in setOf(ConversationStatus.WAITING_FOR_USER, ConversationStatus.BLOCKED) }.forEach {
+        findConversationsForProducts(products).filter { it.audienceRole.name==actionRole.name && it.status in setOf(ConversationStatus.WAITING_FOR_USER, ConversationStatus.BLOCKED) }.forEach {
             actions += PersonalActionDetails("conversation:${it.id.value}:${it.status}", it.productId, "ADVISOR_${it.status}", it.title, "CONVERSATION", it.id.value, it.updatedAt)
         }
         jdbc.query(
             """SELECT question_id,product_id,question,created_at FROM pf_stakeholder_question
-                WHERE requested_respondent_user_id=? AND status='OPEN' ORDER BY created_at DESC""".trimIndent(),
+                WHERE (requested_respondent_user_id=? OR requested_respondent_user_id IS NULL) AND requested_role=? AND status='OPEN' ORDER BY created_at DESC""".trimIndent(),
             { rs, _ -> PersonalActionDetails(
                 "question:${rs.getString(1)}", ProductId(rs.getString(2)), "QUESTION_OPEN", rs.getString(3),
                 "QUESTION", rs.getString(1), rs.getTimestamp(4).toInstant(),
-            ) }, userId.value,
+            ) }, userId.value, actionRole.name,
         ).filter { it.productId.value in products }.forEach(actions::add)
-        jdbc.query(
-            """SELECT e.id,e.product_id,v.title,e.updated_at FROM pf_epic e
-                JOIN pf_epic_version v ON v.epic_id=e.id AND v.version=e.current_version
-                WHERE e.source_product_request_id IS NOT NULL AND v.status='AVAILABLE'
-                  AND NOT EXISTS (SELECT 1 FROM pf_epic_approval_record a WHERE a.epic_id=e.id AND a.epic_version=e.current_version AND a.approval_role='PRODUCT_OWNER')
-                  AND EXISTS (SELECT 1 FROM pf_product_membership m WHERE m.user_id=? AND m.product_id=e.product_id AND m.status='ACTIVE')""".trimIndent(),
-            { rs, _ -> PersonalActionDetails(
-                "product-approval:${rs.getString(1)}", ProductId(rs.getString(2)), "PRODUCT_APPROVAL_REQUIRED", rs.getString(3),
-                "EPIC", rs.getString(1), rs.getTimestamp(4).toInstant(),
-            ) }, userId.value,
-        ).forEach(actions::add)
-        if (actsAsFactoryOwner(userId)) jdbc.query(
-            """SELECT e.id,e.product_id,v.title,e.updated_at FROM pf_epic e
-                JOIN pf_epic_version v ON v.epic_id=e.id AND v.version=e.current_version
-                WHERE e.source_product_request_id IS NOT NULL AND v.status='AVAILABLE'
-                  AND EXISTS (SELECT 1 FROM pf_epic_approval_record a WHERE a.epic_id=e.id AND a.epic_version=e.current_version AND a.approval_role='PRODUCT_OWNER')
-                  AND NOT EXISTS (SELECT 1 FROM pf_epic_approval_record a WHERE a.epic_id=e.id AND a.epic_version=e.current_version AND a.approval_role='FACTORY_OWNER')""".trimIndent(),
-            { rs, _ -> PersonalActionDetails(
-                "factory-approval:${rs.getString(1)}", ProductId(rs.getString(2)), "FACTORY_APPROVAL_REQUIRED", rs.getString(3),
-                "EPIC", rs.getString(1), rs.getTimestamp(4).toInstant(),
-            ) },
-        ).forEach(actions::add)
+        val user = identities.getIdentity(userId)
+        products.forEach { product ->
+            designQueries.findEpics(EpicFilter(ProductId(product))).filter { it.status !in setOf(EpicStatus.COMPLETED,EpicStatus.CANCELLED,EpicStatus.WITHDRAWN) }.forEach epicLoop@ { epic ->
+                val state=epic.review ?: return@epicLoop
+                val po=user.actingRole==ActingRole.PRODUCT_OWNER && !state.productOwnerApproved
+                val architect=user.actingRole==ActingRole.ARCHITECT && !state.architectApproved
+                if (po || architect) actions += PersonalActionDetails("review:${epic.id.value}:${epic.contentVersion}:${user.actingRole}",epic.productId,
+                    if(po) "PRODUCT_APPROVAL_REQUIRED" else "ARCHITECT_APPROVAL_REQUIRED",epic.title,"EPIC",epic.id.value,epic.updatedAt)
+            }
+        }
         return actions.sortedByDescending { it.createdAt }
+    }
+
+    fun notifyEpicReviews() {
+        designQueries.findEpics(EpicFilter()).forEach { epic ->
+            val state=epic.review ?: return@forEach
+            if (epic.status in setOf(EpicStatus.CANCELLED,EpicStatus.WITHDRAWN,EpicStatus.NOT_SUCCESSFUL)) return@forEach
+            for (role in ProductMembershipRole.entries) {
+                val needed=if(role==ProductMembershipRole.ARCHITECT) !state.architectApproved else !state.productOwnerApproved
+                if (needed || epic.status==EpicStatus.COMPLETED) identities.productMembers(epic.productId,role).filter { it.active }.forEach { user ->
+                    val completed=epic.status==EpicStatus.COMPLETED
+                    notify(user.id,epic.productId,"epic-review:${epic.id.value}:${state.contentVersion}:${state.policyVersion}:$role:${if(completed) "done" else "review"}",
+                        if(completed) "EPIC_COMPLETED" else if(role==ProductMembershipRole.ARCHITECT) "ARCHITECT_APPROVAL_REQUIRED" else "PRODUCT_APPROVAL_REQUIRED",
+                        if(completed) "Geverifieerd: ${epic.title}" else "Beoordeling nodig: ${epic.title}","EPIC",epic.id.value)
+                }
+            }
+        }
     }
 
     override fun findNotifications(userId: UserId): List<NotificationDetails> = jdbc.query(
         "SELECT notification_id,product_id,kind,title,target_type,target_id,read_at,created_at,version FROM pf_personal_notification WHERE recipient_user_id=? ORDER BY created_at DESC",
         { rs, _ -> NotificationDetails(rs.getString(1), ProductId(rs.getString(2)), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getTimestamp(7)?.toInstant(), rs.getTimestamp(8).toInstant(), rs.getLong(9)) }, userId.value,
-    )
+    ).filter { notification ->
+        notification.productId.value in allowedProducts(userId) && when(notification.kind) {
+            "ARCHITECT_APPROVAL_REQUIRED" -> identities.getIdentity(userId).actingRole==ActingRole.ARCHITECT
+            "PRODUCT_APPROVAL_REQUIRED", "PROPOSAL_READY" -> identities.getIdentity(userId).actingRole==ActingRole.PRODUCT_OWNER
+            "FACTORY_APPROVAL_REQUIRED" -> false
+            else -> true
+        }
+    }
 
     @Transactional
     fun markNotificationRead(id: String, userId: UserId, expectedVersion: Long, idempotencyKey: String) {
@@ -726,11 +755,11 @@ class ProductAdvisorApplicationService(
     private fun factoryOwners(): List<UserId> = jdbc.query("SELECT user_id FROM pf_user_global_role WHERE role='FACTORY_OWNER'", { rs, _ -> UserId(rs.getString(1)) })
     private fun actsAsFactoryOwner(userId: UserId): Boolean = (jdbc.queryForObject(
         """SELECT COUNT(*) FROM pf_user_global_role r JOIN pf_user_account u ON u.user_id=r.user_id
-            WHERE r.user_id=? AND r.role='FACTORY_OWNER' AND (u.acting_role IS NULL OR u.acting_role<>'PRODUCT_OWNER')""".trimIndent(),
+            WHERE r.user_id=? AND r.role='FACTORY_OWNER' AND (u.acting_role IS NULL OR u.acting_role='FACTORY_OWNER')""".trimIndent(),
         Long::class.java, userId.value,
     ) ?: 0L) > 0
     private fun allowedProducts(userId: UserId): Set<String> {
-        return if (actsAsFactoryOwner(userId)) jdbc.query("SELECT product_id FROM pf_product", { rs, _ -> rs.getString(1) }).toSet() else jdbc.query("SELECT product_id FROM pf_product_membership WHERE user_id=? AND status='ACTIVE'", { rs, _ -> rs.getString(1) }, userId.value).toSet()
+        return if (actsAsFactoryOwner(userId)) jdbc.query("SELECT product_id FROM pf_product", { rs, _ -> rs.getString(1) }).toSet() else identities.getIdentity(userId).let { user -> user.memberships.filter { it.status==MembershipStatus.ACTIVE && it.role.name==user.actingRole.name }.map { it.productId.value }.toSet() }
     }
     private fun findConversationsForProducts(productIds: Set<String>): List<ProductConversationDetails> = productIds.flatMap { findConversations(ProductId(it)) }
     private fun replayCommand(key: String, type: String, requestFingerprint: String): String? {
@@ -805,4 +834,11 @@ class ProductAdvisorScheduler(
         service.resumeAdvisorTurns()
         service.routeApprovedRequests()
     }
+}
+
+@Service
+class EpicReviewNotificationScheduler(private val service: ProductAdvisorApplicationService,
+    @Value("\${PF_AI_RUNTIME_SCHEDULING_ENABLED:false}") private val enabled: Boolean) {
+    @Scheduled(fixedDelayString = "\${PF_GOVERNANCE_NOTIFICATION_DELAY_MS:15000}")
+    fun reconcile() { if(enabled) service.notifyEpicReviews() }
 }

@@ -62,6 +62,9 @@ data class EpicDetails(
     val refinementReason: String? = null,
     val sourceProductRequestId: String? = null,
     val sourceProductRequestVersion: Long? = null,
+    val contentVersion: Long = version,
+    val impact: EpicImpactAssessment = EpicImpactAssessment(),
+    val review: EpicReviewState? = null,
 )
 data class ApproveEpicCommand(val epicId: EpicId, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class RequestEpicRefinementCommand(val epicId: EpicId, val reason: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)

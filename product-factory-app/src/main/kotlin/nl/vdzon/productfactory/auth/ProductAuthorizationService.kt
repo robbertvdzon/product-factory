@@ -2,6 +2,7 @@ package nl.vdzon.productfactory.auth
 
 import nl.vdzon.productfactory.api.advisor.UserDetails
 import nl.vdzon.productfactory.api.advisor.UserId
+import nl.vdzon.productfactory.api.advisor.ProductMembershipRole
 import nl.vdzon.productfactory.api.shared.ProductId
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.jdbc.core.JdbcTemplate
@@ -30,12 +31,12 @@ class ProductAuthorizationService(
         current(authentication)?.id ?: users.resolveOrCreate("local@productfactory.invalid", true).id
 
     fun isFactoryOwner(authentication: Authentication? = SecurityContextHolder.getContext().authentication): Boolean =
-        !authRequired || current(authentication)?.effectiveGlobalRoles?.any { it.name == "FACTORY_OWNER" } == true
+        !authRequired || (current(authentication)?.actingRole?.name == "FACTORY_OWNER" && current(authentication)?.effectiveGlobalRoles?.any { it.name == "FACTORY_OWNER" } == true)
 
     fun canReadProduct(productId: ProductId, authentication: Authentication? = SecurityContextHolder.getContext().authentication): Boolean {
         if (isFactoryOwner(authentication)) return true
         return current(authentication)?.memberships?.any {
-            it.productId == productId && it.status.name == "ACTIVE" && it.role.name == "PRODUCT_OWNER"
+            it.productId == productId && it.status.name == "ACTIVE" && it.role.name == current(authentication)?.actingRole?.name
         } == true
     }
 
@@ -44,6 +45,14 @@ class ProductAuthorizationService(
 
     fun requireProduct(productId: ProductId, authentication: Authentication? = SecurityContextHolder.getContext().authentication) {
         if (!canReadProduct(productId, authentication)) throw AccessDeniedException("Geen toegang tot dit product.")
+    }
+
+    fun requireRole(productId: ProductId, role: ProductMembershipRole, authentication: Authentication? = SecurityContextHolder.getContext().authentication) {
+        if (!authRequired) return
+        val user = current(authentication)
+        if (user == null || !user.active || user.actingRole.name != role.name || user.memberships.none {
+            it.productId == productId && it.role == role && it.status.name == "ACTIVE"
+        }) throw AccessDeniedException("Een actief ${role.name}-lidmaatschap in deze rol is vereist.")
     }
 
     fun requireFactoryOwner(authentication: Authentication? = SecurityContextHolder.getContext().authentication) {

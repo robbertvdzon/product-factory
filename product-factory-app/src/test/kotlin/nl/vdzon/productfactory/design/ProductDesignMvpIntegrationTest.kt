@@ -45,6 +45,8 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     private val advisor: ProductAdvisorApplicationService,
     private val users: UserIdentityRepository,
     private val jdbc: JdbcTemplate,
+    private val governance: nl.vdzon.productfactory.design.mvp.EpicGovernanceApplicationService,
+    private val policies: ProductGovernanceService,
 ) {
     private var productId = ProductId("not-initialized")
 
@@ -523,6 +525,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     private fun assertStrictObjectSchemas(schema: JsonNode) {
+        if (schema.has("enum") || schema.has("const")) assertThat(schema.has("type")).isTrue()
         val types = schema.path("type").let { type ->
             if (type.isArray) type.map(JsonNode::asText).toSet() else setOf(type.asText())
         }
@@ -533,6 +536,144 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
             schema.path("properties").forEach(::assertStrictObjectSchemas)
         }
         schema.path("items").takeUnless(JsonNode::isMissingNode)?.let(::assertStrictObjectSchemas)
+    }
+
+    private fun setupGovernance(automatic: Boolean = false): Pair<UserId, UserId> {
+        val factory=users.resolveOrCreate("factory-${productId.value}@example.test",true).id
+        policies.updatePolicy(UpdateGovernancePolicyCommand(ProductGovernancePolicy(productId,
+            productOwnerMode=if(automatic) ResponsibilityMode.AI else ResponsibilityMode.HUMAN,
+            architectMode=if(automatic) ResponsibilityMode.AI else ResponsibilityMode.HUMAN),factory,"policy-${productId.value}"))
+        val po=users.resolveOrCreate("po-${productId.value}@example.test",false).id
+        val arch=users.resolveOrCreate("arch-${productId.value}@example.test",false).id
+        users.grantProductOwner(po,productId,factory,0,"po-${productId.value}")
+        users.grantProductOwner(arch,productId,factory,0,"arch-${productId.value}",ProductMembershipRole.ARCHITECT)
+        users.setActingRole(po,ActingRole.PRODUCT_OWNER)
+        users.setActingRole(arch,ActingRole.ARCHITECT)
+        return po to arch
+    }
+
+    private fun governedEpic(material: ImpactCategory? = null, unknown: Boolean = false, productAi: ProductAiImpact = ProductAiImpact()): EpicDetails {
+        design.runProcessSession(productId)
+        val result=validEpic()
+        (result.path("epic") as ObjectNode).set<JsonNode>("impact",mapper.valueToTree(EpicImpactAssessment(
+            ImpactCategory.entries.take(6).map { ImpactItem(it,if(it==material) { if(unknown) ImpactLevel.UNKNOWN else ImpactLevel.MATERIAL } else ImpactLevel.NONE,
+                "Onderbouwde impact voor $it",listOf("Repository inspectie: geen aanvullende wijziging buiten beschreven scope")) },
+            productAi=productAi,changeSummary="Eerste onderbouwde uitwerking")))
+        completeOnlyJob(result);design.runProcessSession(productId)
+        return queries.findEpics(EpicFilter(productId)).single()
+    }
+
+    private fun decision(epic: EpicDetails,user: UserId,role: ProductMembershipRole,decision: ReviewDecision=ReviewDecision.APPROVE,key: String=UUID.randomUUID().toString()) =
+        ReviewEpicCommand(epic.id,epic.version,role,user,decision,"Beoordeling met onderbouwde reden",key)
+
+    @Test
+    fun `menselijke PO keurt compatibele impact goed zonder factory owner stap en status behoudt akkoord`() {
+        val (po,_)=setupGovernance()
+        val epic=governedEpic()
+        assertThat(epic.review!!.architectApproved).isTrue()
+        assertThat(epic.review!!.ready).isFalse()
+        assertThatThrownBy { design.claimEpicForPlanning(ClaimEpicForPlanningCommand(epic.id,epic.version,PROCESS,"blocked")) }.isInstanceOf(InvalidCommand::class.java)
+        val cmd=decision(epic,po,ProductMembershipRole.PRODUCT_OWNER)
+        governance.review(cmd);governance.review(cmd)
+        assertThat(governance.reviewState(epic.id).records).hasSize(2)
+        assertThat(queries.getEpic(epic.id).status).isEqualTo(EpicStatus.AVAILABLE)
+        design.claimEpicForPlanning(ClaimEpicForPlanningCommand(epic.id,epic.version,PROCESS,"claim"))
+        val claimed=queries.getEpic(epic.id)
+        assertThat(claimed.contentVersion).isEqualTo(epic.contentVersion)
+        assertThat(claimed.version).isGreaterThan(epic.version)
+        assertThat(governance.canDispatch(epic.id,epic.version)).isTrue()
+        assertThatThrownBy { governance.review(cmd.copy(reason="Andere payload")) }.isInstanceOf(IdempotencyConflict::class.java)
+    }
+
+    @Test
+    fun `materiele impact en AI iedere tien minuten vragen architect en nieuw beleid maakt akkoord ongeldig`() {
+        val (po,arch)=setupGovernance()
+        val epic=governedEpic(ImpactCategory.PRODUCT_AI,productAi=ProductAiImpact(changed=true,frequency="Iedere tien minuten",estimatedAdditionalJobsPerDay=144))
+        governance.review(decision(epic,po,ProductMembershipRole.PRODUCT_OWNER))
+        assertThat(governance.reviewState(epic.id).architectRequired).isTrue()
+        assertThat(governance.reviewState(epic.id).ready).isFalse()
+        governance.review(decision(epic,arch,ProductMembershipRole.ARCHITECT,ReviewDecision.REQUEST_RESEARCH))
+        assertThat(governance.reviewState(epic.id).ready).isFalse()
+        governance.review(decision(epic,arch,ProductMembershipRole.ARCHITECT))
+        assertThat(governance.reviewState(epic.id).ready).isTrue()
+        val policy=policies.getPolicy(productId)
+        policies.updatePolicy(UpdateGovernancePolicyCommand(policy.copy(maximumAdditionalJobsPerDay=100),arch,"new-policy"))
+        assertThat(governance.reviewState(epic.id).ready).isFalse()
+        assertThat(governance.reviewState(epic.id).records).hasSize(3)
+    }
+
+    @Test
+    fun `autonoom binnen mandaat geen mens nodig maar onbekende impact stopt`() {
+        setupGovernance(automatic=true)
+        val epic=governedEpic()
+        assertThat(epic.review!!.ready).isTrue()
+        assertThat(epic.review!!.records).allMatch { it.automatic }
+        design.claimEpicForPlanning(ClaimEpicForPlanningCommand(epic.id,epic.version,PROCESS,"auto-claim"))
+        assertThat(governance.canDispatch(epic.id,epic.version)).isTrue()
+    }
+
+    @Test
+    fun `onbekende impact kan niet door mens of autonoom worden goedgekeurd`() {
+        val (_,arch)=setupGovernance(automatic=true)
+        val epic=governedEpic(ImpactCategory.DATABASE,unknown=true)
+        assertThat(epic.review!!.ready).isFalse()
+        assertThatThrownBy { governance.review(decision(epic,arch,ProductMembershipRole.ARCHITECT)) }.isInstanceOf(InvalidCommand::class.java)
+    }
+
+    @Test
+    fun `nieuwe inhoud en late verfijning blokkeren oude planningversie`() {
+        val (po,arch)=setupGovernance()
+        val epic=governedEpic()
+        governance.review(decision(epic,po,ProductMembershipRole.PRODUCT_OWNER))
+        design.claimEpicForPlanning(ClaimEpicForPlanningCommand(epic.id,epic.version,PROCESS,"late-claim"))
+        val claimed=queries.getEpic(epic.id)
+        design.requestEpicRefinement(RequestEpicRefinementCommand(epic.id,"Nieuwe migratie is nodig volgens architect",claimed.version,STAKEHOLDER,"late-impact"))
+        assertThat(governance.canDispatch(epic.id,epic.version)).isFalse()
+        design.runProcessSession(productId)
+        val draft=validEpic();val previous=queries.getEpic(epic.id)
+        draft.put("outcome","REVISE_EPIC").put("epicId",epic.id.value).put("expectedVersion",previous.version)
+        keepExistingUx(draft.path("epic") as ObjectNode,previous)
+        (draft.path("epic") as ObjectNode).set<JsonNode>("impact",mapper.valueToTree(epic.impact.copy(changeSummary="Database-aanpassing toegelicht")))
+        completeOnlyJob(draft);design.runProcessSession(productId)
+        val revised=queries.getEpic(epic.id)
+        assertThat(revised.contentVersion).isGreaterThan(epic.contentVersion)
+        assertThat(revised.review!!.productOwnerApproved).isFalse()
+        assertThat(revised.review!!.records).anyMatch { it.contentVersion==epic.contentVersion }
+        assertThat(governance.canDispatch(epic.id,epic.version)).isFalse()
+        assertThatThrownBy { governance.review(decision(epic,arch,ProductMembershipRole.ARCHITECT)) }.isInstanceOf(VersionConflict::class.java)
+    }
+
+    @Test
+    fun `factory owner en ingetrokken lidmaatschap kunnen reviews niet omzeilen`() {
+        val (po,arch)=setupGovernance()
+        val epic=governedEpic(ImpactCategory.ACCESS)
+        val factory=users.resolveOrCreate("other-factory-${productId.value}@example.test",true).id
+        assertThatThrownBy { governance.review(decision(epic,factory,ProductMembershipRole.ARCHITECT)) }.isInstanceOf(InvalidCommand::class.java)
+        assertThatThrownBy { design.approveEpic(ApproveEpicCommand(epic.id,epic.version,STAKEHOLDER,"bypass")) }.isInstanceOf(InvalidCommand::class.java)
+        assertThatThrownBy { policies.updatePolicy(UpdateGovernancePolicyCommand(policies.getPolicy(productId).copy(monthlyProductBudgetEuro="100"),factory,"budget-bypass")) }.isInstanceOf(InvalidCommand::class.java)
+        governance.review(decision(epic,po,ProductMembershipRole.PRODUCT_OWNER))
+        governance.review(decision(epic,arch,ProductMembershipRole.ARCHITECT))
+        assertThat(governance.reviewState(epic.id).ready).isTrue()
+        users.revokeProductOwner(arch,productId,"Andere architect",factory,1,"revoke",ProductMembershipRole.ARCHITECT)
+        assertThat(governance.reviewState(epic.id).ready).isFalse()
+        assertThatThrownBy { users.setActingRole(po,ActingRole.ARCHITECT) }.isInstanceOf(InvalidCommand::class.java)
+    }
+
+    @Test
+    fun `rolgerichte planningsvraag blokkeert gekoppelde dispatch tot idempotent antwoord`() {
+        val (_,arch)=setupGovernance(automatic=true)
+        val epic=governedEpic()
+        design.claimEpicForPlanning(ClaimEpicForPlanningCommand(epic.id,epic.version,PROCESS,"question-claim"))
+        val question=products.askStakeholder(AskStakeholderCommand(productId,"PRODUCT_PLANNER_MVP","Mag deze koppeling worden gebruikt?",
+            "Architectuurvraag tijdens planning",ProcessSessionId("question-session"),listOf(SourceReference("EPIC",epic.id.value,epic.version)),
+            PROCESS,"question-create",epicLinkId=epic.id,requestedRole=ProductMembershipRole.ARCHITECT))
+        val details=productQueries.getStakeholderQuestion(question)
+        assertThat(details.requestedRole).isEqualTo(ProductMembershipRole.ARCHITECT)
+        assertThat(details.requestedRespondentUserId).isEqualTo(arch)
+        assertThat(governance.canDispatch(epic.id,epic.version)).isFalse()
+        val answer=AnswerStakeholderQuestionDirectlyCommand(question,"Ja, binnen de vastgelegde grenzen.",details.version,STAKEHOLDER,"question-answer")
+        products.answerStakeholderQuestionDirectly(answer);products.answerStakeholderQuestionDirectly(answer)
+        assertThat(governance.canDispatch(epic.id,epic.version)).isTrue()
     }
 
     private fun completeOnlyJob(result: ObjectNode) {

@@ -335,6 +335,46 @@ class AuthenticationFlowTest(
         }.andExpect { status { isForbidden() } }
     }
 
+    @Test
+    fun `uitgenodigde architect buiten allowlist logt in en ingetrokken rol blokkeert API`() {
+        val factoryLogin=login()
+        val factory=userIdentities.findByEmail("stakeholder@example.com")!!
+        val id="architect-${java.util.UUID.randomUUID().toString().take(8)}"
+        val factoryCsrf=objectMapper.readTree(factoryLogin.contentAsByteArray).path("csrfToken").asText()
+        mockMvc.post("/api/products") {
+            header(HttpHeaders.ORIGIN,FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER,factoryCsrf)
+            cookie(cookie(factoryLogin,ProductFactorySessionService.SESSION_COOKIE),cookie(factoryLogin,ProductFactorySessionService.CSRF_COOKIE))
+            contentType=MediaType.APPLICATION_JSON
+            content="""{"requestedId":"$id","name":"Architect project","idempotencyKey":"$id"}"""
+        }.andExpect { status { isCreated() } }
+        val invited=userIdentities.createForAdministration("$id@example.test","invite-$id")
+        userIdentities.grantProductOwner(invited.id,nl.vdzon.productfactory.api.shared.ProductId(id),factory.id,0,"grant-$id",nl.vdzon.productfactory.api.advisor.ProductMembershipRole.ARCHITECT)
+        val now=Instant.now()
+        `when`(jwtDecoder.decode("invited-token")).thenReturn(Jwt.withTokenValue("invited-token").header("alg","RS256")
+            .subject(id).issuer("https://accounts.google.com").audience(listOf("product-factory-client"))
+            .issuedAt(now.minusSeconds(10)).expiresAt(now.plusSeconds(300)).claim("email","$id@example.test").claim("email_verified",true).build())
+        val response=mockMvc.post("/api/auth/google") {
+            header(HttpHeaders.ORIGIN,FRONTEND_ORIGIN);contentType=MediaType.APPLICATION_JSON
+            content="""{"idToken":"invited-token"}"""
+        }.andExpect { status { isOk() };jsonPath("$.actingRole") { value("ARCHITECT") };jsonPath("$.availableRoles[0]") { value("ARCHITECT") } }.andReturn().response
+        val session=cookie(response,ProductFactorySessionService.SESSION_COOKIE)
+        mockMvc.get("/api/products/$id/governance") { cookie(session) }.andExpect { status { isOk() } }
+        mockMvc.get("/api/admin/users") { cookie(session) }.andExpect { status { isForbidden() } }
+        mockMvc.get("/api/ai/tasks") { cookie(session) }.andExpect { status { isForbidden() } }
+        val token=objectMapper.readTree(response.contentAsByteArray).path("csrfToken").asText()
+        mockMvc.post("/api/products/$id/conversations") {
+            header(HttpHeaders.ORIGIN,FRONTEND_ORIGIN);header(ProductFactorySessionService.CSRF_HEADER,token)
+            cookie(session,cookie(response,ProductFactorySessionService.CSRF_COOKIE));contentType=MediaType.APPLICATION_JSON
+            content="""{"title":"Geen PO rol","idempotencyKey":"idea-$id"}"""
+        }.andExpect { status { isForbidden() } }
+        userIdentities.revokeProductOwner(invited.id,nl.vdzon.productfactory.api.shared.ProductId(id),"Toegang ingetrokken",factory.id,1,"revoke-$id",nl.vdzon.productfactory.api.advisor.ProductMembershipRole.ARCHITECT)
+        mockMvc.get("/api/products/$id/governance") { cookie(session) }.andExpect { status { isForbidden() } }
+        mockMvc.post("/api/auth/google") {
+            header(HttpHeaders.ORIGIN,FRONTEND_ORIGIN);contentType=MediaType.APPLICATION_JSON;content="""{"idToken":"invited-token"}"""
+        }.andExpect { status { isUnauthorized() } }
+    }
+
     private fun login() = mockMvc.post("/api/auth/google") {
         header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
         contentType = MediaType.APPLICATION_JSON

@@ -35,7 +35,7 @@ class ProductAdvisorController(
         @RequestBody request: CreateConversationRequest,
         authentication: Authentication?,
     ): Map<String, String> {
-        authorization.requireProduct(ProductId(productId), authentication)
+        authorization.requireRole(ProductId(productId), ProductMembershipRole.PRODUCT_OWNER, authentication)
         val id = service.createConversation(CreateConversationCommand(ProductId(productId), request.title, authorization.currentUserId(authentication), request.idempotencyKey))
         return mapOf("id" to id.value)
     }
@@ -53,7 +53,7 @@ class ProductAdvisorController(
         authentication: Authentication?,
     ): Map<String, String> {
         val id = ProductConversationId(conversationId)
-        authorization.requireProduct(service.getConversation(id).productId, authentication)
+        service.getConversation(id).let { authorization.requireRole(it.productId, it.audienceRole, authentication) }
         val messageId = service.addMessage(AddConversationMessageCommand(id, request.text, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey))
         return mapOf("id" to messageId.value)
     }
@@ -62,7 +62,7 @@ class ProductAdvisorController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun close(@PathVariable conversationId: String, @RequestBody request: ConversationActionRequest, authentication: Authentication?) {
         val id = ProductConversationId(conversationId)
-        authorization.requireProduct(service.getConversation(id).productId, authentication)
+        service.getConversation(id).let { authorization.requireRole(it.productId, it.audienceRole, authentication) }
         service.closeConversation(CloseConversationCommand(id, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey))
     }
 
@@ -70,7 +70,7 @@ class ProductAdvisorController(
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun retry(@PathVariable conversationId: String, @RequestBody request: ConversationActionRequest, authentication: Authentication?) {
         val id = ProductConversationId(conversationId)
-        authorization.requireProduct(service.getConversation(id).productId, authentication)
+        service.getConversation(id).let { authorization.requireRole(it.productId, it.audienceRole, authentication) }
         service.retryConversation(id, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey)
     }
 
@@ -87,7 +87,7 @@ class ProductAdvisorController(
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun approveRequest(@PathVariable requestId: String, @RequestBody request: RequestApprovalRequest, authentication: Authentication?) {
         val id = ProductRequestId(requestId)
-        authorization.requireProduct(service.getRequest(id).productId, authentication)
+        authorization.requireRole(service.getRequest(id).productId, ProductMembershipRole.PRODUCT_OWNER, authentication)
         service.approveRequest(ApproveProductRequestCommand(id, request.requestVersion, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey))
     }
 
@@ -95,7 +95,7 @@ class ProductAdvisorController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun cancelRequest(@PathVariable requestId: String, @RequestBody request: ConversationActionRequest, authentication: Authentication?) {
         val id = ProductRequestId(requestId)
-        authorization.requireProduct(service.getRequest(id).productId, authentication)
+        authorization.requireRole(service.getRequest(id).productId, ProductMembershipRole.PRODUCT_OWNER, authentication)
         service.cancelRequest(CancelProductRequestCommand(id, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey))
     }
 
@@ -103,9 +103,9 @@ class ProductAdvisorController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun productApproval(@PathVariable epicId: String, @RequestBody request: EpicApprovalRequest, authentication: Authentication?) {
         val productId = epicProduct(epicId)
-        authorization.requireProduct(productId, authentication)
+        authorization.requireRole(productId, ProductMembershipRole.PRODUCT_OWNER, authentication)
         val user = authorization.current(authentication)
-        if (user != null && user.memberships.none { it.productId == productId && it.status == MembershipStatus.ACTIVE }) {
+        if (user != null && user.memberships.none { it.productId == productId && it.status == MembershipStatus.ACTIVE && it.role == ProductMembershipRole.PRODUCT_OWNER }) {
             throw AccessDeniedException("Een actief product owner-lidmaatschap is vereist.")
         }
         service.approveEpic(epicId, ApprovalRole.PRODUCT_OWNER, authorization.currentUserId(authentication), request.expectedVersion, request.idempotencyKey)
@@ -115,7 +115,7 @@ class ProductAdvisorController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun factoryApproval(@PathVariable epicId: String, @RequestBody request: EpicApprovalRequest, authentication: Authentication?) {
         authorization.requireFactoryOwner(authentication)
-        service.approveEpic(epicId, ApprovalRole.FACTORY_OWNER, authorization.currentUserId(authentication), request.expectedVersion, request.idempotencyKey)
+        throw nl.vdzon.productfactory.api.shared.InvalidCommand("Factory owners keuren epics niet goed. Stel productrollen in en gebruik de architectwerkplek.")
     }
 
     @PostMapping("/api/epics/{epicId}/product-request-refinement")

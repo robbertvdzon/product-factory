@@ -1,5 +1,8 @@
 # Runbook — Product Advisor en Product Requests
 
+Zie voor de nieuwe PO-/architectflow, rollen en migratie het
+[runbook epic-samenwerking](epic-samenwerking-runbook.md).
+
 ## Operationele grens
 
 `GET /api/foundation/implementations` toont `product-advisor-v1`. Product Advisor gebruikt Agent

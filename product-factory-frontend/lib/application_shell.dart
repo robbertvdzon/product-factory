@@ -11,6 +11,7 @@ import 'page_refresh.dart';
 import 'page_reload.dart';
 import 'product_workspace.dart';
 import 'product_conversations.dart';
+import 'epic_collaboration.dart';
 import 'product_factory_theme.dart';
 import 'testbed.dart';
 import 'user_management.dart';
@@ -31,9 +32,11 @@ enum _Destination {
   operation,
   system,
   acceptance,
+  governance,
 }
 
 _Destination _destinationForPath(String path) => switch (path) {
+  '/productafspraken' => _Destination.governance,
   '/ontwerp' => _Destination.design,
   '/planning' => _Destination.planning,
   '/kwaliteit' => _Destination.quality,
@@ -52,6 +55,7 @@ _Destination _destinationForPath(String path) => switch (path) {
 };
 
 String _pathForDestination(_Destination destination) => switch (destination) {
+  _Destination.governance => '/productafspraken',
   _Destination.overview => '/',
   _Destination.design => '/ontwerp',
   _Destination.planning => '/planning',
@@ -88,6 +92,7 @@ class ApplicationShell extends StatefulWidget {
     this.isFactoryOwner = true,
     this.productMemberships = const {},
     this.actingRole,
+    this.availableRoles = const {},
     this.onSwitchRole,
     super.key,
   });
@@ -111,6 +116,7 @@ class ApplicationShell extends StatefulWidget {
 
   /// `FACTORY_OWNER` of `PRODUCT_OWNER`; bepaalt samen met [isFactoryOwner] het rollabel.
   final String? actingRole;
+  final Set<String> availableRoles;
 
   /// Aanwezig wanneer de gebruiker tussen factory owner en product owner kan wisselen.
   final ValueChanged<String>? onSwitchRole;
@@ -220,7 +226,25 @@ class _ApplicationShellState extends State<ApplicationShell> {
     final memory =
         widget.memoryAiGateway ??
         HttpMemoryAiGateway(csrfToken: widget.csrfToken);
+    if (_selected == _Destination.governance || !widget.isFactoryOwner) {
+      return EpicCollaborationPage(
+        key: ValueKey('collaboration-${widget.actingRole}-${_selected.name}'),
+        products: products,
+        role: widget.actingRole ?? 'PRODUCT_OWNER',
+        csrfToken: widget.csrfToken,
+        initialProductId: _selectedProductId,
+        onProductSelected: _selectProduct,
+        section: _selected == _Destination.governance
+            ? 'policy'
+            : _selected == _Destination.meetings
+            ? 'questions'
+            : _selected == _Destination.design
+            ? 'epics'
+            : 'home',
+      );
+    }
     return switch (_selected) {
+      _Destination.governance => const SizedBox.shrink(),
       _Destination.overview => ProductWorkspacePage(
         gateway: products,
         initialProductId: _selectedProductId,
@@ -428,7 +452,7 @@ class _ApplicationShellState extends State<ApplicationShell> {
                   onPressed: () => widget.onSwitchRole!('FACTORY_OWNER'),
                 ),
               ],
-              if (!compact) ...[
+              if (!compact && widget.isFactoryOwner) ...[
                 const SizedBox(width: 10),
                 FilledButton.icon(
                   onPressed: () => _select(_Destination.signals),
@@ -460,48 +484,82 @@ class _ApplicationShellState extends State<ApplicationShell> {
       children: [
         const _Brand(),
         const SizedBox(height: 24),
-        _navItem(
-          _Destination.overview,
-          Icons.home_outlined,
-          'Overzicht',
-          closeAfterSelection,
-        ),
-        _navItem(
-          _Destination.design,
-          Icons.auto_awesome_outlined,
-          'Ontwerp',
-          closeAfterSelection,
-        ),
-        _navItem(
-          _Destination.planning,
-          Icons.format_list_bulleted,
-          'Planning',
-          closeAfterSelection,
-        ),
-        _navItem(
-          _Destination.quality,
-          Icons.diamond_outlined,
-          'Kwaliteit',
-          closeAfterSelection,
-        ),
-        _navItem(
-          _Destination.signals,
-          Icons.radio_button_unchecked,
-          'Signalen',
-          closeAfterSelection,
-        ),
-        _navItem(
-          _Destination.meetings,
-          Icons.forum_outlined,
-          'Overleggen',
-          closeAfterSelection,
-        ),
-        _navItem(
-          _Destination.conversations,
-          Icons.chat_bubble_outline,
-          'Gesprekken',
-          closeAfterSelection,
-        ),
+        if (!widget.isFactoryOwner) ...[
+          _navItem(
+            _Destination.overview,
+            Icons.home_outlined,
+            widget.actingRole == 'ARCHITECT' ? 'Te beoordelen' : 'Mijn werk',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.design,
+            Icons.auto_awesome_outlined,
+            widget.actingRole == 'ARCHITECT' ? 'Epicimpact' : 'Mijn epics',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.meetings,
+            Icons.question_answer_outlined,
+            'Vragen',
+            closeAfterSelection,
+          ),
+          if (widget.actingRole == 'ARCHITECT')
+            _navItem(
+              _Destination.governance,
+              Icons.rule,
+              'Productafspraken',
+              closeAfterSelection,
+            ),
+        ] else ...[
+          _navItem(
+            _Destination.overview,
+            Icons.home_outlined,
+            'Overzicht',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.design,
+            Icons.auto_awesome_outlined,
+            'Ontwerp',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.planning,
+            Icons.format_list_bulleted,
+            'Planning',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.quality,
+            Icons.diamond_outlined,
+            'Kwaliteit',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.signals,
+            Icons.radio_button_unchecked,
+            'Signalen',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.meetings,
+            Icons.forum_outlined,
+            'Overleggen',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.conversations,
+            Icons.chat_bubble_outline,
+            'Gesprekken',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.governance,
+            Icons.supervisor_account_outlined,
+            'Productbesturing',
+            closeAfterSelection,
+          ),
+        ],
         if (widget.isFactoryOwner)
           const Padding(
             padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
@@ -580,7 +638,11 @@ class _ApplicationShellState extends State<ApplicationShell> {
   );
 
   Widget _roleLabel() {
-    final label = widget.isFactoryOwner ? 'Factory owner' : 'Product owner';
+    final label = widget.isFactoryOwner
+        ? 'Factory owner'
+        : widget.actingRole == 'ARCHITECT'
+        ? 'Architect'
+        : 'Product owner';
     const style = TextStyle(color: Color(0xff90aaa4), fontSize: 12);
     final onSwitchRole = widget.onSwitchRole;
     if (onSwitchRole == null) return Text(label, style: style);
@@ -597,19 +659,22 @@ class _ApplicationShellState extends State<ApplicationShell> {
         for (final (role, title, subtitle) in const [
           ('FACTORY_OWNER', 'Factory owner', 'Alle producten en beheer'),
           ('PRODUCT_OWNER', 'Product owner', 'Alleen je eigen producten'),
+          ('ARCHITECT', 'Architect', 'Architectuur en product-AI'),
         ])
-          PopupMenuItem(
-            value: role,
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                role == current ? Icons.check : null,
-                color: ProductFactoryColors.primary,
+          if (widget.availableRoles.isEmpty ||
+              widget.availableRoles.contains(role))
+            PopupMenuItem(
+              value: role,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  role == current ? Icons.check : null,
+                  color: ProductFactoryColors.primary,
+                ),
+                title: Text('Werken als ${title.toLowerCase()}'),
+                subtitle: Text(subtitle),
               ),
-              title: Text('Werken als ${title.toLowerCase()}'),
-              subtitle: Text(subtitle),
             ),
-          ),
       ],
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -689,7 +754,10 @@ class _ApplicationShellState extends State<ApplicationShell> {
   };
 
   _Destination _allowed(_Destination destination) =>
-      !widget.isFactoryOwner && _factoryOwnerDestinations.contains(destination)
+      !widget.isFactoryOwner &&
+          (_factoryOwnerDestinations.contains(destination) ||
+              (destination == _Destination.governance &&
+                  widget.actingRole != 'ARCHITECT'))
       ? _Destination.overview
       : destination;
 

@@ -56,6 +56,13 @@ schedules, de volledige keten, negentien vaste Testbedscenario's en een normatie
 
 ## Geplande uitbreiding na het MVP
 
+Voor de volgende uitbreiding staat een volledig overdrachtspakket klaar:
+[stap 11 — Epicontwikkeling met PO en architect](11-epic-samenwerking-po-architect.md),
+met [functionele specificatie](../voorstellen/epic-samenwerking-po-architect.md) en
+[klikbare UX en schermbeelden](../ux/epic-samenwerking/README.md). Dit is nog niet geïmplementeerd.
+De architect neemt daarin architectuur, product-AI, budgetten en uitzonderingen op zich;
+de huidige verplichte factory-ownerapproval vervalt voor die nieuwe flow.
+
 | Stap | Plan | Resultaat |
 |---|---|---|
 | 10 | [Product Advisor en Product Requests](10-product-advisor-en-productrequests.md) | Een product owner kan met `PRODUCT_ADVISOR` overleggen en een bevestigd verzoek als hotfix, bugfix of dubbel goedgekeurde epic laten uitvoeren. |

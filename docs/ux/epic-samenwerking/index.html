@@ -1,0 +1,1508 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Product Factory — PO, architect en factory owner</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Product Factory — PO, architect en factory owner" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Product Factory — PO, architect en factory owner&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&quot;pf-prototype&quot; aria-label=&quot;Product Factory rolontwerp&quot;&gt;
+  &lt;div class=&quot;pf-demo&quot;&gt;
+    &lt;span&gt;&lt;strong&gt;UX-verkenning&lt;/strong&gt; · fictief PvdD-voorbeeld&lt;/span&gt;
+    &lt;label&gt;Bekijk als &lt;select id=&quot;pf-role&quot; aria-label=&quot;Bekijk als&quot;&gt;&lt;option value=&quot;po&quot;&gt;Marc · product owner&lt;/option&gt;&lt;option value=&quot;architect&quot;&gt;Robbert · architect&lt;/option&gt;&lt;option value=&quot;owner&quot;&gt;Robbert · factory owner&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;
+    &lt;label&gt;Moment &lt;select id=&quot;pf-stage&quot; aria-label=&quot;Moment in de epic&quot;&gt;&lt;option value=&quot;draft&quot;&gt;Samen uitwerken&lt;/option&gt;&lt;option value=&quot;review&quot;&gt;Architect beoordeelt&lt;/option&gt;&lt;option value=&quot;planning&quot;&gt;Vraag tijdens planning&lt;/option&gt;&lt;option value=&quot;building&quot;&gt;Wordt gebouwd&lt;/option&gt;&lt;option value=&quot;delivered&quot;&gt;Opgeleverd&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;pf-window&quot;&gt;
+    &lt;header class=&quot;pf-top&quot;&gt;&lt;div class=&quot;pf-brand&quot;&gt;&lt;span class=&quot;pf-mark&quot;&gt;pf&lt;/span&gt; Product Factory&lt;/div&gt;&lt;div class=&quot;pf-top-right&quot;&gt;&lt;span class=&quot;pf-muted&quot;&gt;Werkplek&lt;/span&gt;&lt;span id=&quot;pf-identity&quot;&gt;&lt;/span&gt;&lt;/div&gt;&lt;/header&gt;
+    &lt;div class=&quot;pf-layout&quot;&gt;&lt;aside id=&quot;pf-sidebar&quot;&gt;&lt;/aside&gt;&lt;main id=&quot;pf-main&quot;&gt;&lt;/main&gt;&lt;/div&gt;
+    &lt;footer class=&quot;pf-foot&quot;&gt;&lt;span&gt;Interactief ontwerp · alle acties blijven in dit voorbeeld&lt;/span&gt;&lt;span id=&quot;pf-footer-role&quot;&gt;&lt;/span&gt;&lt;/footer&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;pf-toast&quot; id=&quot;pf-toast&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;style&gt;
+#pf-prototype { --pf-bg:light-dark(#f6f7f9,#171b20); --pf-paper:light-dark(#ffffff,#20262d); --pf-ink:light-dark(#1e2d35,#edf2f5); --pf-sub:light-dark(#566771,#acbcc7); --pf-line:light-dark(#dfe6e9,#3b454f); --pf-green:light-dark(#176d56,#88d6b8); --pf-soft:light-dark(#edf6f1,#233d34); --pf-warn:light-dark(#875014,#ecc28b); --pf-warm:light-dark(#fff5e7,#423326); --pf-blue:light-dark(#285b8d,#a5cdf3); --pf-bluebg:light-dark(#eff5fc,#263647); color:var(--pf-ink); font:14px/1.5 -apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif; }
+#pf-prototype * {box-sizing:border-box} #pf-prototype button,#pf-prototype input,#pf-prototype textarea,#pf-prototype select {font:inherit;color:inherit} #pf-prototype button {cursor:pointer} #pf-prototype button:disabled {opacity:.55;cursor:default} #pf-prototype button:focus-visible,#pf-prototype select:focus-visible,#pf-prototype textarea:focus-visible,#pf-prototype input:focus-visible {outline:2px solid var(--pf-green);outline-offset:3px}
+#pf-prototype .pf-demo {display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 2px 16px;color:var(--pf-sub);font-size:12px} #pf-prototype .pf-demo&gt;span {margin-right:auto} #pf-prototype label {display:grid;gap:6px} #pf-prototype .pf-demo label {display:flex;align-items:center;gap:6px} #pf-prototype select {max-width:100%;padding:7px 10px;border:1px solid var(--pf-line);border-radius:7px;background:var(--pf-paper)}
+#pf-prototype .pf-window {background:var(--pf-bg);border:1px solid var(--pf-line);border-radius:12px;overflow:hidden} #pf-prototype .pf-top {display:flex;justify-content:space-between;gap:14px;align-items:center;padding:17px 22px;border-bottom:1px solid var(--pf-line);background:var(--pf-paper)} #pf-prototype .pf-brand {display:flex;align-items:center;gap:10px;font-weight:600} #pf-prototype .pf-mark {background:var(--pf-green);color:var(--pf-paper);width:31px;height:31px;display:grid;place-items:center;border-radius:9px;font-weight:700} #pf-prototype .pf-top-right {display:flex;align-items:center;gap:12px;font-size:12px} #pf-prototype .pf-layout {display:grid;grid-template-columns:176px minmax(0,1fr);min-height:670px} #pf-prototype aside {padding:24px 13px;background:var(--pf-paper);border-right:1px solid var(--pf-line)} #pf-prototype main {padding:28px;min-width:0} #pf-prototype .pf-project {padding:0 10px 22px;display:grid;gap:3px} #pf-prototype .pf-project strong {font-size:16px} #pf-prototype .pf-muted {color:var(--pf-sub)} #pf-prototype .pf-small {font-size:12px} #pf-prototype .pf-nav {display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;text-align:left;padding:11px 12px;background:transparent;border:0;border-radius:7px;margin:3px 0} #pf-prototype .pf-nav.active {background:var(--pf-soft);color:var(--pf-green);font-weight:600} #pf-prototype .pf-nav-note {border-top:1px solid var(--pf-line);margin:28px 10px 0;padding-top:15px;font-size:12px;color:var(--pf-sub)}
+#pf-prototype h1 {font-size:26px;line-height:1.25;margin:0 0 9px;letter-spacing:-.6px;font-weight:600} #pf-prototype h2 {font-size:17px;margin:0 0 14px;font-weight:600} #pf-prototype h3 {font-size:14px;margin:0 0 6px;font-weight:600} #pf-prototype p {margin:0 0 13px} #pf-prototype .pf-eyebrow {color:var(--pf-green);font-size:11px;letter-spacing:1.1px;text-transform:uppercase;margin-bottom:9px;font-weight:600} #pf-prototype .pf-heading {display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:22px} #pf-prototype .pf-heading p {color:var(--pf-sub);margin:0} #pf-prototype .pf-btn {display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 13px;border:1px solid var(--pf-line);border-radius:7px;background:var(--pf-paper);text-align:center;font-weight:500;text-decoration:none} #pf-prototype .pf-primary {background:var(--pf-green);color:var(--pf-paper);border-color:var(--pf-green)} #pf-prototype .pf-link {color:var(--pf-green);border:0;background:transparent;padding:5px 0;text-align:left;font-weight:500} #pf-prototype .pf-btnrow {display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:16px} #pf-prototype .pf-panel {background:var(--pf-paper);border:1px solid var(--pf-line);border-radius:10px;padding:20px;margin-bottom:18px} #pf-prototype .pf-callout {display:flex;align-items:flex-start;justify-content:space-between;gap:16px;background:var(--pf-warm);border-radius:9px;padding:18px;margin-bottom:22px;color:var(--pf-warn)} #pf-prototype .pf-callout p {margin:4px 0 0} #pf-prototype .pf-callout.green {background:var(--pf-soft);color:var(--pf-green)} #pf-prototype .pf-callout.blue {background:var(--pf-bluebg);color:var(--pf-blue)} #pf-prototype .pf-tag {display:inline-block;max-width:100%;border-radius:5px;padding:3px 7px;font-size:11px;line-height:1.5;background:var(--pf-bg);color:var(--pf-sub);white-space:normal} #pf-prototype .pf-tag.green {background:var(--pf-soft);color:var(--pf-green)} #pf-prototype .pf-tag.amber {background:var(--pf-warm);color:var(--pf-warn)} #pf-prototype .pf-tag.blue {background:var(--pf-bluebg);color:var(--pf-blue)}
+#pf-prototype .pf-row {display:flex;justify-content:space-between;gap:16px;align-items:center;padding:16px 0;border-top:1px solid var(--pf-line)} #pf-prototype .pf-row:first-child {border-top:0;padding-top:0} #pf-prototype .pf-row:last-child {padding-bottom:0} #pf-prototype .pf-row p {margin:5px 0 0;color:var(--pf-sub);font-size:12px} #pf-prototype .pf-row&gt;div {min-width:0} #pf-prototype .pf-split {display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px} #pf-prototype .pf-two {display:grid;grid-template-columns:1fr 1fr;gap:16px} #pf-prototype .pf-tabs {display:flex;gap:18px;flex-wrap:wrap;border-bottom:1px solid var(--pf-line);margin-bottom:22px} #pf-prototype .pf-tab {padding:11px 0;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--pf-sub)} #pf-prototype .pf-tab.active {color:var(--pf-green);border-bottom-color:var(--pf-green);font-weight:600} #pf-prototype .pf-steps {display:flex;gap:7px;margin:0 0 22px;flex-wrap:wrap} #pf-prototype .pf-step {flex:1;min-width:75px;border-top:3px solid var(--pf-line);padding-top:8px;color:var(--pf-sub);font-size:11px} #pf-prototype .pf-step.done {border-color:var(--pf-green)} #pf-prototype .pf-step.current {border-color:var(--pf-green);color:var(--pf-green);font-weight:600}
+#pf-prototype textarea,#pf-prototype input[type=text],#pf-prototype input[type=number] {width:100%;background:var(--pf-paper);border:1px solid var(--pf-line);border-radius:7px;padding:11px;resize:vertical} #pf-prototype textarea {min-height:95px} #pf-prototype .pf-chat {display:grid;gap:14px;margin-bottom:20px} #pf-prototype .pf-message {background:var(--pf-bg);border-radius:9px;padding:14px} #pf-prototype .pf-message.mine {background:var(--pf-soft);margin-left:26px} #pf-prototype .pf-message strong {display:block;margin-bottom:6px;font-size:12px} #pf-prototype .pf-message p:last-child {margin:0} #pf-prototype .pf-checks {list-style:none;padding:0;margin:8px 0} #pf-prototype .pf-checks li {padding:7px 0;display:flex;gap:8px} #pf-prototype .pf-checks li:before {content:&#x27;✓&#x27;;color:var(--pf-green)} #pf-prototype .pf-list {padding-left:18px;margin:10px 0} #pf-prototype .pf-list li {margin:8px 0} #pf-prototype .pf-meta {display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:9px 0 18px;color:var(--pf-sub);font-size:12px} #pf-prototype .pf-impact {width:100%;display:flex;align-items:flex-start;gap:12px;border:0;border-top:1px solid var(--pf-line);background:transparent;text-align:left;padding:15px 0} #pf-prototype .pf-impact:first-child {border-top:0} #pf-prototype .pf-impact .pf-impact-text {flex:1} #pf-prototype .pf-impact p {font-size:12px;color:var(--pf-sub);margin:4px 0 0} #pf-prototype .pf-impact-num {color:var(--pf-sub);font-size:11px;padding-top:3px;min-width:20px} #pf-prototype .pf-detail {border-left:3px solid var(--pf-green);padding:4px 0 4px 16px;margin:14px 0 22px} #pf-prototype .pf-detail p {margin:7px 0} #pf-prototype .pf-progress {height:5px;background:var(--pf-line);border-radius:5px;margin:12px 0} #pf-prototype .pf-progress&gt;span {display:block;height:5px;background:var(--pf-green);border-radius:5px} #pf-prototype .pf-foot {display:flex;justify-content:space-between;gap:8px;padding:12px 20px;border-top:1px solid var(--pf-line);color:var(--pf-sub);font-size:11px;background:var(--pf-paper)} #pf-prototype .pf-toast:not(:empty) {margin-top:9px;padding:12px 16px;background:var(--pf-soft);color:var(--pf-green);border-radius:7px} #pf-prototype .pf-table {width:100%;border-collapse:collapse} #pf-prototype .pf-table th,#pf-prototype .pf-table td {text-align:left;padding:12px 8px;border-bottom:1px solid var(--pf-line);font-size:12px;vertical-align:top;overflow-wrap:anywhere} #pf-prototype .pf-table th {color:var(--pf-sub);font-weight:500} #pf-prototype .pf-checklabel {display:flex;gap:9px;align-items:flex-start;margin:12px 0} #pf-prototype .pf-checklabel input {margin-top:5px}
+#pf-prototype .pv-window {border:1px solid var(--pf-line);border-radius:9px;background:var(--pf-paper);overflow:hidden;margin:14px auto;max-width:100%} #pf-prototype .pv-window.mobile {max-width:300px} #pf-prototype .pv-bar {background:var(--pf-soft);color:var(--pf-green);padding:12px 15px;display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:600} #pf-prototype .pv-body {padding:18px} #pf-prototype .pv-title {font-size:20px;font-weight:600;margin:6px 0} #pf-prototype .pv-filter {display:flex;gap:7px;flex-wrap:wrap;margin:17px 0} #pf-prototype .pv-chip {border:1px solid var(--pf-line);border-radius:20px;background:var(--pf-paper);padding:5px 10px;font-size:11px} #pf-prototype .pv-chip.active {background:var(--pf-green);color:var(--pf-paper);border-color:var(--pf-green)} #pf-prototype .pv-item {padding:14px 0;border-top:1px solid var(--pf-line)} #pf-prototype .pv-item p {font-size:12px;margin:6px 0;color:var(--pf-sub)} #pf-prototype .pv-disclaimer {background:var(--pf-bluebg);color:var(--pf-blue);padding:10px;border-radius:6px;font-size:11px} #pf-prototype .pf-ux-toolbar {display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px} #pf-prototype .pf-ux-toolbar&gt;div {display:flex;gap:6px;flex-wrap:wrap} #pf-prototype .pf-pre {padding:12px;background:var(--pf-bg);border-radius:7px;overflow-wrap:anywhere;font-size:12px} #pf-prototype .pf-compact .pf-impact {padding:10px 0} #pf-prototype .pf-compact .pf-row {padding:11px 0}
+@media(max-width:850px){#pf-prototype .pf-layout {grid-template-columns:150px minmax(0,1fr)}#pf-prototype main {padding:22px 18px}#pf-prototype .pf-split {grid-template-columns:1fr}#pf-prototype .pf-top-right .pf-muted {display:none}}
+@media(max-width:600px){#pf-prototype .pf-layout {grid-template-columns:1fr;min-height:0}#pf-prototype aside {padding:12px;border-right:0;border-bottom:1px solid var(--pf-line)}#pf-prototype .pf-project {padding:0 4px 8px}#pf-prototype .pf-project strong {font-size:14px}#pf-prototype .pf-project .pf-small,#pf-prototype .pf-nav-note {display:none}#pf-prototype aside nav {display:flex;gap:5px;flex-wrap:wrap}#pf-prototype .pf-nav {width:auto;padding:8px}#pf-prototype .pf-top {padding:13px;flex-wrap:wrap}#pf-prototype .pf-top-right {font-size:11px}#pf-prototype main {padding:20px 14px}#pf-prototype .pf-heading,#pf-prototype .pf-callout {flex-direction:column}#pf-prototype h1 {font-size:23px}#pf-prototype .pf-two {grid-template-columns:1fr}#pf-prototype .pf-panel {padding:16px}#pf-prototype .pf-demo label {flex-wrap:wrap}#pf-prototype .pf-row {align-items:flex-start;flex-wrap:wrap}#pf-prototype .pf-foot {flex-wrap:wrap}#pf-prototype .pf-impact {flex-wrap:wrap}#pf-prototype .pf-impact .pf-tag {margin-left:32px}#pf-prototype .pf-tabs {gap:14px}#pf-prototype .pf-message.mine {margin-left:12px}#pf-prototype .pf-btn,#pf-prototype .pf-nav {min-height:42px}#pf-prototype textarea,#pf-prototype input,#pf-prototype select {font-size:16px}}
+&lt;/style&gt;
+&lt;script&gt;
+(() =&gt; {
+const root=document.getElementById(&#x27;pf-prototype&#x27;);
+const s={role:&#x27;po&#x27;,stage:&#x27;draft&#x27;,page:&#x27;home&#x27;,tab:&#x27;overview&#x27;,ux:&#x27;main&#x27;,mobile:false,filter:false,impact:null,chat:[],idea:&#x27;&#x27;,answered:false,question:&#x27;&#x27;,story:null,archAnswer:&#x27;&#x27;,decision:&#x27;&#x27;,adjusted:false,approved:false,poApproved:false};
+const design={compact:false,showStories:true};
+const roles={po:&#x27;Marc · product owner&#x27;,architect:&#x27;Robbert · architect&#x27;,owner:&#x27;Robbert · factory owner&#x27;};
+const title=&#x27;Sneller zien welke agendapunten aandacht vragen&#x27;;
+const esc=v=&gt;String(v).replace(/[&amp;&lt;&gt;&quot;&#x27;]/g,c=&gt;({&#x27;&amp;&#x27;:&#x27;&amp;amp;&#x27;,&#x27;&lt;&#x27;:&#x27;&amp;lt;&#x27;,&#x27;&gt;&#x27;:&#x27;&amp;gt;&#x27;,&#x27;&quot;&#x27;:&#x27;&amp;quot;&#x27;,&quot;&#x27;&quot;:&#x27;&amp;#39;&#x27;}[c]));
+const b=(label,action,primary=false,extra=&#x27;&#x27;)=&gt;`&lt;button class=&quot;pf-btn ${primary?&#x27;pf-primary&#x27;:&#x27;&#x27;}&quot; data-action=&quot;${action}&quot; ${extra}&gt;${label}&lt;/button&gt;`;
+const tag=(text,tone=&#x27;&#x27;)=&gt;`&lt;span class=&quot;pf-tag ${tone}&quot;&gt;${text}&lt;/span&gt;`;
+const heading=(eyebrow,name,desc=&#x27;&#x27;,action=&#x27;&#x27;)=&gt;`&lt;div class=&quot;pf-heading&quot;&gt;&lt;div&gt;&lt;div class=&quot;pf-eyebrow&quot;&gt;${eyebrow}&lt;/div&gt;&lt;h1&gt;${name}&lt;/h1&gt;${desc?`&lt;p&gt;${desc}&lt;/p&gt;`:&#x27;&#x27;}&lt;/div&gt;${action}&lt;/div&gt;`;
+const panel=(name,content)=&gt;`&lt;section class=&quot;pf-panel&quot;&gt;${name?`&lt;h2&gt;${name}&lt;/h2&gt;`:&#x27;&#x27;}${content}&lt;/section&gt;`;
+const callout=(name,text,action=&#x27;&#x27;,tone=&#x27;&#x27;)=&gt;`&lt;div class=&quot;pf-callout ${tone}&quot;&gt;&lt;div&gt;&lt;strong&gt;${name}&lt;/strong&gt;&lt;p&gt;${text}&lt;/p&gt;&lt;/div&gt;${action}&lt;/div&gt;`;
+const tabs=(items,current,kind=&#x27;tab&#x27;)=&gt;`&lt;nav class=&quot;pf-tabs&quot; aria-label=&quot;Epiconderdelen&quot;&gt;${items.map(([key,label])=&gt;`&lt;button class=&quot;pf-tab ${key===current?&#x27;active&#x27;:&#x27;&#x27;}&quot; data-${kind}=&quot;${key}&quot; aria-current=&quot;${key===current?&#x27;page&#x27;:&#x27;false&#x27;}&quot;&gt;${label}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/nav&gt;`;
+const status=()=&gt;({draft:&#x27;Samen uitwerken&#x27;,review:s.adjusted&amp;&amp;!s.poApproved?&#x27;Marc beoordeelt de aanpassing&#x27;:&#x27;Architect beoordeelt&#x27;,planning:s.answered?&#x27;Planning gaat verder&#x27;:&#x27;Vraag aan Marc&#x27;,building:&#x27;Wordt gebouwd&#x27;,delivered:&#x27;Opgeleverd&#x27;})[s.stage];
+const version=()=&gt;s.adjusted?3:2;
+function steps(){const idx={draft:0,review:1,planning:2,building:3,delivered:4}[s.stage];return `&lt;div class=&quot;pf-steps&quot;&gt;${[&#x27;Uitwerken&#x27;,&#x27;Goedkeuren&#x27;,&#x27;Planning&#x27;,&#x27;Bouwen &amp; testen&#x27;,&#x27;Opgeleverd&#x27;].map((v,i)=&gt;`&lt;div class=&quot;pf-step ${i&lt;idx?&#x27;done&#x27;:i===idx?&#x27;current&#x27;:&#x27;&#x27;}&quot;&gt;${i&lt;idx?&#x27;✓ &#x27;:&#x27;&#x27;}${v}&lt;/div&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;`;}
+function row(name,sub,action,st=&#x27;&#x27;){return `&lt;div class=&quot;pf-row&quot;&gt;&lt;div&gt;&lt;strong&gt;${name}&lt;/strong&gt;${st?` &lt;span&gt;${st}&lt;/span&gt;`:&#x27;&#x27;}&lt;p&gt;${sub}&lt;/p&gt;&lt;/div&gt;${action}&lt;/div&gt;`;}
+function toast(text){root.querySelector(&#x27;#pf-toast&#x27;).textContent=text;}
+function nav(){let items=s.role===&#x27;po&#x27;?[[&#x27;home&#x27;,&#x27;Mijn werk&#x27;],[&#x27;epic&#x27;,&#x27;Mijn epics&#x27;],[&#x27;questions&#x27;,&#x27;Vragen&#x27;,s.stage===&#x27;planning&#x27;&amp;&amp;!s.answered?&#x27;1&#x27;:&#x27;&#x27;]]:s.role===&#x27;architect&#x27;?[[&#x27;home&#x27;,&#x27;Te beoordelen&#x27;,s.stage===&#x27;review&#x27;&amp;&amp;!s.approved?&#x27;1&#x27;:&#x27;&#x27;],[&#x27;impact&#x27;,&#x27;Epicimpact&#x27;],[&#x27;rules&#x27;,&#x27;Productafspraken&#x27;]]:[[&#x27;home&#x27;,&#x27;Factoryoverzicht&#x27;],[&#x27;runs&#x27;,&#x27;Runs&#x27;],[&#x27;planning&#x27;,&#x27;Planning&#x27;],[&#x27;quality&#x27;,&#x27;Kwaliteit&#x27;],[&#x27;settings&#x27;,&#x27;Instellingen&#x27;]];root.querySelector(&#x27;#pf-sidebar&#x27;).innerHTML=`&lt;div class=&quot;pf-project&quot;&gt;&lt;span class=&quot;pf-small pf-muted&quot;&gt;${s.role===&#x27;owner&#x27;?&#x27;Alle producten&#x27;:&#x27;Project&#x27;}&lt;/span&gt;&lt;strong&gt;${s.role===&#x27;owner&#x27;?&#x27;Factorybeheer&#x27;:&#x27;PvdD&#x27;}&lt;/strong&gt;&lt;span class=&quot;pf-small pf-muted&quot;&gt;${s.role===&#x27;po&#x27;?&#x27;Productontwikkeling&#x27;:s.role===&#x27;architect&#x27;?&#x27;Architectuur &amp; product-AI&#x27;:&#x27;Operatie &amp; inrichting&#x27;}&lt;/span&gt;&lt;/div&gt;&lt;nav aria-label=&quot;Hoofdnavigatie&quot;&gt;${items.map(([key,label,count])=&gt;`&lt;button class=&quot;pf-nav ${s.page===key?&#x27;active&#x27;:&#x27;&#x27;}&quot; data-page=&quot;${key}&quot;&gt;${label}${count?tag(count,&#x27;amber&#x27;):&#x27;&#x27;}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/nav&gt;&lt;div class=&quot;pf-nav-note&quot;&gt;${s.role===&#x27;po&#x27;?&#x27;Jij bepaalt wat het product moet doen. AI helpt je het uit te werken.&#x27;:s.role===&#x27;architect&#x27;?&#x27;Jij beslist over technische impact, product-AI en uitzonderingen.&#x27;:&#x27;Productbesluiten liggen bij de PO en architect.&#x27;}&lt;/div&gt;`;}
+function poHome(){let notice=s.stage===&#x27;draft&#x27;?callout(&#x27;Je idee krijgt vorm&#x27;,&#x27;Bekijk het voorstel en geef aan wat je anders wilt.&#x27;,b(&#x27;Verder uitwerken&#x27;,&#x27;epic&#x27;,true),&#x27;blue&#x27;):s.stage===&#x27;review&#x27;?callout(s.adjusted&amp;&amp;!s.poApproved?&#x27;Er is een aangepaste versie&#x27;:&#x27;Jouw functionele akkoord is gegeven&#x27;,s.adjusted&amp;&amp;!s.poApproved?&#x27;De architect stelt voor alleen gewijzigde stukken te analyseren. Bekijk de wijziging.&#x27;:&#x27;Robbert kijkt naar de analysefrequentie. Jij hoeft nu niets te doen.&#x27;,b(&#x27;Bekijk epic&#x27;,&#x27;epic&#x27;),s.adjusted?&#x27;&#x27;:&#x27;green&#x27;):s.stage===&#x27;planning&#x27;?callout(s.answered?&#x27;Bedankt, je antwoord is verwerkt&#x27;:&#x27;Er is één vraag voor jou&#x27;,s.answered?&#x27;De planner gaat verder met het opdelen van je epic.&#x27;:&#x27;De planner wil weten welke agendapunten bovenaan moeten staan.&#x27;,b(s.answered?&#x27;Bekijk voortgang&#x27;:&#x27;Beantwoord vraag&#x27;,s.answered?&#x27;progress&#x27;:&#x27;questions&#x27;,true),s.answered?&#x27;green&#x27;:&#x27;&#x27;):s.stage===&#x27;delivered&#x27;?callout(&#x27;Je idee is opgeleverd&#x27;,&#x27;Het overzicht met aandachtspunten is beschikbaar in PvdD.&#x27;,b(&#x27;Bekijk resultaat&#x27;,&#x27;progress&#x27;,true),&#x27;green&#x27;):callout(&#x27;Je epic wordt gebouwd&#x27;,&#x27;2 van de 4 stories zijn gereed. Er zijn geen open vragen aan jou.&#x27;,b(&#x27;Volg de bouw&#x27;,&#x27;progress&#x27;),&#x27;blue&#x27;);return heading(&#x27;Mijn werk&#x27;,&#x27;Goedemorgen Marc&#x27;,&#x27;Van jouw idee naar een verbetering in PvdD.&#x27;,b(&#x27;+ Nieuw idee&#x27;,&#x27;new&#x27;,true))+notice+panel(&#x27;Jouw epics&#x27;,row(title,&#x27;Door jou gestart · bijgewerkt vandaag&#x27;,b(&#x27;Open epic&#x27;,&#x27;epic&#x27;),tag(status(),&#x27;blue&#x27;))+row(&#x27;Bronverwijzingen bij een analyse&#x27;,&#x27;Opgeleverd · vorige week&#x27;,b(&#x27;Bekijk resultaat&#x27;,&#x27;other-delivery&#x27;),tag(&#x27;Opgeleverd&#x27;,&#x27;green&#x27;)))+`&lt;div class=&quot;pf-two&quot;&gt;${panel(&#x27;Een idee hoeft niet af te zijn&#x27;,&#x27;&lt;p class=&quot;pf-muted&quot;&gt;Beschrijf wat je mist of wat makkelijker zou kunnen. Je hoeft nog geen oplossing te hebben.&lt;/p&gt;&#x27;+b(&#x27;Bespreek een idee&#x27;,&#x27;new&#x27;))}${panel(&#x27;Voor jou overzichtelijk&#x27;,&#x27;&lt;p class=&quot;pf-muted&quot;&gt;Je ziet hier je ideeën, vragen en opleveringen. Per epic kun je ook de afzonderlijke stories volgen.&lt;/p&gt;&#x27;)}&lt;/div&gt;`;}
+function newIdea(){return heading(&#x27;Nieuw idee&#x27;,&#x27;Wat wil je verbeteren?&#x27;,&#x27;Vertel het zoals je het aan een collega zou vertellen.&#x27;)+panel(&#x27;&#x27;,`&lt;label&gt;Je idee&lt;textarea id=&quot;pf-idea&quot; placeholder=&quot;Bijvoorbeeld: ik wil bij een vergadering sneller zien welke onderwerpen aandacht nodig hebben.&quot;&gt;${esc(s.idea)}&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;pf-meta&quot;&gt;Voor PvdD · samen met Product Advisor&lt;/div&gt;${b(&#x27;Samen uitwerken&#x27;,&#x27;create-idea&#x27;,true)}&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Gebruik voorbeeldidee&#x27;,&#x27;example&#x27;)}&lt;/div&gt;`);}
+function epicHeader(){return `&lt;button class=&quot;pf-link&quot; data-page=&quot;home&quot;&gt;← Mijn werk&lt;/button&gt;`+heading(`Epic · versie ${version()}`,title)+`&lt;div class=&quot;pf-meta&quot;&gt;${tag(status(),&#x27;blue&#x27;)}&lt;span&gt;PO: Marc&lt;/span&gt;&lt;span&gt;Architect: Robbert&lt;/span&gt;&lt;/div&gt;`+steps();}
+function conversation(){return panel(&#x27;Samen uitwerken&#x27;,`&lt;div class=&quot;pf-chat&quot;&gt;&lt;div class=&quot;pf-message mine&quot;&gt;&lt;strong&gt;Marc&lt;/strong&gt;&lt;p&gt;${esc(s.idea||&#x27;Ik wil sneller zien welke onderwerpen aandacht nodig hebben. Kunnen we de AI elke tien minuten laten kijken?&#x27;)}&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;pf-message&quot;&gt;&lt;strong&gt;Product Advisor&lt;/strong&gt;&lt;p&gt;Ik stel een overzicht voor met een korte toelichting per aandachtspunt en links naar de bronstukken.&lt;/p&gt;&lt;p&gt;Wil je vooral nieuwe punten herkennen, of ook bestaande punten opnieuw beoordelen?&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;pf-message mine&quot;&gt;&lt;strong&gt;Marc&lt;/strong&gt;&lt;p&gt;Vooral nieuwe of gewijzigde stukken. En ik wil zelf kunnen bepalen wat echt belangrijk is.&lt;/p&gt;&lt;/div&gt;${s.chat.map(x=&gt;`&lt;div class=&quot;pf-message ${x.who===&#x27;Marc&#x27;?&#x27;mine&#x27;:&#x27;&#x27;}&quot;&gt;&lt;strong&gt;${x.who}&lt;/strong&gt;&lt;p&gt;${esc(x.text)}&lt;/p&gt;&lt;/div&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;&lt;label&gt;Bespreek de uitwerking&lt;textarea id=&quot;pf-chat-input&quot; placeholder=&quot;Wat wil je aanpassen of verder bespreken?&quot;&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Verstuur&#x27;,&#x27;send&#x27;,true)}&lt;/div&gt;&lt;div class=&quot;pf-small pf-muted&quot; style=&quot;margin-top:10px&quot;&gt;Antwoorden in dit prototype zijn voorbeelden.&lt;/div&gt;`);}
+function dossier(){return panel(&#x27;Dit gaan we verbeteren&#x27;,`&lt;h3&gt;Doel&lt;/h3&gt;&lt;p&gt;Marc ziet snel welke nieuwe of gewijzigde agendapunten aandacht verdienen, met een herleidbare toelichting.&lt;/p&gt;&lt;h3&gt;Werking&lt;/h3&gt;&lt;ul class=&quot;pf-list&quot;&gt;&lt;li&gt;Een overzicht per vergadering met een filter ‘Aandacht nodig’.&lt;/li&gt;&lt;li&gt;Per punt een korte reden, bronverwijzingen en een link naar de volledige analyse.&lt;/li&gt;&lt;li&gt;Marc kan een punt markeren als bekeken.&lt;/li&gt;&lt;li&gt;${s.adjusted?&#x27;Nieuwe of gewijzigde stukken worden automatisch geanalyseerd.&#x27;:&#x27;Het voorstel vraagt om een AI-controle iedere tien minuten.&#x27;}&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Buiten deze epic&lt;/h3&gt;&lt;p class=&quot;pf-muted&quot;&gt;Geen automatisch verzonden adviezen en geen automatische besluitvorming.&lt;/p&gt;&lt;h3&gt;Klaar als&lt;/h3&gt;&lt;ul class=&quot;pf-checks&quot;&gt;&lt;li&gt;Nieuwe aandachtspunten zijn herkenbaar.&lt;/li&gt;&lt;li&gt;Elke toelichting verwijst naar de gebruikte stukken.&lt;/li&gt;&lt;li&gt;Bekeken punten blijven terug te vinden.&lt;/li&gt;&lt;li&gt;Ook zonder analyse of bij een fout is duidelijk wat er gebeurt.&lt;/li&gt;&lt;/ul&gt;${b(&#x27;Bespreek dit onderdeel&#x27;,&#x27;discuss-overview&#x27;)}`);}
+function approval(){if(s.stage===&#x27;draft&#x27;)return callout(&#x27;Klaar om functioneel goed te keuren?&#x27;,&#x27;Je keurt de werking en schermen goed. Robbert beoordeelt daarna het voorgestelde AI-gebruik.&#x27;,b(&#x27;Functioneel akkoord&#x27;,&#x27;po-approve&#x27;,true),&#x27;green&#x27;);if(s.stage===&#x27;review&#x27;&amp;&amp;s.adjusted&amp;&amp;!s.poApproved)return callout(&#x27;Versie 3 · één functionele wijziging&#x27;,&#x27;AI analyseert alleen nieuwe of gewijzigde stukken. Ongewijzigde stukken worden niet elke tien minuten opnieuw geanalyseerd.&#x27;,b(&#x27;Akkoord met versie 3&#x27;,&#x27;po-reapprove&#x27;,true),&#x27;blue&#x27;);if(s.stage===&#x27;review&#x27;)return callout(&#x27;Wacht op de architect&#x27;,&#x27;Jouw akkoord staat vast voor deze versie. Robbert beoordeelt de AI-frequentie; daarna kan de planning starten.&#x27;,b(&#x27;Bekijk wat er openstaat&#x27;,&#x27;reviews&#x27;),&#x27;blue&#x27;);return &#x27;&#x27;;}
+function ux(){return panel(&#x27;Schermontwerp · aandachtspunten&#x27;,`&lt;div class=&quot;pf-ux-toolbar&quot;&gt;&lt;div&gt;${[[&#x27;main&#x27;,&#x27;Overzicht&#x27;],[&#x27;detail&#x27;,&#x27;Detail&#x27;],[&#x27;empty&#x27;,&#x27;Leeg&#x27;],[&#x27;error&#x27;,&#x27;Fout&#x27;]].map(([k,l])=&gt;b(l,&#x27;ux-&#x27;+k,false,`aria-pressed=&quot;${s.ux===k}&quot;`)).join(&#x27;&#x27;)}&lt;/div&gt;${b(s.mobile?&#x27;Bekijk desktop&#x27;:&#x27;Bekijk mobiel&#x27;,&#x27;viewport&#x27;)}&lt;/div&gt;&lt;div class=&quot;pv-window ${s.mobile?&#x27;mobile&#x27;:&#x27;&#x27;}&quot;&gt;&lt;div class=&quot;pv-bar&quot;&gt;&lt;span&gt;PvdD · Raadswerk&lt;/span&gt;&lt;span&gt;Marc&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;pv-body&quot;&gt;&lt;div class=&quot;pf-small pf-muted&quot;&gt;Gemeenteraad · 24 september&lt;/div&gt;&lt;div class=&quot;pv-title&quot;&gt;${s.ux===&#x27;detail&#x27;?&#x27;Groen in de openbare ruimte&#x27;:&#x27;Aandachtspunten&#x27;}&lt;/div&gt;&lt;p class=&quot;pf-small pf-muted&quot;&gt;${s.ux===&#x27;detail&#x27;?&#x27;Agendapunt 7 · nieuw stuk beschikbaar&#x27;:&#x27;Bereid je vergadering gericht voor.&#x27;}&lt;/p&gt;${s.ux===&#x27;empty&#x27;?&#x27;&lt;div class=&quot;pf-callout green&quot;&gt;&lt;div&gt;&lt;strong&gt;Je bent bij&lt;/strong&gt;&lt;p&gt;Er zijn geen nieuwe aandachtspunten. Alle agendapunten blijven beschikbaar.&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&#x27;:s.ux===&#x27;error&#x27;?&#x27;&lt;div class=&quot;pf-callout&quot;&gt;&lt;div&gt;&lt;strong&gt;Analyse nog niet beschikbaar&lt;/strong&gt;&lt;p&gt;De bronstukken kun je al lezen. We proberen de analyse opnieuw.&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&#x27;:s.ux===&#x27;detail&#x27;?`&lt;div class=&quot;pv-disclaimer&quot;&gt;AI-concept · controleer bronnen en formulering&lt;/div&gt;&lt;h3 style=&quot;margin-top:18px&quot;&gt;Waarom dit aandacht vraagt&lt;/h3&gt;&lt;p&gt;In het gewijzigde voorstel is minder ruimte voor groen opgenomen. Vergelijk de nieuwe bijlage met het oorspronkelijke voorstel.&lt;/p&gt;&lt;div class=&quot;pf-pre&quot;&gt;Bron: raadsvoorstel · bijlage openbare ruimte · p. 4&lt;/div&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Markeer als bekeken&#x27;,&#x27;ux-viewed&#x27;,true)}${b(&#x27;← Overzicht&#x27;,&#x27;ux-main&#x27;)}&lt;/div&gt;`:`&lt;div class=&quot;pv-filter&quot;&gt;&lt;button class=&quot;pv-chip ${s.filter?&#x27;&#x27;:&#x27;active&#x27;}&quot; data-action=&quot;ux-all&quot;&gt;Alle punten · 8&lt;/button&gt;&lt;button class=&quot;pv-chip ${s.filter?&#x27;active&#x27;:&#x27;&#x27;}&quot; data-action=&quot;ux-filter&quot;&gt;Aandacht nodig · 2&lt;/button&gt;&lt;/div&gt;&lt;div class=&quot;pv-item&quot;&gt;${tag(&#x27;Nieuw stuk&#x27;,&#x27;amber&#x27;)}&lt;h3 style=&quot;margin-top:8px&quot;&gt;Groen in de openbare ruimte&lt;/h3&gt;&lt;p&gt;Gewijzigde bijlage heeft gevolgen voor de hoeveelheid groen.&lt;/p&gt;${b(&#x27;Bekijk aandachtspunt&#x27;,&#x27;ux-detail&#x27;)}&lt;/div&gt;&lt;div class=&quot;pv-item&quot;&gt;${tag(&#x27;Aandacht nodig&#x27;,&#x27;amber&#x27;)}&lt;h3 style=&quot;margin-top:8px&quot;&gt;Dierenwelzijn bij evenementen&lt;/h3&gt;&lt;p&gt;Een nieuwe voorwaarde verdient nadere beoordeling.&lt;/p&gt;&lt;/div&gt;${s.filter?&#x27;&#x27;:&#x27;&lt;div class=&quot;pv-item&quot;&gt;&lt;span class=&quot;pf-muted&quot;&gt;Vaststelling vorige notulen&lt;/span&gt; &#x27;+tag(&#x27;Bekeken&#x27;,&#x27;green&#x27;)+&#x27;&lt;/div&gt;&#x27;}&lt;div class=&quot;pv-disclaimer&quot;&gt;AI-concept · controleer bronnen en formulering&lt;/div&gt;`}&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pf-meta&quot;&gt;Scherm ${s.ux===&#x27;main&#x27;?&#x27;1&#x27;:s.ux===&#x27;detail&#x27;?&#x27;2&#x27;:s.ux===&#x27;empty&#x27;?&#x27;3&#x27;:&#x27;4&#x27;} van 4 · ${s.mobile?&#x27;mobiele&#x27;:&#x27;desktop&#x27;} weergave · versie ${version()}&lt;/div&gt;&lt;label&gt;Feedback op dit scherm&lt;textarea id=&quot;pf-ux-feedback&quot; placeholder=&quot;Bijvoorbeeld: maak de reden direct zichtbaar, zonder dat ik eerst hoef te klikken.&quot;&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Bespreek met AI&#x27;,&#x27;ux-feedback&#x27;,true)}&lt;/div&gt;`);}
+function risk(){return panel(&#x27;Waar moeten we rekening mee houden?&#x27;,row(&#x27;AI kan een verkeerd aandachtspunt aanwijzen&#x27;,&#x27;Marc blijft zelf beoordelen; de bron staat direct bij iedere toelichting.&#x27;,&#x27;&#x27;,tag(&#x27;Aandachtspunt&#x27;,&#x27;amber&#x27;))+row(&#x27;Sommige stukken zijn nog niet beschikbaar&#x27;,&#x27;Het scherm toont wat nog ontbreekt en doet geen uitspraak over ontbrekende stukken.&#x27;,&#x27;&#x27;,tag(&#x27;Afgevangen&#x27;,&#x27;green&#x27;))+row(&#x27;Automatisch analyseren kan veel AI vragen&#x27;,&#x27;Robbert beoordeelt hoe vaak en onder welke voorwaarden de analyse mag draaien.&#x27;,b(&#x27;Bekijk beoordeling&#x27;,&#x27;reviews&#x27;),tag(&#x27;Bij architect&#x27;,&#x27;blue&#x27;)))+panel(&#x27;Open functionele keuzes&#x27;,s.stage===&#x27;planning&#x27;&amp;&amp;!s.answered?row(&#x27;Wat komt bovenaan in het overzicht?&#x27;,&#x27;Nieuwe stukken of alle punten die aandacht vragen?&#x27;,b(&#x27;Beantwoord&#x27;,&#x27;questions&#x27;)):&#x27;&lt;p&gt;Geen open vragen over de werking. Nieuwe vragen verschijnen bij ‘Vragen’ en bij deze epic.&lt;/p&gt;&#x27;);}
+function reviews(){return panel(&#x27;Goedkeuringen&#x27;,row(&#x27;Marc · product owner&#x27;,s.stage===&#x27;draft&#x27;?&#x27;Beoordeelt de werking, scope en schermen.&#x27;:s.adjusted&amp;&amp;!s.poApproved?&#x27;Versie 3 heeft opnieuw jouw functionele akkoord nodig.&#x27;:`Functioneel akkoord op versie ${version()}.`,&#x27;&#x27;,tag(s.stage===&#x27;draft&#x27;||s.adjusted&amp;&amp;!s.poApproved?&#x27;Nog te beoordelen&#x27;:&#x27;Akkoord&#x27;,s.stage===&#x27;draft&#x27;?&#x27;&#x27;:&#x27;green&#x27;))+row(&#x27;Robbert · architect&#x27;,s.adjusted?&#x27;AI alleen bij gewijzigde inhoud, maximaal één analyse per documentversie.&#x27;:&#x27;Beoordeelt het voorstel om iedere tien minuten AI te gebruiken.&#x27;,&#x27;&#x27;,tag([&#x27;planning&#x27;,&#x27;building&#x27;,&#x27;delivered&#x27;].includes(s.stage)||s.approved?&#x27;Akkoord&#x27;:&#x27;Beoordeling nodig&#x27;,s.approved?&#x27;green&#x27;:&#x27;amber&#x27;)))+panel(&#x27;Wat betekent dit voor jou?&#x27;,&#x27;&lt;p&gt;De architect kan een technische afspraak vastleggen of een aanpassing voorstellen. Verandert daardoor de werking, dan krijg jij de aangepaste epic terug.&lt;/p&gt;&lt;p class=&quot;pf-muted&quot;&gt;Na de benodigde akkoorden gaat de epic automatisch naar planning.&lt;/p&gt;&#x27;);}
+const storyNames=[&#x27;Nieuwe aandachtspunten opslaan&#x27;,&#x27;Alleen gewijzigde stukken analyseren&#x27;,&#x27;Aandachtspunten tonen en filteren&#x27;,&#x27;Bekeken punten onthouden&#x27;];
+function stories(){return panel(&#x27;Stories&#x27;,storyNames.map((name,i)=&gt;{let st=s.stage===&#x27;delivered&#x27;?&#x27;Opgeleverd&#x27;:s.stage===&#x27;building&#x27;?(i&lt;2?&#x27;Gereed&#x27;:i===2?&#x27;In uitvoering&#x27;:&#x27;Gepland&#x27;):i===2&amp;&amp;!s.answered?&#x27;Wacht op jouw antwoord&#x27;:&#x27;In voorbereiding&#x27;;return row(name,`Story ${i+1} · ${[&#x27;Gegevens klaarzetten&#x27;,&#x27;AI-verwerking&#x27;,&#x27;Overzicht voor Marc&#x27;,&#x27;Eigen werk bijhouden&#x27;][i]}`,b(&#x27;Bekijk&#x27;,&#x27;story-&#x27;+i),tag(st,st===&#x27;Gereed&#x27;||st===&#x27;Opgeleverd&#x27;?&#x27;green&#x27;:st.includes(&#x27;antwoord&#x27;)?&#x27;amber&#x27;:&#x27;blue&#x27;));}).join(&#x27;&#x27;));}
+function progress(){return (s.stage===&#x27;delivered&#x27;?callout(&#x27;Beschikbaar in PvdD&#x27;,&#x27;De vier stories zijn opgeleverd en de controles zijn geslaagd.&#x27;,b(&#x27;Bekijk de nieuwe schermen&#x27;,&#x27;delivered-ux&#x27;,true),&#x27;green&#x27;):s.stage===&#x27;building&#x27;?callout(&#x27;De bouw is bezig&#x27;,&#x27;2 van de 4 stories zijn gereed. Het overzicht wordt nu gebouwd.&#x27;,&#x27;&#x27;,&#x27;blue&#x27;):s.stage===&#x27;planning&#x27;&amp;&amp;!s.answered?callout(&#x27;Planning wacht op jouw antwoord&#x27;,&#x27;De vraag over de volgorde van aandachtspunten blokkeert één story.&#x27;,b(&#x27;Beantwoord vraag&#x27;,&#x27;questions&#x27;,true)):callout(&#x27;De volgende stap&#x27;,&#x27;Na de benodigde goedkeuringen maakt AI de stories en start de planning.&#x27;,&#x27;&#x27;,&#x27;blue&#x27;))+panel(&#x27;Van idee naar oplevering&#x27;,`&lt;div class=&quot;pf-progress&quot;&gt;&lt;span style=&quot;width:${{draft:15,review:30,planning:45,building:70,delivered:100}[s.stage]}%&quot;&gt;&lt;/span&gt;&lt;/div&gt;${row(&#x27;Functioneel uitgewerkt&#x27;,`Versie ${version()} · schermen en acceptatiecriteria vastgelegd`,&#x27;&#x27;,tag(s.stage===&#x27;draft&#x27;?&#x27;In gesprek&#x27;:&#x27;Gereed&#x27;,&#x27;green&#x27;))}${row(&#x27;Technisch beoordeeld&#x27;,s.adjusted?&#x27;Alleen gewijzigde stukken analyseren.&#x27;:&#x27;Analysefrequentie en AI-gebruik beoordeeld door Robbert.&#x27;,&#x27;&#x27;,tag([&#x27;planning&#x27;,&#x27;building&#x27;,&#x27;delivered&#x27;].includes(s.stage)?&#x27;Gereed&#x27;:&#x27;Nog open&#x27;,&#x27;blue&#x27;))}${row(&#x27;Bouwen en testen&#x27;,s.stage===&#x27;delivered&#x27;?&#x27;Alle controles geslaagd.&#x27;:&#x27;Voortgang per story hieronder.&#x27;,&#x27;&#x27;,tag(s.stage===&#x27;delivered&#x27;?&#x27;Gereed&#x27;:s.stage===&#x27;building&#x27;?&#x27;Bezig&#x27;:&#x27;Volgt&#x27;,&#x27;blue&#x27;))}`)+(design.showStories?stories():&#x27;&#x27;)+(s.stage===&#x27;delivered&#x27;?panel(&#x27;Wat is er voor jou veranderd?&#x27;,&#x27;&lt;ul class=&quot;pf-checks&quot;&gt;&lt;li&gt;Nieuwe en gewijzigde aandachtspunten staan bij de vergadering.&lt;/li&gt;&lt;li&gt;Je kunt filteren en punten als bekeken markeren.&lt;/li&gt;&lt;li&gt;Je ziet steeds de onderliggende bron.&lt;/li&gt;&lt;/ul&gt;&#x27;+b(&#x27;Bespreek een vervolgidee&#x27;,&#x27;new&#x27;)):&#x27;&#x27;);}
+function epic(){let items=[[&#x27;overview&#x27;,&#x27;Uitwerking&#x27;],[&#x27;ux&#x27;,&#x27;Schermen&#x27;],[&#x27;risk&#x27;,&#x27;Aandachtspunten&#x27;],[&#x27;reviews&#x27;,&#x27;Goedkeuring&#x27;],[&#x27;progress&#x27;,&#x27;Voortgang&#x27;]];let body=s.tab===&#x27;overview&#x27;?`&lt;div class=&quot;pf-split&quot;&gt;${conversation()}&lt;div&gt;${dossier()}&lt;/div&gt;&lt;/div&gt;`:s.tab===&#x27;ux&#x27;?ux():s.tab===&#x27;risk&#x27;?risk():s.tab===&#x27;reviews&#x27;?reviews():progress();return epicHeader()+approval()+tabs(items,s.tab)+body+(s.story!==null?storyDetail():&#x27;&#x27;);}
+function questionPage(){return heading(&#x27;Vragen voor jou&#x27;,s.answered?&#x27;Je bent weer bij&#x27;:&#x27;Eén keuze helpt de planner verder&#x27;,&#x27;Ook tijdens planning en bouw komen vragen hier terecht.&#x27;)+(s.stage===&#x27;planning&#x27;?panel(&#x27;Volgorde van aandachtspunten&#x27;,`${tag(&#x27;Planning&#x27;,&#x27;blue&#x27;)} &lt;span class=&quot;pf-small pf-muted&quot;&gt;${title} · story 3&lt;/span&gt;&lt;div class=&quot;pf-detail&quot;&gt;&lt;h3&gt;Wat wil je bovenaan zien?&lt;/h3&gt;&lt;p&gt;Nieuwe stukken kunnen minder urgent zijn dan oudere punten die nog aandacht vragen. Welke volgorde helpt jou het meest?&lt;/p&gt;&lt;/div&gt;${s.answered?callout(&#x27;Antwoord verwerkt&#x27;,esc(s.question),&#x27;&#x27;,&#x27;green&#x27;):`&lt;label class=&quot;pf-checklabel&quot;&gt;&lt;input type=&quot;radio&quot; name=&quot;pf-answer&quot; value=&quot;Nieuw of gewijzigd eerst&quot; checked&gt;&lt;span&gt;Nieuw of gewijzigd eerst&lt;/span&gt;&lt;/label&gt;&lt;label class=&quot;pf-checklabel&quot;&gt;&lt;input type=&quot;radio&quot; name=&quot;pf-answer&quot; value=&quot;Alle open aandachtspunten eerst&quot;&gt;&lt;span&gt;Alle open aandachtspunten eerst&lt;/span&gt;&lt;/label&gt;&lt;label&gt;Toelichting&lt;textarea id=&quot;pf-question-note&quot; placeholder=&quot;Eventueel: binnen die groep op volgorde van de agenda.&quot;&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Verstuur antwoord&#x27;,&#x27;answer&#x27;,true)}${b(&#x27;Bekijk de epic&#x27;,&#x27;epic&#x27;)}&lt;/div&gt;&lt;p class=&quot;pf-small pf-muted&quot; style=&quot;margin-top:12px&quot;&gt;Deze story wacht op jouw antwoord. Andere voorbereidingen kunnen verder.&lt;/p&gt;`}`):panel(&#x27;Geen open vragen&#x27;,&#x27;&lt;p&gt;Als AI jouw keuze nodig heeft, verschijnt hier de vraag met de betrokken epic en waarom het antwoord nodig is.&lt;/p&gt;&#x27;+b(&#x27;Bekijk voorbeeld tijdens planning&#x27;,&#x27;show-planning&#x27;)));}
+function storyDetail(){let i=s.story;return panel(`Story ${i+1} · ${storyNames[i]}`,`&lt;p&gt;${[&#x27;Nieuwe en gewijzigde agendapunten krijgen een herkenbare status.&#x27;,&#x27;Bij een nieuwe documentversie volgt één analyse. Bestaande resultaten worden hergebruikt.&#x27;,&#x27;Marc kan alle punten of alleen aandachtspunten bekijken.&#x27;,&#x27;Marc kan punten markeren als bekeken en later terugvinden.&#x27;][i]}&lt;/p&gt;&lt;h3&gt;Klaar als&lt;/h3&gt;&lt;ul class=&quot;pf-checks&quot;&gt;&lt;li&gt;De afgesproken werking is zichtbaar in PvdD.&lt;/li&gt;&lt;li&gt;Lege en fouttoestanden zijn begrijpelijk.&lt;/li&gt;&lt;li&gt;De bijbehorende controles slagen.&lt;/li&gt;&lt;/ul&gt;${i===2&amp;&amp;s.stage===&#x27;planning&#x27;&amp;&amp;!s.answered?b(&#x27;Beantwoord open vraag&#x27;,&#x27;questions&#x27;,true):&#x27;&#x27;}&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Sluit story&#x27;,&#x27;close-story&#x27;)}&lt;/div&gt;`);}
+const impacts=[
+ [&#x27;Database&#x27;,&#x27;Eén optioneel veld erbij; backwards compatible.&#x27;,&#x27;Bestaande functionaliteit blijft werken. Geen omzetting van bestaande rijen nodig.&#x27;,&#x27;Laag&#x27;,&#x27;green&#x27;,&#x27;Voeg een nullable veld last_reviewed_document_version toe aan de bestaande analysegegevens. Oude applicatieversies negeren het veld; bestaande rijen behouden hun werking.&#x27;,&#x27;Additieve schemawijziging en een controle op oude en nieuwe applicatieversies.&#x27;,&#x27;Impact op database&#x27;],
+ [&#x27;Migratie&#x27;,&#x27;Geen tabelmigratie of heranalyse van het archief.&#x27;,&#x27;Geen backfill en geen downtime voorzien.&#x27;,&#x27;Geen wijziging&#x27;,&#x27;&#x27;,&#x27;Het voorstel gebruikt bestaande documentversies. Historische stukken blijven beschikbaar zonder verplichte nieuwe AI-analyse.&#x27;,&#x27;Een eventuele latere archiefanalyse is een afzonderlijke keuze met een eigen impactbeoordeling.&#x27;,&#x27;Impact op migratie&#x27;],
+ [&#x27;Externe systemen&#x27;,&#x27;Bestaande Agent Runtime; geen nieuwe koppeling.&#x27;,&#x27;Geen nieuwe leverancier of SQL-dienst nodig.&#x27;,&#x27;Bestaand&#x27;,&#x27;&#x27;,&#x27;PvdD gebruikt zijn bestaande database en Agent Runtime-koppeling. Er worden geen nieuwe externe diensten geïntroduceerd.&#x27;,&#x27;Behoud bestaande tenantisolatie en job-idempotentie.&#x27;,&#x27;Impact op koppelingen&#x27;],
+ [&#x27;Frontend&#x27;,&#x27;Een overzicht in de bestaande frontend.&#x27;,&#x27;Geen nieuwe frontendapplicatie.&#x27;,&#x27;Bestaand&#x27;,&#x27;&#x27;,&#x27;Het aandachtspuntenoverzicht en de detailweergave worden toegevoegd aan de bestaande PvdD-frontend.&#x27;,&#x27;Gebruik bestaande navigatie en componenten.&#x27;,&#x27;Impact op frontend&#x27;],
+ [&#x27;Toegang&#x27;,&#x27;Bestaande login en rechten blijven gelden.&#x27;,&#x27;Geen nieuw afgeschermd applicatiedeel.&#x27;,&#x27;Geen wijziging&#x27;,&#x27;&#x27;,&#x27;Het overzicht gebruikt de bestaande beveiligde toegang. Deze epic introduceert geen nieuw inlogmechanisme of gebruikersrol.&#x27;,&#x27;Controleer dat de nieuwe endpoints dezelfde toegangsregels volgen.&#x27;,&#x27;Impact op toegang&#x27;],
+ [&#x27;Product-AI&#x27;,&#x27;AI iedere tien minuten voorgesteld.&#x27;,&#x27;144 mogelijke starts per dag, vóór vermenigvuldiging met documenten.&#x27;,&#x27;Besluit nodig&#x27;,&#x27;amber&#x27;,&#x27;Een onvoorwaardelijke tienminutentaak kan 144 keer per dag starten. Bij D documenten en één job per document is de bovengrens 144 × D jobs per dag, exclusief retries. De werkelijke aantallen en kosten zijn nog niet vastgesteld.&#x27;,&#x27;Advies: controleer op wijzigingen; analyseer alleen nieuwe documentversies. Stel retry- en verbruikslimieten in en hergebruik resultaten.&#x27;,&#x27;AI-gebruik van PvdD&#x27;]
+];
+function archHome(){return heading(&#x27;PvdD · architect&#x27;,&#x27;Wat vraagt jouw beoordeling?&#x27;,&#x27;Technische impact en het AI-gebruik van het product.&#x27;)+callout(s.approved?&#x27;Beoordeling vastgelegd&#x27;:&#x27;Eén epic vraagt een besluit&#x27;,s.approved?&#x27;Je besluit is gekoppeld aan de epicversie.&#x27;:`${s.poApproved?&#x27;Marc heeft deze versie functioneel goedgekeurd.&#x27;:&#x27;Het functionele akkoord van Marc volgt nog.&#x27;} Het voorgestelde AI-ritme vraagt jouw beoordeling.`,b(&#x27;Bekijk impact&#x27;,&#x27;impact&#x27;,true),s.approved?&#x27;green&#x27;:&#x27;&#x27;)+panel(&#x27;Te beoordelen&#x27;,row(title,&#x27;Database: additief · bestaande frontend · product-AI: hogere frequentie&#x27;,b(&#x27;Beoordeel&#x27;,&#x27;impact&#x27;),tag(s.approved?&#x27;Akkoord&#x27;:&#x27;AI-besluit nodig&#x27;,s.approved?&#x27;green&#x27;:&#x27;amber&#x27;)))+panel(&#x27;Recent beoordeeld&#x27;,row(&#x27;Bronverwijzingen bij een analyse&#x27;,&#x27;Bestaande opslag en koppelingen · geen extra AI-aanroepen&#x27;,&#x27;&#x27;,tag(&#x27;Past binnen afspraken&#x27;,&#x27;green&#x27;)))+panel(&#x27;Bij ieder voorstel een kort impactoverzicht&#x27;,&#x27;&lt;p class=&quot;pf-muted&quot;&gt;Ook ‘geen wijziging’ wordt expliciet onderbouwd. Open een onderdeel om met AI te onderzoeken wat er verandert en waarom.&lt;/p&gt;&#x27;+b(&#x27;Bekijk productafspraken&#x27;,&#x27;rules&#x27;));}
+function impactPage(){return heading(`Epic · versie ${version()}`, &#x27;Impact in één oogopslag&#x27;,title)+`&lt;div class=&quot;pf-meta&quot;&gt;${tag(s.approved?&#x27;Architectuur akkoord&#x27;:&#x27;Jouw beoordeling nodig&#x27;,s.approved?&#x27;green&#x27;:&#x27;amber&#x27;)}&lt;span&gt;Functioneel akkoord: ${s.poApproved?&#x27;Marc&#x27;:s.adjusted?&#x27;opnieuw nodig&#x27;:&#x27;nog nodig&#x27;}&lt;/span&gt;&lt;span&gt;Voorbeeldanalyse · nog geen implementatie&lt;/span&gt;&lt;/div&gt;`+panel(&#x27;&#x27;,impacts.map((x,i)=&gt;`&lt;button class=&quot;pf-impact&quot; data-impact=&quot;${i}&quot; aria-expanded=&quot;${s.impact===i}&quot;&gt;&lt;span class=&quot;pf-impact-num&quot;&gt;0${i+1}&lt;/span&gt;&lt;span class=&quot;pf-impact-text&quot;&gt;&lt;strong&gt;${x[0]}&lt;/strong&gt;&lt;p&gt;${i===5&amp;&amp;s.adjusted?&#x27;Alleen gewijzigde documentversies analyseren.&#x27;:x[1]}&lt;/p&gt;&lt;/span&gt;${tag(i===5&amp;&amp;s.adjusted?&#x27;Aangepast&#x27;:x[3],i===5&amp;&amp;s.adjusted?&#x27;green&#x27;:x[4])}&lt;span aria-hidden=&quot;true&quot;&gt;↗&lt;/span&gt;&lt;/button&gt;`).join(&#x27;&#x27;))+(s.impact!==null?impactDetail():&#x27;&#x27;)+panel(&#x27;Besluit voor deze epic&#x27;,`${s.approved?callout(`Akkoord op versie ${version()}`,esc(s.decision||&#x27;De voorgestelde impact is akkoord.&#x27;),&#x27;&#x27;,&#x27;green&#x27;):`&lt;p class=&quot;pf-muted&quot;&gt;Leg je besluit vast bij deze versie. Een wijzigingsverzoek past de epic aan en vraagt zo nodig opnieuw functioneel akkoord.&lt;/p&gt;&lt;label&gt;Toelichting&lt;textarea id=&quot;pf-decision&quot; placeholder=&quot;Waarom is dit akkoord, of wat moet er anders?&quot;&gt;${esc(s.decision)}&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Akkoord op deze versie&#x27;,&#x27;arch-approve&#x27;,true)}${b(&#x27;Vraag aanpassing&#x27;,&#x27;arch-change&#x27;)}${b(&#x27;Vraag onderzoek&#x27;,&#x27;arch-research&#x27;)}&lt;/div&gt;`}&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Bekijk functionele samenvatting&#x27;,&#x27;arch-functional&#x27;)}&lt;/div&gt;`);}
+function impactDetail(){let x=impacts[s.impact];return panel(x[7],`&lt;p&gt;${s.impact===5&amp;&amp;s.adjusted?&#x27;Nieuw voorstel: analyseer uitsluitend nieuwe of gewijzigde documenten, maximaal één succesvolle analyse per documentversie.&#x27;:x[1]}&lt;/p&gt;&lt;div class=&quot;pf-detail&quot;&gt;&lt;h3&gt;Wat verandert er?&lt;/h3&gt;&lt;p&gt;${x[5]}&lt;/p&gt;&lt;h3&gt;Onderbouwing / te controleren&lt;/h3&gt;&lt;p&gt;${x[6]}&lt;/p&gt;&lt;/div&gt;${s.impact===5?`&lt;div class=&quot;pf-two&quot;&gt;&lt;div&gt;&lt;h3&gt;Voorgesteld ritme&lt;/h3&gt;&lt;p&gt;Elke 10 minuten&lt;br&gt;&lt;span class=&quot;pf-muted&quot;&gt;144 mogelijke starts per dag&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;div&gt;&lt;h3&gt;Kosten en volume&lt;/h3&gt;&lt;p&gt;Nog niet onderbouwd&lt;br&gt;&lt;span class=&quot;pf-muted&quot;&gt;Aantal stukken, tokens en retries ontbreken.&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Werk alternatief met wijzigingen uit&#x27;,&#x27;ai-alternative&#x27;)}&lt;/div&gt;`:&#x27;&#x27;}&lt;label&gt;Vraag AI over dit onderdeel&lt;textarea id=&quot;pf-arch-question&quot; placeholder=&quot;Wat verandert er precies, waarom is dat nodig en kan het eenvoudiger?&quot;&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Onderzoek met AI&#x27;,&#x27;ask-impact&#x27;,true)}${b(&#x27;Sluit toelichting&#x27;,&#x27;close-impact&#x27;)}&lt;/div&gt;${s.archAnswer?`&lt;div class=&quot;pf-message&quot; style=&quot;margin-top:15px&quot;&gt;&lt;strong&gt;AI · voorbeeldantwoord&lt;/strong&gt;&lt;p&gt;${esc(s.archAnswer)}&lt;/p&gt;&lt;/div&gt;`:&#x27;&#x27;}`);}
+function rules(){return heading(&#x27;PvdD · productafspraken&#x27;,&#x27;De ruimte waarbinnen AI kan werken&#x27;,&#x27;Beheerd door de architect; uitzonderingen komen bij jou terug.&#x27;)+panel(&#x27;Architectuur&#x27;,row(&#x27;Bestaande database en frontend&#x27;,&#x27;Additieve, compatibele wijzigingen mogen binnen deze afspraak.&#x27;,&#x27;&#x27;,&#x27;&#x27;)+row(&#x27;Altijd beoordelen&#x27;,&#x27;Tabelmigraties, nieuwe opslag, externe koppelingen, een nieuwe frontend of gewijzigde toegangsgrenzen.&#x27;,&#x27;&#x27;,&#x27;&#x27;))+panel(&#x27;AI in het product&#x27;,`&lt;label class=&quot;pf-checklabel&quot;&gt;&lt;input type=&quot;checkbox&quot; checked&gt;&lt;span&gt;Alleen nieuwe of gewijzigde inhoud analyseren&lt;/span&gt;&lt;/label&gt;&lt;label class=&quot;pf-checklabel&quot;&gt;&lt;input type=&quot;checkbox&quot; checked&gt;&lt;span&gt;Een nieuw AI-doel, hogere frequentie of nieuwe provider vraagt architectbeoordeling&lt;/span&gt;&lt;/label&gt;&lt;label class=&quot;pf-checklabel&quot;&gt;&lt;input type=&quot;checkbox&quot; checked&gt;&lt;span&gt;Geen automatische heranalyse van het archief&lt;/span&gt;&lt;/label&gt;&lt;div class=&quot;pf-two&quot;&gt;&lt;label&gt;Maximale extra jobs per dag&lt;input id=&quot;pf-job-budget&quot; type=&quot;number&quot; min=&quot;0&quot; placeholder=&quot;Nog vast te stellen&quot;&gt;&lt;/label&gt;&lt;label&gt;Productbudget per maand (€)&lt;input id=&quot;pf-money-budget&quot; type=&quot;number&quot; min=&quot;0&quot; placeholder=&quot;Nog vast te stellen&quot;&gt;&lt;/label&gt;&lt;/div&gt;&lt;p class=&quot;pf-small pf-muted&quot; style=&quot;margin-top:12px&quot;&gt;Voorbeeldbeleid. Een lege grens is niet onbeperkt: extra verbruik vraagt een besluit.&lt;/p&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Bewaar productafspraken&#x27;,&#x27;save-rules&#x27;,true)}&lt;/div&gt;`)+panel(&#x27;Opnieuw beoordelen&#x27;,&#x27;&lt;p&gt;Nieuwe technische impact tijdens planning of bouw komt terug bij de architect. Functionele gevolgen gaan naar Marc. Alleen het betrokken werk wacht.&lt;/p&gt;&#x27;);}
+function ownerHome(){return heading(&#x27;Factory owner&#x27;,&#x27;De factory draait&#x27;,&#x27;Overzicht over producten, uitvoering en inrichting.&#x27;)+panel(&#x27;Producten&#x27;,row(&#x27;PvdD&#x27;,&#x27;PO: Marc · architect: Robbert · menselijk gestuurd&#x27;,b(&#x27;Bekijk planning&#x27;,&#x27;planning&#x27;),tag(&#x27;1 vraag aan PO&#x27;,&#x27;amber&#x27;))+row(&#x27;HKH&#x27;,&#x27;Menselijk gestuurd · rollen nog toe te wijzen&#x27;,b(&#x27;Rollen instellen&#x27;,&#x27;settings&#x27;),tag(&#x27;Inrichten&#x27;))+row(&#x27;HKH Autopilot&#x27;,&#x27;PO en architect: AI · automatisch binnen productafspraken&#x27;,b(&#x27;Bekijk runs&#x27;,&#x27;runs&#x27;),tag(&#x27;Automatisch&#x27;,&#x27;green&#x27;)))+callout(&#x27;Productbesluiten hebben een eigenaar&#x27;,&#x27;Een open PO- of architectvraag blokkeert het betrokken productwerk. Er is geen extra goedkeuring van de factory owner.&#x27;,&#x27;&#x27;,&#x27;blue&#x27;)+panel(&#x27;Operatie&#x27;,row(&#x27;Productontwerp&#x27;,&#x27;Laatste uitvoering geslaagd&#x27;,b(&#x27;Runs&#x27;,&#x27;runs&#x27;),tag(&#x27;Gezond&#x27;,&#x27;green&#x27;))+row(&#x27;Kwaliteitscontrole&#x27;,&#x27;Eén verificatie loopt&#x27;,b(&#x27;Kwaliteit&#x27;,&#x27;quality&#x27;),tag(&#x27;Actief&#x27;,&#x27;blue&#x27;)));}
+function ownerPage(){if(s.page===&#x27;settings&#x27;)return heading(&#x27;Instellingen&#x27;,&#x27;Producten en rollen&#x27;,&#x27;De factory owner richt in wie het product bestuurt.&#x27;)+panel(&#x27;PvdD&#x27;,`&lt;div class=&quot;pf-two&quot;&gt;&lt;label&gt;Product owner&lt;input type=&quot;text&quot; value=&quot;Marc&quot;&gt;&lt;/label&gt;&lt;label&gt;Architect&lt;input type=&quot;text&quot; value=&quot;Robbert&quot;&gt;&lt;/label&gt;&lt;/div&gt;&lt;div class=&quot;pf-detail&quot;&gt;&lt;h3&gt;Bevoegdheden architect&lt;/h3&gt;&lt;p&gt;Architectuur, product-AI, productbudgetten en uitzonderingen.&lt;/p&gt;&lt;/div&gt;&lt;label&gt;Werkwijze&lt;select&gt;&lt;option&gt;Menselijke PO en architect, met AI&lt;/option&gt;&lt;option&gt;Automatische PO en architect binnen productafspraken&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;&lt;div class=&quot;pf-btnrow&quot;&gt;${b(&#x27;Bewaar toewijzing&#x27;,&#x27;save-settings&#x27;,true)}&lt;/div&gt;`)+panel(&#x27;HKH Autopilot&#x27;,&#x27;&lt;p&gt;Automatische PO en architect. AI kan uitwerken, beoordelen en laten uitvoeren binnen de ingestelde productafspraken.&lt;/p&gt;&lt;p class=&quot;pf-muted&quot;&gt;Afwijkingen volgen de ingestelde uitzonderingsroute. Zonder mandaat blijft het betrokken werk geblokkeerd.&lt;/p&gt;&#x27;)+panel(&#x27;Factoryconfiguratie&#x27;,row(&#x27;Agent Runtime en modellen&#x27;,&#x27;Verbinding, beschikbaarheid en globale standaardmodellen&#x27;,b(&#x27;Bekijk instellingen&#x27;,&#x27;runtime-settings&#x27;))+row(&#x27;Procesritmes&#x27;,&#x27;Ontwerp, planning, dispatching en kwaliteit&#x27;,b(&#x27;Bekijk ritmes&#x27;,&#x27;rhythms&#x27;)));if(s.page===&#x27;runs&#x27;)return heading(&#x27;Operatie&#x27;,&#x27;Runs&#x27;,&#x27;Technische uitvoeringsdetails voor de factory owner.&#x27;)+panel(&#x27;&#x27;,`&lt;table class=&quot;pf-table&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Proces&lt;/th&gt;&lt;th&gt;Product&lt;/th&gt;&lt;th&gt;Uitkomst&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;${[[&#x27;Productontwerp&#x27;,&#x27;PvdD&#x27;,&#x27;Geslaagd&#x27;],[&#x27;Productplanning&#x27;,&#x27;PvdD&#x27;,&#x27;Vraag aan PO&#x27;],[&#x27;Kwaliteitscontrole&#x27;,&#x27;HKH Autopilot&#x27;,&#x27;Actief&#x27;]].map((x,i)=&gt;`&lt;tr&gt;&lt;td&gt;${x[0]}&lt;/td&gt;&lt;td&gt;${x[1]}&lt;/td&gt;&lt;td&gt;${tag(x[2],i===1?&#x27;amber&#x27;:&#x27;green&#x27;)}&lt;/td&gt;&lt;td&gt;${b(&#x27;Details&#x27;,&#x27;run-&#x27;+i)}&lt;/td&gt;&lt;/tr&gt;`).join(&#x27;&#x27;)}&lt;/tbody&gt;&lt;/table&gt;`);if(s.page===&#x27;planning&#x27;)return heading(&#x27;Planning&#x27;,&#x27;Van epic naar uitvoering&#x27;,&#x27;Over alle producten heen.&#x27;)+panel(&#x27;PvdD&#x27;,row(title,&#x27;Eén story wacht op een functionele keuze van Marc.&#x27;,&#x27;&#x27;,tag(&#x27;Vraag aan PO&#x27;,&#x27;amber&#x27;))+row(&#x27;Bronverwijzingen bij een analyse&#x27;,&#x27;Alle stories zijn geleverd.&#x27;,&#x27;&#x27;,tag(&#x27;Gereed&#x27;,&#x27;green&#x27;)))+panel(&#x27;HKH Autopilot&#x27;,row(&#x27;Tijdlijn met bronverwijzingen&#x27;,&#x27;Eén story bij Software Factory · twee stories in de backlog&#x27;,&#x27;&#x27;,tag(&#x27;Bouwt&#x27;,&#x27;blue&#x27;)));if(s.page===&#x27;quality&#x27;)return heading(&#x27;Kwaliteit&#x27;,&#x27;Verificaties en bevindingen&#x27;,&#x27;Controle op de daadwerkelijk geleverde versie.&#x27;)+panel(&#x27;Laatste controles&#x27;,row(&#x27;PvdD · bronverwijzingen&#x27;,&#x27;Acceptatiecriteria geslaagd · geleverde versie gecontroleerd&#x27;,&#x27;&#x27;,tag(&#x27;Geslaagd&#x27;,&#x27;green&#x27;))+row(&#x27;HKH Autopilot · tijdlijn&#x27;,&#x27;Navigatie en bronlinks worden gecontroleerd&#x27;,&#x27;&#x27;,tag(&#x27;Bezig&#x27;,&#x27;blue&#x27;)))+panel(&#x27;Open bevindingen&#x27;,&#x27;&lt;p&gt;Geen open blokkerende bevindingen in dit voorbeeld.&lt;/p&gt;&#x27;);return ownerHome();}
+function render(){root.classList.toggle(&#x27;pf-compact&#x27;,design.compact);root.querySelector(&#x27;#pf-role&#x27;).value=s.role;root.querySelector(&#x27;#pf-stage&#x27;).value=s.stage;root.querySelector(&#x27;#pf-stage&#x27;).disabled=s.role===&#x27;owner&#x27;;root.querySelector(&#x27;#pf-identity&#x27;).textContent=roles[s.role];root.querySelector(&#x27;#pf-footer-role&#x27;).textContent=s.role===&#x27;po&#x27;?&#x27;Ideeën · vragen · voortgang&#x27;:s.role===&#x27;architect&#x27;?&#x27;Impact · besluiten · productafspraken&#x27;:&#x27;Instellingen · runs · planning · kwaliteit&#x27;;nav();let content=s.role===&#x27;po&#x27;?(s.page===&#x27;new&#x27;?newIdea():s.page===&#x27;epic&#x27;?epic():s.page===&#x27;questions&#x27;?questionPage():s.page===&#x27;other&#x27;?heading(&#x27;Opgeleverd&#x27;,&#x27;Bronverwijzingen bij een analyse&#x27;,&#x27;Elke analyse verwijst nu naar de gebruikte documenten.&#x27;)+panel(&#x27;Resultaat&#x27;,&#x27;&lt;p&gt;Je kunt vanuit een toelichting direct zien welk bronstuk erbij hoort.&lt;/p&gt;&#x27;+b(&#x27;Terug naar mijn werk&#x27;,&#x27;home&#x27;)):poHome()):s.role===&#x27;architect&#x27;?(s.page===&#x27;impact&#x27;?impactPage():s.page===&#x27;rules&#x27;?rules():s.page===&#x27;functional&#x27;?heading(&#x27;Functionele samenvatting&#x27;,title)+dossier()+b(&#x27;Terug naar impact&#x27;,&#x27;impact&#x27;):archHome()):ownerPage();root.querySelector(&#x27;#pf-main&#x27;).innerHTML=content;}
+function move(page){s.page=page;s.story=null;render();}
+root.addEventListener(&#x27;change&#x27;,e=&gt;{if(e.target.id===&#x27;pf-role&#x27;){s.role=e.target.value;s.page=&#x27;home&#x27;;s.impact=null;toast(&#x27;&#x27;);render();}if(e.target.id===&#x27;pf-stage&#x27;){s.stage=e.target.value;s.page=s.role===&#x27;architect&#x27;?&#x27;impact&#x27;:&#x27;epic&#x27;;s.tab=[&#x27;planning&#x27;,&#x27;building&#x27;,&#x27;delivered&#x27;].includes(s.stage)?&#x27;progress&#x27;:&#x27;overview&#x27;;s.answered=false;s.adjusted=[&#x27;planning&#x27;,&#x27;building&#x27;,&#x27;delivered&#x27;].includes(s.stage);s.approved=[&#x27;planning&#x27;,&#x27;building&#x27;,&#x27;delivered&#x27;].includes(s.stage);s.poApproved=s.stage!==&#x27;draft&#x27;;s.story=null;toast(&#x27;&#x27;);render();}});
+root.addEventListener(&#x27;click&#x27;,e=&gt;{const el=e.target.closest(&#x27;button&#x27;);if(!el)return;if(el.dataset.page){move(el.dataset.page);return;}if(el.dataset.tab){s.tab=el.dataset.tab;s.story=null;render();return;}if(el.dataset.impact!==undefined){s.impact=Number(el.dataset.impact);s.archAnswer=&#x27;&#x27;;render();return;}const a=el.dataset.action;if(!a)return;
+if([&#x27;home&#x27;,&#x27;new&#x27;,&#x27;epic&#x27;,&#x27;questions&#x27;,&#x27;impact&#x27;,&#x27;rules&#x27;,&#x27;planning&#x27;,&#x27;runs&#x27;,&#x27;quality&#x27;,&#x27;settings&#x27;].includes(a)){move(a);return;}
+if(a===&#x27;example&#x27;){s.idea=&#x27;Ik wil sneller zien welke onderwerpen aandacht nodig hebben. Kunnen we de AI elke tien minuten laten kijken?&#x27;;root.querySelector(&#x27;#pf-idea&#x27;).value=s.idea;return;}
+if(a===&#x27;create-idea&#x27;){const v=root.querySelector(&#x27;#pf-idea&#x27;).value.trim();if(!v){toast(&#x27;Beschrijf eerst je idee of gebruik het voorbeeldidee.&#x27;);return;}s.idea=v;s.stage=&#x27;draft&#x27;;s.page=&#x27;epic&#x27;;s.tab=&#x27;overview&#x27;;s.chat=[];s.adjusted=false;s.poApproved=false;s.approved=false;render();return;}
+if(a===&#x27;send&#x27;){let v=root.querySelector(&#x27;#pf-chat-input&#x27;).value.trim();if(!v){toast(&#x27;Typ eerst wat je wilt bespreken.&#x27;);return;}s.chat.push({who:&#x27;Marc&#x27;,text:v},{who:&#x27;Product Advisor&#x27;,text:&#x27;Ik heb je feedback bij deze uitwerking gezet. In de uiteindelijke applicatie werk ik daarmee het voorstel bij en laat ik zien wat verandert. Bekijk hier ook de schermen en aandachtspunten.&#x27;});render();toast(&#x27;Feedback toegevoegd aan het voorbeeldgesprek.&#x27;);return;}
+if(a===&#x27;po-approve&#x27;){s.poApproved=true;s.stage=&#x27;review&#x27;;s.tab=&#x27;reviews&#x27;;render();toast(&#x27;Functioneel akkoord vastgelegd. De beoordeling ligt nu bij Robbert als architect.&#x27;);return;}
+if(a===&#x27;po-reapprove&#x27;){s.poApproved=true;s.stage=s.approved?&#x27;planning&#x27;:&#x27;review&#x27;;s.tab=&#x27;progress&#x27;;render();toast(s.approved?&#x27;Versie 3 functioneel goedgekeurd. De benodigde akkoorden zijn compleet; planning kan verder.&#x27;:&#x27;Versie 3 functioneel goedgekeurd. De architect beoordeelt de aangepaste impact nog.&#x27;);return;}
+if(a===&#x27;progress&#x27;){s.page=&#x27;epic&#x27;;s.tab=&#x27;progress&#x27;;render();return;}
+if(a===&#x27;reviews&#x27;){s.tab=&#x27;reviews&#x27;;render();return;}
+if(a===&#x27;discuss-overview&#x27;){s.tab=&#x27;overview&#x27;;render();root.querySelector(&#x27;#pf-chat-input&#x27;).focus();return;}
+if(a===&#x27;viewport&#x27;){s.mobile=!s.mobile;render();return;}
+if([&#x27;ux-main&#x27;,&#x27;ux-detail&#x27;,&#x27;ux-empty&#x27;,&#x27;ux-error&#x27;].includes(a)){s.ux=a.slice(3);render();return;}
+if(a===&#x27;ux-all&#x27;||a===&#x27;ux-filter&#x27;){s.filter=a===&#x27;ux-filter&#x27;;render();return;}
+if(a===&#x27;ux-viewed&#x27;){toast(&#x27;Het punt is gemarkeerd als bekeken in dit schermvoorbeeld.&#x27;);return;}
+if(a===&#x27;ux-feedback&#x27;){let v=root.querySelector(&#x27;#pf-ux-feedback&#x27;).value.trim();if(!v){toast(&#x27;Schrijf eerst je feedback op dit scherm.&#x27;);return;}s.chat.push({who:&#x27;Marc&#x27;,text:`Feedback op scherm ${s.ux}: ${v}`},{who:&#x27;Product Advisor&#x27;,text:&#x27;Je schermfeedback staat bij de epic. In de uiteindelijke flow werk ik het ontwerp bij en toon ik de verschillen.&#x27;});s.tab=&#x27;overview&#x27;;render();return;}
+if(a===&#x27;show-planning&#x27;){s.stage=&#x27;planning&#x27;;s.answered=false;render();return;}
+if(a===&#x27;answer&#x27;){s.question=root.querySelector(&#x27;input[name=&quot;pf-answer&quot;]:checked&#x27;).value;let note=root.querySelector(&#x27;#pf-question-note&#x27;).value.trim();if(note)s.question+=&#x27; — &#x27;+note;s.answered=true;render();toast(&#x27;Antwoord gekoppeld aan de epic en story. De planner kan verder.&#x27;);return;}
+if(a.startsWith(&#x27;story-&#x27;)){s.story=Number(a.slice(6));render();return;}
+if(a===&#x27;close-story&#x27;){s.story=null;render();return;}
+if(a===&#x27;delivered-ux&#x27;){s.tab=&#x27;ux&#x27;;render();return;}
+if(a===&#x27;other-delivery&#x27;){move(&#x27;other&#x27;);return;}
+if(a===&#x27;close-impact&#x27;){s.impact=null;render();return;}
+if(a===&#x27;ask-impact&#x27;){let q=root.querySelector(&#x27;#pf-arch-question&#x27;).value.trim();if(!q){toast(&#x27;Stel eerst je vraag over dit impactpunt.&#x27;);return;}s.archAnswer=s.impact===5?&#x27;Een broncontrole hoeft geen AI-aanroep te zijn. Vergelijk eerst documentversies en start AI alleen bij inhoudelijke wijzigingen. Voor een kostenraming zijn het aantal documenten, tokens per document en de retrygrens nodig. Die gegevens ontbreken nog in dit voorbeeld.&#x27;:impacts[s.impact][6]+&#x27; De uiteindelijke agent onderbouwt dit met concrete codeverwijzingen en bestaande architectuurbesluiten.&#x27;;render();return;}
+if(a===&#x27;ai-alternative&#x27;){s.archAnswer=&#x27;Voorgestelde wijziging: controleer iedere tien minuten op nieuwe documentversies; start AI alleen als de inhoud is gewijzigd. Maximaal één succesvolle analyse per documentversie, begrensde retries en geen heranalyse van het archief. Vraag dit als aanpassing aan de epic; Marc ziet daarna het functionele verschil.&#x27;;render();return;}
+if(a===&#x27;arch-approve&#x27;){s.decision=root.querySelector(&#x27;#pf-decision&#x27;).value.trim();if(!s.decision){toast(&#x27;Leg kort vast waarom deze impact akkoord is.&#x27;);return;}s.approved=true;s.stage=s.poApproved?&#x27;planning&#x27;:&#x27;review&#x27;;render();toast(&#x27;Architectbesluit vastgelegd bij deze versie. Er is geen factory-ownergoedkeuring nodig.&#x27;);return;}
+if(a===&#x27;arch-change&#x27;){s.decision=root.querySelector(&#x27;#pf-decision&#x27;).value.trim();if(!s.decision){toast(&#x27;Beschrijf welke aanpassing je wilt, bijvoorbeeld alleen AI bij gewijzigde stukken.&#x27;);return;}s.adjusted=true;s.approved=false;s.poApproved=false;s.stage=&#x27;review&#x27;;render();toast(&#x27;Wijzigingsverzoek vastgelegd. Het voorbeeld toont versie 3; Marc en de architect beoordelen die opnieuw.&#x27;);return;}
+if(a===&#x27;arch-research&#x27;){s.decision=root.querySelector(&#x27;#pf-decision&#x27;).value.trim();if(!s.decision){toast(&#x27;Beschrijf wat AI eerst moet onderzoeken.&#x27;);return;}toast(&#x27;Onderzoeksvraag aan de epic gekoppeld. De architectbeoordeling blijft open.&#x27;);return;}
+if(a===&#x27;arch-functional&#x27;){move(&#x27;functional&#x27;);return;}
+if(a===&#x27;save-rules&#x27;){toast(&#x27;Productafspraken bewaard in dit prototype. Nieuwe afwijkingen gaan naar de architect.&#x27;);return;}
+if(a===&#x27;save-settings&#x27;){toast(&#x27;Roltoewijzing bewaard in dit prototype.&#x27;);return;}
+if(a===&#x27;runtime-settings&#x27;){root.querySelector(&#x27;#pf-main&#x27;).innerHTML=heading(&#x27;Factoryconfiguratie&#x27;,&#x27;Agent Runtime en modellen&#x27;,&#x27;Globale uitvoering; product-AI-beleid blijft bij de architect.&#x27;)+panel(&#x27;Verbinding&#x27;,&#x27;&lt;p&gt;Agent Runtime · verbonden&lt;/p&gt;&lt;p&gt;Modelinstellingen worden per agenttaak beheerd.&lt;/p&gt;&#x27;+b(&#x27;Terug naar instellingen&#x27;,&#x27;settings&#x27;));return;}
+if(a===&#x27;rhythms&#x27;){root.querySelector(&#x27;#pf-main&#x27;).innerHTML=heading(&#x27;Factoryconfiguratie&#x27;,&#x27;Procesritmes&#x27;,&#x27;Automatische ontwerp-, planning- en kwaliteitsruns.&#x27;)+panel(&#x27;PvdD&#x27;,&#x27;&lt;p&gt;Productontwerp · op verzoek&lt;/p&gt;&lt;p&gt;Planning · automatisch na benodigde akkoorden&lt;/p&gt;&lt;p&gt;Verificatie · na levering&lt;/p&gt;&#x27;+b(&#x27;Terug naar instellingen&#x27;,&#x27;settings&#x27;));return;}
+if(a.startsWith(&#x27;run-&#x27;)){root.querySelector(&#x27;#pf-main&#x27;).innerHTML=heading(&#x27;Run · voorbeeld&#x27;,&#x27;Uitvoering bekijken&#x27;,&#x27;Procesinput, voortgang en resultaat.&#x27;)+panel(&#x27;Resultaat&#x27;,a===&#x27;run-1&#x27;?&#x27;&lt;p&gt;Planning wacht op de functionele keuze van Marc voor story 3.&lt;/p&gt;&lt;p&gt;De vraag is zichtbaar in zijn persoonlijke werkplek.&lt;/p&gt;&#x27;:a===&#x27;run-2&#x27;?&#x27;&lt;p&gt;De kwaliteitsagent controleert de geleverde versie op acceptatie.&lt;/p&gt;&#x27;:&#x27;&lt;p&gt;Epicversie 2 gepubliceerd met vier schermtoestanden.&lt;/p&gt;&#x27;)+b(&#x27;Terug naar runs&#x27;,&#x27;runs&#x27;);return;}
+});
+render();
+if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addToggle(design,&#x27;compact&#x27;,{label:&#x27;Compactere lijsten&#x27;});tweak.addToggle(design,&#x27;showStories&#x27;,{label:&#x27;Stories direct in PO-voortgang&#x27;});}
+})();
+&lt;/script&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

@@ -212,6 +212,7 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
             status.globalRoles.contains('FACTORY_OWNER'),
         productMemberships: status.productMemberships,
         actingRole: status.actingRole,
+        availableRoles: status.availableRoles,
         onSwitchRole: status.canSwitchRole && !_busy ? _switchRole : null,
       );
     }
@@ -319,6 +320,7 @@ class FoundationPage extends StatelessWidget {
     this.isFactoryOwner = true,
     this.productMemberships = const {},
     this.actingRole,
+    this.availableRoles = const {},
     this.onSwitchRole,
     super.key,
   });
@@ -340,6 +342,7 @@ class FoundationPage extends StatelessWidget {
   final bool isFactoryOwner;
   final Set<String> productMemberships;
   final String? actingRole;
+  final Set<String> availableRoles;
   final ValueChanged<String>? onSwitchRole;
 
   @override
@@ -361,6 +364,7 @@ class FoundationPage extends StatelessWidget {
     isFactoryOwner: isFactoryOwner,
     productMemberships: productMemberships,
     actingRole: actingRole,
+    availableRoles: availableRoles,
     onSwitchRole: onSwitchRole,
   );
 }

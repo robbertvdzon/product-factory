@@ -1,5 +1,13 @@
 # Product Factory — UX-referentie
 
+## Ontwerp voor de volgende uitbreiding
+
+Het [UX-ontwerp voor PO, architect en factory owner](epic-samenwerking/README.md) bevat
+een zelfstandig klikbaar prototype, schermbeelden en schermcontracten voor epicontwikkeling.
+Het hoort bij [stap 11](../stappenplannen/11-epic-samenwerking-po-architect.md) en is nog
+geen beschrijving van de geïmplementeerde frontend. Voor deze toekomstige rolwerkplekken is
+dit nieuwe ontwerp de referentie; bestaande functionaliteit blijft hieronder beschreven.
+
 De frontend gebruikt het Product Factory v2-UX-concept uit commit
 [`3d6cbe4`](https://github.com/robbertvdzon/product-factory/tree/3d6cbe4/v2/ux) als vaste visuele
 referentie. Het concept werd vóór de technische herbouw gemaakt en is geen bron van domeinlogica.

@@ -20,6 +20,7 @@ data class AuthenticationStatus(
     val productMemberships: Set<String> = emptySet(),
     val grantedGlobalRoles: Set<String> = emptySet(),
     val actingRole: String? = null,
+    val availableRoles: Set<String> = emptySet(),
 )
 
 data class ActingRoleRequest(

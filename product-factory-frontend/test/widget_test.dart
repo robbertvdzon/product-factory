@@ -81,7 +81,7 @@ void main() {
     await tester.tap(appText('Test Google-login'));
     await tester.pumpAndSettle();
     expect(gateway.lastGoogleToken, 'short-lived-google-token');
-    expect(appText('Nog geen producten'), findsOneWidget);
+    expect(appText('Nog geen producttoegang'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Uitloggen'));
     await tester.pumpAndSettle();

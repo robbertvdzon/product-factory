@@ -133,7 +133,7 @@ class ProductController(
         val all = queries.findStakeholderQuestions(StakeholderQuestionFilter(ProductId(productId)))
         if (authorization.isFactoryOwner(authentication)) return all
         val userId = authorization.current(authentication)?.id ?: return emptyList()
-        return all.filter { it.requestedRespondentUserId == userId }
+        return all.filter { it.requestedRole.name == authorization.current(authentication)?.actingRole?.name && (it.requestedRespondentUserId == userId || it.requestedRespondentUserId == null) }
     }
     @PostMapping("/questions/{questionId}/answer") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun answer(@PathVariable questionId: String, @RequestBody request: AnswerQuestionRequest, authentication: Authentication?) {
@@ -160,7 +160,8 @@ class ProductController(
     private fun requireQuestionRespondent(questionId: String, authentication: Authentication?) {
         val question = queries.getStakeholderQuestion(StakeholderQuestionId(questionId))
         val actor = authorization.current(authentication)
-        if (!authorization.isFactoryOwner(authentication) && question.requestedRespondentUserId != actor?.id) {
+        authorization.requireRole(question.productId, question.requestedRole, authentication)
+        if (actor != null && question.requestedRespondentUserId != null && question.requestedRespondentUserId != actor.id) {
             throw org.springframework.security.access.AccessDeniedException("Deze vraag is aan een andere gebruiker gericht.")
         }
     }

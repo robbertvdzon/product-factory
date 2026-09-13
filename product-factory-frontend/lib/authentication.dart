@@ -17,6 +17,7 @@ class AuthenticationStatus {
     this.productMemberships = const {},
     this.grantedGlobalRoles = const {},
     this.actingRole,
+    this.availableRoles = const {},
   });
 
   factory AuthenticationStatus.fromJson(Map<String, Object?> json) =>
@@ -37,6 +38,9 @@ class AuthenticationStatus {
             .map((e) => '$e')
             .toSet(),
         actingRole: json['actingRole'] as String?,
+        availableRoles: (json['availableRoles'] as List? ?? const [])
+            .map((e) => '$e')
+            .toSet(),
       );
 
   final bool authenticated;
@@ -53,10 +57,13 @@ class AuthenticationStatus {
 
   /// `FACTORY_OWNER` of `PRODUCT_OWNER`: de rol waarmee de gebruiker nu werkt.
   final String? actingRole;
+  final Set<String> availableRoles;
 
   /// Alleen een factory owner kan kiezen tussen factory owner en product owner.
   bool get canSwitchRole =>
-      authRequired && grantedGlobalRoles.contains('FACTORY_OWNER');
+      authRequired &&
+      (availableRoles.length > 1 ||
+          grantedGlobalRoles.contains('FACTORY_OWNER'));
 }
 
 abstract interface class AuthenticationGateway {

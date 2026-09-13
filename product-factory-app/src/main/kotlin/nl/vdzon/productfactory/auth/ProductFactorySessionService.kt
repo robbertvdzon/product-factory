@@ -27,6 +27,7 @@ data class ResolvedSession(
     val csrfToken: String?,
     val grantedGlobalRoles: Set<String> = globalRoles,
     val actingRole: String? = null,
+    val availableRoles: Set<String> = emptySet(),
 )
 
 @Service
@@ -48,6 +49,7 @@ class ProductFactorySessionService(
     fun create(email: String, response: HttpServletResponse): AuthenticationStatus {
         val now = clock.instant()
         val user = users.resolveOrCreate(email, email.trim().lowercase() in factoryOwners)
+        if (!user.active) throw LoginRejected("Account is niet actief.")
         val sessionId = randomTokenHex(32)
         val csrfToken = randomTokenUrlSafe(32)
         repository.create(
@@ -68,6 +70,7 @@ class ProductFactorySessionService(
             productMemberships = user.memberships.filter { it.status.name == "ACTIVE" }.map { it.productId.value }.toSet(),
             grantedGlobalRoles = user.globalRoles.map { it.name }.toSet(),
             actingRole = user.actingRole.name,
+            availableRoles = user.availableRoles,
         )
     }
 
@@ -78,11 +81,13 @@ class ProductFactorySessionService(
         val csrfToken = request.cookie(CSRF_COOKIE)?.value
             ?.takeIf { constantTimeEquals(sha256Hex(it), session.csrfTokenHash) }
         val user = users.get(nl.vdzon.productfactory.api.advisor.UserId(session.userId))
+        if (!user.active) return null
         return ResolvedSession(
             session.sessionId, user.email, user.id.value, user.effectiveGlobalRoles.map { it.name }.toSet(),
             user.memberships.filter { it.status.name == "ACTIVE" }.map { it.productId.value }.toSet(), csrfToken,
             grantedGlobalRoles = user.globalRoles.map { it.name }.toSet(),
             actingRole = user.actingRole.name,
+            availableRoles = user.availableRoles,
         )
     }
 

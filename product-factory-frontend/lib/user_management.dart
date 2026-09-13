@@ -87,23 +87,45 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   Future<void> _grant(Map<String, Object?> user) async {
     String? productId = _products.firstOrNull?.id;
+    String role = 'PRODUCT_OWNER';
     final selected = await showDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, update) => AlertDialog(
           title: Text('${_value(user['email'])} koppelen'),
-          content: DropdownButtonFormField<String>(
-            initialValue: productId,
-            decoration: const InputDecoration(labelText: 'Product'),
-            items: _products
-                .map(
-                  (product) => DropdownMenuItem(
-                    value: product.id,
-                    child: Text(product.name),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: productId,
+                decoration: const InputDecoration(labelText: 'Product'),
+                items: _products
+                    .map(
+                      (product) => DropdownMenuItem(
+                        value: product.id,
+                        child: Text(product.name),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => update(() => productId = value),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: role,
+                decoration: const InputDecoration(labelText: 'Productrol'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'PRODUCT_OWNER',
+                    child: Text('Product owner'),
                   ),
-                )
-                .toList(),
-            onChanged: (value) => update(() => productId = value),
+                  DropdownMenuItem(
+                    value: 'ARCHITECT',
+                    child: Text('Architect'),
+                  ),
+                ],
+                onChanged: (value) => update(() => role = value!),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -123,13 +145,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
     if (selected == null) return;
     final memberships = (user['memberships'] as List? ?? const [])
         .whereType<Map>()
-        .where((membership) => _value(membership['productId']) == selected)
+        .where(
+          (membership) =>
+              _value(membership['productId']) == selected &&
+              membership['role'] == role,
+        )
         .toList();
     final expectedVersion = memberships.isEmpty
         ? 0
         : (memberships.single['version'] as num).toInt();
     await _mutate(
-      () => _gateway.grant(_value(user['id']), selected, expectedVersion),
+      () => _gateway.grant(_value(user['id']), selected, expectedVersion, role),
     );
   }
 
@@ -188,6 +214,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         _value(membership['productId']),
         reason,
         (membership['version'] as num).toInt(),
+        _value(membership['role']),
       ),
     );
   }
@@ -339,11 +366,13 @@ class _UserGateway {
     String userId,
     String productId,
     int expectedVersion,
+    String role,
   ) => _send(
     'PUT',
     '/api/admin/users/$userId/memberships/${Uri.encodeComponent(productId)}',
     {
       'expectedVersion': expectedVersion,
+      'role': role,
       'idempotencyKey': _key('grant-membership'),
     },
   );
@@ -352,6 +381,7 @@ class _UserGateway {
     String productId,
     String reason,
     int expectedVersion,
+    String role,
   ) => _send(
     'DELETE',
     '/api/admin/users/$userId/memberships/${Uri.encodeComponent(productId)}',
@@ -359,6 +389,7 @@ class _UserGateway {
       'reason': reason,
       'confirmation': true,
       'expectedVersion': expectedVersion,
+      'role': role,
       'idempotencyKey': _key('revoke-membership'),
     },
   );

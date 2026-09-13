@@ -259,8 +259,8 @@ class ProductApplicationService(
                 { rs, _ -> UserId(rs.getString(1)) }, requestId.value, command.productId.value,
             ).singleOrNull() }
             ?: jdbc.query(
-                "SELECT user_id FROM pf_user_global_role WHERE role='FACTORY_OWNER' ORDER BY granted_at",
-                { rs, _ -> UserId(rs.getString(1)) },
+                "SELECT user_id FROM pf_product_membership WHERE product_id=? AND role=? AND status='ACTIVE' ORDER BY granted_at",
+                { rs, _ -> UserId(rs.getString(1)) }, command.productId.value, command.requestedRole.name,
             ).firstOrNull()
         respondent?.let {
             val valid = jdbc.queryForObject(
@@ -280,6 +280,7 @@ class ProductApplicationService(
             StakeholderQuestionStatus.OPEN.name, now, command.actor.type.name, command.actor.id, 1L,
             respondent?.value, command.productRequestId?.value, command.epicLinkId?.value, command.storyLinkId?.value,
         )
+        jdbc.update("UPDATE pf_stakeholder_question SET requested_role=? WHERE question_id=?",command.requestedRole.name,id.value)
         respondent?.let {
             try {
                 jdbc.update(
@@ -577,6 +578,8 @@ class ProductApplicationService(
     }
 
     fun deleteAllOwnedData() {
+        jdbc.update("DELETE FROM pf_product_governance_history")
+        jdbc.update("DELETE FROM pf_product_governance_policy")
         jdbc.update("DELETE FROM pf_meeting_message")
         jdbc.update("DELETE FROM pf_stakeholder_question")
         jdbc.update("DELETE FROM pf_meeting")
@@ -619,6 +622,7 @@ class ProductApplicationService(
         instant(rs, "answered_at"), instant(rs, "withdrawn_at"), rs.getLong("version"),
         rs.getString("requested_respondent_user_id")?.let(::UserId), rs.getString("product_request_id")?.let(::ProductRequestId),
         rs.getString("epic_link_id")?.let(::EpicId), rs.getString("story_link_id")?.let(::StoryId),
+        nl.vdzon.productfactory.api.advisor.ProductMembershipRole.valueOf(rs.getString("requested_role")),
     )
 
     private fun meeting(rs: ResultSet): MeetingDetails {

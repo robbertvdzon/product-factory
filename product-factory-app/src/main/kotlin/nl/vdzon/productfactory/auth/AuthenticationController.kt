@@ -96,6 +96,7 @@ class AuthenticationController(
             productMemberships = resolved.productMemberships,
             grantedGlobalRoles = resolved.grantedGlobalRoles,
             actingRole = resolved.actingRole,
+            availableRoles = resolved.availableRoles,
         ))
     }
 
