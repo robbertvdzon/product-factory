@@ -150,17 +150,53 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
             (path("epic") as ObjectNode).put("solution", "Toon de gegevens uit de bestaande eigen API met duidelijke uitleg wanneer het overzicht nog leeg is.")
             keepExistingUx(path("epic") as ObjectNode, current)
         }
+        (revised.path("epic").path("readiness") as ObjectNode).apply {
+            put("readyForPlanning", false)
+            putArray("openQuestions").add("Welke tekst moet bij een fout verschijnen?")
+        }
+        revised.putObject("stakeholderQuestion")
+            .put("question", "Welke tekst moet bij een fout verschijnen?")
+            .put("context", "Een tweede onafhankelijke vraag binnen dezelfde ontwerpsessie.")
+            .put("requestedRole", "PRODUCT_OWNER")
+        revised.withArray("memoryChanges").addObject().apply {
+            put("type", "ADD")
+            putNull("itemId")
+            putNull("expectedVersionId")
+            put("title", "Bevestigde leegtetekst")
+            put("content", "De PO koos uitleg over nog niet gecontroleerde resultaten.")
+            put("reason", "Behoud het eerste antwoord tijdens de tweede vraag.")
+        }
         completeOnlyJob(revised)
+        advisor.routeApprovedRequests()
+        val followUp = productQueries.findStakeholderQuestions(StakeholderQuestionFilter(productId)).single { it.status == StakeholderQuestionStatus.OPEN }
+        assertThat(followUp.id).isNotEqualTo(question.id)
+        advisor.routeApprovedRequests()
+        assertThat(jdbc.queryForObject("SELECT status FROM pf_design_work_item WHERE request_id=?", String::class.java, requestId.value))
+            .isEqualTo("WAITING_FOR_USER")
+        assertThat(queries.getProcessSession(question.processSessionId).aiTaskIds).hasSize(2)
+        products.answerStakeholderQuestionDirectly(AnswerStakeholderQuestionDirectlyCommand(
+            followUp.id, "Toon Probeer het opnieuw bij een fout.", followUp.version,
+            ActorReference(ActorType.STAKEHOLDER, owner.id.value), "second-answer-${productId.value}",
+        ))
+        advisor.routeApprovedRequests()
+        val secondVersion = queries.getEpic(current.id)
+        completeOnlyJob(validEpic().apply {
+            put("outcome", "REVISE_EPIC")
+            put("epicId", current.id.value)
+            put("expectedVersion", secondVersion.version)
+            (path("epic") as ObjectNode).put("solution", "Toon de gegevens uit de bestaande eigen API met de bevestigde uitleg bij een leeg overzicht en een fout.")
+            keepExistingUx(path("epic") as ObjectNode, secondVersion)
+        })
         advisor.routeApprovedRequests()
 
         val routed = advisor.getRequest(requestId)
         assertThat(routed.status).isEqualTo(ProductRequestStatus.ROUTED)
         assertThat(routed.linkedEpicId).isEqualTo(current.id.value)
         assertThat(queries.getEpic(current.id).readiness.requiresExternalData).isFalse()
-        assertThat(runtime.requests.last().prompt).contains("Ontwerpkeuze voor lege toestand")
+        assertThat(runtime.requests.last().prompt).contains("Ontwerpkeuze voor lege toestand", "Bevestigde leegtetekst", "Probeer het opnieuw")
         assertThat(jdbc.queryForObject("SELECT process_session_id FROM pf_design_work_item WHERE request_id=?", String::class.java, requestId.value))
             .isEqualTo(question.processSessionId.value)
-        assertThat(runtime.distinctIdempotencyKeys()).hasSize(2)
+        assertThat(runtime.distinctIdempotencyKeys()).hasSize(3)
     }
 
     @Test

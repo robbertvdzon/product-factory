@@ -181,12 +181,15 @@ class ProductDesignMvpService(
         // A prior iteration can publish memory before asking a human a question. Freeze the
         // current memory for each new task, while preserving the repository/design snapshot.
         val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant())
+        val questions = products.findStakeholderQuestions(StakeholderQuestionFilter(productId))
         val taskSnapshot = (mapper.readTree(snapshotJson) as ObjectNode).apply {
             set<JsonNode>("agentMemory", mapper.valueToTree(currentMemory))
+            set<JsonNode>("stakeholderQuestions", mapper.valueToTree(questions))
         }
         val taskSnapshotJson = mapper.writeValueAsString(taskSnapshot)
-        val inputs = (frozenInputs(sessionId).filter { it.type != "MEMORY_VERSION" } +
-            currentMemory.map { SourceReference("MEMORY_VERSION", it.activeVersionId.value, 1) })
+        val inputs = (frozenInputs(sessionId).filter { it.type !in setOf("MEMORY_VERSION", "STAKEHOLDER_QUESTION") } +
+            currentMemory.map { SourceReference("MEMORY_VERSION", it.activeVersionId.value, 1) } +
+            questions.map { SourceReference("STAKEHOLDER_QUESTION", it.id.value, it.version) })
             .sortedWith(compareBy(SourceReference::type, SourceReference::id, SourceReference::version))
         jdbc.update(
             "UPDATE pf_design_process_session SET snapshot_json=?,memory_version_ids_json=?,inputs_json=? WHERE id=?",
@@ -606,12 +609,13 @@ class ProductDesignMvpService(
 
     private fun applyTrustedEffects(sessionId: ProcessSessionId, result: JsonNode, epic: EpicDetails) {
         val frozen = frozenInputs(sessionId)
+        val effectKey = "${sessionId.value}-${requireNotNull(currentTaskId(sessionId)).value}"
         result.path("processedSignalIds").takeIf(JsonNode::isArray)?.forEachIndexed { index, idNode ->
             val id = UserSignalId(idNode.asText())
             val source = frozen.singleOrNull { it.type == "USER_SIGNAL" && it.id == id.value }
                 ?: throw InvalidCommand("Ontwerpresultaat probeert een niet-bevroren signaal te verwerken.")
             productCommands.linkSignalToEpic(LinkSignalToEpicCommand(
-                id, epic.id, epic.version, source.version, DESIGN_ACTOR, "design-signal-${sessionId.value}-$index",
+                id, epic.id, epic.version, source.version, DESIGN_ACTOR, "design-signal-${effectKey}-$index",
             ))
         }
         result.path("stakeholderQuestion").takeIf { it.isObject }?.let { question ->
@@ -619,14 +623,14 @@ class ProductDesignMvpService(
             productCommands.askStakeholder(AskStakeholderCommand(
                 epic.productId, ROLE.value, requiredText(question, "question", 5, 1000),
                 requiredText(question, "context", 5, 2000), sessionId, listOf(SourceReference("EPIC", epic.id.value, epic.version)),
-                DESIGN_ACTOR, "design-question-${sessionId.value}", directed?.requestedBy?.takeIf { question.path("requestedRole").asText("PRODUCT_OWNER")=="PRODUCT_OWNER" }?.let(::UserId),
+                DESIGN_ACTOR, "design-question-${effectKey}", directed?.requestedBy?.takeIf { question.path("requestedRole").asText("PRODUCT_OWNER")=="PRODUCT_OWNER" }?.let(::UserId),
                 directed?.requestId?.let(::ProductRequestId), epic.id,
                 requestedRole=nl.vdzon.productfactory.api.advisor.ProductMembershipRole.valueOf(question.path("requestedRole").asText("PRODUCT_OWNER")),
             ))
         }
         result.path("factoryDecision").takeIf { it.isTextual && it.asText().isNotBlank() }?.let { decision ->
             decisionCommands.createDecision(CreateDecisionCommand(
-                epic.productId, decision.asText().trim(), DecisionOrigin.FACTORY, DESIGN_ACTOR, "design-decision-${sessionId.value}",
+                epic.productId, decision.asText().trim(), DecisionOrigin.FACTORY, DESIGN_ACTOR, "design-decision-${effectKey}",
             ))
         }
         result.path("memoryChanges").takeIf(JsonNode::isArray)?.forEachIndexed { index, change ->
@@ -634,16 +638,16 @@ class ProductDesignMvpService(
             when (MemoryChangeType.valueOf(change.path("type").asText())) {
                 MemoryChangeType.ADD -> memoryCommands.addAgentMemory(AddAgentMemoryCommand(
                     context, requiredText(change, "title", 1, MAX_MEMORY_TITLE_LENGTH), requiredText(change, "content", 1, 4000),
-                    requiredText(change, "reason", 1, 1000), "design-memory-${sessionId.value}-$index",
+                    requiredText(change, "reason", 1, 1000), "design-memory-${effectKey}-$index",
                 ))
                 MemoryChangeType.REPLACE -> memoryCommands.replaceAgentMemory(ReplaceAgentMemoryCommand(
                     context, MemoryItemId(requiredText(change, "itemId", 1, 80)), MemoryVersionId(requiredText(change, "expectedVersionId", 1, 80)),
                     requiredText(change, "title", 1, MAX_MEMORY_TITLE_LENGTH), requiredText(change, "content", 1, 4000), requiredText(change, "reason", 1, 1000),
-                    "design-memory-${sessionId.value}-$index",
+                    "design-memory-${effectKey}-$index",
                 ))
                 MemoryChangeType.RETRACT -> memoryCommands.retractAgentMemory(RetractAgentMemoryCommand(
                     context, MemoryItemId(requiredText(change, "itemId", 1, 80)), MemoryVersionId(requiredText(change, "expectedVersionId", 1, 80)),
-                    requiredText(change, "reason", 1, 1000), "design-memory-${sessionId.value}-$index",
+                    requiredText(change, "reason", 1, 1000), "design-memory-${effectKey}-$index",
                 ))
             }
         }
@@ -969,7 +973,7 @@ class ProductDesignMvpService(
     private fun waitForDirectedAnswer(sessionId: ProcessSessionId) {
         val now = clock.instant()
         jdbc.update(
-            """UPDATE pf_design_process_session SET status='BLOCKED',blocked_reason='Productontwerp wacht op antwoord van de product owner.',
+            """UPDATE pf_design_process_session SET status='BLOCKED',blocked_reason='Productontwerp wacht op antwoord van de toegewezen productrol.',
                 error_code='WAITING_FOR_USER',call_claimed_until=NULL,updated_at=? WHERE id=?""".trimIndent(),
             now, sessionId.value,
         )

@@ -424,11 +424,15 @@ class ProductAdvisorApplicationService(
                     SELECT 1 FROM pf_stakeholder_question q
                     WHERE q.process_session_id=pf_design_work_item.process_session_id
                       AND q.product_request_id=pf_design_work_item.request_id AND q.status='ANSWERED'
+                ) AND NOT EXISTS (
+                    SELECT 1 FROM pf_stakeholder_question pending
+                    WHERE pending.process_session_id=pf_design_work_item.process_session_id
+                      AND pending.product_request_id=pf_design_work_item.request_id AND pending.status='OPEN'
                 )""".trimIndent(),
             clock.instant(),
         )
         jdbc.query(
-            "SELECT DISTINCT product_id FROM pf_design_work_item WHERE status IN ('PENDING','IN_PROGRESS','BLOCKED') ORDER BY product_id",
+            "SELECT DISTINCT w.product_id FROM pf_design_work_item w JOIN pf_product p ON p.product_id=w.product_id WHERE p.status='ACTIVE' AND w.status IN ('PENDING','IN_PROGRESS','BLOCKED') ORDER BY w.product_id",
             { rs, _ -> ProductId(rs.getString(1)) },
         ).take(limit).forEach { productId ->
             runCatching { productDesign.runProcessSession(productId) }
