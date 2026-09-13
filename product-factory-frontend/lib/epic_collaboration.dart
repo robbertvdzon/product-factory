@@ -751,6 +751,16 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         const Divider(height: 32),
         text(_text(_map(request['content'])['title'])),
         text(_text(_map(request['content'])['summary'])),
+        if (['APPROVED', 'ROUTING'].contains(request['status']))
+          notice(
+            'Je epic wordt uitgewerkt',
+            'AI werkt aan de functionele uitwerking, schermen en impact. Je kunt deze pagina sluiten; het resultaat verschijnt hier vanzelf.',
+          ),
+        if (request['status'] == 'ROUTING_FAILED')
+          notice(
+            'Het uitwerken vraagt aandacht',
+            'Je voorstel is bewaard. De verwerking is nog niet geslaagd; je hoeft het idee niet opnieuw in te voeren.',
+          ),
         if (request['status'] == 'PROPOSED')
           button(
             'Laat dit voorstel uitwerken',
