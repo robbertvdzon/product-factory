@@ -1005,10 +1005,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     final selected =
         screens.where((s) => s['screenKey'] == screenKey).firstOrNull ??
         screens.first;
-    final variants = {
-      for (final variant in _maps(selected['artifacts']))
-        _text(variant['viewport']): variant['artifactName'],
-    };
+    // The public EpicUxScreen contract serializes its viewport map as an object.
+    final variants = _map(selected['artifacts']);
     if (!variants.containsKey(viewport)) {
       viewport = variants.keys.firstOrNull ?? 'DESKTOP';
     }

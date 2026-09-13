@@ -178,11 +178,26 @@ class ProductDesignMvpService(
     }
 
     private fun requestTask(sessionId: ProcessSessionId, productId: ProductId, snapshotJson: String, gitUrl: String, gitSha: String, attempt: Int) {
+        // A prior iteration can publish memory before asking a human a question. Freeze the
+        // current memory for each new task, while preserving the repository/design snapshot.
+        val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant())
+        val taskSnapshot = (mapper.readTree(snapshotJson) as ObjectNode).apply {
+            set<JsonNode>("agentMemory", mapper.valueToTree(currentMemory))
+        }
+        val taskSnapshotJson = mapper.writeValueAsString(taskSnapshot)
+        val inputs = (frozenInputs(sessionId).filter { it.type != "MEMORY_VERSION" } +
+            currentMemory.map { SourceReference("MEMORY_VERSION", it.activeVersionId.value, 1) })
+            .sortedWith(compareBy(SourceReference::type, SourceReference::id, SourceReference::version))
+        jdbc.update(
+            "UPDATE pf_design_process_session SET snapshot_json=?,memory_version_ids_json=?,inputs_json=? WHERE id=?",
+            taskSnapshotJson, mapper.writeValueAsString(currentMemory.map { it.activeVersionId }),
+            mapper.writeValueAsString(inputs), sessionId.value,
+        )
         val configuration = aiQueries.getAiJobConfiguration(JOB_KEY)
         val taskId = ai.requestAiTask(RequestAiTaskCommand(
             JOB_KEY, productId, "product-design", sessionId, ROLE.value,
             configuration.execution, configuration.version, PROMPT_TEMPLATE_VERSION,
-            designPrompt(snapshotJson), RESPONSE_SCHEMA, RepositorySnapshot(gitUrl, gitSha),
+            designPrompt(taskSnapshotJson), RESPONSE_SCHEMA, RepositorySnapshot(gitUrl, gitSha),
             outputArtifacts = UX_ARTIFACT_DECLARATIONS,
             executionTimeout = Duration.ofMinutes(30), idempotencyKey = "design-${sessionId.value}-$attempt",
         ))
@@ -369,8 +384,7 @@ class ProductDesignMvpService(
         val rationale = requiredText(node, "slicabilityRationale", 20, 4000)
         val researchSources = readResearchSources(node.path("researchSources"))
         val declared = readReadiness(node.path("readiness"))
-        val mentionsExternalData = EXTERNAL_DATA_PATTERN.containsMatchIn("$problem $solution")
-        val readiness = calculateReadiness(declared, mentionsExternalData, visibleChange, uxArtifacts, uxScreens, researchSources)
+        val readiness = calculateReadiness(declared, visibleChange, uxArtifacts, uxScreens, researchSources)
         val impact = node.path("impact").takeIf { it.isObject }?.let { mapper.treeToValue(it, EpicImpactAssessment::class.java) } ?: EpicImpactAssessment()
         if (requireImpact && impact.items.isEmpty()) throw InvalidCommand("Een nieuwe uitwerking vereist onderbouwde architectuurimpact.")
         if (impact.items.isNotEmpty()) {
@@ -511,13 +525,12 @@ class ProductDesignMvpService(
 
     private fun calculateReadiness(
         declared: EpicReadinessDetails,
-        mentionsExternalData: Boolean,
         visibleChange: Boolean,
         uxArtifacts: List<ArtifactReference>,
         uxScreens: List<EpicUxScreen>,
         researchSources: List<EpicResearchSource>,
     ): EpicReadinessDetails {
-        val requiresExternalData = declared.requiresExternalData || mentionsExternalData
+        val requiresExternalData = declared.requiresExternalData
         val unmet = declared.unmetConditions.toMutableList()
         if (!declared.readyForPlanning) unmet += "Productontwerp heeft de epic nog niet gereed voor planning verklaard."
         if (requiresExternalData && researchSources.count { it.status == ResearchSourceStatus.VALIDATED } < MIN_VALIDATED_EXTERNAL_SOURCES) {
@@ -1082,6 +1095,9 @@ Geen verzonnen getallen: onbekende raming is null; onbekende architectuurimpact 
 Geef concrete risico's (kans, impact, maatregel, onzekerheid, verantwoordelijke PRODUCT_OWNER of ARCHITECT).
 Stel stakeholderQuestion.requestedRole in op PRODUCT_OWNER voor functionele keuzes en ARCHITECT voor architectuur, product-AI, budgetten en uitzonderingen.
 Gebruik governancePolicy als mandaat; de agent keurt menselijke beslissingen niet zelf goed.
+readiness beschrijft inhoudelijke gereedheid, niet toestemming: de factory bewaakt PO- en architectakkoord apart per inhoudsversie.
+Stel een vraag bij een ontbrekende ontwerpkeuze; maak van het nog ontbreken van formele goedkeuring geen inhoudelijke blokkade.
+requiresExternalData betreft nieuw te ontsluiten externe databronnen; bestaande eigen databasegegevens of een eigen API maken dit niet true.
 Leg bij revisie in impact.changeSummary uit wat voor de PO en architect is veranderd. Verwerk alle feedback.
 Zet readiness.readyForPlanning alleen op true als onderzoek, UX, acceptatiecriteria, afhankelijkheden en open vragen voldoende concreet zijn voor Productplanning.
 Als currentEpicToRefine aanwezig is, of de bevroren epics al een actuele NEEDS_RESEARCH- of NEEDS_REFINEMENT-epic bevatten, retourneer REVISE_EPIC met exact haar id
@@ -1147,7 +1163,7 @@ $snapshotJson"""
         private val ROLE = AgentRoleKey("PRODUCT_DESIGNER_MVP")
         private val JOB_KEY = AiJobKey("PRODUCT_DESIGN.CREATE_EPIC")
         private val DESIGN_ACTOR = ActorReference(ActorType.PROCESS, "product-design-mvp")
-        private const val PROMPT_TEMPLATE_VERSION = 5L
+        private const val PROMPT_TEMPLATE_VERSION = 6L
         private val CALL_CLAIM = Duration.ofMinutes(5)
         private const val MAX_DESIGN_ITERATIONS = 3
         private const val MIN_VALIDATED_EXTERNAL_SOURCES = 2
@@ -1172,7 +1188,6 @@ $snapshotJson"""
             EpicStatus.AWAITING_APPROVAL, EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL, EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL, EpicStatus.AVAILABLE, EpicStatus.IN_PLANNING, EpicStatus.ACTIVE,
             EpicStatus.VERIFYING, EpicStatus.COMPLETED, EpicStatus.NOT_SUCCESSFUL,
         )
-        private val EXTERNAL_DATA_PATTERN = Regex("""(?i)\b(bron|bronnen|archief|archieven|collectie|collecties|dataset|datasets|api|data|gegevens)\b""")
         private val FORBIDDEN_OUTPUT_FIELDS = setOf("story", "stories", "backlog", "storylist")
         private const val RESPONSE_SCHEMA = """{"type":"object","additionalProperties":false,"required":["outcome","reason","epicId","expectedVersion","epic","processedSignalIds","stakeholderQuestion","factoryDecision","memoryChanges"],"properties":{"outcome":{"enum":["NO_EPIC","CREATE_EPIC","REVISE_EPIC"],"type":"string"},"reason":{"type":["string","null"]},"epicId":{"type":["string","null"]},"expectedVersion":{"type":["integer","null"]},"epic":{"type":["object","null"],"additionalProperties":false,"required":["title","summary","problem","solution","directionReferences","visibleBehaviorChange","uxDesign","acceptanceCriteria","slicabilityRationale","researchSources","readiness","uxArtifactChanges","uxScreens","impact"],"properties":{"title":{"type":"string"},"summary":{"type":"string","minLength":10,"maxLength":600},"problem":{"type":"string"},"solution":{"type":"string"},"directionReferences":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","id","version"],"properties":{"type":{"enum":["PRODUCT_ASSIGNMENT","DECISION"],"type":"string"},"id":{"type":"string"},"version":{"type":"integer"}}}},"visibleBehaviorChange":{"type":"boolean"},"uxDesign":{"type":["string","null"]},"acceptanceCriteria":{"type":"array","items":{"type":"string"}},"slicabilityRationale":{"type":"string"},"researchSources":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","provider","uri","accessMethod","license","coverage","status","validationEvidence"],"properties":{"name":{"type":"string","minLength":2,"maxLength":200},"provider":{"type":"string","minLength":2,"maxLength":200},"uri":{"type":"string","minLength":8,"maxLength":1000},"accessMethod":{"type":"string","minLength":2,"maxLength":1000},"license":{"type":"string","minLength":2,"maxLength":500},"coverage":{"type":"string","minLength":5,"maxLength":2000},"status":{"enum":["CANDIDATE","VALIDATED","BLOCKED"],"type":"string"},"validationEvidence":{"type":"string","minLength":5,"maxLength":2000}}}},"readiness":{"type":"object","additionalProperties":false,"required":["readyForPlanning","requiresExternalData","unmetConditions","openQuestions"],"properties":{"readyForPlanning":{"type":"boolean"},"requiresExternalData":{"type":"boolean"},"unmetConditions":{"type":"array","items":{"type":"string"}},"openQuestions":{"type":"array","items":{"type":"string"}}}},"uxArtifactChanges":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["operation","existingArtifactName","outputArtifactName","screenKey","reason"],"properties":{"operation":{"type":"string","enum":["KEEP","REPLACE","REMOVE","ADD"]},"existingArtifactName":{"type":["string","null"]},"outputArtifactName":{"type":["string","null"]},"screenKey":{"type":"string"},"reason":{"type":"string"}}}},"uxScreens":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["screenKey","state","purpose","artifacts"],"properties":{"screenKey":{"type":"string"},"state":{"type":"string","enum":["INITIAL","MAIN","DETAIL","EMPTY","ERROR","OTHER"]},"purpose":{"type":"string"},"artifacts":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["viewport","artifactName"],"properties":{"viewport":{"type":"string","enum":["DESKTOP","MOBILE","OTHER"]},"artifactName":{"type":"string"}}}}}}},"impact":{"type":"object","additionalProperties":false,"required":["items","risks","productAi","changeSummary"],"properties":{"items":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["category","level","summary","evidence","alternatives"],"properties":{"category":{"enum":["DATABASE","MIGRATION","EXTERNAL_SYSTEM","FRONTEND","ACCESS","PRODUCT_AI","INFRASTRUCTURE"],"type":"string"},"level":{"enum":["NONE","COMPATIBLE","MATERIAL","UNKNOWN"],"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"alternatives":{"type":"string"}}}},"risks":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["title","likelihood","impact","mitigation","uncertainty","responsibleRole"],"properties":{"title":{"type":"string"},"likelihood":{"type":"string"},"impact":{"type":"string"},"mitigation":{"type":"string"},"uncertainty":{"type":"string"},"responsibleRole":{"enum":["PRODUCT_OWNER","ARCHITECT"],"type":"string"}}}},"productAi":{"type":"object","additionalProperties":false,"required":["changed","currentBehavior","proposedBehavior","trigger","frequency","volume","oneTimeWork","providerAndModel","dataAndValidation","limitsAndRetries","estimatedAdditionalJobsPerDay","estimatedMonthlyCostEuro","estimatedGrowthPercent","assumptions"],"properties":{"changed":{"type":"boolean"},"currentBehavior":{"type":"string"},"proposedBehavior":{"type":"string"},"trigger":{"type":"string"},"frequency":{"type":"string"},"volume":{"type":"string"},"oneTimeWork":{"type":"string"},"providerAndModel":{"type":"string"},"dataAndValidation":{"type":"string"},"limitsAndRetries":{"type":"string"},"estimatedAdditionalJobsPerDay":{"type":["integer","null"]},"estimatedMonthlyCostEuro":{"type":["string","null"]},"estimatedGrowthPercent":{"type":["integer","null"]},"assumptions":{"type":"array","items":{"type":"string"}}}},"changeSummary":{"type":"string"}}}}},"processedSignalIds":{"type":"array","items":{"type":"string"}},"stakeholderQuestion":{"type":["object","null"],"additionalProperties":false,"required":["question","context","requestedRole"],"properties":{"question":{"type":"string"},"context":{"type":"string"},"requestedRole":{"type":"string","enum":["PRODUCT_OWNER","ARCHITECT"]}}},"factoryDecision":{"type":["string","null"]},"memoryChanges":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","itemId","expectedVersionId","title","content","reason"],"properties":{"type":{"enum":["ADD","REPLACE","RETRACT"],"type":"string"},"itemId":{"type":["string","null"],"maxLength":80},"expectedVersionId":{"type":["string","null"],"maxLength":80},"title":{"type":["string","null"],"maxLength":300},"content":{"type":["string","null"],"maxLength":4000},"reason":{"type":"string","minLength":1,"maxLength":1000}}}}}}"""
     }

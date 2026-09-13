@@ -112,6 +112,14 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         advisor.routeApprovedRequests()
 
         val first = validEpic().also { result ->
+            result.withArray("memoryChanges").addObject().apply {
+                put("type", "ADD")
+                putNull("itemId")
+                putNull("expectedVersionId")
+                put("title", "Ontwerpkeuze voor lege toestand")
+                put("content", "De bestaande eigen API bevat alle benodigde gegevens; de PO bepaalt de uitleg bij leegte.")
+                put("reason", "Bewaar dit onderzoek voor de hervatting na het antwoord.")
+            }
             (result.path("epic").path("readiness") as ObjectNode).apply {
                 put("readyForPlanning", false)
                 putArray("openQuestions").add("Welke uitleg moet op de lege toestand staan?")
@@ -139,6 +147,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
             put("outcome", "REVISE_EPIC")
             put("epicId", current.id.value)
             put("expectedVersion", current.version)
+            (path("epic") as ObjectNode).put("solution", "Toon de gegevens uit de bestaande eigen API met duidelijke uitleg wanneer het overzicht nog leeg is.")
             keepExistingUx(path("epic") as ObjectNode, current)
         }
         completeOnlyJob(revised)
@@ -147,6 +156,8 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         val routed = advisor.getRequest(requestId)
         assertThat(routed.status).isEqualTo(ProductRequestStatus.ROUTED)
         assertThat(routed.linkedEpicId).isEqualTo(current.id.value)
+        assertThat(queries.getEpic(current.id).readiness.requiresExternalData).isFalse()
+        assertThat(runtime.requests.last().prompt).contains("Ontwerpkeuze voor lege toestand")
         assertThat(jdbc.queryForObject("SELECT process_session_id FROM pf_design_work_item WHERE request_id=?", String::class.java, requestId.value))
             .isEqualTo(question.processSessionId.value)
         assertThat(runtime.distinctIdempotencyKeys()).hasSize(2)

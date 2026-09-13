@@ -45,6 +45,18 @@ void main() {
         'problem': 'Gebruikers missen updates',
         'solution': 'Toon een overzicht met meldingen',
         'acceptanceCriteria': ['Nieuwe meldingen worden getoond.'],
+        'uxScreens': [
+          {
+            'screenKey': 'overzicht',
+            'state': 'MAIN',
+            'purpose': 'Het overzicht',
+            'artifacts': {'DESKTOP': 'ux-01', 'MOBILE': 'ux-02'},
+          },
+        ],
+        'uxArtifacts': [
+          {'name': 'ux-01', 'uri': '/private/desktop'},
+          {'name': 'ux-02', 'uri': '/private/mobile'},
+        ],
         'review': {
           'productOwnerApproved': false,
           'architectApproved': false,
@@ -62,7 +74,17 @@ void main() {
           'productAi': {'changed': true, 'frequency': 'Iedere tien minuten'},
         },
       };
+      final requestedImages = <String>[];
       final client = MockClient((request) async {
+        if (request.url.path.endsWith('/ux-artifacts')) {
+          requestedImages.add(request.url.queryParameters['name']!);
+          return http.Response.bytes(
+            base64Decode(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+            ),
+            200,
+          );
+        }
         final path = request.url.path;
         Object? value = [];
         if (path == '/api/products') {
@@ -127,6 +149,19 @@ void main() {
           find.textContaining('AI wordt iedere tien minuten aangeroepen'),
           findsOneWidget,
         );
+      }
+      if (role == 'PRODUCT_OWNER') {
+        await tester.ensureVisible(find.text('Schermen'));
+        await tester.tap(find.text('Schermen'));
+        await tester.pumpAndSettle();
+        expect(find.text('Desktop'), findsOneWidget);
+        expect(find.text('Mobiel'), findsOneWidget);
+        expect(requestedImages, ['ux-01']);
+        await tester.ensureVisible(find.text('Mobiel'));
+        await tester.tap(find.text('Mobiel'));
+        await tester.pumpAndSettle();
+        expect(requestedImages, ['ux-01', 'ux-02']);
+        expect(tester.takeException(), isNull);
       }
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
