@@ -83,19 +83,34 @@ De PO-/architectwerkplekken, het wisselen van desktop-/mobiele UX-varianten en d
 werkplek zijn in Chromium gecontroleerd; de ontwerpbeelden werden met PO-rechten als HTTP 200
 opgehaald. [Schermafbeeldingen en echte AI-uitvoer](ux/epic-samenwerking/README.md#productieproef).
 
-## Openstaande eindcontrole
+## Afsluitende productiecontrole
 
 De latere AI-uitvoer gebruikte vraag-ID’s als `processedSignalIds`. De backend weigerde publicatie
-terecht; de proef bereikte daardoor nog niet de afsluitende PO-/architectgoedkeuring. Revisie
+terecht; de proef bereikte daardoor aanvankelijk niet de afsluitende PO-/architectgoedkeuring. Revisie
 `d8ab466` beperkt deze uitvoer tot actuele signaal-ID’s (bij geen signalen: een lege lijst) en
 geeft de validatiefout mee aan herhalingen. Die revisie is volledig automatisch getest en de
-productie-release/smoketest is geslaagd, maar de laatste echte AI-herhaling en beide uiteindelijke
-goedkeuringen zijn nog niet op productie bevestigd.
+productie-release/smoketest is geslaagd. De laatste echte AI-herhaling en beide uiteindelijke
+goedkeuringen zijn op 2026-09-13 om 16:13 UTC ook op productie bevestigd:
 
-De automatische goedkeuringscontrole heeft het openen van een nieuwe test-debugsessie geweigerd:
-het gebruik van `PF_DEBUG_TOKEN` voor de productie-eindcontrole vraagt expliciete toestemming.
-De eerder gestarte proef heeft het testproduct inactief gemaakt. Dispatch en productschedules
-bleven uit; uit deze proef zijn geen applicatiewijzigingen via Software Factory verstuurd.
+- AI-taak `99e07241-87c7-4a43-b7a5-8135870c82bf` slaagde met promptversie 7 op revisie `d8ab466`.
+- Dezelfde epic `b07e7ca2-3d51-4364-a652-bf867631818e` kreeg inhoudsversie 3, met beide eerdere
+  antwoorden verwerkt, tien bewaarde UX-beelden en zeven impactcategorieën.
+- Alle tien ontwerpbeelden waren met PO-rechten bereikbaar (HTTP 200, afbeeldingscontenttype).
+- Alleen PO-akkoord gaf geen vrijgave: architectbeoordeling bleef verplicht wegens product-AI-impact.
+- Expliciet architectakkoord voor de geïsoleerde proef gaf `ready=true`, zonder blockers,
+  voor inhoudsversie 3 en beleidsversie 2. Herhaling met dezelfde idempotentiesleutel resulteerde
+  in precies twee besluiten: één PO-besluit en één architectbesluit.
+- Voortgang meldde ontwerp afgerond en beschikbaar voor planning; bouw en verificatie stonden
+  terecht nog op wachtend, zonder stories of verzonnen implementatieresultaten.
+
+Na expliciete toestemming van de gebruiker is uitsluitend de bestaande `PF_DEBUG_TOKEN`-sleutel
+rechtstreeks naar het geheugen van het testproces gelezen. De sleutel, sessiecookies en CSRF-token
+zijn niet in chat, testuitvoer of bestanden opgenomen. De eerdere automatische weigering is daarmee
+opgelost. De proef heeft de actieve rol teruggezet naar factory owner en het testproduct inactief
+gemaakt. Dispatch en productschedules bleven uit; uit deze proef zijn geen applicatiewijzigingen
+via Software Factory verstuurd.
+
+## Nog te controleren bij ingebruikname
 
 Bij de gewone Google-login in de Codex-browser meldde Google: `The given origin is not allowed
 for the given client ID.` Dit is afzonderlijk van de geverifieerde serverrollen; de origin-

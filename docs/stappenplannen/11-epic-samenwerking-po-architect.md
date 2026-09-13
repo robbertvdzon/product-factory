@@ -1,6 +1,6 @@
 # Stap 11 — Epicontwikkeling met PO en architect
 
-Status: geïmplementeerd, automatisch geverifieerd en uitgerold; de productie-eindcontrole is gedeeltelijk afgerond. Zie het [bewijsrecord](../epic-samenwerking-bewijsrecord.md) voor resultaten en blokkades. Datum: 2026-09-13.
+Status: geïmplementeerd, automatisch geverifieerd en uitgerold; de epicflow tot en met PO-/architectakkoord is op productie gecontroleerd met echte AI en UX-beelden. Zie het [bewijsrecord](../epic-samenwerking-bewijsrecord.md) voor resultaten en integratiegrenzen. Datum: 2026-09-13.
 
 ## Opdracht voor de uitvoerende AI-agent
 
