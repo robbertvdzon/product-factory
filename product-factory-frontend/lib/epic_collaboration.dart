@@ -820,9 +820,13 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         'Inhoudsversie ${e['contentVersion'] ?? e['version']} · ${label(e['status'])}',
       ),
       if (_text(_map(e['impact'])['changeSummary']).isNotEmpty)
-        notice(
-          'Wijziging in deze versie',
-          _text(_map(e['impact'])['changeSummary']),
+        Card(
+          child: ExpansionTile(
+            title: const Text('Wijziging in deze versie'),
+            childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+            expandedCrossAxisAlignment: CrossAxisAlignment.start,
+            children: [text(_text(_map(e['impact'])['changeSummary']))],
+          ),
         ),
       if (_strings(review['blockers']).isNotEmpty)
         notice(
