@@ -6,6 +6,9 @@ Factorybeheer maakt een product en de productopdracht aan. Via **Beheer → Lede
 factory owner het Google-e-mailadres toe en kent per product `PRODUCT_OWNER` of `ARCHITECT` toe.
 Een gebruiker met een actief lidmaatschap kan inloggen zonder een wijziging van de serverallowlist.
 Google-handtekening, issuer, audience, verloopdatum en geverifieerd e-mailadres blijven verplicht.
+De productie-origin moet ook zijn toegestaan in de Google OAuth-client achter `PF_GOOGLE_CLIENT_ID`.
+Bij Googles melding “origin is not allowed” moet die externe origin-configuratie worden gecontroleerd;
+een productlidmaatschap kan een geweigerde Google-origin niet oplossen.
 Een ingetrokken rol verliest meteen toegang; bestaande sessies geven geen blijvende bevoegdheid.
 
 Via **Productbesturing** kiest factorybeheer menselijke of AI-besturing voor beide rollen.

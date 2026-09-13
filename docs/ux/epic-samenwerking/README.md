@@ -176,3 +176,17 @@ De echte Flutter-frontend is in Chromium gecontroleerd met synthetische API-data
 [PO-werkplek](implementatie/po-mijn-werk.png), [epic](implementatie/po-epic.png),
 [mobiel](implementatie/po-mobiel.png) en [architectimpact](implementatie/architect-impact.png).
 Dit zijn implementatieschermen; de oorspronkelijke vijftien beelden blijven de ontwerpreferentie.
+
+
+## Productieproef
+
+Deze beelden komen uit de echte productieproef, met een geïsoleerd testproduct en echte AI-taken:
+
+- [PO beantwoordt een echte vervolgvraag](productie/po-vraag.png), op revisie `6f1fbdd`.
+- [Factory owner stelt de besturingsrollen in](productie/factory-owner.png), op revisie `93eb2fa`.
+- [Door AI gemaakt desktopontwerp](productie/ai-ontwerp-desktop.png) en
+  [mobiel ontwerp](productie/ai-ontwerp-mobiel.png) voor de proefepic.
+
+De laatste twee beelden zijn bewaarde ontwerpartifacts, geen geïmplementeerde wijziging aan HKH.
+Ze tonen een hoofdtoestand uit een set van tien beelden. De proefresultaten en nog openstaande
+productie-eindcontrole staan in het [bewijsrecord](../../epic-samenwerking-bewijsrecord.md).
