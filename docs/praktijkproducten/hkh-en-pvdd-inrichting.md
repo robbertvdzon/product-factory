@@ -159,10 +159,10 @@ opnieuw live getest. Omgevingen zijn niet nodig om het eerste idee uit te werken
 | Datagrenzen | Geen bestaande productiegegevens wijzigen; tests schrijven alleen in expliciete testdossiers | Geen bestaande productiebronnen of analyses wijzigen; acceptatietests gebruiken synthetische gegevens |
 | Toegangsgrenzen | Publieke functies anoniem; dossier-/beheerproeven alleen met geautoriseerde testtoegang | Productie alleen met geautoriseerde testtoegang; acceptatie gebruikt de bestaande testconfiguratie |
 
-De huidige Product Factory-editor vult het revision JSON-pad vast met `commit`. Voor PvdD moet
-dit via de bestaande testconfiguratie-API op `gitRevision` worden gezet, of de editor moet worden
-uitgebreid. Dit is nog geen in dit voorstel uitgevoerde wijziging. De beginroutes zijn uitsluitend
-voor de basiscontrole; functionele tests vragen routes passend bij de goedgekeurde epic.
+De Product Factory-editor laat het revision-endpoint, revision JSON-pad, de toegestane routes en
+de data- en toegangsgrenzen per omgeving bewerken. Vul voor PvdD dus `gitRevision` in en voor HKH
+`commit`. De beginroutes zijn uitsluitend voor de basiscontrole; functionele tests vragen routes
+passend bij de goedgekeurde epic.
 
 HKH heeft daarnaast beheerapps op `https://hkh-admin.vdzonsoftware.nl` en
 `https://hkh-admin-acceptance.vdzonsoftware.nl`. De huidige omgevingen-editor biedt één basis-URL
