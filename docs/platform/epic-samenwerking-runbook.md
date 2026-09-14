@@ -172,3 +172,10 @@ niet meer opvraagbaar. Het gesprek verdwijnt uit lijsten en persoonlijke acties.
 adviesbeurten worden geblokkeerd; een al gestarte Runtime-taak kan afronden, maar haar antwoord
 wordt niet meer gepubliceerd. Een databasevergrendeling voorkomt dat late resultaten het gesprek
 heropenen. Migratie V38 bewaart alle bestaande gesprekken en voegt alleen de verwijdermarkering toe.
+
+Productiecontrole 14 september 2026: release `e5c3bf2fedca444aee2e062eddbc1b1be2ac0f95`
+slaagde voor 198 backendtests, 56 frontendtests, de aanvullende authenticatietest en de volledige
+releasepipeline (run `34860620423`). Acceptatie en productie slaagden voor de rooktest. In de
+PO-weergave van HKH zijn de drie prullenbakknoppen zichtbaar; de bevestiging noemt het juiste
+gesprek en annuleren behoudt alle drie de gesprekken. Bestaande gebruikersgesprekken zijn tijdens
+de productiecontrole niet verwijderd.
