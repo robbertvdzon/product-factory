@@ -118,8 +118,18 @@ void main() {
           'productAi': {'changed': true, 'frequency': 'Iedere tien minuten'},
         },
       };
+      var deleted = false;
+      var deletes = 0;
       final requestedImages = <String>[];
       final client = MockClient((request) async {
+        if (request.method == 'DELETE') {
+          expect(request.url.path, '/api/epics/epic-1');
+          expect(request.headers['X-PF-CSRF'], 'csrf');
+          expect(jsonDecode(request.body)['expectedVersion'], 1);
+          deleted = true;
+          deletes++;
+          return http.Response('', 204);
+        }
         if (request.url.path.endsWith('/ux-artifacts')) {
           requestedImages.add(request.url.queryParameters['name']!);
           return http.Response.bytes(
@@ -142,7 +152,7 @@ void main() {
             },
           ];
         }
-        if (path.endsWith('/epics')) value = [epic];
+        if (path.endsWith('/epics')) value = deleted ? [] : [epic];
         if (path.endsWith('/governance')) {
           value = {'configured': true, 'version': 1};
         }
@@ -168,7 +178,7 @@ void main() {
               body: EpicCollaborationPage(
                 products: HttpProductGateway(client: client),
                 role: role,
-                api: CollaborationApi(null, client: client),
+                api: CollaborationApi('csrf', client: client),
               ),
             ),
           ),
@@ -188,6 +198,7 @@ void main() {
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
+      expect(find.text('Epic verwijderen'), role == 'PRODUCT_OWNER' ? findsOneWidget : findsNothing);
       if (role == 'ARCHITECT') {
         expect(
           find.textContaining('AI wordt iedere tien minuten aangeroepen'),
@@ -217,6 +228,27 @@ void main() {
       expect(find.text('Mijn conceptbericht'), findsOneWidget);
       await tester.ensureVisible(find.text('Verstuur'));
       expect(tester.takeException(), isNull);
+      if (role == 'PRODUCT_OWNER') {
+        await tester.tap(find.text('Epic'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Epic verwijderen'));
+        await tester.tap(find.text('Epic verwijderen'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('“Betere meldingen”'), findsOneWidget);
+        await tester.tap(find.text('Annuleren'));
+        await tester.pumpAndSettle();
+        expect(deletes, 0);
+        await tester.tap(find.text('Epic verwijderen'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Verwijderen'));
+        await tester.pumpAndSettle();
+        expect(deletes, 1);
+        expect(find.text('Betere meldingen'), findsNothing);
+        await tester.pump(const Duration(seconds: 9));
+        await tester.pumpAndSettle();
+        expect(find.text('Betere meldingen'), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
     });

@@ -150,3 +150,23 @@ PNG van 1440×1000 pixels (61.003 bytes). Op een vervolgvraag om een uitlegplaat
 diagram van de onderdelen van die screenshot, zichtbaar met het aparte label **Illustratie**.
 De twee beelden staan bij hun eigen antwoord. De tijdelijke PO-rolweergave is beëindigd en de
 controletabs zijn gesloten; het gesprek met de voorbeelden blijft beschikbaar bij Mijn vragen aan AI.
+
+## Leesbare epicinhoud en verwijderen (2026-09-14)
+
+De epicinhoud gebruikt selecteerbare Markdown met koppen, alinea's, lijsten, nadruk en code.
+De AI krijgt dezelfde opmaakinstructie voor nieuwe inhoud en revisies. Bestaande lange tekst
+krijgt waar mogelijk extra alinea's en genummerde inline-opsommingen worden lijsten; deze
+presentatie verandert geen opgeslagen inhoudsversies of goedkeuringen. Schermafbeeldingen
+blijven beschikbaar onder Schermen.
+
+Een PO (of factory owner) kan een epic via **Epic verwijderen** en een bevestiging verwijderen.
+De architect heeft deze actie niet. `DELETE /api/epics/{id}` controleert productrol, CSRF,
+actuele versie en idempotentie. Migratie V39 voegt een verwijdermarkering toe; overzichten
+filteren deze epics weg. Historie, beoordelingen en relaties blijven bewaard voor herleidbaarheid.
+Openstaande stories worden geannuleerd; voor lopende uitvoering gebruikt de dispatcher het
+bestaande externe annuleringsprotocol. Opgeleverde wijzigingen blijven bestaan.
+
+Verificatie: volledige lokale verify, migratie en dispatcher-integratietest (inclusief externe
+annulering), PO-/architectautorisatie, CSRF, versieconflict en herhaling. Widgettests controleren
+Markdown en de verwijderbevestiging op 320px bij 200% tekstgrootte; Annuleren behoudt de epic en
+Verwijderen houdt deze ook na verversen uit het overzicht.

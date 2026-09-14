@@ -405,6 +405,22 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `PO verwijdert epic zonder historie te verliezen of late verfijning toe te laten`() {
+        design.runProcessSession(productId)
+        completeOnlyJob(validEpic())
+        design.runProcessSession(productId)
+        val epic = queries.findEpics(EpicFilter(productId)).single()
+        val command = DeleteEpicCommand(epic.id,"PO wil deze epic verwijderen",epic.version,PROCESS,"delete-epic")
+        assertThatThrownBy { design.deleteEpic(command.copy(expectedVersion=epic.version+1,idempotencyKey="wrong-delete")) }.isInstanceOf(VersionConflict::class.java)
+        design.deleteEpic(command)
+        design.deleteEpic(command)
+        assertThat(queries.findEpics(EpicFilter(productId))).isEmpty()
+        assertThat(queries.getEpic(epic.id).status).isEqualTo(EpicStatus.CANCELLED)
+        assertThat(queries.getEpicHistory(epic.id)).hasSize(2)
+        assertThatThrownBy { design.requestEpicRefinement(RequestEpicRefinementCommand(epic.id,"Late aanpassing",epic.version,PROCESS,"late-delete-refinement")) }.isInstanceOf(VersionConflict::class.java)
+    }
+
+    @Test
     fun `epiclevenscyclus bewaart iedere versie en controleert actor versie en idempotentie`() {
         design.runProcessSession(productId)
         completeOnlyJob(validEpic())

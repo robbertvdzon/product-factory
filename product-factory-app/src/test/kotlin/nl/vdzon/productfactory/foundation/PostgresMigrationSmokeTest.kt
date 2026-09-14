@@ -42,11 +42,11 @@ class PostgresMigrationSmokeTest {
     }
 
     @Test
-    fun `gespreksverwijdering migreert vanaf vorige release met behoud van berichten`() {
+    fun `epicverwijdering migreert vanaf vorige release met behoud van berichten`() {
         val database = "productfactory_advisor_images"
         createDatabase(database)
         val url = databaseUrl(database)
-        Flyway.configure().dataSource(url, postgres.username, postgres.password).target("37").load().migrate()
+        Flyway.configure().dataSource(url, postgres.username, postgres.password).target("38").load().migrate()
         val jdbc = InstantAwareJdbcTemplate(DriverManagerDataSource(url, postgres.username, postgres.password))
         jdbc.update("INSERT INTO pf_product(product_id,name,status,created_at,updated_at,updated_by_type,updated_by_id,version) VALUES ('old-product','Bestaand','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'SYSTEM','test',1)")
         jdbc.update("INSERT INTO pf_user_account(user_id,normalized_email,created_at,updated_at) VALUES ('old-user','old@example.test',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
@@ -67,7 +67,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(38)
+        assertThat(result.migrationsExecuted).isEqualTo(39)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -147,6 +147,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("37")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("38")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("39")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -215,7 +217,7 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("38")
+                    assertThat(rows.getString(1)).isEqualTo("39")
                 }
             }
         }
@@ -230,7 +232,7 @@ class PostgresMigrationSmokeTest {
         assertThat(old.targetSchemaVersion.toString()).isEqualTo("8")
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(30)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(31)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_quality_process_session").use { rows ->
@@ -257,7 +259,7 @@ class PostgresMigrationSmokeTest {
         Flyway.configure().dataSource(url, postgres.username, postgres.password).target("9").load().migrate()
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(29)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(30)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_dispatcher_process_session").use { rows ->
@@ -281,7 +283,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(28)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(29)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_schedule_run").use { rows ->
@@ -309,7 +311,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(27)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(28)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery(
@@ -350,7 +352,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(26)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(27)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery(
@@ -409,7 +411,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(25)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(26)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT epic_approval_mode FROM pf_product WHERE product_id='approval-product'").use { rows ->

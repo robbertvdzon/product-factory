@@ -32,6 +32,7 @@ import java.util.UUID
 @Import(AiExecutionRuntimeIntegrationTest.RuntimeTestConfiguration::class)
 class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
     private val productCommands: ProductCommandService,
+    private val design: nl.vdzon.productfactory.api.design.ProductDesignService,
     private val dispatcher: SoftwareFactoryDispatcherService,
     private val queries: SoftwareFactoryDispatcherQueryService,
     private val planningQueries: ProductPlanningQueryService,
@@ -71,6 +72,18 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
     @AfterEach
     fun cleanDispatcherData() {
         dispatcherImpl.deleteAllOwnedData()
+    }
+
+    @Test
+    fun `epic verwijderen stopt externe uitvoering en raakt andere epics niet`() {
+        dispatcher.checkAutomatically(productId)
+        val story = planningQueries.getStory(firstStory)
+        design.deleteEpic(nl.vdzon.productfactory.api.design.DeleteEpicCommand(story.epicId,"Epic verwijderd door de PO",1,STAKEHOLDER,"delete-running"))
+        assertThat(jdbc.queryForObject("SELECT refinement_cancel_requested FROM pf_story WHERE id=?",Boolean::class.java,firstStory.value)).isTrue()
+        dispatcher.checkAutomatically(productId)
+        assertThat(planningQueries.getStory(firstStory).status).isEqualTo(StoryStatus.CANCELLED)
+        assertThat(mock.find(productId.value,"OPEN")).isEmpty()
+        assertThat(planningQueries.getBacklog(productId).count { it.status==StoryStatus.TODO }).isEqualTo(1)
     }
 
     @Test

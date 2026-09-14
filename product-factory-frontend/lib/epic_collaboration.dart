@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'external_link.dart';
+import 'epic_markdown.dart';
 import 'conversation_images.dart';
 import 'chat_answer_image.dart';
 import 'conversation_timeline.dart';
@@ -809,6 +810,28 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           .toList(),
     ),
   ];
+  Future<void> deleteEpic(Json e) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Epic verwijderen?'),
+        content: Text('“${_text(e['title'])}” verdwijnt uit je epics. Openstaande stories worden gestopt en voor werk in uitvoering wordt annulering aangevraagd. Reeds opgeleverde wijzigingen blijven bestaan.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuleren')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwijderen')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await mutate(() async {
+      await api.request('/api/epics/${_text(e['id'])}', method: 'DELETE', body: {'expectedVersion': e['version']});
+      loadSequence++;
+      epic = null;
+      conversation = null;
+      discussions = [];
+    });
+  }
+
   Future<void> deleteConversation(Json c) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1221,6 +1244,15 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         _text(e['title']),
         style: Theme.of(context).textTheme.headlineMedium,
       ),
+      if (!architect)
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: saving ? null : () => deleteEpic(e),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Epic verwijderen'),
+          ),
+        ),
       const SizedBox(height: 8),
       text(
         'Inhoudsversie ${e['contentVersion'] ?? e['version']} · ${label(e['status'])}',
@@ -1231,7 +1263,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             title: const Text('Wijziging in deze versie'),
             childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
-            children: [text(_text(_map(e['impact'])['changeSummary']))],
+            children: [EpicMarkdown(_text(_map(e['impact'])['changeSummary']))],
           ),
         ),
       if (_strings(review['blockers']).isNotEmpty)
@@ -1350,12 +1382,14 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
 
   void reviewAction() => unawaited(review('APPROVE'));
   Widget dossier() => panel('Dit gaan we verbeteren', [
-    text('Probleem'),
-    text(_text(epic!['problem'])),
-    text('Werking en scope'),
-    text(_text(epic!['solution'])),
-    text('Klaar als'),
-    ..._strings(epic!['acceptanceCriteria']).map((x) => text('✓ $x')),
+    EpicMarkdown([
+      '## Probleem',
+      readableEpicMarkdown(_text(epic!['problem'])),
+      '## Werking en scope',
+      readableEpicMarkdown(_text(epic!['solution'])),
+      '## Klaar als',
+      _strings(epic!['acceptanceCriteria']).map((x) => '- ${x.replaceAll('\n', '\n  ')}').join('\n'),
+    ].join('\n\n')),
     if (versions.length > 1)
       ExpansionTile(
         title: const Text('Vorige versies vergelijken'),
@@ -1364,7 +1398,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             .map(
               (v) => ListTile(
                 title: Text('Versie ${v['contentVersion'] ?? v['version']}'),
-                subtitle: SelectableText(_text(v['solution'])),
+                subtitle: EpicMarkdown(_text(v['solution'])),
               ),
             )
             .toList(),

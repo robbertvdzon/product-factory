@@ -32,6 +32,15 @@ class EpicCollaborationController(private val policies: ProductGovernanceService
         authorization.requireProduct(ProductId(productId),authentication)
         return policies.updatePolicy(UpdateGovernancePolicyCommand(request.policy,authorization.currentUserId(authentication),request.idempotencyKey))
     }
+    @DeleteMapping("/epics/{epicId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteEpic(@PathVariable epicId: String, @RequestBody request: DesignVersionedRequest, authentication: Authentication?) {
+        val epic = queries.getEpic(EpicId(epicId))
+        authorization.requireRole(epic.productId, ProductMembershipRole.PRODUCT_OWNER, authentication)
+        design.deleteEpic(DeleteEpicCommand(epic.id, "Epic verwijderd door de product owner", request.expectedVersion,
+            ActorReference(ActorType.STAKEHOLDER, authorization.currentUserId(authentication).value), request.idempotencyKey))
+    }
+
     @GetMapping("/epics/{epicId}/reviews")
     fun reviews(@PathVariable epicId: String,authentication: Authentication?): EpicReviewState {
         authorization.requireProduct(queries.getEpic(EpicId(epicId)).productId,authentication)

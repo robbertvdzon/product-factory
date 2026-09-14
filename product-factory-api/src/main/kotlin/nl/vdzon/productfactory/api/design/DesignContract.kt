@@ -82,6 +82,7 @@ data class RecordEpicVerificationCommand(
 )
 data class WithdrawEpicCommand(val epicId: EpicId, val reason: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class CancelEpicCommand(val epicId: EpicId, val reason: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
+data class DeleteEpicCommand(val epicId: EpicId, val reason: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 
 data class RestoreEpicContentCommand(val epicId: EpicId, val contentVersion: Long, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 
@@ -96,6 +97,7 @@ interface ProductDesignService {
     fun recordEpicVerification(command: RecordEpicVerificationCommand)
     fun withdrawEpic(command: WithdrawEpicCommand)
     fun cancelEpic(command: CancelEpicCommand)
+    fun deleteEpic(command: DeleteEpicCommand)
 }
 
 interface ProductDesignQueryService {

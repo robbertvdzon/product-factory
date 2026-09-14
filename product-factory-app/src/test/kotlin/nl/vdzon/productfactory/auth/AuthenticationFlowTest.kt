@@ -42,6 +42,7 @@ class AuthenticationFlowTest(
     @Autowired private val objectMapper: ObjectMapper,
     @Autowired private val sessionRepository: AuthenticationSessionRepository,
     @Autowired private val userIdentities: UserIdentityRepository,
+    @Autowired private val jdbc: org.springframework.jdbc.core.JdbcTemplate,
 ) {
     @MockitoBean
     private lateinit var jwtDecoder: JwtDecoder
@@ -442,6 +443,32 @@ class AuthenticationFlowTest(
             content="""{"expectedVersion":1,"idempotencyKey":"delete-$id"}"""
         }.andExpect { status { isNoContent() } }
         mockMvc.get("/api/conversations/$questionId") { cookie(session) }.andExpect { status { isNotFound() } }
+        val epicId = "epic-$id"
+        jdbc.update("INSERT INTO pf_epic(id,product_id,current_version,status,created_at,updated_at) VALUES (?,?,1,'AVAILABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", epicId, id)
+        jdbc.update("""INSERT INTO pf_epic_version(epic_id,version,title,summary,problem,solution,direction_references_json,ux_design,acceptance_criteria_json,slicability_rationale,source_references_json,status,actor_type,actor_id,created_at)
+            VALUES (?,1,'Testepic','Samenvatting','Probleem','Oplossing','[]','UX','["Klaar"]','Zelfstandig','[]','AVAILABLE','PROCESS','test',CURRENT_TIMESTAMP)""", epicId)
+        mockMvc.delete("/api/epics/$epicId") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN); header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, cookie(response, ProductFactorySessionService.CSRF_COOKIE)); contentType=MediaType.APPLICATION_JSON
+            content="""{"expectedVersion":1,"idempotencyKey":"delete-epic-$id"}"""
+        }.andExpect { status { isForbidden() } }
+        // Dezelfde gebruiker mag de epic wel verwijderen met een toegekende PO-rol.
+        userIdentities.grantProductOwner(invited.id, nl.vdzon.productfactory.api.shared.ProductId(id), factory.id, 0, "grant-po-$id")
+        userIdentities.setActingRole(invited.id, nl.vdzon.productfactory.api.advisor.ActingRole.PRODUCT_OWNER)
+        mockMvc.delete("/api/epics/$epicId") {
+            cookie(session); contentType=MediaType.APPLICATION_JSON
+            content="""{"expectedVersion":1,"idempotencyKey":"delete-epic-$id"}"""
+        }.andExpect { status { isForbidden() } }
+        mockMvc.delete("/api/epics/$epicId") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN); header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, cookie(response, ProductFactorySessionService.CSRF_COOKIE)); contentType=MediaType.APPLICATION_JSON
+            content="""{"expectedVersion":1,"idempotencyKey":"delete-epic-$id"}"""
+        }.andExpect { status { isNoContent() } }
+        mockMvc.get("/api/products/$id/epics") { cookie(session) }.andExpect {
+            status { isOk() }; content { json("[]") }
+        }
+        userIdentities.setActingRole(invited.id, nl.vdzon.productfactory.api.advisor.ActingRole.ARCHITECT)
+        userIdentities.revokeProductOwner(invited.id, nl.vdzon.productfactory.api.shared.ProductId(id), "Testrol ingetrokken", factory.id, 1, "revoke-po-$id")
         userIdentities.revokeProductOwner(invited.id,nl.vdzon.productfactory.api.shared.ProductId(id),"Toegang ingetrokken",factory.id,1,"revoke-$id",nl.vdzon.productfactory.api.advisor.ProductMembershipRole.ARCHITECT)
         mockMvc.get("/api/products/$id/governance") { cookie(session) }.andExpect { status { isForbidden() } }
         mockMvc.post("/api/auth/google") {
