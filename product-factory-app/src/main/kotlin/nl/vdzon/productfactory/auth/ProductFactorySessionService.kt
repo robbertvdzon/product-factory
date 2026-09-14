@@ -28,6 +28,9 @@ data class ResolvedSession(
     val grantedGlobalRoles: Set<String> = globalRoles,
     val actingRole: String? = null,
     val availableRoles: Set<String> = emptySet(),
+    val authenticatedUserId: String = userId,
+    val authenticatedEmail: String = stakeholderEmail,
+    val viewingAs: Boolean = false,
 )
 
 @Service
@@ -74,20 +77,89 @@ class ProductFactorySessionService(
         )
     }
 
+    @Transactional
+    fun createDebugSession(targetEmail: String?, actingRole: nl.vdzon.productfactory.api.advisor.ActingRole?, response: HttpServletResponse): AuthenticationStatus {
+        val technicalUser = users.resolveOrCreate(DEBUG_AGENT_EMAIL, true)
+        if (!technicalUser.active) throw LoginRejected("Technisch debug-account is niet actief.")
+        if (targetEmail == null) return createSession(technicalUser, response)
+        val target = users.findByEmail(targetEmail) ?: throw LoginRejected("Onbekende gebruiker voor debug-weergave.")
+        if (!target.active) throw LoginRejected("Account is niet actief.")
+        if (actingRole == null) return create(target.email, response)
+        if (actingRole.name !in target.availableRoles) {
+            throw LoginRejected("Deze rol is niet aan de gekozen gebruiker toegekend.")
+        }
+        return createSession(technicalUser, response, target, actingRole)
+    }
+
+    private fun createSession(
+        authenticatedUser: nl.vdzon.productfactory.api.advisor.UserDetails,
+        response: HttpServletResponse,
+        viewedUser: nl.vdzon.productfactory.api.advisor.UserDetails? = null,
+        viewedRole: nl.vdzon.productfactory.api.advisor.ActingRole? = null,
+    ): AuthenticationStatus {
+        val now = clock.instant()
+        val sessionId = randomTokenHex(32)
+        val csrfToken = randomTokenUrlSafe(32)
+        repository.create(AuthenticationSession(
+            sessionId, authenticatedUser.email, authenticatedUser.id.value, sha256Hex(csrfToken), now,
+            now.plus(SESSION_LIFETIME), viewedUser?.id?.value, viewedRole?.name,
+        ))
+        addCookie(response, SESSION_COOKIE, signer.cookieValue(sessionId), httpOnly = true, SESSION_LIFETIME)
+        addCookie(response, CSRF_COOKIE, csrfToken, httpOnly = false, SESSION_LIFETIME)
+        return authenticationStatus(viewedUser ?: authenticatedUser, csrfToken, authenticatedUser, viewedUser != null, viewedRole)
+    }
+
     fun resolve(request: HttpServletRequest): ResolvedSession? {
         val sessionCookie = request.cookie(SESSION_COOKIE)?.value ?: return null
         val sessionId = signer.verifiedSessionId(sessionCookie) ?: return null
         val session = repository.findActive(sessionId, clock.instant()) ?: return null
         val csrfToken = request.cookie(CSRF_COOKIE)?.value
             ?.takeIf { constantTimeEquals(sha256Hex(it), session.csrfTokenHash) }
-        val user = users.get(nl.vdzon.productfactory.api.advisor.UserId(session.userId))
-        if (!user.active) return null
+        val authenticatedUser = users.get(nl.vdzon.productfactory.api.advisor.UserId(session.userId))
+        if (!authenticatedUser.active) return null
+        val viewedUser = session.viewedUserId?.let { runCatching { users.get(nl.vdzon.productfactory.api.advisor.UserId(it)) }.getOrNull() }
+            ?.takeIf { it.active }
+        val viewedRole = session.viewedActingRole?.let { runCatching { nl.vdzon.productfactory.api.advisor.ActingRole.valueOf(it) }.getOrNull() }
+            ?.takeIf { viewedUser != null && it.name in viewedUser.availableRoles }
+        val user = if (viewedUser != null && viewedRole != null) viewedUser.copy(actingRole = viewedRole) else authenticatedUser
         return ResolvedSession(
             session.sessionId, user.email, user.id.value, user.effectiveGlobalRoles.map { it.name }.toSet(),
             user.memberships.filter { it.status.name == "ACTIVE" }.map { it.productId.value }.toSet(), csrfToken,
             grantedGlobalRoles = user.globalRoles.map { it.name }.toSet(),
             actingRole = user.actingRole.name,
             availableRoles = user.availableRoles,
+            authenticatedUserId = authenticatedUser.id.value,
+            authenticatedEmail = authenticatedUser.email,
+            viewingAs = user.id != authenticatedUser.id,
+        )
+    }
+
+    @Transactional
+    fun viewAs(session: ResolvedSession, targetUserId: String, role: nl.vdzon.productfactory.api.advisor.ActingRole) {
+        val target = users.get(nl.vdzon.productfactory.api.advisor.UserId(targetUserId))
+        if (!target.active) throw LoginRejected("Account is niet actief.")
+        if (role.name !in target.availableRoles) throw LoginRejected("Deze rol is niet aan de gekozen gebruiker toegekend.")
+        repository.setViewAs(session.sessionId, target.id.value, role.name)
+    }
+
+    @Transactional
+    fun clearViewAs(session: ResolvedSession) = repository.clearViewAs(session.sessionId)
+
+    private fun authenticationStatus(
+        user: nl.vdzon.productfactory.api.advisor.UserDetails,
+        csrfToken: String?,
+        authenticatedUser: nl.vdzon.productfactory.api.advisor.UserDetails = user,
+        viewingAs: Boolean = false,
+        roleOverride: nl.vdzon.productfactory.api.advisor.ActingRole? = null,
+    ): AuthenticationStatus {
+        val effective = roleOverride?.let { user.copy(actingRole = it) } ?: user
+        return AuthenticationStatus(
+            true, true, effective.email, csrfToken, userId = effective.id.value,
+            globalRoles = effective.effectiveGlobalRoles.map { it.name }.toSet(),
+            productMemberships = effective.memberships.filter { it.status.name == "ACTIVE" }.map { it.productId.value }.toSet(),
+            grantedGlobalRoles = effective.globalRoles.map { it.name }.toSet(),
+            actingRole = effective.actingRole.name, availableRoles = effective.availableRoles,
+            viewingAs = viewingAs, authenticatedEmail = authenticatedUser.email,
         )
     }
 
@@ -135,6 +207,7 @@ class ProductFactorySessionService(
         const val CSRF_COOKIE = "PF_CSRF"
         const val CSRF_HEADER = "X-PF-CSRF"
         private val SESSION_LIFETIME: Duration = Duration.ofDays(30)
+        const val DEBUG_AGENT_EMAIL = "codex-debug-agent@productfactory.invalid"
     }
 }
 

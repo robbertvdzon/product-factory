@@ -12,6 +12,8 @@ data class AuthenticationSession(
     val csrfTokenHash: String,
     val createdAt: Instant,
     val expiresAt: Instant,
+    val viewedUserId: String? = null,
+    val viewedActingRole: String? = null,
 )
 
 @Repository
@@ -33,7 +35,7 @@ class AuthenticationSessionRepository(
     }
 
     fun findActive(sessionId: String, now: Instant): AuthenticationSession? = jdbcTemplate.query(
-        "SELECT session_id, stakeholder_email, user_id, csrf_token_hash, created_at, expires_at " +
+        "SELECT session_id, stakeholder_email, user_id, csrf_token_hash, created_at, expires_at, viewed_user_id, viewed_acting_role " +
             "FROM authentication_session WHERE session_id = ? AND revoked_at IS NULL AND expires_at > ?",
         { resultSet, _ ->
             AuthenticationSession(
@@ -43,11 +45,27 @@ class AuthenticationSessionRepository(
                 csrfTokenHash = resultSet.getString("csrf_token_hash"),
                 createdAt = resultSet.getTimestamp("created_at").toInstant(),
                 expiresAt = resultSet.getTimestamp("expires_at").toInstant(),
+                viewedUserId = resultSet.getString("viewed_user_id"),
+                viewedActingRole = resultSet.getString("viewed_acting_role"),
             )
         },
         sessionId,
         Timestamp.from(now),
     ).singleOrNull()
+
+    fun setViewAs(sessionId: String, userId: String, role: String) {
+        jdbcTemplate.update(
+            "UPDATE authentication_session SET viewed_user_id=?, viewed_acting_role=? WHERE session_id=? AND revoked_at IS NULL",
+            userId, role, sessionId,
+        )
+    }
+
+    fun clearViewAs(sessionId: String) {
+        jdbcTemplate.update(
+            "UPDATE authentication_session SET viewed_user_id=NULL, viewed_acting_role=NULL WHERE session_id=? AND revoked_at IS NULL",
+            sessionId,
+        )
+    }
 
     fun revoke(sessionId: String, now: Instant) {
         jdbcTemplate.update(

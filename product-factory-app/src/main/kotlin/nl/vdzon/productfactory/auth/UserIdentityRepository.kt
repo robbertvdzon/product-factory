@@ -92,8 +92,9 @@ class UserIdentityRepository(
     }
 
     fun findAll(): List<UserDetails> = jdbc.query(
-        "SELECT user_id FROM pf_user_account WHERE active=TRUE ORDER BY normalized_email",
+        "SELECT user_id FROM pf_user_account WHERE active=TRUE AND normalized_email<>? ORDER BY normalized_email",
         { rs, _ -> UserId(rs.getString(1)) },
+        ProductFactorySessionService.DEBUG_AGENT_EMAIL,
     ).map(::get)
 
     fun findByEmail(email: String): UserDetails? = jdbc.query(

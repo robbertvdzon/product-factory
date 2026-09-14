@@ -18,6 +18,8 @@ class AuthenticationStatus {
     this.grantedGlobalRoles = const {},
     this.actingRole,
     this.availableRoles = const {},
+    this.viewingAs = false,
+    this.authenticatedEmail,
   });
 
   factory AuthenticationStatus.fromJson(Map<String, Object?> json) =>
@@ -41,6 +43,8 @@ class AuthenticationStatus {
         availableRoles: (json['availableRoles'] as List? ?? const [])
             .map((e) => '$e')
             .toSet(),
+        viewingAs: json['viewingAs'] == true,
+        authenticatedEmail: json['authenticatedEmail'] as String?,
       );
 
   final bool authenticated;
@@ -58,6 +62,8 @@ class AuthenticationStatus {
   /// `FACTORY_OWNER` of `PRODUCT_OWNER`: de rol waarmee de gebruiker nu werkt.
   final String? actingRole;
   final Set<String> availableRoles;
+  final bool viewingAs;
+  final String? authenticatedEmail;
 
   /// Alleen een factory owner kan kiezen tussen factory owner en product owner.
   bool get canSwitchRole =>
@@ -69,8 +75,15 @@ class AuthenticationStatus {
 abstract interface class AuthenticationGateway {
   Future<AuthenticationStatus> session();
   Future<AuthenticationStatus> googleLogin(String idToken);
+  Future<AuthenticationStatus> debugLogin(
+    String token,
+    String? email,
+    String? role,
+  );
   Future<void> logout(String? csrfToken);
   Future<void> setActingRole(String role, String? csrfToken);
+  Future<void> viewAs(String userId, String role, String? csrfToken);
+  Future<void> clearViewAs(String? csrfToken);
 }
 
 class HttpAuthenticationGateway implements AuthenticationGateway {
@@ -103,6 +116,28 @@ class HttpAuthenticationGateway implements AuthenticationGateway {
   }
 
   @override
+  Future<AuthenticationStatus> debugLogin(
+    String token,
+    String? email,
+    String? role,
+  ) async {
+    final body = <String, Object?>{};
+    if (email != null && email.trim().isNotEmpty) body['email'] = email.trim();
+    if (role != null) body['actingRole'] = role;
+    final response = await _send(
+      () => _client.post(
+        _uri('/api/auth/debug-session'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-PF-Debug-Token': token,
+        },
+        body: jsonEncode(body),
+      ),
+    );
+    return _statusResponse(response);
+  }
+
+  @override
   Future<void> logout(String? csrfToken) async {
     final response = await _send(
       () => _client.post(
@@ -120,6 +155,29 @@ class HttpAuthenticationGateway implements AuthenticationGateway {
         _uri('/api/me/acting-role'),
         headers: {'Content-Type': 'application/json', 'X-PF-CSRF': ?csrfToken},
         body: jsonEncode({'role': role}),
+      ),
+    );
+    if (response.statusCode != 204) throw _failure(response);
+  }
+
+  @override
+  Future<void> viewAs(String userId, String role, String? csrfToken) async {
+    final response = await _send(
+      () => _client.put(
+        _uri('/api/me/view-as'),
+        headers: {'Content-Type': 'application/json', 'X-PF-CSRF': ?csrfToken},
+        body: jsonEncode({'userId': userId, 'role': role}),
+      ),
+    );
+    if (response.statusCode != 204) throw _failure(response);
+  }
+
+  @override
+  Future<void> clearViewAs(String? csrfToken) async {
+    final response = await _send(
+      () => _client.delete(
+        _uri('/api/me/view-as'),
+        headers: {'X-PF-CSRF': ?csrfToken},
       ),
     );
     if (response.statusCode != 204) throw _failure(response);

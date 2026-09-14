@@ -137,7 +137,11 @@ private class ProductFactorySessionFilter(
                 forbidden(response, "De request-origin is niet toegestaan.")
                 return
             }
-            if (request.requestURI != "/api/auth/google" && session != null && !sessionService.validateCsrf(request, session)) {
+            if (
+                request.requestURI !in setOf("/api/auth/google", "/api/auth/debug-session") &&
+                session != null &&
+                !sessionService.validateCsrf(request, session)
+            ) {
                 forbidden(response, "CSRF-validatie is mislukt.")
                 return
             }

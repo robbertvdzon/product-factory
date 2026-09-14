@@ -4,6 +4,7 @@ import nl.vdzon.productfactory.api.advisor.ActingRole
 import nl.vdzon.productfactory.api.advisor.GlobalRole
 import nl.vdzon.productfactory.api.shared.InvalidCommand
 import org.springframework.http.HttpStatus
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.PutMapping
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 class CurrentUserController(
     private val users: UserIdentityRepository,
     private val authorization: ProductAuthorizationService,
+    private val sessions: ObjectProvider<ProductFactorySessionService>,
 ) {
     @PutMapping("/acting-role")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -31,5 +33,21 @@ class CurrentUserController(
             throw AccessDeniedException("Factory owner-rechten zijn vereist.")
         }
         users.setActingRole(user.id, request.role)
+    }
+
+    @PutMapping("/view-as")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun viewAs(@RequestBody request: ViewAsRequest, authentication: Authentication?) {
+        val session = authorization.requireAuthenticatedFactoryOwner(authentication)
+        sessions.getIfAvailable()?.viewAs(session, request.userId, request.role)
+            ?: throw InvalidCommand("Sessieweergave is alleen beschikbaar wanneer authenticatie aanstaat.")
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/view-as")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun clearViewAs(authentication: Authentication?) {
+        val session = authorization.requireAuthenticatedFactoryOwner(authentication)
+        sessions.getIfAvailable()?.clearViewAs(session)
+            ?: throw InvalidCommand("Sessieweergave is alleen beschikbaar wanneer authenticatie aanstaat.")
     }
 }

@@ -8,10 +8,16 @@ import 'http_client_factory.dart';
 import 'product_workspace.dart';
 
 class UserManagementPage extends StatefulWidget {
-  const UserManagementPage({required this.products, this.csrfToken, super.key});
+  const UserManagementPage({
+    required this.products,
+    this.csrfToken,
+    this.onViewAs,
+    super.key,
+  });
 
   final ProductGateway products;
   final String? csrfToken;
+  final void Function(String userId, String role)? onViewAs;
 
   @override
   State<UserManagementPage> createState() => _UserManagementPageState();
@@ -263,6 +269,54 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
   }
 
+  Future<void> _viewAs(Map<String, Object?> user) async {
+    final roles = <String>{
+      ...(user['globalRoles'] as List? ?? const []).map((role) => '$role'),
+      ...(user['memberships'] as List? ?? const [])
+          .whereType<Map>()
+          .where((membership) => membership['status'] == 'ACTIVE')
+          .map((membership) => '${membership['role']}'),
+    }.toList();
+    if (roles.isEmpty) return;
+    var role = roles.first;
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: Text('Bekijken als ${_value(user['email'])}'),
+          content: DropdownButtonFormField<String>(
+            initialValue: role,
+            decoration: const InputDecoration(labelText: 'Rol'),
+            items: roles
+                .map(
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text(switch (value) {
+                      'FACTORY_OWNER' => 'Factory owner',
+                      'ARCHITECT' => 'Architect',
+                      _ => 'Product owner',
+                    }),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) => update(() => role = value!),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuleren'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, role),
+              child: const Text('Bekijken'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) widget.onViewAs?.call(_value(user['id']), selected);
+  }
+
   Future<void> _mutate(Future<void> Function() action) async {
     setState(() => _busy = true);
     try {
@@ -351,6 +405,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       child: Wrap(
                         spacing: 8,
                         children: [
+                          if (widget.onViewAs != null)
+                            OutlinedButton.icon(
+                              onPressed: () => _viewAs(user),
+                              icon: const Icon(Icons.visibility_outlined),
+                              label: const Text('Bekijken als'),
+                            ),
                           OutlinedButton.icon(
                             onPressed: _products.isEmpty
                                 ? null

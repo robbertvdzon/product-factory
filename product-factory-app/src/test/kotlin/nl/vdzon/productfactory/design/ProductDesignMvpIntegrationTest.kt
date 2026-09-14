@@ -510,7 +510,9 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
                         addObject().apply {
                             put("operation", "KEEP")
                             put("existingArtifactName", name)
-                            putNull("outputArtifactName")
+                            // Reproduceert de productie-uitvoer die dezelfde bestaande naam ook
+                            // als output herhaalde, zonder dat er een nieuw artifact was gemaakt.
+                            put("outputArtifactName", name)
                             put("screenKey", screen.screenKey)
                             put("reason", "Dit scherm blijft ongewijzigd onderdeel van de hoofdroute.")
                         }
@@ -751,6 +753,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         val job = runtime.jobs.values.single { it.status != "SUCCEEDED" }
         runtime.results[job.id] = result
         runtime.resultArtifacts[job.id] = result.path("epic").path("uxArtifactChanges")
+            .filter { it.path("operation").asText() in setOf("ADD", "REPLACE") }
             .mapNotNull { it.path("outputArtifactName").takeIf(JsonNode::isTextual)?.asText() }
             .mapIndexed { index, name ->
                 RuntimeArtifactView("ux-$index", job.id, name, "image/png", 128, (index + 1).toString().take(1).repeat(64), java.time.Instant.now())

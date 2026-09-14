@@ -113,6 +113,9 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
   Future<void> _login(String idToken) async =>
       _perform(() => widget.gateway.googleLogin(idToken));
 
+  Future<void> _debugLogin(String token, String? email, String? role) async =>
+      _perform(() => widget.gateway.debugLogin(token, email, role));
+
   Future<void> _logout() async {
     setState(() {
       _busy = true;
@@ -140,6 +143,22 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
     final csrfToken = _status?.csrfToken;
     await _perform(() async {
       await widget.gateway.setActingRole(role, csrfToken);
+      return widget.gateway.session();
+    });
+  }
+
+  Future<void> _viewAs(String userId, String role) async {
+    final csrfToken = _status?.csrfToken;
+    await _perform(() async {
+      await widget.gateway.viewAs(userId, role, csrfToken);
+      return widget.gateway.session();
+    });
+  }
+
+  Future<void> _clearViewAs() async {
+    final csrfToken = _status?.csrfToken;
+    await _perform(() async {
+      await widget.gateway.clearViewAs(csrfToken);
       return widget.gateway.session();
     });
   }
@@ -214,7 +233,14 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
         actingRole: status.actingRole,
         availableRoles: status.availableRoles,
         onSwitchRole: status.canSwitchRole && !_busy ? _switchRole : null,
+        viewingAs: status.viewingAs,
+        authenticatedEmail: status.authenticatedEmail,
+        onViewAs: !_busy ? _viewAs : null,
+        onClearViewAs: status.viewingAs && !_busy ? _clearViewAs : null,
       );
+    }
+    if (Uri.base.path == '/debug-login') {
+      return DebugLoginPage(busy: _busy, error: _error, onLogin: _debugLogin);
     }
     return LoginPage(
       busy: _busy,
@@ -224,6 +250,137 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
       googleClientId: status?.googleClientId,
     );
   }
+}
+
+class DebugLoginPage extends StatefulWidget {
+  const DebugLoginPage({
+    required this.busy,
+    required this.onLogin,
+    this.error,
+    super.key,
+  });
+
+  final bool busy;
+  final String? error;
+  final void Function(String token, String? email, String? role) onLogin;
+
+  @override
+  State<DebugLoginPage> createState() => _DebugLoginPageState();
+}
+
+class _DebugLoginPageState extends State<DebugLoginPage> {
+  final _token = TextEditingController();
+  final _email = TextEditingController();
+  String? _role;
+
+  @override
+  void dispose() {
+    _token.dispose();
+    _email.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.visibility_outlined, size: 46),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Agenttoegang',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Open een afgeschermde beheersessie of bekijk de applicatie als een bestaande gebruiker.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _token,
+                    obscureText: true,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(labelText: 'Debug-token'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Gebruiker (optioneel)',
+                      hintText: 'naam@example.com',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String?>(
+                    initialValue: _role,
+                    decoration: const InputDecoration(labelText: 'Rol'),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('Huidige rol')),
+                      DropdownMenuItem(
+                        value: 'PRODUCT_OWNER',
+                        child: Text('Product owner'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'ARCHITECT',
+                        child: Text('Architect'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'FACTORY_OWNER',
+                        child: Text('Factory owner'),
+                      ),
+                    ],
+                    onChanged: (value) => setState(() => _role = value),
+                  ),
+                  if (widget.error != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: widget.busy || _token.text.isEmpty
+                        ? null
+                        : () => widget.onLogin(
+                            _token.text,
+                            _email.text.trim().isEmpty
+                                ? null
+                                : _email.text.trim(),
+                            _role,
+                          ),
+                    icon: widget.busy
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.login),
+                    label: const Text('Sessie openen'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class LoginPage extends StatelessWidget {
@@ -322,6 +479,10 @@ class FoundationPage extends StatelessWidget {
     this.actingRole,
     this.availableRoles = const {},
     this.onSwitchRole,
+    this.viewingAs = false,
+    this.authenticatedEmail,
+    this.onViewAs,
+    this.onClearViewAs,
     super.key,
   });
 
@@ -344,6 +505,10 @@ class FoundationPage extends StatelessWidget {
   final String? actingRole;
   final Set<String> availableRoles;
   final ValueChanged<String>? onSwitchRole;
+  final bool viewingAs;
+  final String? authenticatedEmail;
+  final void Function(String userId, String role)? onViewAs;
+  final VoidCallback? onClearViewAs;
 
   @override
   Widget build(BuildContext context) => ApplicationShell(
@@ -366,5 +531,9 @@ class FoundationPage extends StatelessWidget {
     actingRole: actingRole,
     availableRoles: availableRoles,
     onSwitchRole: onSwitchRole,
+    viewingAs: viewingAs,
+    authenticatedEmail: authenticatedEmail,
+    onViewAs: onViewAs,
+    onClearViewAs: onClearViewAs,
   );
 }

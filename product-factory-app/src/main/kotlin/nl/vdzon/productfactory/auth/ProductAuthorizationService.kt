@@ -24,7 +24,9 @@ class ProductAuthorizationService(
     fun current(authentication: Authentication? = SecurityContextHolder.getContext().authentication): UserDetails? {
         if (!authRequired) return null
         val session = authentication?.principal as? ResolvedSession ?: return null
-        return users.get(UserId(session.userId))
+        val user = users.get(UserId(session.userId))
+        val role = session.actingRole?.let { runCatching { nl.vdzon.productfactory.api.advisor.ActingRole.valueOf(it) }.getOrNull() }
+        return role?.let { user.copy(actingRole = it) } ?: user
     }
 
     fun currentUserId(authentication: Authentication? = SecurityContextHolder.getContext().authentication): UserId =
@@ -58,6 +60,17 @@ class ProductAuthorizationService(
 
     fun requireFactoryOwner(authentication: Authentication? = SecurityContextHolder.getContext().authentication) {
         if (!isFactoryOwner(authentication)) throw AccessDeniedException("Factory owner-rechten zijn vereist.")
+    }
+
+    fun requireAuthenticatedFactoryOwner(authentication: Authentication? = SecurityContextHolder.getContext().authentication): ResolvedSession {
+        if (!authRequired) throw AccessDeniedException("Een ingelogde factory owner is vereist.")
+        val session = authentication?.principal as? ResolvedSession
+            ?: throw AccessDeniedException("Een ingelogde factory owner is vereist.")
+        val authenticatedUser = users.get(UserId(session.authenticatedUserId))
+        if (!authenticatedUser.active || nl.vdzon.productfactory.api.advisor.GlobalRole.FACTORY_OWNER !in authenticatedUser.globalRoles) {
+            throw AccessDeniedException("Factory owner-rechten zijn vereist.")
+        }
+        return session
     }
 }
 

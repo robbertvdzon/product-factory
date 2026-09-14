@@ -338,6 +338,54 @@ class AuthenticationFlowTest(
     }
 
     @Test
+    fun `factory owner bekijkt tijdelijk exact de rechten van een andere gebruiker`() {
+        val login = login()
+        val session = cookie(login, ProductFactorySessionService.SESSION_COOKIE)
+        val csrf = cookie(login, ProductFactorySessionService.CSRF_COOKIE)
+        val token = objectMapper.readTree(login.contentAsByteArray).get("csrfToken").asText()
+        val suffix = java.util.UUID.randomUUID().toString().take(8)
+        val productId = "view-as-$suffix"
+        mockMvc.post("/api/products") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, csrf)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"requestedId":"$productId","name":"View as","idempotencyKey":"create-$productId"}"""
+        }.andExpect { status { isCreated() } }
+        val owner = userIdentities.findByEmail("stakeholder@example.com")!!
+        val target = userIdentities.createForAdministration("$suffix@example.test", "create-user-$suffix")
+        userIdentities.grantProductOwner(
+            target.id, nl.vdzon.productfactory.api.shared.ProductId(productId), owner.id,
+            0, "grant-user-$suffix",
+        )
+
+        mockMvc.put("/api/me/view-as") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, csrf)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"userId":"${target.id.value}","role":"PRODUCT_OWNER"}"""
+        }.andExpect { status { isNoContent() } }
+
+        mockMvc.get("/api/auth/session") { cookie(session, csrf) }.andExpect {
+            status { isOk() }
+            jsonPath("$.stakeholderEmail") { value(target.email) }
+            jsonPath("$.actingRole") { value("PRODUCT_OWNER") }
+            jsonPath("$.viewingAs") { value(true) }
+            jsonPath("$.authenticatedEmail") { value(owner.email) }
+        }
+        mockMvc.get("/api/admin/users") { cookie(session, csrf) }.andExpect { status { isForbidden() } }
+        mockMvc.get("/api/products/$productId") { cookie(session, csrf) }.andExpect { status { isOk() } }
+
+        mockMvc.delete("/api/me/view-as") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, csrf)
+        }.andExpect { status { isNoContent() } }
+        mockMvc.get("/api/admin/users") { cookie(session, csrf) }.andExpect { status { isOk() } }
+    }
+
+    @Test
     fun `uitgenodigde architect buiten allowlist logt in en ingetrokken rol blokkeert API`() {
         val factoryLogin=login()
         val factory=userIdentities.findByEmail("stakeholder@example.com")!!

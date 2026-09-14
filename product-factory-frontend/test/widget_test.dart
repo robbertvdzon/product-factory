@@ -1127,6 +1127,13 @@ class FakeAuthenticationGateway implements AuthenticationGateway {
   }
 
   @override
+  Future<AuthenticationStatus> debugLogin(
+    String token,
+    String? email,
+    String? role,
+  ) => googleLogin(token);
+
+  @override
   Future<void> logout(String? csrfToken) async {
     logoutCsrf = csrfToken;
   }
@@ -1136,6 +1143,12 @@ class FakeAuthenticationGateway implements AuthenticationGateway {
 
   @override
   Future<void> setActingRole(String role, String? csrfToken) async {}
+
+  @override
+  Future<void> viewAs(String userId, String role, String? csrfToken) async {}
+
+  @override
+  Future<void> clearViewAs(String? csrfToken) async {}
 }
 
 class RoleSwitchingAuthenticationGateway implements AuthenticationGateway {
@@ -1158,6 +1171,13 @@ class RoleSwitchingAuthenticationGateway implements AuthenticationGateway {
   Future<AuthenticationStatus> googleLogin(String idToken) => session();
 
   @override
+  Future<AuthenticationStatus> debugLogin(
+    String token,
+    String? email,
+    String? role,
+  ) => session();
+
+  @override
   Future<void> logout(String? csrfToken) async {}
 
   @override
@@ -1166,6 +1186,12 @@ class RoleSwitchingAuthenticationGateway implements AuthenticationGateway {
     csrfTokens.add(csrfToken);
     _actingRole = role;
   }
+
+  @override
+  Future<void> viewAs(String userId, String role, String? csrfToken) async {}
+
+  @override
+  Future<void> clearViewAs(String? csrfToken) async {}
 }
 
 class FakeTestControlGateway implements TestControlGateway {

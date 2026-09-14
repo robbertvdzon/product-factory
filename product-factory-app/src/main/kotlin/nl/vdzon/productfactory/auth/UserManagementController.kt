@@ -33,6 +33,7 @@ class UserManagementController(
     fun delete(@PathVariable userId: String, @RequestBody request: DeleteUserRequest, authentication: Authentication?) {
         authorization.requireFactoryOwner(authentication)
         val target = users.get(UserId(userId))
+        if (target.email == ProductFactorySessionService.DEBUG_AGENT_EMAIL) throw IllegalArgumentException("Het technische debug-account kan niet worden verwijderd.")
         if (request.confirmation.trim().lowercase() != target.email) throw IllegalArgumentException("Typ het exacte e-mailadres om de gebruiker te verwijderen.")
         val actor = authorization.currentUserId(authentication)
         if (actor == target.id) throw IllegalArgumentException("Je kunt je eigen actieve factory-owneraccount niet verwijderen.")

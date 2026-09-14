@@ -147,6 +147,15 @@ en de afzonderlijke `PF_CSRF`-cookie wordt tegen een hash in de database gecontr
 header `X-PF-CSRF`. `GET /api/auth/session` en `POST /api/auth/logout` leveren respectievelijk
 sessiestatus en intrekking zonder een Google-token of sessiegeheim te loggen.
 
+Voor beheer en ondersteuning bestaat daarnaast een afzonderlijke agentingang op `/debug-login`.
+Die gebruikt uitsluitend `PF_DEBUG_TOKEN` in de header `X-PF-Debug-Token`; het geheim staat niet in
+de frontendbundle, URL, response of applicatielog. Zonder gekozen gebruiker opent de token een
+afgeschermd technisch factory-owneraccount. Met een bestaand actief e-mailadres en een werkelijk
+toegekende rol ontstaat een sessie die precies de producttoegang en schermen van die gebruiker
+heeft. Een factory owner kan hetzelfde doen via **Beheer → Leden → Bekijken als**. Deze keuze wordt
+alleen op de huidige sessie opgeslagen en wijzigt de rolkeuze van de bekeken gebruiker niet. Een
+zichtbare balk vermeldt de bekeken identiteit en biedt steeds **Terug naar factory owner**.
+
 Alle productdata en muterende routes zijn standaard beveiligd. Alleen login, logout, health en een
 beperkte versiequery mogen publiek zijn. Productie start niet wanneer authenticatie verplicht is
 maar client-id, allowlist of sessiesleutel ontbreekt. Tokens, cookies en volledige persoonlijke

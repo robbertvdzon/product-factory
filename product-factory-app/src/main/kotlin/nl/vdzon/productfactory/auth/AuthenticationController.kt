@@ -23,7 +23,6 @@ class AuthenticationController(
     @Value("\${PF_AUTH_REQUIRED:false}") private val authRequired: Boolean,
     @Value("\${PF_ENVIRONMENT:local}") private val environment: String,
     @Value("\${PF_GOOGLE_CLIENT_ID:}") private val googleClientId: String,
-    @Value("\${PF_STAKEHOLDER_EMAILS:}") private val stakeholderEmailsRaw: String,
     @Value("\${PF_DEBUG_TOKEN:}") private val debugToken: String,
     private val verifierProvider: ObjectProvider<GoogleIdentityVerifier>,
     private val sessionServiceProvider: ObjectProvider<ProductFactorySessionService>,
@@ -32,11 +31,6 @@ class AuthenticationController(
     private val rejectedLogins = Counter.builder("product_factory_authentication_failures")
         .description("Aantal geweigerde loginpogingen")
         .register(meterRegistry)
-    private val stakeholderEmails = stakeholderEmailsRaw
-        .split(',', ';')
-        .map { it.trim().lowercase() }
-        .filter { it.isNotEmpty() }
-        .toSet()
 
     @PostMapping("/google")
     fun googleLogin(
@@ -53,7 +47,8 @@ class AuthenticationController(
      * Ongebruikelijke extra ingang naast de normale Google-login: een vast, apart geheim
      * (PF_DEBUG_TOKEN) waarmee een tooling-agent (geen mens) een echte sessie kan bootstrappen
      * zonder OAuth-redirect. Staat standaard uit (lege PF_DEBUG_TOKEN = endpoint geweigerd) en
-     * mint alleen een sessie voor een e-mailadres dat al op de stakeholder-allowlist staat.
+     * mint zonder doelgebruiker een afgeschermde technische factory-owner-sessie, of bootst
+     * een sessie na voor een al bestaande actieve gebruiker en een werkelijk toegekende rol.
      */
     @PostMapping("/debug-session")
     fun debugSession(
@@ -67,11 +62,9 @@ class AuthenticationController(
         if (provided.isNullOrBlank() || !constantTimeEquals(provided, debugToken)) {
             throw LoginRejected("Debug-login is geweigerd.")
         }
-        val email = (body.email?.trim()?.lowercase() ?: stakeholderEmails.firstOrNull())
-            ?: throw LoginRejected("Geen toegestaan e-mailadres geconfigureerd.")
-        if (email !in stakeholderEmails) throw LoginRejected("E-mailadres niet toegestaan.")
         val sessionService = sessionServiceProvider.getIfAvailable() ?: throw LoginRejected("Login is niet beschikbaar.")
-        return withRuntimeConfiguration(sessionService.create(email, response))
+        val email = body.email?.trim()?.lowercase()
+        return withRuntimeConfiguration(sessionService.createDebugSession(email, body.actingRole, response))
     }
 
     private fun constantTimeEquals(left: String, right: String): Boolean = MessageDigest.isEqual(
@@ -97,6 +90,8 @@ class AuthenticationController(
             grantedGlobalRoles = resolved.grantedGlobalRoles,
             actingRole = resolved.actingRole,
             availableRoles = resolved.availableRoles,
+            viewingAs = resolved.viewingAs,
+            authenticatedEmail = resolved.authenticatedEmail,
         ))
     }
 

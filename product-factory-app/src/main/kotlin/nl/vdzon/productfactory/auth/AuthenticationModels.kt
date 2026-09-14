@@ -6,6 +6,7 @@ data class GoogleLoginRequest(
 
 data class DebugSessionRequest(
     val email: String? = null,
+    val actingRole: nl.vdzon.productfactory.api.advisor.ActingRole? = null,
 )
 
 data class AuthenticationStatus(
@@ -21,9 +22,16 @@ data class AuthenticationStatus(
     val grantedGlobalRoles: Set<String> = emptySet(),
     val actingRole: String? = null,
     val availableRoles: Set<String> = emptySet(),
+    val viewingAs: Boolean = false,
+    val authenticatedEmail: String? = null,
 )
 
 data class ActingRoleRequest(
+    val role: nl.vdzon.productfactory.api.advisor.ActingRole,
+)
+
+data class ViewAsRequest(
+    val userId: String,
     val role: nl.vdzon.productfactory.api.advisor.ActingRole,
 )
 

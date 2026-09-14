@@ -428,11 +428,15 @@ class ProductDesignMvpService(
             val operation = runCatching { UxArtifactOperation.valueOf(requiredText(change, "operation", 3, 20)) }
                 .getOrElse { throw InvalidCommand("UX-artifactbeslissing heeft geen geldige operatie.") }
             val existingName = nullableText(change, "existingArtifactName", 1, 255)
-            val outputName = nullableText(change, "outputArtifactName", 1, 255)
+            var outputName = nullableText(change, "outputArtifactName", 1, 255)
             val screenKey = requiredText(change, "screenKey", 2, 160)
             val reason = requiredText(change, "reason", 5, 1000)
             when (operation) {
                 UxArtifactOperation.KEEP, UxArtifactOperation.REMOVE -> {
+                    // Sommige modellen herhalen bij KEEP de bestaande naam ook in outputArtifactName,
+                    // terwijl er aantoonbaar geen nieuw artifact met die naam is opgeleverd. De
+                    // bedoeling is dan volledig eenduidig en veilig als KEEP te normaliseren.
+                    if (outputName == existingName && outputName !in producedByName) outputName = null
                     if (existingName == null || outputName != null) throw InvalidCommand("$operation vereist alleen een bestaand UX-artifact.")
                 }
                 UxArtifactOperation.REPLACE -> {

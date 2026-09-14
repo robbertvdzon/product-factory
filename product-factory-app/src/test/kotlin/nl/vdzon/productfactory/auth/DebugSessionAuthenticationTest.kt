@@ -1,6 +1,7 @@
 package nl.vdzon.productfactory.auth
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
@@ -26,7 +27,12 @@ import org.springframework.test.web.servlet.post
 @ActiveProfiles("test")
 class DebugSessionAuthenticationTest(
     @Autowired private val mockMvc: MockMvc,
+    @Autowired private val users: UserIdentityRepository,
 ) {
+    @BeforeEach
+    fun activeTarget() {
+        users.resolveOrCreate("other@example.com", false)
+    }
     @Test
     fun `debug-header is toegestaan vanaf de publieke frontend`() {
         mockMvc.options("/api/auth/debug-session") {
@@ -56,7 +62,7 @@ class DebugSessionAuthenticationTest(
     }
 
     @Test
-    fun `debug-session zonder e-mailadres kiest het eerste toegestane mailadres`() {
+    fun `debug-session zonder e-mailadres gebruikt een zelfstandig technisch account`() {
         mockMvc.post("/api/auth/debug-session") {
             header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
             header(AuthenticationController.DEBUG_TOKEN_HEADER, "test-debug-token")
@@ -64,7 +70,29 @@ class DebugSessionAuthenticationTest(
             content = "{}"
         }.andExpect {
             status { isOk() }
-            jsonPath("$.stakeholderEmail") { value("stakeholder@example.com") }
+            jsonPath("$.stakeholderEmail") { value(ProductFactorySessionService.DEBUG_AGENT_EMAIL) }
+            jsonPath("$.globalRoles[0]") { value("FACTORY_OWNER") }
+        }
+    }
+
+    @Test
+    fun `debug-session blijft werken wanneer de browser al een sessiecookie heeft`() {
+        val firstLogin = mockMvc.post("/api/auth/debug-session") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(AuthenticationController.DEBUG_TOKEN_HEADER, "test-debug-token")
+            contentType = MediaType.APPLICATION_JSON
+            content = "{}"
+        }.andReturn()
+
+        mockMvc.post("/api/auth/debug-session") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
+            header(AuthenticationController.DEBUG_TOKEN_HEADER, "test-debug-token")
+            cookie(*firstLogin.response.cookies)
+            contentType = MediaType.APPLICATION_JSON
+            content = "{}"
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.stakeholderEmail") { value(ProductFactorySessionService.DEBUG_AGENT_EMAIL) }
         }
     }
 

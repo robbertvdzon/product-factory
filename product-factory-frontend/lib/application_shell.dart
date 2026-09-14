@@ -94,6 +94,10 @@ class ApplicationShell extends StatefulWidget {
     this.actingRole,
     this.availableRoles = const {},
     this.onSwitchRole,
+    this.viewingAs = false,
+    this.authenticatedEmail,
+    this.onViewAs,
+    this.onClearViewAs,
     super.key,
   });
 
@@ -120,6 +124,10 @@ class ApplicationShell extends StatefulWidget {
 
   /// Aanwezig wanneer de gebruiker tussen factory owner en product owner kan wisselen.
   final ValueChanged<String>? onSwitchRole;
+  final bool viewingAs;
+  final String? authenticatedEmail;
+  final void Function(String userId, String role)? onViewAs;
+  final VoidCallback? onClearViewAs;
 
   @override
   State<ApplicationShell> createState() => _ApplicationShellState();
@@ -187,6 +195,23 @@ class _ApplicationShellState extends State<ApplicationShell> {
                 children: [
                   _topbar(desktop),
                   if (widget.showAcceptanceBanner) const AcceptanceBanner(),
+                  if (widget.viewingAs)
+                    MaterialBanner(
+                      leading: const Icon(Icons.visibility_outlined),
+                      content: Text(
+                        'Je bekijkt Product Factory als ${widget.stakeholderEmail} · ${switch (widget.actingRole) {
+                          'ARCHITECT' => 'architect',
+                          'FACTORY_OWNER' => 'factory owner',
+                          _ => 'product owner',
+                        }}',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: widget.onClearViewAs,
+                          child: const Text('Terug naar factory owner'),
+                        ),
+                      ],
+                    ),
                   if (widget.error != null)
                     Container(
                       width: double.infinity,
@@ -320,6 +345,7 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.members => UserManagementPage(
         products: products,
         csrfToken: widget.csrfToken,
+        onViewAs: widget.onViewAs,
       ),
       _Destination.settings => ProductWorkspacePage(
         gateway: products,
