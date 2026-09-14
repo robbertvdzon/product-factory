@@ -809,6 +809,27 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           .toList(),
     ),
   ];
+  Future<void> deleteConversation(Json c) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gesprek verwijderen?'),
+        content: Text('“${_text(c['title'])}” verdwijnt uit je gesprekken. Je kunt het daarna niet meer openen.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuleren')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwijderen')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await mutate(() async {
+      await api.request('/api/conversations/${_text(c['id'])}', method: 'DELETE', body: {'expectedVersion': c['version']});
+      loadSequence++;
+      conversations.removeWhere((item) => _text(item['id']) == _text(c['id']));
+      if (_text(conversation?['id']) == _text(c['id'])) conversation = null;
+    });
+  }
+
   Widget conversationRow(Json c) => ListTile(
     title: Text(_text(c['title'])),
     subtitle: Text(
@@ -822,7 +843,18 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           ? 'AI maakt de epic'
           : 'Open gesprek'}',
     ),
-    trailing: const Icon(Icons.chevron_right),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (ownQuestions && c['request'] == null && c['epicId'] == null && c['purpose'] != 'EPIC')
+          IconButton(
+            tooltip: 'Gesprek verwijderen',
+            onPressed: saving ? null : () => deleteConversation(c),
+            icon: const Icon(Icons.delete_outline),
+          ),
+        const Icon(Icons.chevron_right),
+      ],
+    ),
     onTap: () => mutate(() async {
       conversation = _map(
         await api.request(

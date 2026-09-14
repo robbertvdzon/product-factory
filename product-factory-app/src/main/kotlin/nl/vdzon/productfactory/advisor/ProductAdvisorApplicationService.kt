@@ -129,6 +129,29 @@ class ProductAdvisorApplicationService(
     }
 
     @Transactional
+    override fun deleteConversation(command: DeleteConversationCommand) {
+        val hash = fingerprint(command)
+        replayCommand(command.idempotencyKey, "DELETE_CONVERSATION", hash)?.let { return }
+        jdbc.query("SELECT conversation_id FROM pf_product_conversation WHERE conversation_id=? FOR UPDATE", { rs, _ -> rs.getString(1) }, command.conversationId.value)
+        val conversation = getConversation(command.conversationId, false)
+        if (conversation.version != command.expectedVersion) throw VersionConflict("Het gesprek is intussen gewijzigd. Ververs en probeer opnieuw.")
+        if (conversation.epicId != null || conversation.purpose == ConversationPurpose.EPIC || conversation.request != null) {
+            throw InvalidCommand("Een gesprek dat bij een epic of wijzigingsverzoek hoort kan niet worden verwijderd.")
+        }
+        val now = clock.instant()
+        jdbc.update("UPDATE pf_product_conversation SET deleted_at=?,status='CLOSED',updated_at=?,version=version+1 WHERE conversation_id=?", now, now, command.conversationId.value)
+        jdbc.update("UPDATE pf_product_advisor_turn SET status='BLOCKED',safe_error_code='CONVERSATION_DELETED',updated_at=? WHERE conversation_id=? AND status IN ('PENDING','WAITING_FOR_AI')", now, command.conversationId.value)
+        jdbc.update("DELETE FROM pf_personal_notification WHERE target_type='CONVERSATION' AND target_id=?", command.conversationId.value)
+        recordCommand(command.idempotencyKey, "DELETE_CONVERSATION", hash, command.conversationId.value)
+    }
+
+    /** Serialize results and deletion, including a turn selected just before deletion. */
+    private fun lockVisibleTurn(turnId: String): Boolean = jdbc.query(
+        "SELECT deleted_at FROM pf_product_conversation WHERE conversation_id=(SELECT conversation_id FROM pf_product_advisor_turn WHERE turn_id=?) FOR UPDATE",
+        { rs, _ -> rs.getTimestamp(1) == null }, turnId,
+    ).singleOrNull() == true
+
+    @Transactional
     override fun closeConversation(command: CloseConversationCommand) {
         val fingerprint = fingerprint(command)
         replayCommand(command.idempotencyKey, "CLOSE_CONVERSATION", fingerprint)?.let { return }
@@ -225,6 +248,7 @@ class ProductAdvisorApplicationService(
     }
 
     private fun startTurn(turnId: String) {
+        if (!lockVisibleTurn(turnId)) return
         val turn = jdbc.query(
             """SELECT t.conversation_id,t.source_message_id,t.attempt_count,c.product_id,t.prompt_text,t.git_url,t.git_commit_sha,
                 t.execution_vendor,t.execution_model,t.execution_mode,t.configuration_version,t.prompt_template_version
@@ -299,6 +323,7 @@ class ProductAdvisorApplicationService(
 
     @Transactional
     fun applyTurn(turnId: String) {
+        if (!lockVisibleTurn(turnId)) return
         val row = jdbc.query(
             "SELECT conversation_id,ai_task_id,git_commit_sha FROM pf_product_advisor_turn WHERE turn_id=? AND status='WAITING_FOR_AI'",
             { rs, _ -> Triple(ProductConversationId(rs.getString(1)), AiTaskId(rs.getString(2)), rs.getString(3)) }, turnId,
@@ -685,7 +710,7 @@ class ProductAdvisorApplicationService(
     }
 
     override fun findConversations(productId: ProductId, includeMessages: Boolean): List<ProductConversationDetails> = jdbc.query(
-        "SELECT conversation_id FROM pf_product_conversation WHERE product_id=? ORDER BY updated_at DESC",
+        "SELECT conversation_id FROM pf_product_conversation WHERE product_id=? AND deleted_at IS NULL ORDER BY updated_at DESC",
         { rs, _ -> ProductConversationId(rs.getString(1)) }, productId.value,
     ).map { getConversation(it, includeMessages) }
 
@@ -710,6 +735,7 @@ class ProductAdvisorApplicationService(
         require(limit in 1..100) { "Ongeldige paginagrootte." }
         require(before == null || after == null) { "Kies één paginarichting." }
         if (conversationIds.isEmpty()) return ConversationMessagePage(emptyList(), false, null)
+        conversationIds.forEach { conversationRow(it) }
         val ids = conversationIds.map { it.value }
         val scope = "conversation_id IN (${ids.joinToString(",") { "?" }})"
         val cursor = before ?: after
@@ -857,7 +883,7 @@ class ProductAdvisorApplicationService(
     }
 
     private fun conversationRow(id: ProductConversationId): ConversationRow = jdbc.query(
-        "SELECT product_id,title,created_by,status,created_at,updated_at,version FROM pf_product_conversation WHERE conversation_id=?",
+        "SELECT product_id,title,created_by,status,created_at,updated_at,version FROM pf_product_conversation WHERE conversation_id=? AND deleted_at IS NULL",
         { rs, _ -> ConversationRow(id, ProductId(rs.getString(1)), rs.getString(2), UserId(rs.getString(3)), ConversationStatus.valueOf(rs.getString(4)), rs.getTimestamp(5).toInstant(), rs.getTimestamp(6).toInstant(), rs.getLong(7)) }, id.value,
     ).singleOrNull() ?: throw AggregateNotFound("Gesprek niet gevonden.")
 
@@ -885,6 +911,7 @@ class ProductAdvisorApplicationService(
     }.trim()
     private fun safeCode(error: Throwable): String = when (error) { is SoftwareFactoryFailure -> error.code; is InvalidCommand -> "ADVISOR_CONTEXT_INVALID"; else -> "ADVISOR_TECHNICAL_FAILURE" }
     private fun blockTurn(turnId: String, code: String) {
+        if (!lockVisibleTurn(turnId)) return
         val conversationId = jdbc.query("SELECT conversation_id FROM pf_product_advisor_turn WHERE turn_id=?", { rs, _ -> rs.getString(1) }, turnId).singleOrNull() ?: return
         jdbc.update("UPDATE pf_product_advisor_turn SET status='BLOCKED',safe_error_code=?,updated_at=? WHERE turn_id=?", code.take(160), clock.instant(), turnId)
         jdbc.update("UPDATE pf_product_conversation SET status='BLOCKED',updated_at=?,version=version+1 WHERE conversation_id=?", clock.instant(), conversationId)

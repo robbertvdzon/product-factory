@@ -158,3 +158,17 @@ Flyway 35 voegt een index toe voor het gericht ophalen van berichtpagina’s.
 Een versieconflict vraagt verversen en opnieuw beoordelen. Een niet-onderbouwde impact vraagt
 onderzoek of verfijning; een ontbrekende rol wordt via Leden toegewezen. Factorybeheer houdt
 runs, planning, kwaliteit, Runtime-instellingen en herstelacties in de bestaande werkplek.
+
+### Losse gesprekken verwijderen
+
+Bij **Mijn vragen aan AI** kan de eigenaar van een los gesprek (PO of architect) het gesprek via
+het prullenbakicoon verwijderen. De bevestiging noemt de titel; annuleren verandert niets.
+`DELETE /api/conversations/{id}` gebruikt de bestaande persoonlijke toegangscontrole, CSRF,
+verwachte versie en idempotentiesleutel. Een gekoppelde epic of ProductRequest verhindert verwijderen.
+
+Verwijderen sluit het gesprek en markeert het intern als verwijderd. Berichten en bijlagen blijven
+voor technische samenhang opgeslagen, maar zijn via de gesprek-, bericht- en afbeeldingsroutes
+niet meer opvraagbaar. Het gesprek verdwijnt uit lijsten en persoonlijke acties. Nog niet verwerkte
+adviesbeurten worden geblokkeerd; een al gestarte Runtime-taak kan afronden, maar haar antwoord
+wordt niet meer gepubliceerd. Een databasevergrendeling voorkomt dat late resultaten het gesprek
+heropenen. Migratie V38 bewaart alle bestaande gesprekken en voegt alleen de verwijdermarkering toe.

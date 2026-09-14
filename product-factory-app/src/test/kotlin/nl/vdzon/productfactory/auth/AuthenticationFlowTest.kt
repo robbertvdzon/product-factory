@@ -424,13 +424,24 @@ class AuthenticationFlowTest(
             cookie(session,cookie(response,ProductFactorySessionService.CSRF_COOKIE));contentType=MediaType.APPLICATION_JSON
             content="""{"title":"Geen PO rol","idempotencyKey":"idea-$id"}"""
         }.andExpect { status { isForbidden() } }
-        mockMvc.post("/api/products/$id/conversations") {
+        val ownQuestion = mockMvc.post("/api/products/$id/conversations") {
             header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN)
             header(ProductFactorySessionService.CSRF_HEADER, token)
             cookie(session, cookie(response, ProductFactorySessionService.CSRF_COOKIE))
             contentType = MediaType.APPLICATION_JSON
             content = """{"title":"Hoe werkt de applicatie?","purpose":"QUESTION","idempotencyKey":"question-$id"}"""
-        }.andExpect { status { isCreated() } }
+        }.andExpect { status { isCreated() } }.andReturn().response
+        val questionId = objectMapper.readTree(ownQuestion.contentAsByteArray).path("id").asText()
+        mockMvc.delete("/api/conversations/$questionId") {
+            cookie(session); contentType=MediaType.APPLICATION_JSON
+            content="""{"expectedVersion":1,"idempotencyKey":"invalid-delete-$id"}"""
+        }.andExpect { status { isForbidden() } }
+        mockMvc.delete("/api/conversations/$questionId") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN); header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, cookie(response, ProductFactorySessionService.CSRF_COOKIE)); contentType=MediaType.APPLICATION_JSON
+            content="""{"expectedVersion":1,"idempotencyKey":"delete-$id"}"""
+        }.andExpect { status { isNoContent() } }
+        mockMvc.get("/api/conversations/$questionId") { cookie(session) }.andExpect { status { isNotFound() } }
         userIdentities.revokeProductOwner(invited.id,nl.vdzon.productfactory.api.shared.ProductId(id),"Toegang ingetrokken",factory.id,1,"revoke-$id",nl.vdzon.productfactory.api.advisor.ProductMembershipRole.ARCHITECT)
         mockMvc.get("/api/products/$id/governance") { cookie(session) }.andExpect { status { isForbidden() } }
         mockMvc.post("/api/auth/google") {

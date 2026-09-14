@@ -124,6 +124,32 @@ class ProductAdvisorIntegrationTest(
     }
 
     @Test
+    fun `verwijderd gesprek verdwijnt met berichten en wordt niet heropend door late AI`() {
+        advisor.addMessage(AddConversationMessageCommand(conversationId,"Leg zoeken uit",1,owner.id,"delete-message"))
+        advisor.resumeAdvisorTurns()
+        val turn = jdbc.queryForObject("SELECT turn_id FROM pf_product_advisor_turn WHERE conversation_id=?",String::class.java,conversationId.value)!!
+        val version = advisor.getConversation(conversationId).version
+        val command = DeleteConversationCommand(conversationId,version,owner.id,"delete-chat")
+        assertThatThrownBy { advisor.deleteConversation(command.copy(expectedVersion=version+1,idempotencyKey="stale-delete")) }.isInstanceOf(VersionConflict::class.java)
+        advisor.deleteConversation(command)
+        advisor.deleteConversation(command)
+        advisor.applyTurn(turn)
+        advisor.resumeAdvisorTurns()
+        assertThat(advisor.findConversations(productId)).isEmpty()
+        assertThatThrownBy { advisor.getConversation(conversationId) }.isInstanceOf(AggregateNotFound::class.java)
+        assertThatThrownBy { advisor.messagePage(listOf(conversationId),null,null,30) }.isInstanceOf(AggregateNotFound::class.java)
+        assertThat(jdbc.queryForObject("SELECT status FROM pf_product_conversation WHERE conversation_id=?",String::class.java,conversationId.value)).isEqualTo("CLOSED")
+        assertThat(jdbc.queryForObject("SELECT safe_error_code FROM pf_product_advisor_turn WHERE turn_id=?",String::class.java,turn)).isEqualTo("CONVERSATION_DELETED")
+    }
+
+    @Test
+    fun `epicgesprek kan niet via losse gesprekken worden verwijderd`() {
+        val id = advisor.createConversation(CreateConversationCommand(productId,"Epic",owner.id,"epic-delete",purpose=ConversationPurpose.EPIC))
+        assertThatThrownBy { advisor.deleteConversation(DeleteConversationCommand(id,1,owner.id,"delete-epic")) }.isInstanceOf(InvalidCommand::class.java)
+        assertThat(advisor.getConversation(id).title).isEqualTo("Epic")
+    }
+
+    @Test
     fun `informatief gesprek kan zonder ProductRequest worden gesloten`() {
         advisor.closeConversation(CloseConversationCommand(conversationId, 1, owner.id, "close-${productId.value}"))
         assertThat(advisor.getConversation(conversationId).status).isEqualTo(ConversationStatus.CLOSED)

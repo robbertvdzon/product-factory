@@ -7,6 +7,50 @@ import 'package:product_factory_frontend/epic_collaboration.dart';
 import 'package:product_factory_frontend/product_workspace.dart';
 
 void main() {
+  testWidgets('los gesprek verwijderen bevestigt de titel en blijft weg na verversen', (tester) async {
+    var deleted = false;
+    var deletes = 0;
+    final client = MockClient((request) async {
+      Object body = [];
+      if (request.method == 'DELETE') {
+        expect(request.url.path, '/api/conversations/chat-1');
+        expect(request.headers['X-PF-CSRF'], 'csrf');
+        expect(jsonDecode(request.body)['expectedVersion'], 4);
+        deleted = true;
+        deletes++;
+        return http.Response('', 204);
+      }
+      if (request.url.path == '/api/products') {
+        body = [{'id':'hkh','name':'HKH','status':'ACTIVE','dispatchingEnabled':true,'version':1}];
+      } else if (request.url.path.endsWith('/conversations') && !deleted) {
+        body = [{'id':'chat-1','productId':'hkh','title':'Hoe werkt zoeken?','status':'PROCESSING','purpose':'QUESTION','version':4}];
+      }
+      return http.Response(jsonEncode(body), 200, headers: {'content-type':'application/json'});
+    });
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: EpicCollaborationPage(
+      products: HttpProductGateway(client:client), role:'PRODUCT_OWNER', section:'own-questions',
+      initialProductId:'hkh', api:CollaborationApi('csrf',client:client),
+    ))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Gesprek verwijderen'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('“Hoe werkt zoeken?”'), findsOneWidget);
+    await tester.tap(find.text('Annuleren'));
+    await tester.pumpAndSettle();
+    expect(deletes,0);
+    expect(find.text('Hoe werkt zoeken?'),findsOneWidget);
+    await tester.tap(find.byTooltip('Gesprek verwijderen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verwijderen'));
+    await tester.pumpAndSettle();
+    expect(deletes,1);
+    expect(find.text('Hoe werkt zoeken?'),findsNothing);
+    await tester.pump(const Duration(seconds:9));
+    await tester.pumpAndSettle();
+    expect(find.text('Hoe werkt zoeken?'),findsNothing);
+    expect(tester.takeException(),isNull);
+  });
+
   test(
     'conflicten en ontbrekende optionele omgeving blijven onderscheiden',
     () async {

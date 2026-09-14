@@ -97,6 +97,14 @@ class ProductAdvisorController(
         service.revertChange(id, request.expectedVersion, request.expectedEpicVersion, authorization.currentUserId(authentication), request.idempotencyKey)
     }
 
+    @DeleteMapping("/api/conversations/{conversationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteConversation(@PathVariable conversationId: String, @RequestBody request: ConversationActionRequest, authentication: Authentication?) {
+        val id = ProductConversationId(conversationId)
+        requireConversationRole(id, authentication)
+        service.deleteConversation(DeleteConversationCommand(id, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey))
+    }
+
     @PostMapping("/api/conversations/{conversationId}/close")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun close(@PathVariable conversationId: String, @RequestBody request: ConversationActionRequest, authentication: Authentication?) {

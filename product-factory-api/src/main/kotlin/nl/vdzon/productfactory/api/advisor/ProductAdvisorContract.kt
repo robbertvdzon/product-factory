@@ -147,12 +147,14 @@ data class CreateConversationCommand(val productId: ProductId, val title: String
     val epicId: String? = null, val audienceRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER, val purpose: ConversationPurpose = ConversationPurpose.LEGACY)
 data class AddConversationMessageCommand(val conversationId: ProductConversationId, val text: String, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String, val intent: ConversationIntent = ConversationIntent.DISCUSS, val expectedEpicVersion: Long? = null, val images: List<ConversationImageInput> = emptyList(), val authorRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER)
 data class CloseConversationCommand(val conversationId: ProductConversationId, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
+data class DeleteConversationCommand(val conversationId: ProductConversationId, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
 data class ApproveProductRequestCommand(val requestId: ProductRequestId, val requestVersion: Long, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
 data class CancelProductRequestCommand(val requestId: ProductRequestId, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
 
 interface ProductAdvisorService {
     fun createConversation(command: CreateConversationCommand): ProductConversationId
     fun addMessage(command: AddConversationMessageCommand): ProductConversationMessageId
+    fun deleteConversation(command: DeleteConversationCommand)
     fun closeConversation(command: CloseConversationCommand)
     fun approveRequest(command: ApproveProductRequestCommand)
     fun cancelRequest(command: CancelProductRequestCommand)
