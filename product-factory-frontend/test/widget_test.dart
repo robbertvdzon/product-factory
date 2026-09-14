@@ -184,6 +184,24 @@ void main() {
     expect(appText('Kwaliteit'), findsWidgets);
   });
 
+  testWidgets('instellingen en navigatie behouden Alle projecten', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final navigation = FakeNavigationLocation(Uri.parse('/beheer/instellingen?product=__all__'));
+    await tester.pumpWidget(ProductFactoryApp(
+      productGateway: ResearchProductGateway(), navigationLocation: navigation,
+      authenticationGateway: FakeAuthenticationGateway(sessionResult: Future.value(
+        const AuthenticationStatus(authenticated: true, authRequired: false))),
+      versionGateway: FakeVersionGateway(),
+    ));
+    await tester.pumpAndSettle();
+    expect(navigation.current.queryParameters['product'], '__all__');
+    await tester.tap(appText('Overzicht'));
+    await tester.pumpAndSettle();
+    expect(navigation.current.queryParameters['product'], '__all__');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('factory owner kan als product owner werken en terugschakelen', (
     tester,
   ) async {
@@ -471,6 +489,8 @@ void main() {
           appText('Productbesturing en productafspraken'),
           role == 'PRODUCT_OWNER' ? findsNothing : findsOneWidget,
         );
+        expect(appTextContaining('Git: '), role == 'PRODUCT_OWNER' ? findsNothing : findsOneWidget);
+        if (role == 'PRODUCT_OWNER') expect(appText('Versie 3'), findsNothing);
         expect(appText('Doelgroep: Bestaande doelgroep'), findsNothing);
         expect(
           appText('Automatische verwerking pauzeren'),

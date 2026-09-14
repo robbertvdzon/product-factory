@@ -12,6 +12,7 @@ class ConversationTimeline extends StatefulWidget {
     required this.title,
     required this.composer,
     required this.messageBuilder,
+    this.header = const SizedBox.shrink(),
     this.introduction = const SizedBox.shrink(),
     this.status = const SizedBox.shrink(),
     this.latest = const SizedBox.shrink(),
@@ -20,7 +21,7 @@ class ConversationTimeline extends StatefulWidget {
   final Future<Map<String, Object?>> Function({String? before, String? after})
   fetch;
   final String title;
-  final Widget composer, introduction, status, latest;
+  final Widget composer, introduction, status, latest, header;
   final Widget Function(ChatMessage message) messageBuilder;
   @override
   State<ConversationTimeline> createState() => _ConversationTimelineState();
@@ -165,6 +166,7 @@ class _ConversationTimelineState extends State<ConversationTimeline> {
         builder: (context, box) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            widget.header,
             Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
             widget.status,
             const SizedBox(height: 8),

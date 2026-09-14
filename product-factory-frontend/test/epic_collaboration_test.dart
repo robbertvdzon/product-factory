@@ -23,7 +23,7 @@ void main() {
       if (request.url.path == '/api/products') {
         body = [{'id':'hkh','name':'HKH','status':'ACTIVE','dispatchingEnabled':true,'version':1}];
       } else if (request.url.path.endsWith('/conversations') && !deleted) {
-        body = [{'id':'chat-1','productId':'hkh','title':'Hoe werkt zoeken?','status':'PROCESSING','purpose':'QUESTION','version':4}];
+        body = [{'id':'chat-1','productId':'hkh','title':'Hoe werkt zoeken?','status':'PROCESSING','purpose':'QUESTION','version':4,'updatedAt':'2026-09-14T12:30:00'}];
       }
       return http.Response(jsonEncode(body), 200, headers: {'content-type':'application/json'});
     });
@@ -32,6 +32,7 @@ void main() {
       initialProductId:'hkh', api:CollaborationApi('csrf',client:client),
     ))));
     await tester.pumpAndSettle();
+    expect(find.textContaining('Laatste activiteit: 14 sep 2026 · 12:30'), findsOneWidget);
     await tester.tap(find.byTooltip('Gesprek verwijderen'));
     await tester.pumpAndSettle();
     expect(find.textContaining('“Hoe werkt zoeken?”'), findsOneWidget);
@@ -103,7 +104,13 @@ void main() {
         ],
         'review': {
           'productOwnerApproved': false,
-          'architectApproved': false,
+          'architectApproved': role == 'PRODUCT_OWNER',
+          'architectRequired': role == 'ARCHITECT',
+          'policyVersion': 3,
+          'records': [
+            {'role':'PRODUCT_OWNER','contentVersion':0,'policyVersion':3,'reason':'Oud akkoord','createdAt':'2026-09-13T10:00:00'},
+            {'role':'PRODUCT_OWNER','contentVersion':1,'policyVersion':3,'reason':'Nieuwe beoordeling','createdAt':'2026-09-14T10:00:00'},
+          ],
           'blockers': ['Functioneel akkoord ontbreekt.'],
         },
         'impact': {
@@ -160,7 +167,7 @@ void main() {
           return http.Response('{}', 404);
         }
         if (path.endsWith('/history')) value = [epic];
-        if (path.endsWith('/progress')) value = {'steps': [], 'stories': []};
+        if (path.endsWith('/progress')) value = {'steps': [], 'stories': [for (final status in ['IN_PROGRESS','DONE','TODO']) {'id':status,'title':'Story $status','status':status}]};
         return http.Response(
           jsonEncode(value),
           200,
@@ -206,6 +213,20 @@ void main() {
         );
       }
       if (role == 'PRODUCT_OWNER') {
+        await tester.ensureVisible(find.text('Goedkeuring'));
+        await tester.tap(find.text('Goedkeuring'));
+        await tester.pumpAndSettle();
+        expect(find.text('Architect: Niet vereist voor deze epic'), findsOneWidget);
+        expect(find.textContaining('Oud akkoord'), findsNothing);
+        expect(find.textContaining('Productafspraken versie'), findsNothing);
+        expect(find.textContaining('Nieuwe beoordeling'), findsOneWidget);
+        await tester.ensureVisible(find.text('Voortgang'));
+        await tester.tap(find.text('Voortgang'));
+        await tester.pumpAndSettle();
+        expect(find.text('1 · In ontwikkeling'), findsOneWidget);
+        expect(find.text('1 · Afgerond'), findsOneWidget);
+        expect(find.text('1 · Nog niet opgepakt'), findsOneWidget);
+        expect(tester.takeException(), isNull);
         await tester.ensureVisible(find.text('Schermen'));
         await tester.tap(find.text('Schermen'));
         await tester.pumpAndSettle();

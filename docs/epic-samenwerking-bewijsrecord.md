@@ -176,3 +176,18 @@ en beide smoke-tests succesvol. In de PO-weergave van HKH zijn de koppen, alinea
 genummerde scope en verwijderknop visueel gecontroleerd. De bevestiging toont de epictitel
 en gevolgen voor openstaand/lopend werk. **Annuleren** behield de bestaande epic. Er is
 geen productie-epic verwijderd.
+
+## PO-overzicht, actuele goedkeuring en gesprekstijden (2026-09-14)
+
+Voortgang telt afzonderlijk IN_PROGRESS (in ontwikkeling), DONE (afgerond) en TODO
+(nog niet opgepakt). De actuele processtap heeft een herkenbaar afspeelpictogram; de
+bouwteller benoemt expliciet afgeronde stories. Goedkeuring toont alleen de huidige
+inhoudsversie en het laatste besluit per rol onder het actuele beleid. Historische
+besluiten blijven opgeslagen. ArchitectRequired=false wordt ‘Niet vereist voor deze epic’.
+Het interne beleidsversienummer is uit deze weergave verwijderd.
+
+Gesprekslijsten tonen updatedAt als laatste activiteit, berichten tonen createdAt in lokale
+tijd. De teruglink staat in de vaste kop boven het gesprek. Productinstellingen verbergen
+Git en de interne opdrachtversie voor de PO. Automatische projectselectie op een pagina
+met één product overschrijft de gedeelde keuze ‘Alle projecten’ niet meer; alleen een
+bewuste keuze in de dropdown verandert deze. De URL bewaart de keuze bij navigatie/herladen.

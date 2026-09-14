@@ -1,3 +1,4 @@
+import 'display_timestamp.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -864,7 +865,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           ? 'Uitwerking wordt opnieuw geprobeerd'
           : _map(c['request'])['status'] == 'ROUTING' || _map(c['request'])['status'] == 'APPROVED'
           ? 'AI maakt de epic'
-          : 'Open gesprek'}',
+          : 'Open gesprek'}${displayTimestamp(c['updatedAt']).isEmpty ? '' : '\nLaatste activiteit: ${displayTimestamp(c['updatedAt'])}'}',
     ),
     trailing: Row(
       mainAxisSize: MainAxisSize.min,
@@ -1004,6 +1005,13 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           'bijgewerkt naar voorstelversie ${proposal['afterContentVersion']}.',
         );
     return ConversationTimeline(
+      header: epic == null ? Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton(
+          onPressed: () => setState(() { conversation = null; discussions = []; }),
+          child: Text(ownQuestions ? '← Mijn vragen aan AI' : '← Mijn epics'),
+        ),
+      ) : const SizedBox.shrink(),
       key: ValueKey(scope),
       revision:
           '${c?['version']}-${discussions.map((d) => d['version']).join('-')}',
@@ -1052,6 +1060,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                   : 'AI',
               style: Theme.of(context).textTheme.labelLarge,
             ),
+            if (displayTimestamp(m['createdAt']).isNotEmpty)
+              Text(displayTimestamp(m['createdAt']), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 5),
             if (!currentProposalMessage(m)) SelectableText(_text(m['text'])),
             storedImages(_maps(m['attachments'])),
@@ -1156,16 +1166,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       composer: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (epic == null)
-            TextButton(
-              onPressed: () => setState(() {
-                conversation = null;
-                discussions = [];
-              }),
-              child: Text(
-                ownQuestions ? '← Mijn vragen aan AI' : '← Mijn epics',
-              ),
-            ),
           if (c?['status'] != 'CLOSED' &&
               !(epic == null &&
                   ['APPROVED', 'ROUTING'].contains(request['status']))) ...[
@@ -1595,16 +1595,23 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
 
   Widget reviewPanel() {
     final r = _map(epic!['review']);
-    return panel('Goedkeuringen', [
-      text(
-        'Product owner: ${r['productOwnerApproved'] == true ? 'akkoord' : 'nog nodig'}',
-      ),
-      text(
-        'Architect: ${r['architectApproved'] == true ? 'akkoord / past binnen afspraken' : 'beoordeling nodig'}',
-      ),
-      text(
-        'Productafspraken versie ${r['policyVersion'] ?? policy['version']}',
-      ),
+    final version = epic!['contentVersion'] ?? epic!['version'];
+    Widget approval(String role, String name, bool approved, {bool required = true}) {
+      final record = _maps(r['records']).where((record) => record['contentVersion'] == version &&
+          record['role'] == role && record['policyVersion'] == r['policyVersion']).lastOrNull;
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(!required ? Icons.remove_circle_outline : approved ? Icons.check_circle_outline : Icons.pending_outlined),
+        title: Text('$name: ${!required ? 'Niet vereist voor deze epic' : approved ? 'Akkoord' : 'Goedkeuring nodig'}'),
+        subtitle: required && record != null ? Text([
+          _text(record['reason']), displayTimestamp(record['createdAt']),
+        ].where((s) => s.isNotEmpty).join('\n')) : null,
+      );
+    }
+    return panel('Goedkeuring van de huidige versie', [
+      text('Inhoudsversie $version. Bij nieuwe inhoud worden de vereiste goedkeuringen opnieuw beoordeeld.'),
+      approval('PRODUCT_OWNER', 'Product owner', r['productOwnerApproved'] == true),
+      approval('ARCHITECT', 'Architect', r['architectApproved'] == true, required: r['architectRequired'] != false),
       if (!factory &&
           !closed(epic!) &&
           _map(epic!['review'])[architect
@@ -1653,18 +1660,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             ),
           ],
         ),
-      const SizedBox(height: 16),
-      ..._maps(r['records']).reversed.map(
-        (record) => ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            '${record['role'] == 'ARCHITECT' ? 'Architect' : 'Product owner'} · ${label(record['decision'])} · versie ${record['contentVersion']}',
-          ),
-          subtitle: Text(
-            '${record['reason']}\n${record['automatic'] == true ? 'Automatisch binnen mandaat' : 'Menselijk besluit'} · ${record['createdAt']}',
-          ),
-        ),
-      ),
     ]);
   }
 
@@ -1748,6 +1743,10 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
 
   Widget progressPanel() => panel('Van idee naar oplevering', [
     text(label(epic!['status'])),
+    Wrap(spacing: 12, runSpacing: 8, children: [
+      for (final entry in {'IN_PROGRESS': 'In ontwikkeling', 'DONE': 'Afgerond', 'TODO': 'Nog niet opgepakt'}.entries)
+        Chip(label: Text('${_maps(progress['stories']).where((s) => s['status'] == entry.key).length} · ${entry.value}')),
+    ]),
     if (_map(progress['waitingOn']).isNotEmpty)
       text(
         '${_map(progress['waitingOn'])['title']}\n${_text(_map(progress['waitingOn'])['detail'])}',
@@ -1758,10 +1757,13 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         leading: Icon(
           step['state'] == 'DONE'
               ? Icons.check_circle_outline
-              : Icons.radio_button_unchecked,
+              : step['state'] == 'CURRENT' ? Icons.play_circle_outline : Icons.radio_button_unchecked,
+          color: step['state'] == 'CURRENT' ? Theme.of(context).colorScheme.primary : null,
         ),
         title: Text(_text(step['label'])),
-        subtitle: Text(_text(step['detail'])),
+        subtitle: Text(step['key'] == 'BUILD'
+            ? '${_maps(progress['stories']).where((s) => s['status'] == 'DONE').length} van ${_maps(progress['stories']).length} stories afgerond'
+            : displayTimestamp(step['detail']).isNotEmpty ? displayTimestamp(step['detail']) : _text(step['detail'])),
       ),
     ),
     for (final entry in environment.entries.where(

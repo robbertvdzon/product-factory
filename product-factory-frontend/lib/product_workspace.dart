@@ -1979,7 +1979,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     }
   }
 
-  Future<void> _loadProducts([String? selectId]) async {
+  Future<void> _loadProducts([String? selectId, bool userSelection = false]) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -2004,7 +2004,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               ? null
               : _fingerprintWorkspace(data);
         });
-        if (selected != null) widget.onProductSelected?.call(selected.id);
+        if (selected != null && userSelection) widget.onProductSelected?.call(selected.id);
       }
     } on ProductFailure catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -2175,7 +2175,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                         )
                         .toList(),
                     onChanged: (id) {
-                      if (id != null) unawaited(_loadProducts(id));
+                      if (id != null) unawaited(_loadProducts(id, true));
                     },
                   ),
                 ),
@@ -4117,8 +4117,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         else ...[
           SelectableText('Doel: ${a['goal']}'),
           const SizedBox(height: 8),
-          SelectableText('Git: ${a['publicGitUrl']}'),
-          SelectableText('Versie ${a['version']}'),
+          if (widget.isFactoryOwner || widget.actingRole != 'PRODUCT_OWNER') ...[
+            SelectableText('Git: ${a['publicGitUrl']}'),
+            SelectableText('Versie ${a['version']}'),
+          ],
         ],
         if (!_editingAssignment) ...[
           Align(

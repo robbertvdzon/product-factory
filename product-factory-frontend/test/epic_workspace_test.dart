@@ -46,6 +46,11 @@ void main() {
                 'version': 1,
               },
           ];
+        } else if (path.endsWith('/messages')) {
+          result = {'hasMore':false,'messages':[
+            {'id':'m1','sender':'USER','text':'Een vraag','createdAt':'2026-09-14T12:30:00'},
+            {'id':'m2','sender':'PRODUCT_ADVISOR','text':'Een antwoord','createdAt':'2026-09-14T12:31:00'},
+          ]};
         } else if (path.endsWith('/epics')) {
           final id = path.split('/')[3];
           result = [
@@ -132,6 +137,10 @@ void main() {
         jsonDecode(writes.last.body)['text'],
         'Ik wil de homepage bespreken.',
       );
+      expect(find.text('14 sep 2026 · 12:30'), findsOneWidget);
+      expect(find.text('14 sep 2026 · 12:31'), findsOneWidget);
+      expect(tester.getTopLeft(find.text(section == 'overview' ? '← Mijn epics' : '← Mijn vragen aan AI')).dy,
+          lessThan(tester.getTopLeft(find.text('Een antwoord')).dy));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
