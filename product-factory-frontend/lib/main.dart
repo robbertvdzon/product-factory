@@ -101,6 +101,7 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
   AuthenticationStatus? _status;
   String? _error;
   bool _busy = true;
+  bool _debugLoginCompleted = false;
 
   @override
   void initState() {
@@ -113,8 +114,12 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
   Future<void> _login(String idToken) async =>
       _perform(() => widget.gateway.googleLogin(idToken));
 
-  Future<void> _debugLogin(String token, String? email, String? role) async =>
-      _perform(() => widget.gateway.debugLogin(token, email, role));
+  Future<void> _debugLogin(String token, String? email, String? role) async {
+    await _perform(() => widget.gateway.debugLogin(token, email, role));
+    if (mounted && _error == null && _status?.authenticated == true) {
+      setState(() => _debugLoginCompleted = true);
+    }
+  }
 
   Future<void> _logout() async {
     setState(() {
@@ -184,6 +189,9 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
 
   @override
   Widget build(BuildContext context) {
+    if (Uri.base.path == '/debug-login' && !_debugLoginCompleted) {
+      return DebugLoginPage(busy: _busy, error: _error, onLogin: _debugLogin);
+    }
     if (_busy && _status == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -238,9 +246,6 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
         onViewAs: !_busy ? _viewAs : null,
         onClearViewAs: status.viewingAs && !_busy ? _clearViewAs : null,
       );
-    }
-    if (Uri.base.path == '/debug-login') {
-      return DebugLoginPage(busy: _busy, error: _error, onLogin: _debugLogin);
     }
     return LoginPage(
       busy: _busy,

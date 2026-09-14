@@ -72,3 +72,5 @@ overzicht en de bewijsregistratie staan in het
 De Product Advisor-bediening en operationele grens staan in het
 [`Product Advisor-runbook`](docs/platform/product-advisor-runbook.md) en het
 [`Product Advisor-bewijsrecord`](docs/product-advisor-bewijsrecord.md).
+Voor AI-agents die productie als een specifieke gebruiker en rol moeten bekijken is er het
+[`Agenttoegang en rolweergave-runbook`](docs/platform/agenttoegang-en-rolweergave.md).

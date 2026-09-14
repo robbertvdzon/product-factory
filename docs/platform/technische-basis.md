@@ -155,6 +155,9 @@ toegekende rol ontstaat een sessie die precies de producttoegang en schermen van
 heeft. Een factory owner kan hetzelfde doen via **Beheer → Leden → Bekijken als**. Deze keuze wordt
 alleen op de huidige sessie opgeslagen en wijzigt de rolkeuze van de bekeken gebruiker niet. Een
 zichtbare balk vermeldt de bekeken identiteit en biedt steeds **Terug naar factory owner**.
+De uitvoerbare procedure voor AI-agents staat in
+[Agenttoegang en rolweergave](agenttoegang-en-rolweergave.md) en wordt vanuit `AGENTS.md` verplicht
+vindbaar gemaakt voor agents die in deze repository werken.
 
 Alle productdata en muterende routes zijn standaard beveiligd. Alleen login, logout, health en een
 beperkte versiequery mogen publiek zijn. Productie start niet wanneer authenticatie verplicht is
@@ -186,3 +189,4 @@ testdocumenten blijven zelfstandig normatief voor hun eigen onderwerp.
 - [Frontend](../stakeholder/frontend.md)
 - [Maven en Spring Modulith](maven-en-spring-modulith.md)
 - [Integratie- en acceptatietesten](integratie-en-acceptatietesten.md)
+- [Agenttoegang en rolweergave](agenttoegang-en-rolweergave.md)
