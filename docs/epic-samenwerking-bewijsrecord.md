@@ -140,3 +140,13 @@ historisch bewijs en geven geen nieuwe architectbevoegdheid.
   via het v2-contract, berichtpaginering, duurzame retentie, hergebruik, vreemde bron/taak weigeren,
   persoonlijke autorisatie en vergroting op 320px. Dit zijn geautomatiseerde tests met een mockruntime;
   een echte browseropname door de productie-AI vraagt aanvullend een live controle.
+
+Live gecontroleerd op productie met revisie `b74da6167d627b08c8a2d7259ddd3a1254edde9a`:
+release 34846938704 en smokechecks voor acceptatie/productie geslaagd. Als PO robbertvdzon
+binnen HKH is een nieuw persoonlijk gesprek gestart met de vraag om het publieke homescherm.
+AI leverde een herkenbare browseropname met label **Screenshot · Productie** en bron
+`https://hkh.vdzonsoftware.nl/`. Vergroten en downloaden werkten; de download is een geldige
+PNG van 1440×1000 pixels (61.003 bytes). Op een vervolgvraag om een uitlegplaatje maakte AI een
+diagram van de onderdelen van die screenshot, zichtbaar met het aparte label **Illustratie**.
+De twee beelden staan bij hun eigen antwoord. De tijdelijke PO-rolweergave is beëindigd en de
+controletabs zijn gesloten; het gesprek met de voorbeelden blijft beschikbaar bij Mijn vragen aan AI.
