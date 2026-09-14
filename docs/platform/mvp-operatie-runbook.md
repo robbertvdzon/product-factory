@@ -80,3 +80,26 @@ publieke hervatfunctie vooruit kan.
 Acceptatie gebruikt server-side Runtimefixtures, de stateful MockSoftwareFactory, uitgeschakelde
 automatische verwerking en Test Control. Productie gebruikt de echte Runtime en Software Factory,
 weigert Test Control en `MOCKED`, vereist Google-authenticatie en controleert alle actieve, niet-gepauzeerde producten iedere tien seconden.
+
+## Productiebewijs 14 september 2026
+
+Release `85362de024c71132aff739511ecd1494500760b2` is via de geslaagde
+[repositorycontrole](https://github.com/robbertvdzon/product-factory/actions/runs/34856564716) en
+[releasepipeline](https://github.com/robbertvdzon/product-factory/actions/runs/34856893377) op
+acceptatie en productie gezet. Lokaal slaagden 196 backendtests, 55 Fluttertests, analyse,
+frontendbuild en cachetest. Beide omgevingen slaagden voor de rooktest met deze exacte revision.
+
+In productie is als factory owner gecontroleerd dat de schema's en aparte dispatcherschakelaar
+vervangen zijn door één projectpauze. Pauzeren en hervatten van HKH werkten via de UI; na afloop
+stonden alle drie actieve producten weer aan. De controlerij van HKH toonde onder andere
+`14:46:10.481738Z` met volgende controle `14:46:20Z`.
+
+Tussen de uitrol om 14:43 UTC en de controle om 14:46 UTC ontstond precies één nieuwe
+dispatchersessie: de eerste HKH-story werd automatisch `IN_PROGRESS` met externe ID `hkh-221`.
+De tweede story bleef `TODO`. Lege controles en ongewijzigd lopend extern werk leverden geen
+nieuwe schedulerruns of AI-taken op. Bestaande historie is behouden.
+
+Bij HKH Autopilot ontstond één ontwerpblokkade `DESIGN_INPUT_INVALID` met melding
+“De complete AI-prompt is leeg of te groot.” Deze inhoudelijke fout bleef zichtbaar en werd
+niet steeds opnieuw gestart. Het verkleinen van die ontwerpcontext is afzonderlijk vervolgwerk;
+de dispatcher en de controles van de andere producten bleven werken.
