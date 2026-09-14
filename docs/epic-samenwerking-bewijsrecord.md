@@ -170,3 +170,9 @@ Verificatie: volledige lokale verify, migratie en dispatcher-integratietest (inc
 annulering), PO-/architectautorisatie, CSRF, versieconflict en herhaling. Widgettests controleren
 Markdown en de verwijderbevestiging op 320px bij 200% tekstgrootte; Annuleren behoudt de epic en
 Verwijderen houdt deze ook na verversen uit het overzicht.
+
+Productiecontrole: release `5815e9e692a50691ba408c09cc1907ab3d2cfce0` doorliep CI
+en beide smoke-tests succesvol. In de PO-weergave van HKH zijn de koppen, alinea's,
+genummerde scope en verwijderknop visueel gecontroleerd. De bevestiging toont de epictitel
+en gevolgen voor openstaand/lopend werk. **Annuleren** behield de bestaande epic. Er is
+geen productie-epic verwijderd.
