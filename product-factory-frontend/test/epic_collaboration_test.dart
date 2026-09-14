@@ -296,7 +296,8 @@ void main() {
               {
                 'id': 'm3',
                 'sender': 'SYSTEM',
-                'text': 'De epic is bijgewerkt naar voorstelversie 2.',
+                'text':
+                    'De epic is bijgewerkt naar voorstelversie 2. Mijn dossiers toegevoegd.',
               },
             ],
             'hasMore': false,
@@ -365,6 +366,7 @@ void main() {
         submittedFeedback['text'],
         'Voeg Mijn dossiers toe aan desktop en mobiel.',
       );
+      expect(find.textContaining('Mijn dossiers toegevoegd.'), findsOneWidget);
       await tester.ensureVisible(find.text('Voorstel terugdraaien'));
       await tester.tap(find.text('Voorstel terugdraaien'));
       await tester.pumpAndSettle();

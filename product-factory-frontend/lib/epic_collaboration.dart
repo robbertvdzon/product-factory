@@ -939,6 +939,14 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     final scope = epic != null
         ? '/api/epics/${_text(epic!['id'])}/messages'
         : '/api/conversations/${_text(c?['id'])}/messages';
+    bool currentProposalMessage(Json m) =>
+        epic != null &&
+        proposal['status'] == 'READY' &&
+        proposal['afterContentVersion'] == epic!['contentVersion'] &&
+        m['sender'] == 'SYSTEM' &&
+        _text(m['text']).contains(
+          'bijgewerkt naar voorstelversie ${proposal['afterContentVersion']}.',
+        );
     return ConversationTimeline(
       key: ValueKey(scope),
       revision:
@@ -989,7 +997,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
               style: Theme.of(context).textTheme.labelLarge,
             ),
             const SizedBox(height: 5),
-            SelectableText(_text(m['text'])),
+            if (!currentProposalMessage(m)) SelectableText(_text(m['text'])),
             storedImages(_maps(m['attachments'])),
             if (m['sender'] == 'SYSTEM' &&
                 _text(m['text']).contains(
@@ -1001,7 +1009,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                       epic!['contentVersion']) ...[
                 notice(
                   'AI stelt versie ${proposal['afterContentVersion']} voor',
-                  '${_text(proposal['summary']).isEmpty ? 'Bekijk de bijgewerkte inhoud en schermen.' : _text(proposal['summary'])} Je kunt via de chat verder bijstellen of vragen dit terug te draaien.',
+                  '${_text(proposal['summary']).isEmpty ? 'Bekijk de bijgewerkte inhoud en schermen.' : _text(proposal['summary'])} Je kunt via de chat verder bijstellen of vragen dit terug te draaien. Uitvoering blijft afhankelijk van de vereiste goedkeuringen.',
                 ),
                 if (c?['status'] != 'PROCESSING' &&
                     [
