@@ -1237,60 +1237,105 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     final impact = _map(epic!['impact']);
     final items = _maps(impact['items']);
     final ai = _map(impact['productAi']);
-    return panel('Impact in één oogopslag', [
-      if (items.isEmpty)
+    const categories = {
+      'DATABASE',
+      'MIGRATION',
+      'EXTERNAL_SYSTEM',
+      'FRONTEND',
+      'ACCESS',
+      'PRODUCT_AI',
+      'INFRASTRUCTURE',
+    };
+    final incomplete =
+        !categories.every((c) => items.any((i) => i['category'] == c)) ||
+        items.any(
+          (i) => !['NONE', 'COMPATIBLE', 'MATERIAL'].contains(i['level']),
+        );
+    final changes = items
+        .where(
+          (i) =>
+              i['level'] == 'MATERIAL' ||
+              (i['level'] == 'COMPATIBLE' && i['category'] != 'FRONTEND'),
+        )
+        .toList();
+    final aiChanged = ai['changed'] == true;
+    final summary = incomplete
+        ? 'De architectuurimpact is nog niet volledig bepaald.'
+        : changes.any((i) => i['level'] == 'MATERIAL')
+        ? 'Er zijn architectuurwijzigingen.'
+        : changes.isNotEmpty || aiChanged
+        ? 'Er zijn wijzigingen binnen de bestaande architectuur.'
+        : 'Er is geen architectuurverandering.';
+    return panel('Architectuur in één oogopslag', [
+      Text(summary, style: Theme.of(context).textTheme.titleMedium),
+      if (incomplete)
         text(
-          'Er is nog geen onderbouwde impactbeoordeling. Vraag verdere uitwerking.',
+          'Niet alle onderdelen zijn beoordeeld. De onderbouwing vraagt nog uitwerking.',
         ),
-      ...items.map(
-        (i) => ExpansionTile(
+      ...changes.map(
+        (i) => text('${category(i['category'])}: ${_text(i['summary'])}'),
+      ),
+      if (aiChanged && !changes.any((i) => i['category'] == 'PRODUCT_AI'))
+        text('Het AI-gebruik van het product verandert.'),
+      if (items.isNotEmpty)
+        ExpansionTile(
+          key: ValueKey(
+            'architecture-details-${epic!['id']}-${epic!['contentVersion']}',
+          ),
           tilePadding: EdgeInsets.zero,
-          title: Text(category(i['category'])),
-          subtitle: Text('${label(i['level'])} · ${_text(i['summary'])}'),
+          title: const Text('Onderbouwing per onderdeel'),
           children: [
-            text('Onderbouwing'),
-            ..._strings(i['evidence']).map(text),
-            if (_text(i['alternatives']).isNotEmpty)
-              text('Alternatieven: ${i['alternatives']}'),
-            if (i['category'] == 'PRODUCT_AI')
-              ...[
-                'currentBehavior',
-                'proposedBehavior',
-                'trigger',
-                'frequency',
-                'volume',
-                'oneTimeWork',
-                'assumptions',
-                'providerAndModel',
-                'dataAndValidation',
-                'limitsAndRetries',
-              ].map(
-                (key) => text(
-                  '${const {'currentBehavior': 'Nu', 'proposedBehavior': 'Straks', 'trigger': 'Trigger', 'frequency': 'Frequentie', 'volume': 'Volume', 'oneTimeWork': 'Eenmalig', 'assumptions': 'Aannames', 'providerAndModel': 'Provider/model', 'dataAndValidation': 'Gegevens en validatie', 'limitsAndRetries': 'Grenzen en retries'}[key]}: ${ai[key] is List ? _strings(ai[key]).join('; ') : _text(ai[key])}',
-                ),
-              ),
-            if (i['category'] == 'PRODUCT_AI')
-              text(
-                'Extra jobs/dag: ${ai['estimatedAdditionalJobsPerDay'] ?? 'onbekend'} · maandkosten: ${ai['estimatedMonthlyCostEuro'] ?? 'onbekend'}',
-              ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: button('Onderzoek met AI', () {
-                setState(() {
-                  tab = 'Impact';
-                  intent = 'DISCUSS';
-                });
-                unawaited(
-                  send(
-                    preset:
-                        'Onderzoek ${category(i['category'])}: ${i['summary']}. Wat verandert precies, waarom en welke alternatieven zijn er? Onderbouw met code en architectuurbesluiten.',
+            ...items.map(
+              (i) => ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text(category(i['category'])),
+                subtitle: Text('${label(i['level'])} · ${_text(i['summary'])}'),
+                children: [
+                  text('Onderbouwing'),
+                  ..._strings(i['evidence']).map(text),
+                  if (_text(i['alternatives']).isNotEmpty)
+                    text('Alternatieven: ${i['alternatives']}'),
+                  if (i['category'] == 'PRODUCT_AI')
+                    ...[
+                      'currentBehavior',
+                      'proposedBehavior',
+                      'trigger',
+                      'frequency',
+                      'volume',
+                      'oneTimeWork',
+                      'assumptions',
+                      'providerAndModel',
+                      'dataAndValidation',
+                      'limitsAndRetries',
+                    ].map(
+                      (key) => text(
+                        '${const {'currentBehavior': 'Nu', 'proposedBehavior': 'Straks', 'trigger': 'Trigger', 'frequency': 'Frequentie', 'volume': 'Volume', 'oneTimeWork': 'Eenmalig', 'assumptions': 'Aannames', 'providerAndModel': 'Provider/model', 'dataAndValidation': 'Gegevens en validatie', 'limitsAndRetries': 'Grenzen en retries'}[key]}: ${ai[key] is List ? _strings(ai[key]).join('; ') : _text(ai[key])}',
+                      ),
+                    ),
+                  if (i['category'] == 'PRODUCT_AI')
+                    text(
+                      'Extra jobs/dag: ${ai['estimatedAdditionalJobsPerDay'] ?? 'onbekend'} · maandkosten: ${ai['estimatedMonthlyCostEuro'] ?? 'onbekend'}',
+                    ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: button('Onderzoek met AI', () {
+                      setState(() {
+                        tab = 'Impact';
+                        intent = 'DISCUSS';
+                      });
+                      unawaited(
+                        send(
+                          preset:
+                              'Onderzoek ${category(i['category'])}: ${i['summary']}. Wat verandert precies, waarom en welke alternatieven zijn er? Onderbouw met code en architectuurbesluiten.',
+                        ),
+                      );
+                    }),
                   ),
-                );
-              }),
+                ],
+              ),
             ),
           ],
         ),
-      ),
     ]);
   }
 
