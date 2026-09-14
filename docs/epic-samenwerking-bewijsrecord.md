@@ -191,3 +191,11 @@ tijd. De teruglink staat in de vaste kop boven het gesprek. Productinstellingen 
 Git en de interne opdrachtversie voor de PO. Automatische projectselectie op een pagina
 met één product overschrijft de gedeelde keuze ‘Alle projecten’ niet meer; alleen een
 bewuste keuze in de dropdown verandert deze. De URL bewaart de keuze bij navigatie/herladen.
+
+Verificatie release `ebb9bfc6a603edde671781e03246ee30b181f46b`: 59 frontendtests,
+Flutter analyze en webbuild geslaagd; CI (inclusief backend en cachetest), acceptatie- en
+productiesmoke geslaagd. Live als PO gecontroleerd: HKH toont 1 in ontwikkeling, 0 afgerond
+en 1 nog niet opgepakt; alleen actueel PO-akkoord en architect niet vereist. Alle projecten
+bleef behouden bij herladen, instellingen en terugnavigatie. Instellingen toonden geen Git
+of opdrachtversie. Gesprekslijst en beide berichtrollen toonden lokale tijdstippen; de
+teruglink bleef boven het scrollbare gesprek. Factory-ownerrol hersteld en controletab gesloten.
