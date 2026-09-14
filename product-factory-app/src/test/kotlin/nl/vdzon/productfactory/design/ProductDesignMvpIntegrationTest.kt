@@ -200,23 +200,33 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `expliciet chatwijzigingsverzoek hervat duurzaam ontwerp en bewaart gesprek en versie`() {
+    fun `natuurlijke chat wijzigt alleen bij wens en herstelt exact via terugdraaien`() = conversationalChange(false)
+
+    @Test
+    fun `voorstel kan ook via de chat worden teruggedraaid`() = conversationalChange(true)
+
+    private fun conversationalChange(undoViaChat: Boolean) {
         design.runProcessSession(productId)
         completeOnlyJob(validEpic())
         design.runProcessSession(productId)
         val original=queries.findEpics(EpicFilter(productId)).single()
         val owner=users.resolveOrCreate("chat-${productId.value}@example.test",true)
         val chat=advisor.createConversation(CreateConversationCommand(productId,"Epicgesprek",owner.id,"chat-create",original.id.value,ProductMembershipRole.PRODUCT_OWNER,ConversationPurpose.EPIC))
-        advisor.addMessage(AddConversationMessageCommand(chat,"Waarom ziet dit er zo uit?",1,owner.id,"chat-discuss"))
+        advisor.addMessage(AddConversationMessageCommand(chat,"Waarom ziet dit er zo uit?",1,owner.id,"chat-discuss",ConversationIntent.AUTO,original.version))
         advisor.resumeAdvisorTurns()
         completeOnlyJob(mapper.createObjectNode().apply { put("outcome","ANSWER"); put("message","Dit is de huidige uitwerking.");putArray("observations").add("Broncode bekeken.");putNull("proposal") })
         advisor.resumeAdvisorTurns()
         assertThat(queries.getEpic(original.id).version).isEqualTo(original.version)
-        val version=advisor.getConversation(chat).version
-        assertThatThrownBy { advisor.addMessage(AddConversationMessageCommand(chat,"Wijzig dit",version,owner.id,"stale-change",ConversationIntent.UPDATE_EPIC,original.version+10)) }.isInstanceOf(VersionConflict::class.java)
-        advisor.addMessage(AddConversationMessageCommand(chat,"Geef Mijn dossiers een eigen knop.",version,owner.id,"chat-change",ConversationIntent.UPDATE_EPIC,original.version))
+        advisor.addMessage(AddConversationMessageCommand(chat, "Wat zou hier handig zijn?", advisor.getConversation(chat).version, owner.id, "chat-clarify", ConversationIntent.AUTO, original.version))
         advisor.resumeAdvisorTurns()
-        completeOnlyJob(mapper.createObjectNode().apply { put("outcome","ANSWER");put("message","Ik stuur de wijziging naar ontwerp.");putArray("observations").add("De knop ontbreekt.");putNull("proposal") })
+        completeOnlyJob(mapper.createObjectNode().apply { put("outcome", "ASK_FOLLOW_UP"); put("message", "Wil je alleen uitleg of ook een ander ontwerp?"); putArray("observations").add("De wens is nog onduidelijk."); putNull("proposal") })
+        advisor.resumeAdvisorTurns()
+        assertThat(queries.getEpic(original.id).contentVersion).isEqualTo(original.contentVersion)
+        val version=advisor.getConversation(chat).version
+        assertThatThrownBy { advisor.addMessage(AddConversationMessageCommand(chat,"Wijzig dit",version,owner.id,"stale-change",ConversationIntent.AUTO,original.version+10)) }.isInstanceOf(VersionConflict::class.java)
+        advisor.addMessage(AddConversationMessageCommand(chat,"Geef Mijn dossiers een eigen knop.",version,owner.id,"chat-change",ConversationIntent.AUTO,original.version))
+        advisor.resumeAdvisorTurns()
+        completeOnlyJob(mapper.createObjectNode().apply { put("outcome","PROPOSE_EPIC_UPDATE");put("message","Ik werk dit uit als nieuwe voorstelversie.");putArray("observations").add("De knop ontbreekt.");putNull("proposal") })
         advisor.resumeAdvisorTurns()
         val pending=queries.getEpic(original.id)
         assertThat(pending.status).isEqualTo(EpicStatus.NEEDS_REFINEMENT)
@@ -230,6 +240,31 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         assertThat(revised.contentVersion).isGreaterThan(original.contentVersion)
         assertThat(advisor.getConversation(chat).messages.count { it.sender==ConversationSender.SYSTEM && it.text.contains("bijgewerkt naar") }).isEqualTo(1)
         assertThat(advisor.findRequests(productId)).isEmpty()
+        val proposed = advisor.getConversation(chat)
+        assertThat(proposed.changeProposal?.status).isEqualTo("READY")
+        assertThat(proposed.changeProposal?.beforeContentVersion).isEqualTo(original.contentVersion)
+        assertThat(proposed.changeProposal?.afterContentVersion).isEqualTo(revised.contentVersion)
+        assertThatThrownBy { advisor.revertChange(chat, proposed.version, revised.version + 1, owner.id, "stale-undo") }.isInstanceOf(VersionConflict::class.java)
+        if (undoViaChat) {
+            advisor.addMessage(AddConversationMessageCommand(chat, "Draai dit voorstel terug", proposed.version, owner.id, "undo-message", ConversationIntent.AUTO, revised.version))
+            advisor.resumeAdvisorTurns()
+            completeOnlyJob(mapper.createObjectNode().apply { put("outcome", "REVERT_EPIC_UPDATE"); put("message", "Ik herstel de vorige inhoud."); putArray("observations").add("De vorige versie is beschikbaar."); putNull("proposal") })
+            advisor.resumeAdvisorTurns()
+        } else {
+            advisor.revertChange(chat, proposed.version, revised.version, owner.id, "undo")
+            advisor.revertChange(chat, proposed.version, revised.version, owner.id, "undo")
+        }
+        val restored = queries.getEpic(original.id)
+        assertThat(restored.contentVersion).isGreaterThan(revised.contentVersion)
+        assertThat(restored.title).isEqualTo(original.title)
+        assertThat(restored.solution).isEqualTo(original.solution)
+        assertThat(restored.uxScreens).isEqualTo(original.uxScreens)
+        assertThat(restored.uxArtifacts).isEqualTo(original.uxArtifacts)
+        assertThat(restored.impact.items).isEqualTo(original.impact.items)
+        assertThat(queries.getEpicHistory(original.id).map { it.contentVersion }).contains(original.contentVersion, revised.contentVersion, restored.contentVersion)
+        assertThat(advisor.getConversation(chat).changeProposal?.status).isEqualTo("REVERTED")
+        assertThat(advisor.getConversation(chat).messages.count { it.sender == ConversationSender.SYSTEM && it.text.contains("is teruggedraaid") }).isEqualTo(1)
+        assertThatThrownBy { advisor.revertChange(chat, advisor.getConversation(chat).version, restored.version, owner.id, "undo-again") }.isInstanceOf(VersionConflict::class.java)
     }
 
     @Test
@@ -666,6 +701,37 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
 
     private fun decision(epic: EpicDetails,user: UserId,role: ProductMembershipRole,decision: ReviewDecision=ReviewDecision.APPROVE,key: String=UUID.randomUUID().toString()) =
         ReviewEpicCommand(epic.id,epic.version,role,user,decision,"Beoordeling met onderbouwde reden",key)
+
+    @Test
+    fun `terugdraaien activeert oude goedkeuringen niet en kan uitgevoerd werk niet terugzetten`() {
+        val (po, arch) = setupGovernance()
+        val original = governedEpic(ImpactCategory.DATABASE)
+        governance.review(decision(original, po, ProductMembershipRole.PRODUCT_OWNER))
+        governance.review(decision(original, arch, ProductMembershipRole.ARCHITECT))
+        design.requestEpicRefinement(RequestEpicRefinementCommand(original.id, "Pas het voorstel aan", original.version, STAKEHOLDER, "proposal-revise"))
+        val pending = queries.getEpic(original.id)
+        design.runProcessSession(productId)
+        val draft = validEpic().apply {
+            put("outcome", "REVISE_EPIC"); put("epicId", pending.id.value); put("expectedVersion", pending.version)
+            (path("epic") as ObjectNode).apply { keepExistingUx(this, pending); set<JsonNode>("impact", mapper.valueToTree(original.impact)) }
+        }
+        completeOnlyJob(draft)
+        design.runProcessSession(productId)
+        val revised = queries.getEpic(original.id)
+        governance.review(decision(revised, po, ProductMembershipRole.PRODUCT_OWNER))
+        governance.review(decision(revised, arch, ProductMembershipRole.ARCHITECT))
+        design.restoreEpicContent(RestoreEpicContentCommand(original.id, original.contentVersion, revised.version, STAKEHOLDER, "restore-approved"))
+        val restored = queries.getEpic(original.id)
+        assertThat(restored.review!!.productOwnerApproved).isFalse()
+        assertThat(restored.review!!.architectApproved).isFalse()
+        assertThatThrownBy { design.claimEpicForPlanning(ClaimEpicForPlanningCommand(restored.id, restored.version, PROCESS, "claim-restored-too-early")) }.isInstanceOf(InvalidCommand::class.java)
+        governance.review(decision(restored, po, ProductMembershipRole.PRODUCT_OWNER))
+        governance.review(decision(restored, arch, ProductMembershipRole.ARCHITECT))
+        design.claimEpicForPlanning(ClaimEpicForPlanningCommand(restored.id, restored.version, PROCESS, "claim-restored"))
+        val claimed = queries.getEpic(original.id)
+        assertThatThrownBy { design.restoreEpicContent(RestoreEpicContentCommand(original.id, original.contentVersion, claimed.version, STAKEHOLDER, "restore-in-planning")) }.isInstanceOf(VersionConflict::class.java)
+        assertThat(queries.getEpic(original.id).version).isEqualTo(claimed.version)
+    }
 
     @Test
     fun `menselijke PO keurt compatibele impact goed zonder factory owner stap en status behoudt akkoord`() {

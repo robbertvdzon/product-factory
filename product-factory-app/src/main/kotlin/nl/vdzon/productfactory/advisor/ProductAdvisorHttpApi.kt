@@ -11,11 +11,12 @@ import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 
 data class CreateConversationRequest(val title: String, val idempotencyKey: String, val purpose: ConversationPurpose = ConversationPurpose.LEGACY)
-data class AddConversationMessageRequest(val text: String, val expectedVersion: Long, val idempotencyKey: String, val intent: ConversationIntent = ConversationIntent.DISCUSS, val expectedEpicVersion: Long? = null, val images: List<ConversationImageInput> = emptyList())
+data class AddConversationMessageRequest(val text: String, val expectedVersion: Long, val idempotencyKey: String, val intent: ConversationIntent = ConversationIntent.AUTO, val expectedEpicVersion: Long? = null, val images: List<ConversationImageInput> = emptyList())
 data class ConversationActionRequest(val expectedVersion: Long, val idempotencyKey: String)
 data class RequestApprovalRequest(val requestVersion: Long, val expectedVersion: Long, val idempotencyKey: String)
 data class EpicApprovalRequest(val expectedVersion: Long, val idempotencyKey: String)
 data class EpicRefinementRequest(val reason: String, val expectedVersion: Long, val idempotencyKey: String)
+data class RevertEpicChangeRequest(val expectedVersion: Long, val expectedEpicVersion: Long, val idempotencyKey: String)
 data class NotificationReadRequest(val expectedVersion: Long, val idempotencyKey: String)
 
 @RestController
@@ -68,6 +69,14 @@ class ProductAdvisorController(
         requireConversationRole(id, authentication)
         val messageId = service.addMessage(AddConversationMessageCommand(id, request.text, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey, request.intent, request.expectedEpicVersion, request.images, if(authorization.current(authentication)?.actingRole==ActingRole.ARCHITECT) ProductMembershipRole.ARCHITECT else ProductMembershipRole.PRODUCT_OWNER))
         return mapOf("id" to messageId.value)
+    }
+
+    @PostMapping("/api/conversations/{conversationId}/revert-epic-change")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun revertChange(@PathVariable conversationId: String, @RequestBody request: RevertEpicChangeRequest, authentication: Authentication?) {
+        val id = ProductConversationId(conversationId)
+        requireConversationRole(id, authentication)
+        service.revertChange(id, request.expectedVersion, request.expectedEpicVersion, authorization.currentUserId(authentication), request.idempotencyKey)
     }
 
     @PostMapping("/api/conversations/{conversationId}/close")

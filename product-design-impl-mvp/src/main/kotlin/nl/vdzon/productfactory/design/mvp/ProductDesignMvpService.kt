@@ -708,6 +708,28 @@ class ProductDesignMvpService(
     }
 
     @Transactional
+    override fun restoreEpicContent(command: RestoreEpicContentCommand) {
+        validateActor(command.actor)
+        val commandFingerprint = fingerprint(command)
+        replay(command.idempotencyKey, commandFingerprint)?.let { return }
+        jdbc.query("SELECT id FROM pf_epic WHERE id=? FOR UPDATE", { rs, _ -> rs.getString(1) }, command.epicId.value)
+        val current = getEpic(command.epicId)
+        val editable = setOf(EpicStatus.AWAITING_APPROVAL, EpicStatus.AWAITING_PRODUCT_OWNER_APPROVAL, EpicStatus.AWAITING_FACTORY_OWNER_APPROVAL, EpicStatus.AVAILABLE, EpicStatus.NEEDS_RESEARCH, EpicStatus.NEEDS_REFINEMENT)
+        if (current.version != command.expectedVersion || current.status !in editable) throw VersionConflict("Deze voorstelversie kan niet meer direct worden teruggedraaid. Bekijk de huidige voortgang.")
+        val previous = getEpicHistory(current.id).firstOrNull { it.contentVersion == command.contentVersion }
+            ?: throw InvalidCommand("De vorige inhoudsversie bestaat niet.")
+        if (previous.contentVersion >= current.contentVersion) throw InvalidCommand("Kies een eerdere inhoudsversie.")
+        val next = current.version + 1
+        val now = clock.instant()
+        val draft = previous.toDraft().copy(impact = previous.impact.copy(changeSummary = "Voorstel teruggedraaid: inhoud, schermen en architectuur hersteld uit versie ${previous.contentVersion}."))
+        val status = publicationStatus(current.productId, draft.status())
+        insertVersion(current.id, next, draft, status, sourceReferences(previous.id, previous.version), command.actor, now, supersedesVersion = current.version)
+        if (jdbc.update("UPDATE pf_epic SET current_version=?,status=?,refinement_reason=NULL,updated_at=? WHERE id=? AND current_version=?", next, status.aggregateStatus().name, now, current.id.value, current.version) != 1) throw VersionConflict("De epic is intussen gewijzigd.")
+        governance.recordAutomaticReviews(current.id)
+        recordCommand(command.idempotencyKey, commandFingerprint, current.id, next)
+    }
+
+    @Transactional
     override fun claimEpicForPlanning(command: ClaimEpicForPlanningCommand) = transition(
         command.epicId, command.expectedVersion, setOf(EpicStatus.AVAILABLE), EpicStatus.IN_PLANNING, command.actor, command.idempotencyKey,
     )

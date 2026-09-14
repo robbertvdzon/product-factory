@@ -103,8 +103,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   String tab = 'Uitwerking',
       viewport = 'DESKTOP',
       epicFilter = 'active',
-      questionFilter = 'OPEN',
-      intent = 'DISCUSS';
+      questionFilter = 'OPEN';
   int loadSequence = 0;
   String? draftProductId;
   bool get ownQuestions => widget.section == 'own-questions';
@@ -271,14 +270,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         environment = nextEnvironment;
         progress = nextProgress;
         epic = nextEpic;
-        if (nextEpic != null &&
-            (closed(nextEpic) ||
-                [
-                  'NEEDS_REFINEMENT',
-                  'NEEDS_RESEARCH',
-                ].contains(nextEpic['status']))) {
-          intent = 'DISCUSS';
-        }
         conversation = nextConversation;
         discussions = nextDiscussions;
         versions = nextVersions;
@@ -319,7 +310,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       discussions = [];
       creating = false;
       pendingImages = [];
-      intent = 'DISCUSS';
       message.clear();
     });
     await load();
@@ -402,9 +392,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       body: {
         'text': text,
         'expectedVersion': conversation!['version'],
-        'intent': epic == null ? 'DISCUSS' : intent,
-        if (epic != null && intent == 'UPDATE_EPIC')
-          'expectedEpicVersion': epic!['version'],
+        'intent': 'AUTO',
+        if (epic != null) 'expectedEpicVersion': epic!['version'],
         'images': pendingImages,
       },
     );
@@ -451,7 +440,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
 
   Future<void> review(String decision, {String? asRole}) async {
     if (decision == 'REQUEST_CHANGE') {
-      setState(() => intent = 'UPDATE_EPIC');
+      setState(() => message.text = 'Pas deze epic aan: ');
       return;
     }
     final reviewRole = asRole ?? actionRole;
@@ -490,7 +479,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     if (decision == 'REQUEST_RESEARCH' && error == null) {
       setState(() {
         tab = 'Impact';
-        intent = 'DISCUSS';
       });
       await send(
         preset:
@@ -943,6 +931,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   Widget chatPanel() {
     final c = conversation;
     final request = _map(c?['request']);
+    final proposal = _map(c?['changeProposal']);
     final messages = epic == null ? _maps(c?['messages']) : discussionMessages;
     return panel(
       epic != null
@@ -996,6 +985,41 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             ),
           ),
         ),
+        if (epic != null && proposal['status'] == 'WORKING')
+          notice(
+            'AI werkt aan een voorstel',
+            'De huidige inhoud blijft zichtbaar totdat de nieuwe versie klaar is.',
+          ),
+        if (epic != null &&
+            proposal['status'] == 'READY' &&
+            proposal['afterContentVersion'] == epic!['contentVersion']) ...[
+          notice(
+            'AI stelt versie ${proposal['afterContentVersion']} voor',
+            '${_text(proposal['summary']).isEmpty ? 'Bekijk de bijgewerkte inhoud en schermen.' : _text(proposal['summary'])} Je kunt via de chat verder bijstellen of vragen dit terug te draaien.',
+          ),
+          if (c?['status'] != 'PROCESSING' &&
+              [
+                'AWAITING_APPROVAL',
+                'AWAITING_PRODUCT_OWNER_APPROVAL',
+                'AWAITING_FACTORY_OWNER_APPROVAL',
+                'AVAILABLE',
+                'NEEDS_RESEARCH',
+                'NEEDS_REFINEMENT',
+              ].contains(epic!['status']))
+            button(
+              'Voorstel terugdraaien',
+              () => mutate(() async {
+                await api.request(
+                  '/api/conversations/${_text(c!['id'])}/revert-epic-change',
+                  method: 'POST',
+                  body: {
+                    'expectedVersion': c['version'],
+                    'expectedEpicVersion': epic!['version'],
+                  },
+                );
+              }),
+            ),
+        ],
         if (c?['status'] == 'PROCESSING')
           const ListTile(
             leading: CircularProgressIndicator(),
@@ -1023,36 +1047,14 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             c?['status'] != 'CLOSED' &&
             !(epic == null &&
                 ['APPROVED', 'ROUTING'].contains(request['status']))) ...[
-          if (epic != null)
-            Wrap(
-              spacing: 8,
-              children: [
-                ChoiceChip(
-                  label: const Text('Vraag stellen'),
-                  selected: intent == 'DISCUSS',
-                  onSelected: (_) => setState(() => intent = 'DISCUSS'),
-                ),
-                if (!closed(epic!) &&
-                    ![
-                      'NEEDS_REFINEMENT',
-                      'NEEDS_RESEARCH',
-                    ].contains(epic!['status']))
-                  ChoiceChip(
-                    label: const Text('Epic aanpassen'),
-                    selected: intent == 'UPDATE_EPIC',
-                    onSelected: (_) => setState(() => intent = 'UPDATE_EPIC'),
-                  ),
-              ],
-            ),
           const SizedBox(height: 12),
           TextField(
             controller: message,
             minLines: 3,
             maxLines: 8,
-            decoration: InputDecoration(
-              labelText: intent == 'UPDATE_EPIC'
-                  ? 'Wat moet AI aanpassen?'
-                  : 'Je bericht',
+            maxLength: epic == null ? 20000 : 8000,
+            decoration: const InputDecoration(
+              labelText: 'Stel een vraag of beschrijf je wens',
             ),
           ),
           const SizedBox(height: 12),
@@ -1060,11 +1062,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
-            child: button(
-              intent == 'UPDATE_EPIC' ? 'Laat AI aanpassen' : 'Verstuur',
-              () => send(),
-              primary: true,
-            ),
+            child: button('Verstuur', () => send(), primary: true),
           ),
         ],
         if (request.isNotEmpty && epic == null) ...[
@@ -1321,7 +1319,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                     child: button('Onderzoek met AI', () {
                       setState(() {
                         tab = 'Impact';
-                        intent = 'DISCUSS';
                       });
                       unawaited(
                         send(
@@ -1415,7 +1412,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       button(
         'Feedback op dit scherm',
         () => setState(() {
-          intent = 'UPDATE_EPIC';
           message.text =
               'Pas scherm ${selected['screenKey']} ($viewport), inhoudsversie ${epic!['contentVersion']}, aan: ';
         }),

@@ -172,6 +172,7 @@ void main() {
     'PO verwerkt een wijziging via het gedeelde epicgesprek met de actuele versie',
     (tester) async {
       final submittedFeedback = <String, Object?>{};
+      final submittedUndo = <String, Object?>{};
       final epic = <String, Object?>{
         'id': 'epic-1',
         'productId': 'hkh',
@@ -201,6 +202,13 @@ void main() {
       final conversation = {
         ...conversationSummary,
         'version': 7,
+        'changeProposal': {
+          'id': 'turn',
+          'status': 'READY',
+          'beforeContentVersion': 1,
+          'afterContentVersion': 2,
+          'summary': 'Mijn dossiers toegevoegd.',
+        },
         'messages': [
           {
             'sender': 'USER',
@@ -228,6 +236,13 @@ void main() {
       );
       final client = MockClient((request) async {
         final path = request.url.path;
+        if (request.method == 'POST' &&
+            path == '/api/conversations/conversation-1/revert-epic-change') {
+          submittedUndo.addAll(
+            (jsonDecode(request.body) as Map).cast<String, Object?>(),
+          );
+          return http.Response('', 204);
+        }
         if (request.method == 'POST' &&
             path == '/api/conversations/conversation-1/messages') {
           submittedFeedback.addAll(
@@ -299,24 +314,27 @@ void main() {
         find.text('Mijn dossiers ontbreekt in de ontwerpen.'),
         findsOneWidget,
       );
-      await tester.ensureVisible(find.text('Epic aanpassen'));
+      expect(find.text('Epic aanpassen'), findsNothing);
       expect(find.text('Architect'), findsOneWidget);
-      await tester.tap(find.text('Epic aanpassen'));
-      await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(TextField).last,
         'Voeg Mijn dossiers toe aan desktop en mobiel.',
       );
-      await tester.ensureVisible(find.text('Laat AI aanpassen'));
-      await tester.tap(find.text('Laat AI aanpassen'));
+      await tester.ensureVisible(find.text('Verstuur'));
+      await tester.tap(find.text('Verstuur'));
       await tester.pumpAndSettle();
       expect(submittedFeedback['expectedVersion'], 7);
       expect(submittedFeedback['expectedEpicVersion'], 2);
-      expect(submittedFeedback['intent'], 'UPDATE_EPIC');
+      expect(submittedFeedback['intent'], 'AUTO');
       expect(
         submittedFeedback['text'],
         'Voeg Mijn dossiers toe aan desktop en mobiel.',
       );
+      await tester.ensureVisible(find.text('Voorstel terugdraaien'));
+      await tester.tap(find.text('Voorstel terugdraaien'));
+      await tester.pumpAndSettle();
+      expect(submittedUndo['expectedVersion'], 7);
+      expect(submittedUndo['expectedEpicVersion'], 2);
       expect(find.text('Rustige homepage'), findsWidgets);
       expect(tester.takeException(), isNull);
     },

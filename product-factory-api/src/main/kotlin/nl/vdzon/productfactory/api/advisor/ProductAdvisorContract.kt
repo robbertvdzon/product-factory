@@ -15,7 +15,7 @@ enum class ProductMembershipRole { PRODUCT_OWNER, ARCHITECT }
 enum class MembershipStatus { ACTIVE, REVOKED }
 enum class ConversationStatus { OPEN, PROCESSING, WAITING_FOR_USER, PROPOSAL_READY, BLOCKED, CLOSED }
 enum class ConversationSender { USER, PRODUCT_ADVISOR, SYSTEM }
-enum class AdvisorOutcome { ANSWER, ASK_FOLLOW_UP, PROPOSE_CHANGE }
+enum class AdvisorOutcome { ANSWER, ASK_FOLLOW_UP, PROPOSE_CHANGE, PROPOSE_EPIC_UPDATE, REVERT_EPIC_UPDATE }
 enum class ProductRequestType { HOTFIX, BUGFIX, EPIC_CANDIDATE }
 enum class ProductRequestStatus { PROPOSED, APPROVED, ROUTING, ROUTED, ROUTING_FAILED, CANCELLED }
 enum class RequestDeliveryStatus { NOT_STARTED, OPEN, DONE, CANCELLED, FAILED }
@@ -80,6 +80,7 @@ data class ProductConversationDetails(
     val epicId: String? = null,
     val audienceRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER,
     val purpose: ConversationPurpose = ConversationPurpose.LEGACY,
+    val changeProposal: EpicChatProposal? = null,
 )
 data class ProductRequestVersionDetails(
     val version: Long,
