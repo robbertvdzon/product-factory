@@ -472,6 +472,22 @@ void main() {
           role == 'PRODUCT_OWNER' ? findsNothing : findsOneWidget,
         );
         expect(appText('Doelgroep: Bestaande doelgroep'), findsNothing);
+        expect(
+          appText('Automatische verwerking pauzeren'),
+          role == 'FACTORY_OWNER' ? findsOneWidget : findsNothing,
+        );
+        expect(appText('Nu starten'), findsNothing);
+        if (role == 'FACTORY_OWNER') {
+          await tester.ensureVisible(appText('Automatische verwerking pauzeren'));
+          await tester.tap(appText('Automatische verwerking pauzeren'));
+          await tester.pumpAndSettle();
+          expect(gateway.dispatchingEnabled, isTrue);
+          expect(gateway.dispatchingChanges, 1);
+          await tester.tap(appText('Automatische verwerking pauzeren'));
+          await tester.pumpAndSettle();
+          expect(gateway.dispatchingEnabled, isFalse);
+          expect(gateway.dispatchingChanges, 2);
+        }
         if (role == 'PRODUCT_OWNER') {
           await tester.ensureVisible(appText('Opdracht bewerken'));
           await tester.tap(appText('Opdracht bewerken'));
@@ -746,11 +762,11 @@ void main() {
     expect(appText('Bronnen verbinden'), findsOneWidget);
     expect(appTextContaining('1 story · Onderzoek nodig'), findsOneWidget);
 
-    expect(appText('Dispatching aanzetten en versturen'), findsOneWidget);
-    await tester.tap(appText('Dispatching aanzetten en versturen'));
+    expect(appText('Automatische verwerking hervatten'), findsOneWidget);
+    await tester.tap(appText('Automatische verwerking hervatten'));
     await tester.pumpAndSettle();
-    expect(appText('Dispatching staat uit'), findsOneWidget);
-    await tester.tap(appText('Aanzetten en versturen'));
+    expect(appText('Automatische verwerking is gepauzeerd'), findsOneWidget);
+    await tester.tap(appText('Hervatten'));
     await tester.pumpAndSettle();
     expect(gateway.dispatchingChanges, 1);
     expect(gateway.dispatchRuns, 1);

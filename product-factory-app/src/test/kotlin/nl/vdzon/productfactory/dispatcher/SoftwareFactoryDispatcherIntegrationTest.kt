@@ -74,6 +74,28 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `automatische polls bewaren alleen gewijzigde externe toestand`() {
+        dispatcher.checkAutomatically(productId)
+        val first = queries.findDeliveryAttempts(DeliveryAttemptFilter(productId)).single()
+        repeat(100) { dispatcher.checkAutomatically(productId) }
+        assertThat(queries.findDispatchSessions(ProcessSessionFilter(productId))).hasSize(1)
+        assertThat(queries.findDeliveryAttempts(DeliveryAttemptFilter(productId)).single().updatedAt).isEqualTo(first.updatedAt)
+        assertThat(mock.find(productId.value,"OPEN")).hasSize(1)
+    }
+
+    @Test
+    fun `automatische dispatcher wacht op projectpauze en goedkeuring`() {
+        productCommands.setProductDispatching(SetProductDispatchingCommand(productId,false,2,STAKEHOLDER,"pause-${productId.value}"))
+        dispatcher.checkAutomatically(productId)
+        assertThat(queries.findDispatchSessions(ProcessSessionFilter(productId))).isEmpty()
+        productCommands.setProductDispatching(SetProductDispatchingCommand(productId,true,3,STAKEHOLDER,"resume-${productId.value}"))
+        jdbc.update("UPDATE pf_epic_version SET status='AWAITING_APPROVAL',impact_json=? WHERE epic_id IN (SELECT id FROM pf_epic WHERE product_id=?)", """{"items":[{"category":"FRONTEND","level":"MATERIAL","summary":"Beoordeling nodig","evidence":[]}]}""", productId.value)
+        dispatcher.checkAutomatically(productId)
+        assertThat(queries.findDeliveryAttempts(DeliveryAttemptFilter(productId))).isEmpty()
+        assertThat(queries.findDispatchSessions(ProcessSessionFilter(productId))).isEmpty()
+    }
+
+    @Test
     fun `versturen en herhalen maken een externe story en reserveren alleen de eerste story`() {
         dispatcher.runDispatchSession(productId)
         dispatcher.runDispatchSession(productId)

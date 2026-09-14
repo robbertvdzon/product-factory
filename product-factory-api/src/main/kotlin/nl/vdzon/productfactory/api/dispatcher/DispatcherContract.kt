@@ -37,7 +37,10 @@ data class DeliveryAttemptDetails(
     val createdAt: Instant,
     val updatedAt: Instant,
 )
-interface SoftwareFactoryDispatcherService { fun runDispatchSession(productId: ProductId) }
+interface SoftwareFactoryDispatcherService {
+    fun runDispatchSession(productId: ProductId)
+    fun checkAutomatically(productId: ProductId) { runDispatchSession(productId) }
+}
 interface SoftwareFactoryDispatcherQueryService {
     fun getDispatchStatus(productId: ProductId): DispatcherProductStatusDetails
     fun findDeliveryAttempts(filter: DeliveryAttemptFilter): List<DeliveryAttemptDetails>

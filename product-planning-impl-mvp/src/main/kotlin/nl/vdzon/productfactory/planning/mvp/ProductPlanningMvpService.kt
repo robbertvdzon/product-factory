@@ -559,17 +559,23 @@ class ProductPlanningMvpService(
         it.status == StakeholderQuestionStatus.OPEN && (it.storyLinkId==story.id || it.linkedObjects.any { ref -> ref.type=="STORY" && ref.id==story.id.value })
     }
 
-    @Transactional
-    override fun reserveNextStoryForDispatch(command: ReserveNextStoryForDispatchCommand): StoryDispatchReservationDetails? {
-        validateProcessActor(command.actor)
-        commandResult(command.idempotencyKey, fingerprint(command))?.let { return reservation(it) }
-        if ((jdbc.queryForObject("SELECT COUNT(*) FROM pf_story WHERE product_id=? AND status='IN_PROGRESS'", Long::class.java, command.productId.value) ?: 0) > 0) return null
-        val story = getBacklog(command.productId).firstOrNull { candidate ->
+    override fun hasDispatchableStory(productId: ProductId): Boolean = nextDispatchableStory(productId) != null
+
+    private fun nextDispatchableStory(productId: ProductId): StoryDetails? {
+        if ((jdbc.queryForObject("SELECT COUNT(*) FROM pf_story WHERE product_id=? AND status='IN_PROGRESS'", Long::class.java, productId.value) ?: 0) > 0) return null
+        return getBacklog(productId).firstOrNull { candidate ->
             candidate.status == StoryStatus.TODO && markerCount(candidate.epicId) == 0L &&
                 governance.canDispatch(candidate.epicId, candidate.epicVersion) && !hasOpenQuestion(candidate) &&
                 candidate.dependencies.all { dependency -> getStory(dependency).status == StoryStatus.DONE } &&
                 (candidate.type != StoryType.BUGFIX || bugLinkConfirmed(candidate.id))
-        } ?: return null
+        }
+    }
+
+    @Transactional
+    override fun reserveNextStoryForDispatch(command: ReserveNextStoryForDispatchCommand): StoryDispatchReservationDetails? {
+        validateProcessActor(command.actor)
+        commandResult(command.idempotencyKey, fingerprint(command))?.let { return reservation(it) }
+        val story = nextDispatchableStory(command.productId) ?: return null
         val now = clock.instant()
         val id = UUID.randomUUID().toString()
         try {

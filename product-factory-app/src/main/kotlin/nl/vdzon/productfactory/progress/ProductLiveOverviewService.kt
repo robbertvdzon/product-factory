@@ -30,6 +30,10 @@ data class ProcessLiveStatus(
     val lastMeaningfulSession: ProcessSessionDetails?,
     val last24h: ProcessSessionCounts,
     val hourly: List<HourlySessionBucket>,
+    val intervalSeconds: Int = 10,
+    val lastCheckedAt: Instant? = null,
+    val retryAfter: Instant? = null,
+    val errorCode: String? = null,
 )
 
 data class ProcessSessionCounts(val total: Int, val noOps: Int, val failed: Int, val meaningful: Int)
@@ -44,19 +48,25 @@ class ProductLiveOverviewService(
     private val quality: QualityQueryService,
     private val dispatcher: SoftwareFactoryDispatcherQueryService,
     private val clock: Clock,
+    private val jdbc: org.springframework.jdbc.core.JdbcTemplate,
 ) {
     fun overview(productId: ProductId): ProductLiveOverview {
         val now = clock.instant()
-        val schedules = products.getProcessSchedules(productId).associateBy { it.process }
+        val product = products.getProduct(productId)
+        val enabled = product.status == nl.vdzon.productfactory.api.product.ProductStatus.ACTIVE && product.dispatchingEnabled
+        val checkedAt = jdbc.query("SELECT checked_at FROM pf_automation_state WHERE product_id=?", { rs, _ -> rs.getTimestamp(1)?.toInstant() }, productId.value).singleOrNull()
         val processes = PROCESS_ORDER.map { process ->
             val find = sessionFinder(process)
-            val schedule = schedules[process]
+            val automation = jdbc.query("SELECT retry_after,error_code FROM pf_automation_process WHERE product_id=? AND process=?", { rs, _ -> rs.getTimestamp(1)?.toInstant() to rs.getString(2) }, productId.value, process.name).singleOrNull()
             val recent = find(ProcessSessionFilter(productId, timeRange = TimeRange(from = now.minus(Duration.ofHours(24)))))
             ProcessLiveStatus(
                 process = process,
-                enabled = schedule?.enabled ?: false,
-                intervalMinutes = schedule?.pattern?.intervalMinutes,
-                nextRunAt = schedule?.nextRunAt,
+                enabled = enabled,
+                intervalMinutes = null,
+                nextRunAt = if (enabled) checkedAt?.plusSeconds(10) else null,
+                lastCheckedAt = checkedAt,
+                retryAfter = automation?.first,
+                errorCode = automation?.second,
                 running = find(ProcessSessionFilter(productId, ACTIVE_STATUSES, limit = 1)).firstOrNull(),
                 lastSession = find(ProcessSessionFilter(productId, limit = 1)).firstOrNull(),
                 lastMeaningfulSession = find(ProcessSessionFilter(productId, limit = 1, excludeNoOps = true)).firstOrNull(),

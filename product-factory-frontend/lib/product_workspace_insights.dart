@@ -612,7 +612,10 @@ class _RunTicks extends StatelessWidget {
 }
 
 String _scheduleRhythm(Map<String, Object?> process) {
-  if (process['enabled'] != true) return 'Schema uit';
+  if (process['enabled'] != true) return 'Gepauzeerd';
+  if (process['intervalSeconds'] != null) {
+    return 'Elke ${process['intervalSeconds']} sec';
+  }
   final interval = (process['intervalMinutes'] as num?)?.toInt();
   return interval == null ? 'Weekschema' : 'Elke $interval min';
 }
@@ -669,13 +672,14 @@ class _AutomationStrip extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Expanded(
-                          child: Text(
-                            _processLabel(_value(process['process'])),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
+                        Text(
+                          _processLabel(_value(process['process'])),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         _ToneChip(
                           _scheduleRhythm(process),

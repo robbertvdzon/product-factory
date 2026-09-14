@@ -97,7 +97,7 @@ class ProductAuthorizationInterceptor(
             path.startsWith("/api/foundation/schedules")) return true
         if (method == "POST" && path == "/api/products") return true
         if (method == "DELETE" && Regex("^/api/products/[^/]+$").matches(path)) return true
-        if (method != "GET" && Regex("^/api/products/[^/]+/(status|dispatching|epic-approval-mode|schedules)(/.*)?$").matches(path)) return true
+        if (method != "GET" && Regex("^/api/products/[^/]+/(status|dispatching|automation|epic-approval-mode|schedules)(/.*)?$").matches(path)) return true
         if (method != "GET" && (path.contains("/sessions/run") || path.contains("agent-environment-keys"))) return true
         if (method != "GET" && (path.startsWith("/api/planning/") || path.startsWith("/api/quality/") ||
                 path.startsWith("/api/dispatcher/") || Regex("^/api/stories/[^/]+/(developed|cancelled)$").matches(path) ||

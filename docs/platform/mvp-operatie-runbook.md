@@ -52,18 +52,25 @@ retry. Na herstel zoekt de dispatcher eerst op storyKey voordat hij opnieuw cre�
 verloren create-response moet daardoor dezelfde externe story worden gevonden. `DONE` en
 `CANCELLED` worden feitelijk verwerkt; een annuleringsmarker gaat altijd vóór nieuwe reservering.
 
-## Scheduler en gemiste starts
+## Automatische verwerking
 
-Productie pollt alleen schedules die de Stakeholder per product heeft geactiveerd. Na downtime
-claimt iedere schedule maximaal één gemist tijdstip en berekent direct het eerste toekomstige
-tijdstip. Controleer recente automatische starts op status `SUCCEEDED`, `SKIPPED` of `FAILED`.
-Een gewijzigde regel geldt pas voor toekomstige starts. Een uitgeschakelde schedule verhindert
-geen handmatige **Nu starten**-actie.
+Productie controleert ieder actief product iedere tien seconden. In Productinstellingen kan de
+factory owner het hele product pauzeren; er zijn geen schema's of afzonderlijke dispatcherschakelaars.
+Lopende AI-taken en extern werk mogen afronden. Na hervatten wordt aanwezig werk opnieuw gecontroleerd.
+Lege controles schrijven geen sessiehistorie en starten geen AI. Het laatste controlemoment staat
+in `pf_automation_state`; `pf_automation_process` bewaart maximaal vier actuele processtatussen
+per product. Technische fouten gebruiken oplopende wachttijden tot tien minuten en worden zichtbaar
+in de instellingen. Een inhoudelijke blokkade wacht op gewijzigde input.
+
+De databaselease voorkomt dubbele automatische controles en verloopt na vijf minuten bij een
+uitgevallen worker. Goedkeuringen, afhankelijkheden en bestaande dispatch-idempotentie blijven
+verplicht. Migratie V37 activeert de nieuwe verwerking voor bestaande producten; inactieve producten
+worden overgeslagen. De oude schedules blijven alleen voor historische compatibiliteit bewaard.
 
 ## Applicatieherstart en correlatie
 
 Processessies, AI-outbox, planningeffecten, kwaliteitsworkitems, dispatchattempts en schedulerruns
-zijn duurzaam. Laat na een herstart eerst de normale reconcilers en schedules lopen. Zoek een fout
+zijn duurzaam. Laat na een herstart eerst de normale reconcilers en automatische controles lopen. Zoek een fout
 met de veilige correlatie-ID en de operationele IDs; log nooit tokens, environmentkeywaarden of
 volledige prompts/resultaten. Escaleer pas na controle dat dezelfde duurzame rij niet meer via de
 publieke hervatfunctie vooruit kan.
@@ -71,6 +78,5 @@ publieke hervatfunctie vooruit kan.
 ## Omgevingsgrenzen
 
 Acceptatie gebruikt server-side Runtimefixtures, de stateful MockSoftwareFactory, uitgeschakelde
-automatische schedules en Test Control. Productie gebruikt de echte Runtime en Software Factory,
-weigert Test Control en `MOCKED`, vereist Google-authenticatie en voert uitsluitend bewust per
-product geactiveerde schedules uit.
+automatische verwerking en Test Control. Productie gebruikt de echte Runtime en Software Factory,
+weigert Test Control en `MOCKED`, vereist Google-authenticatie en controleert alle actieve, niet-gepauzeerde producten iedere tien seconden.

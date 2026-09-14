@@ -97,6 +97,7 @@ interface ProductPlanningService {
 }
 
 interface ProductPlanningQueryService {
+    fun hasDispatchableStory(productId: ProductId): Boolean = getBacklog(productId).any { it.status == StoryStatus.TODO }
     fun getStory(storyId: StoryId): StoryDetails
     fun getBacklog(productId: ProductId): List<StoryDetails>
     fun findStories(filter: StoryFilter): List<StoryDetails>

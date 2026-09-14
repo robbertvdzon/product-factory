@@ -71,9 +71,9 @@ geen algemene setter en kunnen de state machine niet omzeilen.
 
 `Product` bevat minimaal een stabiel product-ID, naam, status `ACTIVE` of `INACTIVE`,
 `dispatchingEnabled`, aanmaakmoment en actuele versie. `findProducts()` maakt dit per product
-uitleesbaar. De dispatcher-scheduler kiest geen producten op basis van een losse productquery, maar
-claimt vervallen `SOFTWARE_FACTORY_DISPATCHER`-schema's. De dispatchersessie valideert daarna
-nogmaals dat exact dat ene product actief is en dispatching aanstaat.
+uitleesbaar. Automatische verwerking controleert ieder actief, niet-gepauzeerd product iedere tien seconden.
+Het bestaande veld `dispatchingEnabled` is voortaan de enige productbrede aan/uit-vlag; er is geen
+losse dispatcherinstelling. De dispatcher valideert de vlag opnieuw voordat hij werk verstuurt.
 
 `ProductAssignment` bevat minimaal doelgroep, productdoel en de publieke Git-URL.
 `TestableProductConfiguration` bevat de acceptatieomgeving en eventueel veilige
@@ -94,59 +94,31 @@ Een proces leest steeds een exacte versie en legt die bronversie op zijn process
 product-ID exact in de requestbody wordt bevestigd. De transactie verwijdert alle productgebonden
 Product Factory-data. Eventueel eerder verstuurd werk in Software Factory valt buiten die transactie.
 
-## Procesconfiguratie en schedules
+## Automatische verwerking
 
-De Stakeholder beheert per product een afzonderlijk schedule voor:
+Ieder actief product wordt standaard iedere tien seconden gecontroleerd voor Productontwerp,
+Productplanning, Kwaliteitsbewaking en de Software Factory-dispatcher. Een factory owner kan met
+`PATCH /api/products/{productId}/automation` en `{paused, expectedVersion, idempotencyKey}` de
+verwerking voor het hele product pauzeren of hervatten. Lopende AI-taken en extern werk mogen
+afronden. Ook de directe trigger na epicgoedkeuring wacht tijdens een projectpauze.
 
-- `PRODUCT_DESIGN` — roept `runProcessSession(productId)` op Productontwerp aan;
-- `PRODUCT_PLANNING` — roept `runProcessSession(productId)` op Productplanning aan;
-- `QUALITY_ASSURANCE` — roept `runProcessSession(productId)` op Kwaliteitsbewaking aan;
-- `SOFTWARE_FACTORY_DISPATCHER` — roept `runDispatchSession(productId)` aan.
+De controle start alleen de bestaande publieke procesfuncties als er nieuw, uitvoerbaar werk is.
+Bij een menselijke PO vereist ontwerp expliciete input; een AI-PO kan ook reageren op gewijzigde
+productdoelen en afgeronde stories. Goedkeuringen, afhankelijkheden en maximaal één externe story
+per product blijven gelden. De dispatcher gebruikt geen AI.
 
-Een productschema is periodiek inhaalwerk. Een epic waarvan alle vereiste beoordelingen geldig zijn,
-plaatst daarnaast meteen een duurzame plannertrigger. Daardoor start Productplanning ook wanneer het
-productschema uitstaat.
+Lege controles en ongewijzigd extern werk maken geen processessie of schedulerrun. Eén vaste
+controlerij en maximaal vier processtatusrijen per product bewaren het controlemoment, de laatst
+verwerkte input en eventuele fout. Een databaselease voorkomt gelijktijdige automatische controles
+voor hetzelfde product. Na herstart verloopt een achtergebleven lease binnen vijf minuten.
+Technische fouten krijgen oplopende wachttijd (20 seconden tot tien minuten); een inhoudelijke
+blokkade vereist nieuwe input. Identieke fouten worden niet iedere controle gelogd.
 
-`ProcessScheduleConfiguration` bevat minimaal product-ID, proces, `enabled`, IANA-tijdzone,
-schedulepatroon, berekende `nextRunAt`, wijzigingsmoment en versie. Het patroon is precies één van:
-
-- een niet-lege lijst `WeeklyScheduleRule`s. Iedere regel bevat één of meer weekdagen en één of meer
-  geldige lokale tijden. Eén regel kan bijvoorbeeld iedere dag om 07:00 en 20:00 betekenen; twee
-  andere regels kunnen maandag om 09:00 en vrijdag om 21:00 betekenen;
-- één vast interval in hele minuten, bijvoorbeeld ieder uur voor de dispatcher.
-
-Dag/tijdregels en een interval worden niet binnen dezelfde configuratie gemengd. Gelijke
-dag/tijdcombinaties worden bij validatie ontdubbeld. Een lokale tijd moet bestaan en tussen `00:00`
-en `23:59` liggen. `nextRunAt` is steeds het vroegste toekomstige tijdstip uit alle regels, berekend
-door de backend.
-
-De normale UI toont menselijke regels met dagen en tijden en geen cronexpressie. De tijdzone is
-expliciet en standaard `Europe/Amsterdam`, zodat zomer- en wintertijd volgens die zone worden
-berekend.
-`updateProcessSchedule(...)` wijzigt alleen toekomstige starts, annuleert geen lopende sessie en
-verandert niets aan handmatige bediening.
-
-`createProduct(...)` maakt voor de vier processen een uitgeschakelde configuratie zonder
-`nextRunAt`. De eerste keer inschakelen vereist een geldig patroon. Uitschakelen bewaart het patroon
-voor later maar maakt `nextRunAt` leeg; opnieuw inschakelen berekent vanaf dat moment uitsluitend
-een toekomstig tijdstip. Zo start een nieuw product nooit onverwacht automatisch.
-
-De technische scheduler pollt vervallen `nextRunAt`s, claimt iedere combinatie van schedule-ID en
-gepland tijdstip hooguit eenmaal en roept alleen de gewone publieke runfunctie aan. Na downtime
-wordt een gemist schema hooguit eenmaal ingehaald; eerdere gemiste tijdstippen worden niet allemaal
-nagespeeld. Daarna wordt direct het eerstvolgende toekomstige tijdstip berekend. Voor een `INACTIVE`
-product wordt geen proces gestart. De dispatcher controleert daarnaast zoals altijd
-`dispatchingEnabled`.
-
-De scheduleradapter en het atomische zoeken en claimen van vervallen schema's horen intern bij de
-productimplementatie. Andere modules krijgen daarvoor geen repositorytoegang en ook geen algemene
-publieke setter. Na een geldige claim kent de adapter alleen product-ID, proces en gepland tijdstip
-en roept hij de publieke run-API van dat proces aan.
-
-Een botsing met een al uitvoerende call volgt de bestaande regel: de scheduler registreert de
-geplande start als overgeslagen en forceert geen tweede uitvoering. Een niet-actief wachtende
-logische sessie, bijvoorbeeld `WAITING_FOR_AI`, wordt door de geplande call juist veilig hervat.
-Een uitgeschakeld schedule verhindert alleen automatische starts; **Nu starten** blijft beschikbaar.
+De UI toont één projectpauze, de laatste controle en betekenisvolle voortgang of fout. Oude
+scheduleconfiguraties en historie blijven leesbaar voor compatibiliteit; de oude scheduler is niet
+meer actief. `PUT /api/products/{productId}/schedules/{process}` retourneert HTTP 410. Er zijn geen
+instelbare intervallen of schakelaars per proces meer. `PF_SCHEDULES_ENABLED` blijft uitsluitend
+een technische omgevingsgrens: productie aan, acceptatie met gecontroleerde fixtures uit.
 
 ## UserSignal
 
@@ -219,9 +191,8 @@ transcript wijzigt nooit stilzwijgend overige productdata.
   vertrouwd vastgelegde vragende rol.
 - Algemene AI-instellingen horen bij AI-uitvoering en niet bij deze module.
 - De frontend gebruikt exact dezelfde commands en queries als andere aanroepers.
-- Per product en `ScheduledProcess` bestaat precies één geversioneerde scheduleconfiguratie.
-- Een schedule start uitsluitend de bestaande publieke runfunctie en bevat geen product- of
-  agentlogica.
+- Per actief product geldt één pauzestand en een vaste controle iedere tien seconden.
+- Automatische verwerking start uitsluitend bestaande publieke procesfuncties; goedkeuringsregels blijven van kracht.
 - Overlegagents schrijven nooit rechtstreeks in een andere module; de notulenagent gebruikt voor
   productbrede rolgeheugenwijzigingen uitsluitend de speciale gevalideerde Agentgeheugen-batch.
 

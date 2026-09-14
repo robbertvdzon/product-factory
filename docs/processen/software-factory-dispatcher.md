@@ -4,7 +4,7 @@ Status: geïmplementeerd in stap 8. Het externe Software Factory-v2-contract en 
 Factory-dispatcher zijn actief; acceptatie gebruikt dezelfde contractvorm via de stateful mock.
 
 De Software Factory-dispatcher stuurt steeds de eerste uitvoerbare story naar Software Factory en
-verwerkt externe opleverstatussen. Hij is een apart uitvoerend onderdeel met een eigen schedule en
+verwerkt externe opleverstatussen. Hij is een apart uitvoerend onderdeel binnen de vaste automatische productcontrole en
 een eigen implementatiemodule. Zijn implementatie gebruikt uitsluitend de benodigde publieke
 capabilitypackages in `product-factory-api`; zij kent geen planningsimplementatie. Hij is
 geen intelligente procesmodule, gebruikt geen AI-agents en bezit geen productlogica.
@@ -61,13 +61,14 @@ List<ProcessSessionDetails> findDispatchSessions(ProcessSessionFilter filter);
 Een sessie start nooit agents. Per product kan maximaal één uitvoering tegelijk lopen; sessies voor
 verschillende producten mogen parallel draaien. Een botsende handmatige UI- of REST-aanroep voor
 hetzelfde product krijgt `ProcessAlreadyRunning`, bij REST bijvoorbeeld HTTP 409. Een botsende
-schedulerrun voor dat product wordt als overgeslagen geregistreerd. Atomische selectie en
+automatische controle voor dat product wordt zonder extra historieregel overgeslagen. Atomische selectie en
 idempotentie voorkomen altijd twee nieuwe externe stories voor hetzelfde product.
 
 De queries zijn read-only en ondersteunen de gewone operationele en frontendweergave. De
 productstatus toont onder meer open extern werk, eventuele technische blokkade en laatste poging.
-De sessiehistorie toont per product ook no-opruns, overgeslagen schedulerbotsingen, verzendingen,
-statussynchronisaties en de uiteindelijke uitkomst; nieuwste sessies staan eerst.
+De sessiehistorie toont verzendingen, statussynchronisaties en fouten; nieuwste sessies staan eerst.
+Automatische controles zonder uitvoerbaar werk of met ongewijzigd extern werk maken geen sessie.
+Oude no-opruns en expliciet handmatige runs blijven volgens de normale retentie zichtbaar.
 
 ## Extern HTTP-contract
 

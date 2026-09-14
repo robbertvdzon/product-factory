@@ -45,6 +45,32 @@ class SoftwareFactoryDispatcherMvpService(
     private val transactions = TransactionTemplate(transactionManager)
     private val adaptersByMode = adapters.associateBy { it.mode }
 
+    /** Read-only polling avoids a new process session while the factory is still busy. */
+    override fun checkAutomatically(productId: ProductId) {
+        val product = products.getProduct(productId)
+        if (product.status != ProductStatus.ACTIVE || !product.dispatchingEnabled) return
+        val attempts = attemptRows("WHERE product_id=? AND status NOT IN ('COMPLETED','CANCELLED')", productId.value)
+        if (attempts.isEmpty() && !planningQueries.hasDispatchableStory(productId)) return
+        if (attempts.any { it.retryAfter?.isAfter(clock.instant()) == true }) return
+        val adapter = selectedAdapter()
+        if (attempts.isEmpty() && adapter.find(productId.value, "OPEN").isNotEmpty()) return
+        if (attempts.size == 1) {
+            val attempt = attempts.single()
+            val cancellation = jdbc.queryForObject("SELECT refinement_cancel_requested AND NOT refinement_cancel_sent FROM pf_story WHERE id=?", Boolean::class.java, attempt.storyId.value) == true
+            if (!cancellation && attempt.status == DeliveryAttemptStatus.ACCEPTED && attempt.externalStoryId != null) {
+                val work = adapter.get(attempt.externalStoryId)
+                    ?: throw ContractFactoryFailure("EXTERNAL_STORY_MISSING", "Een gekoppelde externe story ontbreekt onverwacht.")
+                validateWork(attempt, work)
+                if (work.status == "OPEN" && planningQueries.getStory(attempt.storyId).status == StoryStatus.IN_PROGRESS && attempt.localCommandStatus == LocalCommandStatus.APPLIED) return
+            }
+        }
+        runDispatchSession(productId)
+        val last = findDispatchSessions(ProcessSessionFilter(productId, limit = 1)).firstOrNull()
+        if (last?.status == ProcessSessionStatus.BLOCKED || last?.status == ProcessSessionStatus.FAILED) {
+            throw ContractFactoryFailure(last.errorCode ?: "DISPATCH_FAILED", "Automatisch versturen wacht op herstel.")
+        }
+    }
+
     override fun runDispatchSession(productId: ProductId) {
         val sessionId = transactions.execute { startSession(productId) } ?: error("Dispatchersessie kon niet worden gestart.")
         try {
@@ -63,7 +89,7 @@ class SoftwareFactoryDispatcherMvpService(
     private fun dispatch(sessionId: ProcessSessionId, productId: ProductId): String {
         val product = products.getProduct(productId)
         if (product.status != ProductStatus.ACTIVE) return "Product is inactief; succesvolle no-op."
-        if (!product.dispatchingEnabled) return "Dispatching staat uit; succesvolle no-op."
+        if (!product.dispatchingEnabled) return "Automatische verwerking is gepauzeerd; succesvolle no-op."
         val adapter = selectedAdapter()
         val connection = adapter.status()
         if (!connection.connected || connection.apiVersion != "2") {

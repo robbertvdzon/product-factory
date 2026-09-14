@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import org.springframework.test.web.servlet.patch
 import java.time.Instant
 
 @SpringBootTest(
@@ -413,6 +414,11 @@ class AuthenticationFlowTest(
         mockMvc.get("/api/admin/users") { cookie(session) }.andExpect { status { isForbidden() } }
         mockMvc.get("/api/ai/tasks") { cookie(session) }.andExpect { status { isForbidden() } }
         val token=objectMapper.readTree(response.contentAsByteArray).path("csrfToken").asText()
+        mockMvc.patch("/api/products/$id/automation") {
+            header(HttpHeaders.ORIGIN, FRONTEND_ORIGIN); header(ProductFactorySessionService.CSRF_HEADER, token)
+            cookie(session, cookie(response, ProductFactorySessionService.CSRF_COOKIE)); contentType=MediaType.APPLICATION_JSON
+            content="""{"paused":true,"expectedVersion":1,"idempotencyKey":"pause-$id"}"""
+        }.andExpect { status { isForbidden() } }
         mockMvc.post("/api/products/$id/conversations") {
             header(HttpHeaders.ORIGIN,FRONTEND_ORIGIN);header(ProductFactorySessionService.CSRF_HEADER,token)
             cookie(session,cookie(response,ProductFactorySessionService.CSRF_COOKIE));contentType=MediaType.APPLICATION_JSON

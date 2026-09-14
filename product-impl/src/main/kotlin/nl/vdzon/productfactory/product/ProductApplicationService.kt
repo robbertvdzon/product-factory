@@ -45,7 +45,7 @@ class ProductApplicationService(
         jdbc.update(
             """INSERT INTO pf_product(product_id,name,status,dispatching_enabled,created_at,updated_at,updated_by_type,updated_by_id,version)
                VALUES (?,?,?,?,?,?,?,?,?)""",
-            productId.value, name, command.status.name, false, now, now, command.actor.type.name, command.actor.id, 1L,
+            productId.value, name, command.status.name, true, now, now, command.actor.type.name, command.actor.id, 1L,
         )
         ScheduledProcess.entries.forEach { process ->
             jdbc.update(

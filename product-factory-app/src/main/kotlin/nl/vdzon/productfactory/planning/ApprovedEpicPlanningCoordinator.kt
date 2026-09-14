@@ -28,7 +28,7 @@ class ApprovedEpicPlanningCoordinator(
         val now = clock.instant()
         val products = jdbc.query(
             """SELECT DISTINCT product_id FROM pf_approved_epic_planning_trigger
-                WHERE status='PENDING' AND next_attempt_at<=? ORDER BY product_id LIMIT 20""".trimIndent(),
+                WHERE status='PENDING' AND next_attempt_at<=? AND product_id IN (SELECT product_id FROM pf_product WHERE status='ACTIVE' AND dispatching_enabled=TRUE) ORDER BY product_id LIMIT 20""".trimIndent(),
             { rs, _ -> ProductId(rs.getString(1)) }, now,
         )
         products.forEach { productId ->

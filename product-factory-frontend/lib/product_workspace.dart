@@ -737,8 +737,8 @@ class HttpProductGateway implements ProductGateway {
       });
   @override
   Future<void> setDispatching(ProductSummary product, bool enabled) =>
-      _send('PATCH', '/api/products/${product.id}/dispatching', {
-        'enabled': enabled,
+      _send('PATCH', '/api/products/${product.id}/automation', {
+        'paused': !enabled,
         'expectedVersion': product.version,
         'idempotencyKey': _key('dispatch'),
       });
@@ -2696,13 +2696,6 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             ),
           ),
           FilterChip(
-            label: const Text('Dispatching'),
-            selected: data.product.dispatchingEnabled,
-            onSelected: (value) => _mutate(
-              () => widget.gateway.setDispatching(data.product, value),
-            ),
-          ),
-          FilterChip(
             label: const Text('Epics handmatig goedkeuren'),
             selected: data.product.epicApprovalMode == 'MANUAL',
             onSelected: (value) => _mutate(
@@ -2711,10 +2704,6 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 value ? 'MANUAL' : 'AUTOMATIC',
               ),
             ),
-          ),
-          const Chip(
-            avatar: Icon(Icons.auto_awesome_outlined),
-            label: Text('Ontwerp, planning en kwaliteit actief'),
           ),
           OutlinedButton.icon(
             onPressed: () => _deleteProduct(data),
@@ -3040,7 +3029,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           label: Text(
             data.product.dispatchingEnabled
                 ? 'Nu versturen of bijwerken'
-                : 'Dispatching aanzetten en versturen',
+                : 'Automatische verwerking hervatten',
           ),
         ),
       ],
@@ -3339,9 +3328,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       final enable = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const SelectableText('Dispatching staat uit'),
+          title: const SelectableText('Automatische verwerking is gepauzeerd'),
           content: const SelectableText(
-            'Wil je dispatching voor dit product aanzetten en de eerste uitvoerbare story nu naar Software Factory versturen?',
+            'Wil je de automatische verwerking voor dit project hervatten? Werk met de vereiste goedkeuringen wordt dan weer opgepakt.',
           ),
           actions: [
             TextButton(
@@ -3351,7 +3340,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             FilledButton.icon(
               onPressed: () => Navigator.pop(context, true),
               icon: const Icon(Icons.send_outlined),
-              label: const Text('Aanzetten en versturen'),
+              label: const Text('Hervatten'),
             ),
           ],
         ),
@@ -4552,82 +4541,41 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
   );
   Widget _schedules(
     ProductWorkspaceData data,
-  ) => _section('Instellingen · Automatisering', Icons.schedule_outlined, [
-    const SelectableText(
-      'Ieder proces heeft een eigen controleritme. Een definitief goedgekeurde epic start planning direct, ook als het planningsschema uitstaat.',
+  ) => _section('Automatische verwerking', Icons.sync, [
+    SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Automatische verwerking pauzeren'),
+      value: !data.product.dispatchingEnabled,
+      onChanged: widget.isFactoryOwner
+          ? (paused) => _mutate(
+              () => widget.gateway.setDispatching(data.product, !paused),
+            )
+          : null,
+      subtitle: Text(
+        data.product.status != 'ACTIVE'
+            ? 'Dit project is inactief.'
+            : data.product.dispatchingEnabled
+            ? 'Elke 10 seconden controleren we op werk. Zodra de vereiste goedkeuringen er zijn, gaat de factory verder.'
+            : 'Nieuw automatisch werk is gepauzeerd. Lopende AI-taken en extern werk mogen afronden.',
+      ),
+    ),
+    const SizedBox(height: 12),
+    ..._asMaps(data.live?['processes']).map(
+      (process) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(_processLabel(_value(process['process']))),
+        subtitle: Text(
+          process['errorCode'] != null
+              ? 'Wacht op herstel · ${_value(process['errorCode'])}${process['retryAfter'] == null ? '' : ' · volgende poging ${_shortDateTime(_parseInstant(process['retryAfter'])!)}'}'
+              : '${process['lastCheckedAt'] == null ? 'Controle wordt gestart' : 'Gecontroleerd ${_shortDateTime(_parseInstant(process['lastCheckedAt'])!)}'} · ${_lastRunLine(process)}',
+        ),
+      ),
     ),
     const SizedBox(height: 8),
-    ...data.schedules.map((s) {
-      final live = _liveProcess(data.live, _value(s['process']));
-      final next = _parseInstant(s['nextRunAt']);
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: ListTile(
-            title: SelectableText(_processLabel(_value(s['process']))),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SelectableText(
-                  '${_humanPattern((s['pattern'] as Map?)?.cast<String, Object?>())} · ${s['timezone']} · '
-                  'volgende start ${next == null ? 'uitgeschakeld' : _shortDateTime(next)}',
-                ),
-                if (live != null) ...[
-                  SelectableText(
-                    '${_lastRunLine(live)} · laatste 24 uur: ${_last24hLine(live)}',
-                  ),
-                  const SizedBox(height: 6),
-                  SizedBox(
-                    width: 320,
-                    child: _RunTicks(hourly: _asMaps(live['hourly'])),
-                  ),
-                ],
-              ],
-            ),
-            trailing: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                TextButton(
-                  onPressed: () => _mutate(
-                    () => widget.gateway.runScheduledProcess(
-                      data.product.id,
-                      _value(s['process']),
-                    ),
-                  ),
-                  child: const Text('Nu starten'),
-                ),
-                Switch(
-                  value: s['enabled'] == true,
-                  onChanged: (enabled) =>
-                      _schedule(data.product.id, s, enabled),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }),
-    const SizedBox(height: 8),
-    const SelectableText(
-      'Alle afzonderlijke runs en sessies staan onder Beheer → Operatie.',
+    const Text(
+      'Alleen echte acties, wijzigingen en fouten komen in de historie onder Beheer → Operatie. Controles zonder werk krijgen geen eigen run.',
     ),
   ]);
-
-  String _humanPattern(Map<String, Object?>? pattern) {
-    if (pattern == null) return 'Geen ritme ingesteld';
-    final interval = pattern['intervalMinutes'];
-    if (interval != null) return 'Elke $interval minuten';
-    final rules = (pattern['weeklyRules'] as List? ?? const [])
-        .whereType<Map>();
-    if (rules.isEmpty) return 'Geen ritme ingesteld';
-    return rules
-        .map((rule) {
-          final days = (rule['days'] as List? ?? const []).join(', ');
-          final times = (rule['times'] as List? ?? const []).join(', ');
-          return '$days om $times';
-        })
-        .join(' · ');
-  }
 
   Widget _section(
     String title,
@@ -4780,110 +4728,6 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
           ...values,
           'expectedVersion': (t?['version'] as num?)?.toInt() ?? 0,
         }),
-      );
-    }
-  }
-
-  Future<void> _schedule(
-    String productId,
-    Map<String, Object?> schedule,
-    bool enabled,
-  ) async {
-    final interval = TextEditingController(
-      text: _value(((schedule['pattern'] as Map?)?['intervalMinutes']) ?? 60),
-    );
-    final timezone = TextEditingController(
-      text: _value(schedule['timezone']).isEmpty
-          ? 'Europe/Amsterdam'
-          : _value(schedule['timezone']),
-    );
-    final day = TextEditingController(text: 'MONDAY');
-    final time = TextEditingController(text: '09:00');
-    var weekly =
-        ((schedule['pattern'] as Map?)?['weeklyRules'] as List?)?.isNotEmpty ==
-        true;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: SelectableText('${schedule['process']} instellen'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: timezone,
-                decoration: const InputDecoration(labelText: 'IANA-tijdzone'),
-              ),
-              const SizedBox(height: 12),
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Interval')),
-                  ButtonSegment(value: true, label: Text('Week/dag/tijd')),
-                ],
-                selected: {weekly},
-                onSelectionChanged: (value) =>
-                    setDialogState(() => weekly = value.single),
-              ),
-              if (weekly) ...[
-                TextField(
-                  controller: day,
-                  decoration: const InputDecoration(
-                    labelText: 'Weekdag (bijv. MONDAY)',
-                  ),
-                ),
-                TextField(
-                  controller: time,
-                  decoration: const InputDecoration(
-                    labelText: 'Lokale tijd (HH:mm)',
-                  ),
-                ),
-              ] else
-                TextField(
-                  controller: interval,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Interval in hele minuten',
-                  ),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuleren'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Opslaan'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (ok == true) {
-      await _mutate(
-        () => widget.gateway.saveSchedule(
-          productId,
-          _value(schedule['process']),
-          {
-            'enabled': enabled,
-            'timezone': timezone.text,
-            'pattern': weekly
-                ? {
-                    'weeklyRules': [
-                      {
-                        'days': [day.text.trim().toUpperCase()],
-                        'times': [time.text.trim()],
-                      },
-                    ],
-                  }
-                : {
-                    'weeklyRules': <Object>[],
-                    'intervalMinutes': int.tryParse(interval.text) ?? 60,
-                  },
-            'expectedVersion': (schedule['version'] as num).toInt(),
-          },
-        ),
       );
     }
   }

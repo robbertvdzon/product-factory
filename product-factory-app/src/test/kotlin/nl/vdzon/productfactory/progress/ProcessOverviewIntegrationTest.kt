@@ -182,8 +182,8 @@ class ProcessOverviewIntegrationTest @Autowired constructor(
             jsonPath("$.processes[2].process") { value("QUALITY_ASSURANCE") }
             jsonPath("$.processes[3].process") { value("SOFTWARE_FACTORY_DISPATCHER") }
             jsonPath("$.processes[1].enabled") { value(true) }
-            jsonPath("$.processes[1].intervalMinutes") { value(10) }
-            jsonPath("$.processes[2].enabled") { value(false) }
+            jsonPath("$.processes[1].intervalSeconds") { value(10) }
+            jsonPath("$.processes[2].enabled") { value(true) }
             jsonPath("$.processes[2].intervalMinutes") { doesNotExist() }
             jsonPath("$.processes[0].running.id") { value(running) }
             jsonPath("$.processes[0].lastSession.noOp") { value(true) }

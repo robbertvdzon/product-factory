@@ -44,6 +44,7 @@ data class DeleteProductRequest(val confirmation: String)
 data class AssignmentRequest(val audience: String = "", val goal: String, val publicGitUrl: String, val expectedVersion: Long, val idempotencyKey: String, val aiSupplier: String? = null, val aiModel: String? = null)
 data class TestConfigurationRequest(val acceptance: TestEnvironmentConfiguration, val production: TestEnvironmentConfiguration? = null, val expectedVersion: Long, val idempotencyKey: String)
 data class ProductStatusRequest(val status: ProductStatus, val expectedVersion: Long, val idempotencyKey: String)
+data class AutomationRequest(val paused: Boolean, val expectedVersion: Long, val idempotencyKey: String)
 data class DispatchingRequest(val enabled: Boolean, val expectedVersion: Long, val idempotencyKey: String)
 data class EpicApprovalModeRequest(val mode: EpicApprovalMode, val expectedVersion: Long, val idempotencyKey: String)
 data class ScheduleRequest(val enabled: Boolean, val timezone: String, val pattern: SchedulePattern, val expectedVersion: Long, val idempotencyKey: String)
@@ -116,6 +117,12 @@ class ProductController(
         SetProductStatusCommand(ProductId(productId), request.status, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),
     )
 
+    @PatchMapping("/{productId}/automation") @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun automation(@PathVariable productId: String, @RequestBody request: AutomationRequest, authentication: Authentication?) {
+        authorization.requireFactoryOwner(authentication)
+        commands.setProductDispatching(SetProductDispatchingCommand(ProductId(productId), !request.paused, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey))
+    }
+
     @PatchMapping("/{productId}/dispatching") @ResponseStatus(HttpStatus.NO_CONTENT)
     fun dispatching(@PathVariable productId: String, @RequestBody request: DispatchingRequest, authentication: Authentication?) = commands.setProductDispatching(
         SetProductDispatchingCommand(ProductId(productId), request.enabled, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),
@@ -129,10 +136,11 @@ class ProductController(
     @GetMapping("/{productId}/schedules") fun schedules(@PathVariable productId: String) = queries.getProcessSchedules(ProductId(productId))
     @GetMapping("/{productId}/schedule-runs") fun scheduleRuns(@PathVariable productId: String, @RequestParam(required = false) limit: Int?) =
         queries.findScheduleRuns(ProductId(productId), limit?.coerceIn(1, MAX_LIST_LIMIT))
-    @PutMapping("/{productId}/schedules/{process}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun schedule(@PathVariable productId: String, @PathVariable process: ScheduledProcess, @RequestBody request: ScheduleRequest, authentication: Authentication?) = commands.updateProcessSchedule(
-        UpdateProcessScheduleCommand(ProductId(productId), process, request.enabled, request.timezone, request.pattern, request.expectedVersion, authentication.stakeholderActor(), request.idempotencyKey),
-    )
+    @PutMapping("/{productId}/schedules/{process}")
+    fun schedule(@PathVariable productId: String, @PathVariable process: ScheduledProcess, @RequestBody request: ScheduleRequest, authentication: Authentication?): Nothing {
+        authorization.requireFactoryOwner(authentication)
+        throw org.springframework.web.server.ResponseStatusException(HttpStatus.GONE, "Projecten worden automatisch elke 10 seconden gecontroleerd. Ververs de pagina en gebruik de projectpauze.")
+    }
 
     @GetMapping("/{productId}/signals")
     fun signals(@PathVariable productId: String, @RequestParam(required = false) status: Set<UserSignalStatus>?) = queries.findUserSignals(UserSignalFilter(ProductId(productId), statuses = status.orEmpty()))
