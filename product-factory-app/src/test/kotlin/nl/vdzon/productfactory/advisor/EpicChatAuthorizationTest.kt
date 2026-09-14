@@ -14,7 +14,8 @@ class EpicChatAuthorizationTest {
     private val service = mock(ProductAdvisorApplicationService::class.java)
     private val authorization = mock(ProductAuthorizationService::class.java)
     private val images = mock(ConversationAttachmentService::class.java)
-    private val controller = ProductAdvisorController(service, authorization, mock(JdbcTemplate::class.java), images)
+    private val replies = mock(AdvisorImages::class.java)
+    private val controller = ProductAdvisorController(service, authorization, mock(JdbcTemplate::class.java), images, replies)
     private val now = Instant.parse("2026-01-01T00:00:00Z")
     private val product = ProductId("product")
     private val user = UserId("reader")
@@ -38,6 +39,15 @@ class EpicChatAuthorizationTest {
         assertThrows<AccessDeniedException> { controller.image("image", null) }
         verify(images, never()).inputs(listOf("image"))
     }
+    @Test
+    fun `AI afbeelding uit persoonlijk gesprek wordt geweigerd voor ander productlid`() {
+        `when`(replies.get("image")).thenReturn(AdvisorImage("image", "chat", "message", "screen.png", "SCREENSHOT", "Homepage", "https://example.test/", "PRODUCTION", now))
+        `when`(service.getConversation(conversation.id, false)).thenReturn(conversation.copy(epicId = null, purpose = ConversationPurpose.QUESTION))
+        `when`(authorization.currentUserId(null)).thenReturn(user)
+        assertThrows<AccessDeniedException> { controller.replyImage("image", null, true) }
+        verify(replies, never()).content("image")
+    }
+
     @Test
     fun `berichtpaginas van persoonlijke gesprekken vereisen dezelfde toegang`() {
         `when`(service.getConversation(conversation.id, false)).thenReturn(conversation.copy(epicId = null, purpose = ConversationPurpose.QUESTION))

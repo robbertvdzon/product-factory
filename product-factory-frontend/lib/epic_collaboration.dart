@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'external_link.dart';
 import 'conversation_images.dart';
+import 'chat_answer_image.dart';
 import 'conversation_timeline.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -999,6 +1000,14 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             const SizedBox(height: 5),
             if (!currentProposalMessage(m)) SelectableText(_text(m['text'])),
             storedImages(_maps(m['attachments'])),
+            for (final image in _maps(m['images']))
+              ChatAnswerImage(
+                key: ValueKey('answer-image-${_text(image['id'])}'),
+                image: image,
+                bytes: api.image(
+                  '${AppConfiguration.backendUrl.replaceAll(RegExp(r'/$'), '')}/api/advisor-images/${_text(image['id'])}',
+                ),
+              ),
             if (m['sender'] == 'SYSTEM' &&
                 _text(m['text']).contains(
                   'bijgewerkt naar voorstelversie ${proposal['afterContentVersion']}.',

@@ -44,6 +44,20 @@ wisselt de gebruiker tussen **Epic** en **Gesprek**. De chat opent bij de nieuws
 ouder materiaal laadt bij omhoog scrollen. Nieuwe berichten worden vanaf het laatste opgehaalde
 bericht geladen. Wie oudere berichten leest, blijft op dezelfde plek en ziet **Nieuw bericht ↓**.
 Wijzigingsvoorstellen en terugdraaien staan bij de bijbehorende chatmelding.
+AI kan in zowel persoonlijke vragen als het epicgesprek maximaal vier beelden bij een antwoord
+voegen. **Screenshot · Productie/Acceptatie** is een browseropname van een geconfigureerde
+productomgeving met een bronlink. **Ontwerpschets** en **Illustratie** zijn afzonderlijk gelabeld.
+De beelden kunnen worden vergroot, ingezoomd en gedownload. De browseropname vereist toegang
+tot de pagina; de adviseur omzeilt geen login en voert op de bezochte applicatie geen wijzigingen uit.
+
+Antwoordbeelden worden via het Runtime-outputcontract als PNG overgenomen, gecontroleerd op
+bestandstype, afmetingen en grootte en met het bericht bewaard. De bronvermelding bevat geen
+querystring of fragment. `/api/advisor-images/{id}` controleert dezelfde actuele gesprekstoegang
+als de berichtenroute en stuurt `private, no-store`. Afbeeldingsmetadata reist mee met de
+berichtpagina, de bytes worden apart opgehaald. Maximaal vier recente antwoordbeelden gaan binnen
+het bestaande inputbudget mee bij vervolgvragen (hoogstens 2 MiB per inputbeeld). Grotere beelden
+blijven zichtbaar en downloadbaar in de chat. Migratie V36 is additief en behoudt bestaande gesprekken.
+
 De inhoud wordt via AI gewijzigd.
 Er is één invoerveld: **Stel een vraag of beschrijf je wens**. AI beantwoordt gewone vragen,
 vraagt bij twijfel door en stuurt duidelijke wijzigingswensen met de actuele inhoudsversie en

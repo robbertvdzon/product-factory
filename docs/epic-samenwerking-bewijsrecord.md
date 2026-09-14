@@ -127,3 +127,16 @@ claimt niet dat een lokaal gewijzigd epic reeds extern werk heeft gestopt.
 Bestaande epics zonder impact worden pas onder de nieuwe poorten gebracht wanneer het product
 wordt ingericht; ontbrekende impact vraagt dan verfijning. Oude factory-ownerbesluiten blijven
 historisch bewijs en geven geen nieuwe architectbevoegdheid.
+
+## Antwoordbeelden in de chat — 14 september 2026
+
+- Product Advisor promptversie 5 kan vier optionele PNG-artifacts opleveren. Screenshots verwijzen
+  naar de geconfigureerde productie- of acceptatie-origin; ontwerpen en illustraties hebben een eigen label.
+- V36 koppelt gevalideerde, duurzaam bewaarde Runtime-artifacts aan het antwoordbericht.
+  Persoonlijke gesprekstoegang geldt ook voor de beeldroute; querystrings verdwijnen uit de bronvermelding.
+- De gedeelde chat toont beelden met vergroten, zoomen en downloaden. Bij vervolgvragen kunnen
+  recente beelden binnen het Runtime-inputbudget opnieuw worden aangeboden.
+- Lokale verificatie: 188 backendtests en 55 frontendtests geslaagd; waaronder de echte PNG-kopie
+  via het v2-contract, berichtpaginering, duurzame retentie, hergebruik, vreemde bron/taak weigeren,
+  persoonlijke autorisatie en vergroting op 320px. Dit zijn geautomatiseerde tests met een mockruntime;
+  een echte browseropname door de productie-AI vraagt aanvullend een live controle.

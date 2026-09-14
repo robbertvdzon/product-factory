@@ -56,6 +56,8 @@ data class ProductMembershipHistoryDetails(
     val actorUserId: UserId,
     val occurredAt: Instant,
 )
+data class AdvisorImage(val id: String, val conversationId: String, val messageId: String, val filename: String, val kind: String, val caption: String, val sourceUrl: String?, val environment: String, val createdAt: Instant)
+
 data class ProductConversationMessageDetails(
     val id: ProductConversationMessageId,
     val sequence: Long,
@@ -65,6 +67,7 @@ data class ProductConversationMessageDetails(
     val createdAt: Instant,
     val authorRole: ProductMembershipRole? = null,
     val attachments: List<ConversationAttachment> = emptyList(),
+    val images: List<AdvisorImage> = emptyList(),
 )
 data class ProductConversationDetails(
     val id: ProductConversationId,

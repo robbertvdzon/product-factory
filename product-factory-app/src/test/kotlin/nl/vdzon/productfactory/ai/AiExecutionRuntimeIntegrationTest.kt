@@ -298,6 +298,7 @@ class FakeRuntime : AgentRuntimeClient {
     val models = mutableListOf<RuntimeModelView>()
     val results = mutableMapOf<String, com.fasterxml.jackson.databind.JsonNode>()
     val resultArtifacts = mutableMapOf<String, List<RuntimeArtifactView>>()
+    val artifactBytes = mutableMapOf<String, ByteArray>()
     val v2ResultArtifacts = mutableMapOf<String, List<RuntimeV2ArtifactView>>()
     val attempts = mutableMapOf<String, List<RuntimeAttemptView>>()
     private val uploads = linkedMapOf<String, FakeUpload>()
@@ -325,7 +326,7 @@ class FakeRuntime : AgentRuntimeClient {
     override fun getJob(jobId: String) = jobs.getValue(jobId)
     override fun getResult(jobId: String) = RuntimeJobResult(
         jobId, results[jobId] ?: com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("antwoord", "gereed"),
-        resultArtifacts[jobId] ?: listOf(RuntimeArtifactView("artifact-1", jobId, "bewijs.txt", "text/plain", 6, "0".repeat(64), Instant.now())), Instant.now(),
+        resultArtifacts[jobId] ?: if (results[jobId]?.has("outcome") == true) emptyList() else listOf(RuntimeArtifactView("artifact-1", jobId, "bewijs.txt", "text/plain", 6, "0".repeat(64), Instant.now())), Instant.now(),
     )
     override fun cancelJob(jobId: String): RuntimeJobView = jobs.getValue(jobId).copy(status = "CANCELLED", phase = "CANCELLED").also { jobs[jobId] = it }
     override fun listEnvironmentKeys(projectPrefix: String) = environmentKeys.filter { it.projectPrefix == projectPrefix }
@@ -336,7 +337,7 @@ class FakeRuntime : AgentRuntimeClient {
             artifactCopyFailuresRemaining--
             throw RuntimeCallException("RUNTIME_ARTIFACT_FAILED", "Artifact tijdelijk niet bereikbaar.", true)
         }
-        val bytes = "bewijs".toByteArray()
+        val bytes = artifactBytes[downloadUrl] ?: "bewijs".toByteArray()
         output.write(bytes, offset.toInt(), bytes.size - offset.toInt())
         return RuntimeArtifactCopyResult(bytes.size.toLong(), true)
     }
@@ -404,7 +405,7 @@ class FakeRuntime : AgentRuntimeClient {
     fun distinctIdempotencyKeys() = (requests.map { it.idempotencyKey } + v2Requests.map { it.idempotencyKey }).distinct()
     fun jobCount() = jobs.size
     fun uploadedText() = uploads.values.flatMap { it.content }.toByteArray().toString(Charsets.UTF_8)
-    fun reset() { requests.clear(); v2Requests.clear(); jobs.clear(); environmentKeys.clear(); models.clear(); results.clear(); resultArtifacts.clear(); v2ResultArtifacts.clear(); attempts.clear(); uploads.clear(); loseFirstCreateResponse = false; loseFirstPatchResponse = false; rejectFirstJobForInput = false; artifactCopyFailuresRemaining = 0; createdUploadCount = 0; lost = false; patchLost = false; inputRejected = false }
+    fun reset() { requests.clear(); v2Requests.clear(); jobs.clear(); environmentKeys.clear(); models.clear(); results.clear(); resultArtifacts.clear(); artifactBytes.clear(); v2ResultArtifacts.clear(); attempts.clear(); uploads.clear(); loseFirstCreateResponse = false; loseFirstPatchResponse = false; rejectFirstJobForInput = false; artifactCopyFailuresRemaining = 0; createdUploadCount = 0; lost = false; patchLost = false; inputRejected = false }
     private fun upload(url: String) = uploads.getValue(url.substringAfterLast('/'))
 
     // Spiegelt JsonResultValidator in de Agent Runtime: schema's buiten het portable profiel worden daar

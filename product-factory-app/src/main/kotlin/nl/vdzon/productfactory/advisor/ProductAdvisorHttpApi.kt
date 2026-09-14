@@ -25,6 +25,7 @@ class ProductAdvisorController(
     private val authorization: ProductAuthorizationService,
     private val jdbc: JdbcTemplate,
     private val images: ConversationAttachmentService,
+    private val replyImages: AdvisorImages,
 ) {
     @GetMapping("/api/products/{productId}/conversations")
     fun conversations(@PathVariable productId: String, authentication: Authentication?, @RequestParam(defaultValue="true") includeMessages: Boolean = true) =
@@ -62,6 +63,17 @@ class ProductAdvisorController(
         val content=images.inputs(listOf(imageId)).single()
         return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType(content.mediaType))
             .header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").body(content.content)
+    }
+
+    @GetMapping("/api/advisor-images/{imageId}")
+    fun replyImage(@PathVariable imageId: String, authentication: Authentication?, @RequestParam(defaultValue="false") download: Boolean = false): org.springframework.http.ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> {
+        val image = replyImages.get(imageId)
+        conversation(image.conversationId, authentication, false)
+        val content = replyImages.content(imageId)
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.IMAGE_PNG).contentLength(content.sizeBytes)
+            .header("Cache-Control", "private, no-store").header("X-Content-Type-Options", "nosniff")
+            .header("Content-Disposition", org.springframework.http.ContentDisposition.builder(if (download) "attachment" else "inline").filename(image.filename).build().toString())
+            .body(org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody { output -> content.inputStream.use { it.copyTo(output) } })
     }
 
     @PostMapping("/api/conversations/{conversationId}/messages")
