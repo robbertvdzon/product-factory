@@ -133,7 +133,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Betere meldingen'), findsOneWidget);
       expect(
-        find.text('+ Nieuw idee'),
+        find.text('Nieuwe epic'),
         role == 'PRODUCT_OWNER' ? findsOneWidget : findsNothing,
       );
       await tester.ensureVisible(find.text('Betere meldingen'));
@@ -169,7 +169,7 @@ void main() {
   }
 
   testWidgets(
-    'PO kan een besproken wijziging uit het oorspronkelijke gesprek in de gekoppelde epic verwerken',
+    'PO verwerkt een wijziging via het gedeelde epicgesprek met de actuele versie',
     (tester) async {
       final submittedFeedback = <String, Object?>{};
       final epic = <String, Object?>{
@@ -228,7 +228,8 @@ void main() {
       );
       final client = MockClient((request) async {
         final path = request.url.path;
-        if (request.method == 'POST' && path == '/api/epics/epic-1/feedback') {
+        if (request.method == 'POST' &&
+            path == '/api/conversations/conversation-1/messages') {
           submittedFeedback.addAll(
             (jsonDecode(request.body) as Map).cast<String, Object?>(),
           );
@@ -249,7 +250,10 @@ void main() {
           return jsonOk([epic]);
         }
         if (path == '/api/products/hkh/conversations') {
-          return jsonOk([conversationSummary]);
+          return jsonOk([conversation]);
+        }
+        if (path == '/api/epics/epic-1/discussions') {
+          return jsonOk([conversation]);
         }
         if (path == '/api/conversations/conversation-1') {
           return jsonOk(conversation);
@@ -279,35 +283,28 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Homepage bespreken'));
-      await tester.tap(find.text('Homepage bespreken'));
+      await tester.tap(find.text('Rustige homepage'));
       await tester.pumpAndSettle();
-
       expect(
-        find.text('Dit gesprek heeft de epic nog niet gewijzigd'),
+        find.text('Mijn dossiers ontbreekt in de ontwerpen.'),
         findsOneWidget,
       );
-      await tester.ensureVisible(
-        find.text('Besproken wijziging in epic verwerken'),
-      );
-      await tester.tap(find.text('Besproken wijziging in epic verwerken'));
+      await tester.ensureVisible(find.text('Epic aanpassen'));
+      await tester.tap(find.text('Epic aanpassen'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(TextField).last,
         'Voeg Mijn dossiers toe aan desktop en mobiel.',
       );
-      await tester.tap(find.text('Bevestigen'));
+      await tester.ensureVisible(find.text('Laat AI aanpassen'));
+      await tester.tap(find.text('Laat AI aanpassen'));
       await tester.pumpAndSettle();
-
-      expect(submittedFeedback['expectedVersion'], 2);
-      expect(submittedFeedback['role'], 'PRODUCT_OWNER');
+      expect(submittedFeedback['expectedVersion'], 7);
+      expect(submittedFeedback['expectedEpicVersion'], 2);
+      expect(submittedFeedback['intent'], 'UPDATE_EPIC');
       expect(
         submittedFeedback['text'],
-        contains('Voeg Mijn dossiers toe aan desktop en mobiel.'),
-      );
-      expect(
-        submittedFeedback['text'],
-        contains('Mijn dossiers ontbreekt in de ontwerpen.'),
+        'Voeg Mijn dossiers toe aan desktop en mobiel.',
       );
       expect(find.text('Rustige homepage'), findsWidgets);
       expect(tester.takeException(), isNull);

@@ -10,8 +10,8 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 
-data class CreateConversationRequest(val title: String, val idempotencyKey: String)
-data class AddConversationMessageRequest(val text: String, val expectedVersion: Long, val idempotencyKey: String)
+data class CreateConversationRequest(val title: String, val idempotencyKey: String, val purpose: ConversationPurpose = ConversationPurpose.LEGACY)
+data class AddConversationMessageRequest(val text: String, val expectedVersion: Long, val idempotencyKey: String, val intent: ConversationIntent = ConversationIntent.DISCUSS, val expectedEpicVersion: Long? = null, val images: List<ConversationImageInput> = emptyList())
 data class ConversationActionRequest(val expectedVersion: Long, val idempotencyKey: String)
 data class RequestApprovalRequest(val requestVersion: Long, val expectedVersion: Long, val idempotencyKey: String)
 data class EpicApprovalRequest(val expectedVersion: Long, val idempotencyKey: String)
@@ -23,10 +23,11 @@ class ProductAdvisorController(
     private val service: ProductAdvisorApplicationService,
     private val authorization: ProductAuthorizationService,
     private val jdbc: JdbcTemplate,
+    private val images: ConversationAttachmentService,
 ) {
     @GetMapping("/api/products/{productId}/conversations")
     fun conversations(@PathVariable productId: String, authentication: Authentication?) =
-        authorization.requireProduct(ProductId(productId), authentication).let { service.findConversations(ProductId(productId)) }
+        authorization.requireProduct(ProductId(productId), authentication).let { service.findConversations(ProductId(productId)).filter { canRead(it,authentication) } }
 
     @PostMapping("/api/products/{productId}/conversations")
     @ResponseStatus(HttpStatus.CREATED)
@@ -35,14 +36,25 @@ class ProductAdvisorController(
         @RequestBody request: CreateConversationRequest,
         authentication: Authentication?,
     ): Map<String, String> {
-        authorization.requireRole(ProductId(productId), ProductMembershipRole.PRODUCT_OWNER, authentication)
-        val id = service.createConversation(CreateConversationCommand(ProductId(productId), request.title, authorization.currentUserId(authentication), request.idempotencyKey))
+        val role = if (request.purpose == ConversationPurpose.QUESTION && authorization.current(authentication)?.actingRole == ActingRole.ARCHITECT) ProductMembershipRole.ARCHITECT else ProductMembershipRole.PRODUCT_OWNER
+        authorization.requireRole(ProductId(productId), role, authentication)
+        val id = service.createConversation(CreateConversationCommand(ProductId(productId), request.title, authorization.currentUserId(authentication), request.idempotencyKey, audienceRole=role, purpose=request.purpose))
         return mapOf("id" to id.value)
     }
 
     @GetMapping("/api/conversations/{conversationId}")
     fun conversation(@PathVariable conversationId: String, authentication: Authentication?) = service.getConversation(ProductConversationId(conversationId)).also {
         authorization.requireProduct(it.productId, authentication)
+        if (!canRead(it,authentication)) throw AccessDeniedException("Dit gesprek is persoonlijk.")
+    }
+
+    @GetMapping("/api/conversation-images/{imageId}")
+    fun image(@PathVariable imageId: String, authentication: Authentication?): org.springframework.http.ResponseEntity<ByteArray> {
+        val info=images.get(imageId)
+        conversation(info.conversationId,authentication)
+        val content=images.inputs(listOf(imageId)).single()
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType(content.mediaType))
+            .header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").body(content.content)
     }
 
     @PostMapping("/api/conversations/{conversationId}/messages")
@@ -53,8 +65,8 @@ class ProductAdvisorController(
         authentication: Authentication?,
     ): Map<String, String> {
         val id = ProductConversationId(conversationId)
-        service.getConversation(id).let { authorization.requireRole(it.productId, it.audienceRole, authentication) }
-        val messageId = service.addMessage(AddConversationMessageCommand(id, request.text, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey))
+        requireConversationRole(id, authentication)
+        val messageId = service.addMessage(AddConversationMessageCommand(id, request.text, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey, request.intent, request.expectedEpicVersion, request.images, if(authorization.current(authentication)?.actingRole==ActingRole.ARCHITECT) ProductMembershipRole.ARCHITECT else ProductMembershipRole.PRODUCT_OWNER))
         return mapOf("id" to messageId.value)
     }
 
@@ -62,7 +74,7 @@ class ProductAdvisorController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun close(@PathVariable conversationId: String, @RequestBody request: ConversationActionRequest, authentication: Authentication?) {
         val id = ProductConversationId(conversationId)
-        service.getConversation(id).let { authorization.requireRole(it.productId, it.audienceRole, authentication) }
+        requireConversationRole(id, authentication)
         service.closeConversation(CloseConversationCommand(id, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey))
     }
 
@@ -70,7 +82,7 @@ class ProductAdvisorController(
     @ResponseStatus(HttpStatus.ACCEPTED)
     fun retry(@PathVariable conversationId: String, @RequestBody request: ConversationActionRequest, authentication: Authentication?) {
         val id = ProductConversationId(conversationId)
-        service.getConversation(id).let { authorization.requireRole(it.productId, it.audienceRole, authentication) }
+        requireConversationRole(id, authentication)
         service.retryConversation(id, request.expectedVersion, authorization.currentUserId(authentication), request.idempotencyKey)
     }
 
@@ -144,6 +156,21 @@ class ProductAdvisorController(
     @GetMapping("/api/operations/product-advisor/hotfix-token")
     fun hotfixToken(authentication: Authentication?): DashboardTokenStatus =
         authorization.requireFactoryOwner(authentication).let { service.dashboardTokenStatus() }
+
+    private fun canRead(c: ProductConversationDetails, authentication: Authentication?) =
+        c.epicId != null || c.request?.linkedEpicId != null || authorization.isFactoryOwner(authentication) ||
+            (c.createdBy == authorization.currentUserId(authentication) && c.audienceRole.name == authorization.current(authentication)?.actingRole?.name)
+
+    private fun requireConversationRole(id: ProductConversationId, authentication: Authentication?) {
+        val c=conversation(id.value,authentication)
+        val shared=c.epicId!=null || c.request?.linkedEpicId!=null
+        val role = if (shared) when (authorization.current(authentication)?.actingRole) {
+            ActingRole.ARCHITECT -> ProductMembershipRole.ARCHITECT
+            ActingRole.PRODUCT_OWNER -> ProductMembershipRole.PRODUCT_OWNER
+            else -> c.audienceRole
+        } else c.audienceRole
+        authorization.requireRole(c.productId,role,authentication)
+    }
 
     private fun epicProduct(epicId: String): ProductId = jdbc.query(
         "SELECT product_id FROM pf_epic WHERE id=?", { rs, _ -> ProductId(rs.getString(1)) }, epicId,

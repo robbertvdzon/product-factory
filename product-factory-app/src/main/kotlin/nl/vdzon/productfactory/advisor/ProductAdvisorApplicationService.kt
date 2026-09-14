@@ -33,6 +33,7 @@ import java.util.UUID
 @Service
 class ProductAdvisorApplicationService(
     private val jdbc: JdbcTemplate,
+    private val attachments: ConversationAttachmentService,
     private val mapper: ObjectMapper,
     private val clock: Clock,
     private val products: ProductQueryService,
@@ -68,7 +69,7 @@ class ProductAdvisorApplicationService(
                 VALUES (?,?,?,?,'OPEN',?,?,1)""".trimIndent(),
             id.value, command.productId.value, command.title.trim(), command.userId.value, now, now,
         )
-        jdbc.update("UPDATE pf_product_conversation SET epic_id=?,audience_role=? WHERE conversation_id=?", command.epicId,command.audienceRole.name,id.value)
+        jdbc.update("UPDATE pf_product_conversation SET epic_id=?,audience_role=?,purpose=? WHERE conversation_id=?", command.epicId,command.audienceRole.name,command.purpose.name,id.value)
         recordCommand(command.idempotencyKey, "CREATE_CONVERSATION", fingerprint, id.value)
         return id
     }
@@ -76,19 +77,22 @@ class ProductAdvisorApplicationService(
     @Transactional
     override fun addMessage(command: AddConversationMessageCommand): ProductConversationMessageId {
         require(command.text.trim().length in 1..20_000) { "Een bericht is verplicht en maximaal 20.000 tekens." }
-        jdbc.query(
-            "SELECT message_id,message_text,created_by FROM pf_product_conversation_message WHERE conversation_id=? AND idempotency_key=?",
-            { rs, _ -> Triple(ProductConversationMessageId(rs.getString(1)), rs.getString(2), rs.getString(3)) }, command.conversationId.value, command.idempotencyKey,
-        ).singleOrNull()?.let {
-            if (it.second != command.text.trim() || it.third != command.userId.value) {
-                throw IdempotencyConflict("Idempotentiesleutel is al voor een ander bericht gebruikt.")
-            }
-            return it.first
-        }
+        val messageFingerprint = fingerprint(command)
+        replayCommand(command.idempotencyKey, "ADD_MESSAGE", messageFingerprint)?.let { return ProductConversationMessageId(it) }
         val conversation = conversationRow(command.conversationId)
         if (conversation.version != command.expectedVersion) throw VersionConflict("Het gesprek is intussen gewijzigd.")
         if (conversation.status == ConversationStatus.CLOSED) throw InvalidCommand("Een gesloten gesprek is alleen-lezen.")
         if (conversation.status == ConversationStatus.PROCESSING) throw VersionConflict("De productadviseur verwerkt al een bericht.")
+        val details = getConversation(command.conversationId)
+        val linkedEpicId = details.epicId ?: details.request?.linkedEpicId
+        if (linkedEpicId == null && details.request?.status in setOf(ProductRequestStatus.APPROVED,ProductRequestStatus.ROUTING)) throw VersionConflict("AI werkt de eerste epicversie uit. Wacht tot die klaar is.")
+        if (command.intent == ConversationIntent.UPDATE_EPIC) {
+            val epic = linkedEpicId?.let { designQueries.getEpic(EpicId(it)) } ?: throw InvalidCommand("Dit gesprek hoort niet bij een epic.")
+            if (command.expectedEpicVersion != epic.version) throw VersionConflict("De epic is intussen gewijzigd. Bekijk eerst de actuele versie.")
+            require(command.text.length <= 8000) { "Een wijzigingsverzoek mag maximaal 8.000 tekens bevatten." }
+            if (epic.status in setOf(EpicStatus.NEEDS_REFINEMENT,EpicStatus.NEEDS_RESEARCH)) throw VersionConflict("AI werkt deze epic nog uit. Wacht op de nieuwe versie.")
+            if (epic.status in setOf(EpicStatus.COMPLETED,EpicStatus.CANCELLED,EpicStatus.WITHDRAWN)) throw InvalidCommand("Deze epic is afgesloten. Begin een vervolgepic.")
+        }
         val messageId = ProductConversationMessageId(UUID.randomUUID().toString())
         val turnId = UUID.randomUUID().toString()
         val now = clock.instant()
@@ -102,15 +106,19 @@ class ProductAdvisorApplicationService(
         } catch (_: DuplicateKeyException) {
             throw VersionConflict("Het gesprek is gelijktijdig gewijzigd; ververs en probeer opnieuw.")
         }
-        jdbc.update(
+        if (jdbc.update(
             "UPDATE pf_product_conversation SET status='PROCESSING',updated_at=?,version=version+1 WHERE conversation_id=? AND version=?",
             now, command.conversationId.value, command.expectedVersion,
-        )
+        ) != 1) throw VersionConflict("Het gesprek is intussen gewijzigd.")
+        jdbc.update("UPDATE pf_product_conversation_message SET author_role=? WHERE message_id=?",command.authorRole.name,messageId.value)
+        attachments.save(command.conversationId,messageId,command.images)
         jdbc.update(
             """INSERT INTO pf_product_advisor_turn(turn_id,conversation_id,source_message_id,source_conversation_version,status,created_at,updated_at,idempotency_key)
                 VALUES (?,?,?,?,'PENDING',?,?,?)""".trimIndent(),
             turnId, command.conversationId.value, messageId.value, command.expectedVersion + 1, now, now, "advisor-${command.idempotencyKey}".take(200),
         )
+        jdbc.update("UPDATE pf_product_advisor_turn SET intent=?,expected_epic_version=? WHERE turn_id=?", command.intent.name, command.expectedEpicVersion, turnId)
+        recordCommand(command.idempotencyKey,"ADD_MESSAGE",messageFingerprint,messageId.value)
         return messageId
     }
 
@@ -246,10 +254,15 @@ class ProductAdvisorApplicationService(
                 "conversation" to getConversation(turn.conversationId),
                 "repository" to mapOf("url" to assignment.publicGitUrl, "commitSha" to sha),
                 "testConfiguration" to testConfiguration,
-                "allowedOutcomes" to AdvisorOutcome.entries.map { it.name },
+                "allowedOutcomes" to (if (getConversation(turn.conversationId).purpose == ConversationPurpose.QUESTION || getConversation(turn.conversationId).epicId != null) listOf("ANSWER","ASK_FOLLOW_UP") else AdvisorOutcome.entries.map { it.name }),
+                "conversationPurpose" to getConversation(turn.conversationId).purpose,
+                "activeRole" to getConversation(turn.conversationId).messages.lastOrNull { it.sender == ConversationSender.USER }?.authorRole,
+                "messageIntent" to jdbc.queryForObject("SELECT intent FROM pf_product_advisor_turn WHERE turn_id=?",String::class.java,turnId),
+                "purposeInstruction" to "QUESTION: beantwoord alleen de losse applicatievraag; maak geen voorstel. EPIC zonder epicContext: werk de wens uit als EPIC_CANDIDATE en gebruik PROPOSE_CHANGE zodra een eerste concept mogelijk is; dat wordt automatisch uitgewerkt zonder extra bevestiging. Vraag alleen om verduidelijking als dat echt nodig is.",
+                "referenceImages" to attachments.list(turn.conversationId),
                 "productGovernance" to policies.getPolicy(turn.productId),
                 "epicContext" to (getConversation(turn.conversationId).epicId ?: getConversation(turn.conversationId).request?.linkedEpicId)?.let { designQueries.getEpic(EpicId(it)) },
-                "roleInstruction" to "Beantwoord voor de audienceRole. ARCHITECT onderzoekt korte technische impact en product-AI. PRODUCT_OWNER bespreekt werking en UX. Als epicContext gevuld is, geef je alleen advies voor de bestaande epic. Zeg nooit dat feedback al in de epic, scope, acceptatiecriteria of UX is verwerkt of doorgevoerd. Leg expliciet uit dat de gebruiker de besproken wijziging met de actie in Product Factory naar Productontwerp moet sturen; jij kunt dat niet zelf doen. Maak voor een bestaande epic geen nieuw ProductRequest.",
+                "roleInstruction" to "Beantwoord voor de activeRole (of audienceRole als die ontbreekt). ARCHITECT onderzoekt korte technische impact en product-AI. PRODUCT_OWNER bespreekt werking en UX. Als epicContext gevuld is, geef je alleen advies voor de bestaande epic. Zeg nooit dat feedback al in de epic, scope, acceptatiecriteria of UX is verwerkt of doorgevoerd. Bij DISCUSS beantwoord je alleen de vraag. Bij UPDATE_EPIC vat je het expliciete wijzigingsverzoek samen; Product Factory stuurt het na jouw antwoord automatisch naar Productontwerp. Zeg dan dat de nieuwe versie nog wordt uitgewerkt. Maak voor een bestaande epic geen nieuw ProductRequest.",
             )
             val contextJson = mapper.writeValueAsString(context)
             val prompt = advisorPrompt(contextJson)
@@ -265,6 +278,7 @@ class ProductAdvisorApplicationService(
         val taskId = ai.requestAiTask(RequestAiTaskCommand(
             AiJobKey(JOB_KEY), turn.productId, "product-advisor", null, AGENT_ROLE, frozen.execution, frozen.configurationVersion,
             frozen.promptTemplateVersion, frozen.prompt, RESPONSE_SCHEMA, RepositorySnapshot(frozen.gitUrl, frozen.gitSha),
+            attachments = attachments.inputs(attachments.list(turn.conversationId).map { it.id }),
             executionTimeout = Duration.ofMinutes(30), idempotencyKey = "product-advisor-$turnId-${turn.attemptCount + 1}".take(150),
         ))
         jdbc.update(
@@ -300,20 +314,52 @@ class ProductAdvisorApplicationService(
                 VALUES (?,?,?,'PRODUCT_ADVISOR',?,?,?)""".trimIndent(),
             UUID.randomUUID().toString(), row.first.value, nextSequence(row.first), message, now, "advisor-result-$turnId",
         )
-        val targetStatus = when (outcome) {
+        val targetStatus = if (getConversation(row.first).purpose == ConversationPurpose.QUESTION) ConversationStatus.WAITING_FOR_USER else when (outcome) {
             AdvisorOutcome.ANSWER, AdvisorOutcome.ASK_FOLLOW_UP -> ConversationStatus.WAITING_FOR_USER
             AdvisorOutcome.PROPOSE_CHANGE -> {
-                if (getConversation(row.first).epicId == null && getConversation(row.first).request?.linkedEpicId == null) applyProposal(conversation, result.path("proposal"), requireNotNull(row.third), now)
+                if (getConversation(row.first).purpose != ConversationPurpose.QUESTION && getConversation(row.first).epicId == null && getConversation(row.first).request?.linkedEpicId == null) applyProposal(conversation, result.path("proposal"), requireNotNull(row.third), now)
                 ConversationStatus.PROPOSAL_READY
             }
         }
         jdbc.update("UPDATE pf_product_conversation SET status=?,updated_at=?,version=version+1 WHERE conversation_id=?", targetStatus.name, now, row.first.value)
+        val intent = jdbc.queryForObject("SELECT intent FROM pf_product_advisor_turn WHERE turn_id=?",String::class.java,turnId)
+        if (intent == "UPDATE_EPIC") {
+            val details=getConversation(row.first)
+            val epicId=details.epicId ?: details.request?.linkedEpicId ?: throw InvalidCommand("De gekoppelde epic ontbreekt.")
+            val expected=jdbc.queryForObject("SELECT expected_epic_version FROM pf_product_advisor_turn WHERE turn_id=?",Long::class.java,turnId)!!
+            val requestedText = jdbc.queryForObject("SELECT m.message_text FROM pf_product_advisor_turn t JOIN pf_product_conversation_message m ON m.message_id=t.source_message_id WHERE t.turn_id=?", String::class.java, turnId)!!
+            val context = details.messages.takeLast(8).joinToString("\n\n") { "${it.authorRole ?: it.sender}: ${it.text}" }.takeLast(1500)
+            val transcript = "$requestedText\n\nRecente gesprekscontext (het expliciete verzoek hierboven is leidend):\n$context"
+            val originalContentVersion=designQueries.getEpic(EpicId(epicId)).contentVersion
+            productDesign.requestEpicRefinement(RequestEpicRefinementCommand(EpicId(epicId),"Wijzigingsverzoek uit epicgesprek (referentiebeelden zijn bijgevoegd):\n$transcript",expected,ActorReference(ActorType.PROCESS,"product-advisor"),"chat-refine-$turnId"))
+            jdbc.update("UPDATE pf_product_advisor_turn SET refinement_content_version=? WHERE turn_id=?",originalContentVersion,turnId)
+            jdbc.update("INSERT INTO pf_product_conversation_message(message_id,conversation_id,sequence_number,sender,message_text,created_at,idempotency_key) VALUES (?,?,?,'SYSTEM',?,?,?)",UUID.randomUUID().toString(),row.first.value,nextSequence(row.first),"De wijziging is naar Productontwerp gestuurd. De nieuwe inhoudsversie verschijnt hier zodra AI klaar is; de huidige inhoud is nog niet aangepast.",now,"refine-result-$turnId")
+        }
         jdbc.update("UPDATE pf_product_advisor_turn SET status='APPLIED',safe_error_code=NULL,updated_at=? WHERE turn_id=?", now, turnId)
+    }
+
+    fun resumeChatRefinements(limit: Int = 20) {
+        val pending=jdbc.query("SELECT t.turn_id,t.conversation_id,c.product_id,c.epic_id,t.refinement_content_version FROM pf_product_advisor_turn t JOIN pf_product_conversation c ON c.conversation_id=t.conversation_id WHERE t.status='APPLIED' AND t.refinement_content_version IS NOT NULL AND t.refinement_completed=FALSE ORDER BY t.created_at",{rs,_->listOf(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getLong(5).toString())}).take(limit)
+        pending.forEach { row ->
+            runCatching {
+                val epic=designQueries.getEpic(EpicId(row[3]))
+                if (epic.contentVersion > row[4].toLong() || epic.status in setOf(EpicStatus.CANCELLED,EpicStatus.WITHDRAWN)) {
+                    transactions.executeWithoutResult {
+                        if (jdbc.update("UPDATE pf_product_advisor_turn SET refinement_completed=TRUE WHERE turn_id=? AND refinement_completed=FALSE",row[0]) == 1) {
+                            val conversationId=ProductConversationId(row[1])
+                            val completionMessage = if (epic.status in setOf(EpicStatus.CANCELLED, EpicStatus.WITHDRAWN)) "De epic is gesloten. Het wijzigingsverzoek wordt niet verder uitgewerkt." else "De epic is bijgewerkt naar inhoudsversie ${epic.contentVersion}. Bekijk de wijzigingen en de actuele goedkeuringen."
+                            jdbc.update("INSERT INTO pf_product_conversation_message(message_id,conversation_id,sequence_number,sender,message_text,created_at,idempotency_key) VALUES (?,?,?,'SYSTEM',?,?,?)",UUID.randomUUID().toString(),row[1],nextSequence(conversationId),completionMessage,clock.instant(),"refinement-ready-${row[0]}")
+                            jdbc.update("UPDATE pf_product_conversation SET version=version+1,updated_at=? WHERE conversation_id=?",clock.instant(),row[1])
+                        }
+                    }
+                } else productDesign.runProcessSession(ProductId(row[2]))
+            }.onFailure { log.warn("chat_refinement_waiting turnId={} failureType={}",row[0],it.javaClass.simpleName) }
+        }
     }
 
     private fun applyProposal(conversation: ConversationRow, proposal: JsonNode, expectedGitSha: String, now: Instant) {
         require(proposal.isObject) { "Voorstel ontbreekt." }
-        val type = ProductRequestType.valueOf(required(proposal, "type"))
+        val type = if (getConversation(conversation.id).purpose == ConversationPurpose.EPIC) ProductRequestType.EPIC_CANDIDATE else ProductRequestType.valueOf(required(proposal, "type"))
         val title = required(proposal, "title", 200)
         val summary = required(proposal, "summary")
         val problem = required(proposal, "problem")
@@ -351,7 +397,7 @@ class ProductAdvisorApplicationService(
             requestId.value, version, type.name, title, summary, problem, userImpact, currentBehavior, desiredBehavior,
             json(evidence), sha, json(criteria), json(scope), json(boundaries), json(exclusions), now,
         )
-        if (type == ProductRequestType.EPIC_CANDIDATE && policies.getPolicy(conversation.productId).let { it.configured && it.productOwnerMode == ResponsibilityMode.AI }) {
+        if (type == ProductRequestType.EPIC_CANDIDATE && (getConversation(conversation.id).purpose == ConversationPurpose.EPIC || policies.getPolicy(conversation.productId).let { it.configured && it.productOwnerMode == ResponsibilityMode.AI })) {
             jdbc.update("UPDATE pf_product_request SET status='APPROVED' WHERE request_id=?",requestId.value)
         }
         notify(conversation.createdBy, conversation.productId, "proposal:$requestId:$version", "PROPOSAL_READY", "Voorstel gereed: $title", "PRODUCT_REQUEST", requestId.value)
@@ -588,17 +634,19 @@ class ProductAdvisorApplicationService(
 
     override fun getConversation(id: ProductConversationId): ProductConversationDetails {
         val row = conversationRow(id)
+        val conversationAttachments=attachments.list(id)
         val messages = jdbc.query(
-            """SELECT message_id,sequence_number,sender,message_text,created_by,created_at FROM pf_product_conversation_message
+            """SELECT message_id,sequence_number,sender,message_text,created_by,created_at,author_role FROM pf_product_conversation_message
                 WHERE conversation_id=? ORDER BY sequence_number""".trimIndent(),
             { rs, _ -> ProductConversationMessageDetails(
                 ProductConversationMessageId(rs.getString(1)), rs.getLong(2), ConversationSender.valueOf(rs.getString(3)), rs.getString(4),
-                rs.getString(5)?.let(::UserId), rs.getTimestamp(6).toInstant(),
+                rs.getString(5)?.let(::UserId), rs.getTimestamp(6).toInstant(), rs.getString(7)?.let(ProductMembershipRole::valueOf),
+                conversationAttachments.filter { it.messageId == rs.getString(1) },
             ) }, id.value,
         )
         val request = jdbc.query("SELECT request_id FROM pf_product_request WHERE conversation_id=?", { rs, _ -> ProductRequestId(rs.getString(1)) }, id.value).singleOrNull()?.let(::getRequest)
         val context = jdbc.query("SELECT epic_id,audience_role FROM pf_product_conversation WHERE conversation_id=?",{rs,_->rs.getString(1) to ProductMembershipRole.valueOf(rs.getString(2))},id.value).single()
-        return ProductConversationDetails(row.id, row.productId, row.title, row.createdBy, row.status, row.version, row.createdAt, row.updatedAt, messages, request, context.first, context.second)
+        return ProductConversationDetails(row.id, row.productId, row.title, row.createdBy, row.status, row.version, row.createdAt, row.updatedAt, messages, request, context.first, context.second, ConversationPurpose.valueOf(jdbc.queryForObject("SELECT purpose FROM pf_product_conversation WHERE conversation_id=?",String::class.java,id.value)!!))
     }
 
     override fun findRequests(productId: ProductId?): List<ProductRequestDetails> = jdbc.query(
@@ -683,6 +731,7 @@ class ProductAdvisorApplicationService(
         { rs, _ -> NotificationDetails(rs.getString(1), ProductId(rs.getString(2)), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getTimestamp(7)?.toInstant(), rs.getTimestamp(8).toInstant(), rs.getLong(9)) }, userId.value,
     ).filter { notification ->
         notification.productId.value in allowedProducts(userId) && when(notification.kind) {
+            "QUESTION_OPEN" -> jdbc.queryForObject("SELECT COUNT(*) FROM pf_stakeholder_question WHERE question_id=? AND status='OPEN' AND requested_role=? AND (requested_respondent_user_id IS NULL OR requested_respondent_user_id=?)",Long::class.java,notification.targetId,identities.getIdentity(userId).actingRole.name,userId.value) == 1L
             "ARCHITECT_APPROVAL_REQUIRED" -> identities.getIdentity(userId).actingRole==ActingRole.ARCHITECT
             "PRODUCT_APPROVAL_REQUIRED", "PROPOSAL_READY" -> identities.getIdentity(userId).actingRole==ActingRole.PRODUCT_OWNER
             "FACTORY_APPROVAL_REQUIRED" -> false
@@ -820,7 +869,7 @@ class ProductAdvisorApplicationService(
     companion object {
         const val AGENT_ROLE = "PRODUCT_ADVISOR"
         const val JOB_KEY = "PRODUCT_ADVISOR.CONVERSE"
-        const val PROMPT_VERSION = 2L
+        const val PROMPT_VERSION = 3L
         const val MAX_ATTEMPTS = 3
         const val MAX_HOTFIX_ROUTE_ATTEMPTS = 2
         val SHA = Regex("[0-9a-fA-F]{40}")
@@ -838,6 +887,7 @@ class ProductAdvisorScheduler(
         if (!enabled) return
         service.resumeAdvisorTurns()
         service.routeApprovedRequests()
+        service.resumeChatRefinements()
     }
 }
 

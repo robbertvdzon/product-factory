@@ -63,6 +63,8 @@ data class ProductConversationMessageDetails(
     val text: String,
     val createdBy: UserId?,
     val createdAt: Instant,
+    val authorRole: ProductMembershipRole? = null,
+    val attachments: List<ConversationAttachment> = emptyList(),
 )
 data class ProductConversationDetails(
     val id: ProductConversationId,
@@ -77,6 +79,7 @@ data class ProductConversationDetails(
     val request: ProductRequestDetails? = null,
     val epicId: String? = null,
     val audienceRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER,
+    val purpose: ConversationPurpose = ConversationPurpose.LEGACY,
 )
 data class ProductRequestVersionDetails(
     val version: Long,
@@ -136,8 +139,8 @@ data class NotificationDetails(
 )
 
 data class CreateConversationCommand(val productId: ProductId, val title: String, val userId: UserId, val idempotencyKey: String,
-    val epicId: String? = null, val audienceRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER)
-data class AddConversationMessageCommand(val conversationId: ProductConversationId, val text: String, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
+    val epicId: String? = null, val audienceRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER, val purpose: ConversationPurpose = ConversationPurpose.LEGACY)
+data class AddConversationMessageCommand(val conversationId: ProductConversationId, val text: String, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String, val intent: ConversationIntent = ConversationIntent.DISCUSS, val expectedEpicVersion: Long? = null, val images: List<ConversationImageInput> = emptyList(), val authorRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER)
 data class CloseConversationCommand(val conversationId: ProductConversationId, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
 data class ApproveProductRequestCommand(val requestId: ProductRequestId, val requestVersion: Long, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)
 data class CancelProductRequestCommand(val requestId: ProductRequestId, val expectedVersion: Long, val userId: UserId, val idempotencyKey: String)

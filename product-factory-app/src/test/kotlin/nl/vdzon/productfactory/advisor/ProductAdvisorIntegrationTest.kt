@@ -119,7 +119,7 @@ class ProductAdvisorIntegrationTest(
         assertThat(jdbc.queryForObject(
             "SELECT prompt_template_version FROM pf_ai_task WHERE product_id=? ORDER BY created_at DESC LIMIT 1",
             Long::class.java, productId.value,
-        )).isEqualTo(2L)
+        )).isEqualTo(3L)
         assertThat(submitted.environmentKeys).isEmpty()
         completeOnlyJob(mapper.createObjectNode().apply {
             put("message", "De bestaande route leest productcontext en voert zonder bevestiging niets uit.")
@@ -209,6 +209,49 @@ class ProductAdvisorIntegrationTest(
         assertThat(routing.linkedEpicId).isNull()
         assertThat(jdbc.queryForObject("SELECT status FROM pf_design_work_item WHERE request_id=?", String::class.java, request.value)).isEqualTo("IN_PROGRESS")
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_epic WHERE source_product_request_id=?", Long::class.java, request.value)).isZero()
+    }
+
+    @Test
+    fun `nieuwe epic gaat zonder extra voorstelgoedkeuring naar ontwerp inclusief afbeeldingen`() {
+        val id=advisor.createConversation(CreateConversationCommand(productId,"Nieuwe epic",owner.id,"new-epic",purpose=ConversationPurpose.EPIC))
+        val image=ConversationImageInput("voorbeeld.png","image/png","iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==")
+        val command=AddConversationMessageCommand(id,"Maak de homepage rustig.",1,owner.id,"epic-with-image",images=listOf(image))
+        advisor.addMessage(command)
+        advisor.addMessage(command)
+        assertThat(advisor.getConversation(id).messages.single().attachments).hasSize(1)
+        assertThatThrownBy { advisor.addMessage(command.copy(images=listOf(image.copy(filename="ander.png")))) }.isInstanceOf(IdempotencyConflict::class.java)
+        advisor.resumeAdvisorTurns()
+        ai.dispatchPending()
+        assertThat(runtime.requests.single().attachments).hasSize(1)
+        completeOnlyJob(proposal("BUGFIX","Rustige homepage"))
+        advisor.resumeAdvisorTurns()
+        val request=advisor.findRequests(productId).single()
+        assertThat(request.status).isEqualTo(ProductRequestStatus.APPROVED)
+        assertThat(request.content.type).isEqualTo(ProductRequestType.EPIC_CANDIDATE)
+        advisor.routeApprovedRequests()
+        ai.dispatchPending()
+        assertThat(runtime.requests.last().attachments).hasSize(1)
+        assertThat(runtime.requests.last().prompt).contains("referenceImages","voorbeeld.png")
+        assertThat(advisor.getRequest(request.id).status).isEqualTo(ProductRequestStatus.ROUTING)
+    }
+
+    @Test
+    fun `losse vraag kan ook bij onjuist AI voorstel nooit een epic of werkitem starten`() {
+        val id=advisor.createConversation(CreateConversationCommand(productId,"Hoe werkt zoeken?",owner.id,"question-only",purpose=ConversationPurpose.QUESTION))
+        advisor.addMessage(AddConversationMessageCommand(id,"Leg zoeken uit.",1,owner.id,"question-message"))
+        advisor.resumeAdvisorTurns()
+        completeOnlyJob(proposal("EPIC_CANDIDATE","Ongevraagd voorstel"))
+        advisor.resumeAdvisorTurns()
+        advisor.routeApprovedRequests()
+        assertThat(advisor.findRequests(productId)).isEmpty()
+        assertThat(advisor.getConversation(id).status).isEqualTo(ConversationStatus.WAITING_FOR_USER)
+    }
+
+    @Test
+    fun `ongeldige afbeelding laat geen half bericht of AI beurt achter`() {
+        assertThatThrownBy { advisor.addMessage(AddConversationMessageCommand(conversationId,"Een beeld",1,owner.id,"invalid-image",images=listOf(ConversationImageInput("x.png","image/png","bm90IGFuIGltYWdl")))) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(advisor.getConversation(conversationId).messages).isEmpty()
+        assertThat(advisor.getConversation(conversationId).version).isEqualTo(1L)
     }
 
     private fun insertRequest(type: ProductRequestType): ProductRequestId {

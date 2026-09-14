@@ -20,7 +20,7 @@ data class EpicFeedbackRequest(val expectedVersion: Long, val role: ProductMembe
 class EpicCollaborationController(private val policies: ProductGovernanceService, private val governance: EpicGovernanceService,
     private val design: ProductDesignService, private val queries: ProductDesignQueryService,
     private val advisor: ProductAdvisorService, private val advisorQueries: ProductAdvisorQueryService,
-    private val authorization: ProductAuthorizationService, private val ai: AiExecutionQueryService) {
+    private val authorization: ProductAuthorizationService, private val ai: AiExecutionQueryService, private val jdbc: org.springframework.jdbc.core.JdbcTemplate) {
     @GetMapping("/products/{productId}/governance")
     fun policy(@PathVariable productId: String, authentication: Authentication?): ProductGovernancePolicy {
         authorization.requireProduct(ProductId(productId),authentication)
@@ -47,16 +47,17 @@ class EpicCollaborationController(private val policies: ProductGovernanceService
     @GetMapping("/epics/{epicId}/discussions")
     fun discussions(@PathVariable epicId: String,authentication: Authentication?): List<ProductConversationDetails> {
         val epic=queries.getEpic(EpicId(epicId));authorization.requireProduct(epic.productId,authentication)
-        val role=authorization.current(authentication)?.actingRole?.name
         return advisorQueries.findConversations(epic.productId).filter {
-            (it.epicId==epicId || it.request?.linkedEpicId==epicId) &&
-                (authorization.isFactoryOwner(authentication) || it.audienceRole.name==role)
-        }
+            it.epicId==epicId || it.request?.linkedEpicId==epicId
+        }.sortedWith(compareBy<ProductConversationDetails> { it.status == ConversationStatus.CLOSED }.thenBy { it.createdAt })
     }
     @PostMapping("/epics/{epicId}/discussions")
+    @org.springframework.transaction.annotation.Transactional
     fun discussion(@PathVariable epicId: String,@RequestBody request: EpicDiscussionRequest,authentication: Authentication?): Map<String,String> {
         val epic=queries.getEpic(EpicId(epicId));authorization.requireRole(epic.productId,request.role,authentication)
-        val id=advisor.createConversation(CreateConversationCommand(epic.productId,request.title,authorization.currentUserId(authentication),request.idempotencyKey,epicId,request.role))
+        jdbc.queryForObject("SELECT current_version FROM pf_epic WHERE id=? FOR UPDATE",Long::class.java,epicId)
+        discussions(epicId,authentication).firstOrNull { it.status != ConversationStatus.CLOSED }?.let { return mapOf("id" to it.id.value) }
+        val id=advisor.createConversation(CreateConversationCommand(epic.productId,request.title,authorization.currentUserId(authentication),request.idempotencyKey,epicId,request.role,ConversationPurpose.EPIC))
         return mapOf("id" to id.value)
     }
     @GetMapping("/epics/{epicId}/ux-artifacts")

@@ -26,21 +26,35 @@ gebonden aan het vastgelegde mandaat.
 
 ## Van idee naar uitvoering
 
-De PO gebruikt **Mijn werk → Nieuw idee**. Het gesprek met Product Advisor levert een voorstel.
-Na **Laat dit voorstel uitwerken** maakt Productontwerp een versie met functionele uitwerking,
-acceptatiecriteria, scherminventaris, bewaarde desktop-/mobielbeelden, risico's en impact.
-Bij AI-productbesturing wordt een epicvoorstel automatisch doorgezet.
+De PO opent **Mijn epics → Nieuwe epic**, kiest een project en beschrijft de wens in de chat.
+PNG-, JPEG- en WebP-beelden kunnen worden toegevoegd. Product Advisor vraagt door als informatie
+ontbreekt en stuurt een voldoende uitgewerkte wens automatisch naar Productontwerp. Er is geen
+aparte voorstelgoedkeuring nodig. Productontwerp maakt de eerste epicversie met inhoud,
+acceptatiecriteria, schermen en architectuurimpact. Bestaande gesprekken en testepics blijven behouden.
 
-In de epic staan gesprek en dossier bij elkaar. Feedback neemt de expliciet bevestigde vraag en
-recente gesprekscontext mee naar de bestaande ontwerpflow. Feedback op een scherm benoemt de
-inhoudsversie, screenKey, viewport en artifact. Nieuwe inhoud vraagt opnieuw functioneel akkoord.
+**Mijn epics** toont standaard alle niet-afgeronde epics. De architect opent **Epics**, standaard
+gefilterd op eigen open vragen en benodigde architectuurgoedkeuring. Beide rollen kunnen wisselen
+naar alle of afgeronde epics. **Alle projecten** combineert uitsluitend projecten waarvoor de
+actieve rol toegang heeft en geldt ook voor beide vragensecties.
+
+PO en architect zien hetzelfde dossier: **Inhoud**, **Schermen**, **Architectuur**, **Goedkeuring**
+en **Voortgang**, met een gedeeld epicgesprek ernaast. De inhoud wordt via AI gewijzigd.
+**Vraag stellen** geeft alleen advies; **Epic aanpassen → Laat AI aanpassen** stuurt het expliciete
+verzoek met de actuele epicversie en beelden naar Productontwerp. Het gesprek meldt wanneer de
+nieuwe inhoudsversie klaar is. Nieuwe inhoud vraagt opnieuw de benodigde goedkeuringen.
 Het behouden, vervangen of verwijderen van bestaande UX-artifacts blijft expliciet gevalideerd.
 
-De architect ziet korte impactregels voor database, migratie, externe systemen, frontend,
-toegang en AI in het product. Uitklappen toont bewijs en alternatieven; **Onderzoek met AI** start
-een duurzaam epicgesprek. **Vraag onderzoek** bewaart een open besluit, **Vraag aanpassing**
-stuurt de epic terug naar Productontwerp. Product-AI beschrijft de belasting van het te wijzigen
-product, niet de agentkosten van de factory.
+De architectuur is ook zichtbaar voor de PO. Impactregels beschrijven database, migratie, externe
+systemen, frontend, toegang en product-AI. **Onderzoek met AI** vult een vraag voor het epicgesprek
+in. Product-AI beschrijft de belasting van het te wijzigen product, niet de agentkosten van de factory.
+
+**Vragen voor mij** toont echte open en beantwoorde procesvragen, inclusief project, afzender en
+gekoppelde epic. **Mijn vragen aan AI** bevat persoonlijke gesprekken over de applicatie; deze
+maken nooit automatisch een epic. Het oude notificatieblok met losse vinkjes vervalt in deze werkplek.
+
+Beelden zijn maximaal 4 MiB per stuk, 6 per bericht en samen 8 MiB per bericht. Een gesprek bevat
+maximaal 10 beelden en 10 MiB. Ze worden duurzaam opgeslagen, alleen met product-/gesprekstoegang
+opgehaald en als IMAGE-bestanden aan de betreffende AI-opdracht doorgegeven.
 
 Goedkeuringen horen bij `contentVersion` én de versie van productafspraken. Lifecycle-overgangen
 verhogen `version`, maar behouden `contentVersion`. Verouderde besluiten blijven auditinformatie;
@@ -65,9 +79,12 @@ epicverificatie wordt afzonderlijk benoemd. Architect- en PO-notificaties worden
 |---|---|
 | `GET/PUT /api/products/{id}/governance` | Geversioneerde productbesturing en afspraken |
 | `GET/POST /api/epics/{id}/reviews` | Besluithistorie en versiegebonden besluit |
-| `GET/POST /api/epics/{id}/discussions` | Epicgesprek voor de handelende productrol |
+| `GET/POST /api/epics/{id}/discussions` | Gedeeld epicgesprek voor PO en architect |
 | `POST /api/epics/{id}/feedback` | Feedback op uitwerking/scherm naar duurzame revisie |
 | `GET /api/epics/{id}/ux-artifacts?name=...` | Alleen een bewaard rasterbeeld van deze epic |
+| `POST /api/products/{id}/conversations` | Nieuw gesprek met purpose EPIC of QUESTION |
+| `POST /api/conversations/{id}/messages` | Bericht, images en intent DISCUSS of UPDATE_EPIC; wijzigingen vereisen expectedEpicVersion |
+| `GET /api/conversation-images/{id}` | Geautoriseerd ophalen van een chatbeeld |
 | `GET /api/epics/{id}/progress` | Implementatie, vragen, blokkades en verificatie |
 | `GET /api/my/notifications` | Meldingen binnen de actuele producttoegang |
 | `DELETE /api/products/{id}` | Product en alle lokale Product Factory-data definitief verwijderen |
@@ -84,6 +101,9 @@ en rolgerichte epicgesprekken/vragen toe. Oude approvals blijven intact als hist
 niemand wordt automatisch architect. Bestaande epics zonder impact blijven onder hun oude
 lifecycle zolang het product niet is ingericht. Zodra governance is ingesteld, blokkeert
 ontbrekende impact en moet de epic worden verfijnd. Nieuwe runtimeoutput bevat altijd impact.
+
+Flyway 33 koppelt bestaande aanvraaggesprekken aan hun epic en voegt gespreksdoel, berichtrol,
+beelden en duurzame hervatting van chatwijzigingen toe. Er wordt geen bestaande epic verwijderd.
 
 Een versieconflict vraagt verversen en opnieuw beoordelen. Een niet-onderbouwde impact vraagt
 onderzoek of verfijning; een ontbrekende rol wordt via Leden toegewezen. Factorybeheer houdt

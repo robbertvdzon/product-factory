@@ -265,6 +265,8 @@ class _ApplicationShellState extends State<ApplicationShell> {
             ? 'policy'
             : _selected == _Destination.meetings
             ? 'questions'
+            : _selected == _Destination.conversations
+            ? 'own-questions'
             : _selected == _Destination.design
             ? 'epics'
             : 'home',
@@ -274,7 +276,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.governance => const SizedBox.shrink(),
       _Destination.overview => ProductWorkspacePage(
         gateway: products,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -283,7 +287,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.design => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.design,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -292,7 +298,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.planning => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.planning,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -301,7 +309,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.quality => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.quality,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -310,7 +320,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.signals => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.signals,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -319,7 +331,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.meetings => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.meetings,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -327,7 +341,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       ),
       _Destination.conversations => ProductConversationsPage(
         products: products,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         initialConversationId: _selectedConversationId,
         onProductSelected: _selectProduct,
         onConversationSelected: _selectConversation,
@@ -350,7 +366,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.settings => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.settings,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -367,7 +385,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.decisions => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.decisions,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -387,7 +407,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
       _Destination.operation => ProductWorkspacePage(
         gateway: products,
         section: ProductWorkspaceSection.operation,
-        initialProductId: _selectedProductId,
+        initialProductId: _selectedProductId == '__all__'
+            ? null
+            : _selectedProductId,
         onProductSelected: _selectProduct,
         refreshController: _pageRefresh,
         isFactoryOwner: widget.isFactoryOwner,
@@ -518,20 +540,20 @@ class _ApplicationShellState extends State<ApplicationShell> {
         if (!widget.isFactoryOwner) ...[
           _navItem(
             _Destination.overview,
-            Icons.home_outlined,
-            widget.actingRole == 'ARCHITECT' ? 'Te beoordelen' : 'Mijn werk',
-            closeAfterSelection,
-          ),
-          _navItem(
-            _Destination.design,
-            Icons.auto_awesome_outlined,
-            widget.actingRole == 'ARCHITECT' ? 'Epicimpact' : 'Mijn epics',
+            Icons.layers_outlined,
+            widget.actingRole == 'ARCHITECT' ? 'Epics' : 'Mijn epics',
             closeAfterSelection,
           ),
           _navItem(
             _Destination.meetings,
             Icons.question_answer_outlined,
-            'Vragen',
+            'Vragen voor mij',
+            closeAfterSelection,
+          ),
+          _navItem(
+            _Destination.conversations,
+            Icons.chat_bubble_outline,
+            'Mijn vragen aan AI',
             closeAfterSelection,
           ),
           if (widget.actingRole == 'ARCHITECT')
@@ -800,7 +822,10 @@ class _ApplicationShellState extends State<ApplicationShell> {
       : destination;
 
   void _select(_Destination requested) {
-    final destination = _allowed(requested);
+    final destination =
+        !widget.isFactoryOwner && requested == _Destination.design
+        ? _Destination.overview
+        : _allowed(requested);
     if (destination != _Destination.conversations) {
       _selectedConversationId = null;
     }
@@ -830,7 +855,10 @@ class _ApplicationShellState extends State<ApplicationShell> {
 
   void _applyLocation(Uri location, {bool notify = true}) {
     final requested = _destinationForPath(location.path);
-    final destination = _allowed(requested);
+    final destination =
+        !widget.isFactoryOwner && requested == _Destination.design
+        ? _Destination.overview
+        : _allowed(requested);
     final productId = location.queryParameters['product']?.trim();
     final conversationId = location.queryParameters['conversation']?.trim();
     if (destination != requested) {

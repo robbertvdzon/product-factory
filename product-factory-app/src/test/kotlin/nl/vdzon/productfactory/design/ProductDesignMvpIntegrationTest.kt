@@ -200,6 +200,39 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `expliciet chatwijzigingsverzoek hervat duurzaam ontwerp en bewaart gesprek en versie`() {
+        design.runProcessSession(productId)
+        completeOnlyJob(validEpic())
+        design.runProcessSession(productId)
+        val original=queries.findEpics(EpicFilter(productId)).single()
+        val owner=users.resolveOrCreate("chat-${productId.value}@example.test",true)
+        val chat=advisor.createConversation(CreateConversationCommand(productId,"Epicgesprek",owner.id,"chat-create",original.id.value,ProductMembershipRole.PRODUCT_OWNER,ConversationPurpose.EPIC))
+        advisor.addMessage(AddConversationMessageCommand(chat,"Waarom ziet dit er zo uit?",1,owner.id,"chat-discuss"))
+        advisor.resumeAdvisorTurns()
+        completeOnlyJob(mapper.createObjectNode().apply { put("outcome","ANSWER"); put("message","Dit is de huidige uitwerking.");putArray("observations").add("Broncode bekeken.");putNull("proposal") })
+        advisor.resumeAdvisorTurns()
+        assertThat(queries.getEpic(original.id).version).isEqualTo(original.version)
+        val version=advisor.getConversation(chat).version
+        assertThatThrownBy { advisor.addMessage(AddConversationMessageCommand(chat,"Wijzig dit",version,owner.id,"stale-change",ConversationIntent.UPDATE_EPIC,original.version+10)) }.isInstanceOf(VersionConflict::class.java)
+        advisor.addMessage(AddConversationMessageCommand(chat,"Geef Mijn dossiers een eigen knop.",version,owner.id,"chat-change",ConversationIntent.UPDATE_EPIC,original.version))
+        advisor.resumeAdvisorTurns()
+        completeOnlyJob(mapper.createObjectNode().apply { put("outcome","ANSWER");put("message","Ik stuur de wijziging naar ontwerp.");putArray("observations").add("De knop ontbreekt.");putNull("proposal") })
+        advisor.resumeAdvisorTurns()
+        val pending=queries.getEpic(original.id)
+        assertThat(pending.status).isEqualTo(EpicStatus.NEEDS_REFINEMENT)
+        assertThat(pending.refinementReason).contains("Geef Mijn dossiers een eigen knop.")
+        advisor.resumeChatRefinements()
+        val result=validEpic().apply { put("outcome","REVISE_EPIC");put("epicId",pending.id.value);put("expectedVersion",pending.version); (path("epic") as ObjectNode).apply { put("title","Rustige voortgang met dossiers");keepExistingUx(this,pending) } }
+        completeOnlyJob(result)
+        advisor.resumeChatRefinements()
+        advisor.resumeChatRefinements()
+        val revised=queries.getEpic(original.id)
+        assertThat(revised.contentVersion).isGreaterThan(original.contentVersion)
+        assertThat(advisor.getConversation(chat).messages.count { it.sender==ConversationSender.SYSTEM && it.text.contains("bijgewerkt naar") }).isEqualTo(1)
+        assertThat(advisor.findRequests(productId)).isEmpty()
+    }
+
+    @Test
     fun `wachtende sessie vraagt exact een taak en publiceert complete epic atomair`() {
         design.runProcessSession(productId)
         design.runProcessSession(productId)
