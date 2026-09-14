@@ -253,7 +253,17 @@ void main() {
           return jsonOk([conversation]);
         }
         if (path == '/api/epics/epic-1/discussions') {
-          return jsonOk([conversation]);
+          return jsonOk([
+            conversation,
+            {
+              'id': 'old-architect-chat',
+              'status': 'CLOSED',
+              'audienceRole': 'ARCHITECT',
+              'messages': [
+                {'sender': 'USER', 'text': 'Dit past binnen de architectuur.'},
+              ],
+            },
+          ]);
         }
         if (path == '/api/conversations/conversation-1') {
           return jsonOk(conversation);
@@ -290,6 +300,7 @@ void main() {
         findsOneWidget,
       );
       await tester.ensureVisible(find.text('Epic aanpassen'));
+      expect(find.text('Architect'), findsOneWidget);
       await tester.tap(find.text('Epic aanpassen'));
       await tester.pumpAndSettle();
       await tester.enterText(

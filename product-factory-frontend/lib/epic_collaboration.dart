@@ -132,9 +132,19 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       products.where((p) => p.id == _text(id)).firstOrNull?.name ?? _text(id);
   List<Json> get discussionMessages => discussions.isEmpty
       ? _maps(conversation?['messages'])
-      : (discussions.expand((d) => _maps(d['messages'])).toList()..sort(
-          (a, b) => _text(a['createdAt']).compareTo(_text(b['createdAt'])),
-        ));
+      : (discussions
+            .expand(
+              (d) => _maps(d['messages']).map(
+                (m) => <String, Object?>{
+                  ...m,
+                  'authorRole': m['authorRole'] ?? d['audienceRole'],
+                },
+              ),
+            )
+            .toList()
+          ..sort(
+            (a, b) => _text(a['createdAt']).compareTo(_text(b['createdAt'])),
+          ));
   String? screenKey;
   Timer? timer;
   final message = TextEditingController(), idea = TextEditingController();
@@ -979,6 +989,11 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             title: Text(
               'AI verwerkt je bericht. Je kunt deze pagina sluiten en later terugkomen.',
             ),
+          ),
+        if (c?['status'] == 'BLOCKED')
+          notice(
+            'Je bericht kon niet worden verwerkt',
+            'Je bericht en beelden zijn bewaard. Probeer opnieuw. Als de epic intussen is veranderd, bekijk de huidige versie en verstuur je wens opnieuw.',
           ),
         if (c?['status'] == 'BLOCKED')
           button(
