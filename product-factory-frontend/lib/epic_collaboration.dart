@@ -710,6 +710,19 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
               else if (widget.section == 'questions' && epic == null)
                 questionPanel()
               else if (creating) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: saving
+                        ? null
+                        : () => setState(() {
+                            creating = false;
+                          }),
+                    child: Text(
+                      ownQuestions ? '← Mijn vragen aan AI' : '← Mijn epics',
+                    ),
+                  ),
+                ),
                 Text(
                   ownQuestions ? 'Nieuwe vraag aan AI' : 'Nieuwe epic',
                   style: Theme.of(context).textTheme.headlineMedium,
