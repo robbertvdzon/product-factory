@@ -71,6 +71,36 @@ class ProductAdvisorIntegrationTest(
     }
 
     @Test
+    fun `berichten laden in begrensde paginas zonder gaten bij gelijke tijden en nieuwe berichten`() {
+        val other = advisor.createConversation(CreateConversationCommand(productId, "Ander gesprek", owner.id, "other-page-chat", audienceRole = ProductMembershipRole.ARCHITECT))
+        val time = Instant.parse("2026-09-14T09:00:00Z")
+        fun insert(id: String, sequence: Int, chat: ProductConversationId = conversationId, at: Instant = time) {
+            jdbc.update("INSERT INTO pf_product_conversation_message(message_id,conversation_id,sequence_number,sender,message_text,created_by,created_at,idempotency_key) VALUES (?,?,?,'USER',?,?,?,?)", id, chat.value, sequence, "Bericht $sequence", owner.id.value, at, "key-$id")
+        }
+        (1..75).forEach { insert("page-${(100 - it).toString().padStart(3, '0')}", it) }
+        insert("private-message", 1, other)
+        val latest = advisor.messagePage(listOf(conversationId), null, null, 30)
+        assertThat(latest.messages.map { it.sequence }).containsExactlyElementsOf((46L..75L).toList())
+        assertThat(latest.hasMore).isTrue()
+        val older = advisor.messagePage(listOf(conversationId), latest.nextCursor, null, 30)
+        assertThat(older.messages.map { it.sequence }).containsExactlyElementsOf((16L..45L).toList())
+        val first = advisor.messagePage(listOf(conversationId), older.nextCursor, null, 30)
+        assertThat(first.messages.map { it.sequence }).containsExactlyElementsOf((1L..15L).toList())
+        assertThat(first.hasMore).isFalse()
+        insert("page-new", 76, at = time.plusSeconds(1))
+        val newMessages = advisor.messagePage(listOf(conversationId), null, latest.messages.last().id.value, 30)
+        assertThat(newMessages.messages.single().sequence).isEqualTo(76L)
+        assertThat(newMessages.hasMore).isFalse()
+        assertThat(advisor.getConversation(conversationId, false).messages).isEmpty()
+        assertThat(advisor.getConversation(conversationId).messages).hasSize(76)
+        assertThatThrownBy { advisor.messagePage(listOf(conversationId), "private-message", null, 30) }.isInstanceOf(InvalidCommand::class.java)
+        assertThatThrownBy { advisor.messagePage(listOf(conversationId), null, null, 1000) }.isInstanceOf(IllegalArgumentException::class.java)
+        val combined = advisor.messagePage(listOf(conversationId, other), null, null, 100).messages
+        assertThat(combined).hasSize(77)
+        assertThat(combined.single { it.id.value == "private-message" }.authorRole).isEqualTo(ProductMembershipRole.ARCHITECT)
+    }
+
+    @Test
     fun `idee uitwerken vereist nog geen gedeployde testomgeving`() {
         jdbc.update("DELETE FROM pf_testable_product_configuration WHERE product_id=?",productId.value)
         advisor.addMessage(AddConversationMessageCommand(conversationId,"Werk een nieuw idee uit.",1,owner.id,"without-environment"))

@@ -81,6 +81,7 @@ data class ProductConversationDetails(
     val audienceRole: ProductMembershipRole = ProductMembershipRole.PRODUCT_OWNER,
     val purpose: ConversationPurpose = ConversationPurpose.LEGACY,
     val changeProposal: EpicChatProposal? = null,
+    val referenceImages: List<ConversationAttachment> = emptyList(),
 )
 data class ProductRequestVersionDetails(
     val version: Long,
@@ -157,9 +158,12 @@ interface ProductAdvisorService {
     fun resumeAdvisorTurns(limit: Int = 20)
 }
 
+data class ConversationMessagePage(val messages: List<ProductConversationMessageDetails>, val hasMore: Boolean, val nextCursor: String?)
+
 interface ProductAdvisorQueryService {
-    fun findConversations(productId: ProductId): List<ProductConversationDetails>
-    fun getConversation(id: ProductConversationId): ProductConversationDetails
+    fun messagePage(conversationIds: List<ProductConversationId>, before: String? = null, after: String? = null, limit: Int = 30): ConversationMessagePage
+    fun findConversations(productId: ProductId, includeMessages: Boolean = true): List<ProductConversationDetails>
+    fun getConversation(id: ProductConversationId, includeMessages: Boolean = true): ProductConversationDetails
     fun findRequests(productId: ProductId? = null): List<ProductRequestDetails>
     fun getRequest(id: ProductRequestId): ProductRequestDetails
     fun findActions(userId: UserId): List<PersonalActionDetails>

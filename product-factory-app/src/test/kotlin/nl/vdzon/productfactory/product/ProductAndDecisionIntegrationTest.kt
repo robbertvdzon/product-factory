@@ -28,6 +28,14 @@ class ProductAndDecisionIntegrationTest(
     @Autowired private val jdbc: JdbcTemplate,
 ) {
     @Test
+    fun `productopdracht kan zonder apart doelgroepveld worden vastgelegd`() {
+        val productId = ProductId("no-audience-${java.util.UUID.randomUUID()}")
+        products.createProduct(CreateProductCommand(productId, "Product zonder doelgroepveld", actor = STAKEHOLDER, idempotencyKey = "create-${productId.value}"))
+        products.updateProductAssignment(UpdateProductAssignmentCommand(productId, "", "Een helder productdoel", "https://github.com/example/product.git", 0, STAKEHOLDER, "assignment-${productId.value}"))
+        assertThat(productQueries.getProductAssignment(productId).audience).isEmpty()
+    }
+
+    @Test
     fun `product wordt met alle lokale configuratie en historie definitief verwijderd`() {
         val id = createProduct("product-delete")
         products.updateProductAssignment(UpdateProductAssignmentCommand(

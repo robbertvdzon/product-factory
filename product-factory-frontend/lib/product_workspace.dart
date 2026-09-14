@@ -1315,7 +1315,6 @@ class _AssignmentEditor extends StatefulWidget {
 }
 
 class _AssignmentEditorState extends State<_AssignmentEditor> {
-  late final TextEditingController _audience;
   late final TextEditingController _goal;
   late final TextEditingController _git;
   bool _saving = false;
@@ -1327,7 +1326,6 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
   void initState() {
     super.initState();
     final assignment = widget.assignment;
-    _audience = TextEditingController(text: _value(assignment?['audience']));
     _goal = TextEditingController(text: _value(assignment?['goal']));
     _git = TextEditingController(text: _value(assignment?['publicGitUrl']));
     _aiSupplier = assignment?['aiSupplier'] as String?;
@@ -1336,20 +1334,18 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
 
   @override
   void dispose() {
-    _audience.dispose();
     _goal.dispose();
     _git.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (_audience.text.trim().isEmpty ||
-        _goal.text.trim().isEmpty ||
+    if (_goal.text.trim().isEmpty ||
         (widget.canEditTechnical && _git.text.trim().isEmpty)) {
       setState(
         () => _validationError = widget.canEditTechnical
-            ? 'Vul doelgroep, productdoel en de Git-URL in.'
-            : 'Vul doelgroep en productdoel in.',
+            ? 'Vul het productdoel en de Git-URL in.'
+            : 'Vul het productdoel in.',
       );
       return;
     }
@@ -1358,7 +1354,7 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
       _validationError = null;
     });
     final saved = await widget.onSave({
-      'audience': _audience.text.trim(),
+      'audience': _value(widget.assignment?['audience']),
       'goal': _goal.text.trim(),
       'publicGitUrl': _git.text.trim(),
       'aiSupplier': _aiSupplier,
@@ -1371,14 +1367,8 @@ class _AssignmentEditorState extends State<_AssignmentEditor> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const SelectableText('Werk de doelgroep en het productdoel bij.'),
+      const SelectableText('Beschrijf wat je met het product wilt bereiken.'),
       const SizedBox(height: 20),
-      TextField(
-        key: const ValueKey('assignment-audience'),
-        controller: _audience,
-        decoration: const InputDecoration(labelText: 'Doelgroep'),
-      ),
-      const SizedBox(height: 16),
       TextField(
         key: const ValueKey('assignment-goal'),
         controller: _goal,
@@ -2068,7 +2058,11 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 680),
                       child: SelectableText(
-                        _sectionDescription(widget.section),
+                        widget.section == ProductWorkspaceSection.settings &&
+                                widget.actingRole == 'PRODUCT_OWNER' &&
+                                !widget.isFactoryOwner
+                            ? 'Wat wil je met dit product bereiken?'
+                            : _sectionDescription(widget.section),
                       ),
                     ),
                   ],
@@ -2222,8 +2216,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         ],
         _assignment(data),
         const SizedBox(height: 20),
-        _governance(data),
-        const SizedBox(height: 20),
+        if (widget.isFactoryOwner || widget.actingRole == 'ARCHITECT') ...[
+          _governance(data),
+          const SizedBox(height: 20),
+        ],
         if (widget.isFactoryOwner) _schedules(data),
         if (widget.trailingContent != null) ...[
           const SizedBox(height: 20),
@@ -4114,6 +4110,8 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     return _section(
       _editingAssignment
           ? 'Productopdracht bewerken'
+          : widget.actingRole == 'PRODUCT_OWNER' && !widget.isFactoryOwner
+          ? 'Productopdracht'
           : 'Productopdracht en testomgevingen',
       Icons.assignment_outlined,
       [
@@ -4128,7 +4126,6 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         else if (a == null)
           const SelectableText('Productopdracht nog niet vastgelegd.')
         else ...[
-          SelectableText('Doelgroep: ${a['audience']}'),
           SelectableText('Doel: ${a['goal']}'),
           const SizedBox(height: 8),
           SelectableText('Git: ${a['publicGitUrl']}'),
@@ -4146,6 +4143,9 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               label: const Text('Opdracht bewerken'),
             ),
           ),
+        ],
+        if (!_editingAssignment &&
+            (widget.isFactoryOwner || widget.actingRole == 'ARCHITECT')) ...[
           const Divider(),
           SelectableText(
             'Testomgevingen',

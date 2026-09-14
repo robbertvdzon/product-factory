@@ -38,7 +38,13 @@ naar alle of afgeronde epics. **Alle projecten** combineert uitsluitend projecte
 actieve rol toegang heeft en geldt ook voor beide vragensecties.
 
 PO en architect zien hetzelfde dossier: **Inhoud**, **Schermen**, **Architectuur**, **Goedkeuring**
-en **Voortgang**, met een gedeeld epicgesprek ernaast. De inhoud wordt via AI gewijzigd.
+en **Voortgang**, met een gedeeld epicgesprek ernaast. Dossier en chat scrollen onafhankelijk
+binnen de beschikbare schermhoogte. De chatinvoer blijft onderaan staan. Op smalle schermen
+wisselt de gebruiker tussen **Epic** en **Gesprek**. De chat opent bij de nieuwste 30 berichten;
+ouder materiaal laadt bij omhoog scrollen. Nieuwe berichten worden vanaf het laatste opgehaalde
+bericht geladen. Wie oudere berichten leest, blijft op dezelfde plek en ziet **Nieuw bericht ↓**.
+Wijzigingsvoorstellen en terugdraaien staan bij de bijbehorende chatmelding.
+De inhoud wordt via AI gewijzigd.
 Er is één invoerveld: **Stel een vraag of beschrijf je wens**. AI beantwoordt gewone vragen,
 vraagt bij twijfel door en stuurt duidelijke wijzigingswensen met de actuele inhoudsversie en
 beelden naar Productontwerp. Het gesprek toont wanneer de voorstelversie klaar is en wat veranderde.
@@ -78,6 +84,15 @@ De PO houdt zicht op stories, bugs, hertests en verificatie. **Code geleverd** i
 productie gereed is. De voortgang toont de ingestelde acceptatie-/productielinks; een geslaagde
 epicverificatie wordt afzonderlijk benoemd. Architect- en PO-notificaties worden duurzaam bewaard.
 
+## Eenvoudige productinstellingen
+
+De PO ziet de productopdracht zonder testomgevingen, productbesturing of productafspraken.
+Architect en factory owner behouden hun technische instellingen. Architectuurimpact in de epic
+blijft voor beide rollen zichtbaar. Het aparte doelgroepveld vervalt; alleen het productdoel
+is verplicht. Bestaande doelgroepinformatie blijft bewaard als AI-context en wordt bij het
+bewerken niet gewist. Als doelgroep voor een nieuwe epic van belang is, kan die in het gesprek
+worden verduidelijkt.
+
 ## Publieke endpoints
 
 | Endpoint | Gebruik |
@@ -88,6 +103,8 @@ epicverificatie wordt afzonderlijk benoemd. Architect- en PO-notificaties worden
 | `POST /api/epics/{id}/feedback` | Feedback op uitwerking/scherm naar duurzame revisie |
 | `GET /api/epics/{id}/ux-artifacts?name=...` | Alleen een bewaard rasterbeeld van deze epic |
 | `POST /api/products/{id}/conversations` | Nieuw gesprek met purpose EPIC of QUESTION |
+| `GET /api/epics/{id}/messages` | Gedeelde chatpagina, inclusief eerdere gekoppelde gesprekken |
+| `GET /api/conversations/{id}/messages` | Persoonlijke of nieuwe epicchat: nieuwste 30, eerder via before, nieuwer via after; maximum 100 |
 | `POST /api/conversations/{id}/messages` | Bericht en images; intent AUTO laat AI de bedoeling bepalen, met expectedEpicVersion bij een epic (legacy DISCUSS/UPDATE_EPIC blijven ondersteund) |
 | `POST /api/conversations/{id}/revert-epic-change` | Laatste actuele voorstel terugdraaien met expectedVersion en expectedEpicVersion |
 | `GET /api/conversation-images/{id}` | Geautoriseerd ophalen van een chatbeeld |
@@ -95,6 +112,12 @@ epicverificatie wordt afzonderlijk benoemd. Architect- en PO-notificaties worden
 | `GET /api/my/notifications` | Meldingen binnen de actuele producttoegang |
 | `DELETE /api/products/{id}` | Product en alle lokale Product Factory-data definitief verwijderen |
 | `DELETE /api/admin/users/{id}` | Gebruiker deactiveren, sessies en lidmaatschappen intrekken |
+
+Gesprekslijsten, gespreksdetails en epicdiscussions ondersteunen `includeMessages=false`.
+De werkplek gebruikt deze metadataweergave en haalt berichten afzonderlijk op. De AI-context
+behoudt de volledige beschikbare gesprekshistorie; paginering begrenst uitsluitend de weergave.
+Cursors zijn bericht-ID’s die binnen het toegestane gesprek moeten vallen. De sorteervolgorde
+gebruikt tijdstip, gesprek en berichtvolgnummer zodat gelijke tijdstippen geen gaten veroorzaken.
 
 Mutaties gebruiken sessie, Origin, CSRF, verwachte versie en idempotentiesleutel. Productrollen
 worden bij de backend gecontroleerd. De factory owner mag reviews expliciet als product owner of
@@ -115,6 +138,8 @@ Flyway 34 bewaart de inhoudsversie waarop AI zich baseert en de vorige/nieuwe vo
 wijzigingssamenvatting en terugdraaimarkering. Bestaande gesprekken blijven intact; oude wijzigingen
 zonder vastgelegde resultaatversie krijgen geen terugdraaiactie. Als de inhoud tijdens een
 AI-beurt verandert, kan die beurt de nieuwere inhoud niet overschrijven.
+
+Flyway 35 voegt een index toe voor het gericht ophalen van berichtpagina’s.
 
 Een versieconflict vraagt verversen en opnieuw beoordelen. Een niet-onderbouwde impact vraagt
 onderzoek of verfijning; een ontbrekende rol wordt via Leden toegewezen. Factorybeheer houdt

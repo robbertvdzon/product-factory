@@ -1,0 +1,1 @@
+CREATE INDEX pf_conversation_message_page_idx ON pf_product_conversation_message(conversation_id, created_at, sequence_number);

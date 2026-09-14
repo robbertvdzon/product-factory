@@ -163,6 +163,16 @@ void main() {
         expect(requestedImages, ['ux-01', 'ux-02']);
         expect(tester.takeException(), isNull);
       }
+      await tester.tap(find.text('Gesprek'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Mijn conceptbericht');
+      await tester.tap(find.text('Epic'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gesprek'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mijn conceptbericht'), findsOneWidget);
+      await tester.ensureVisible(find.text('Verstuur'));
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
     });
@@ -171,6 +181,8 @@ void main() {
   testWidgets(
     'PO verwerkt een wijziging via het gedeelde epicgesprek met de actuele versie',
     (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1500, 1100));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       final submittedFeedback = <String, Object?>{};
       final submittedUndo = <String, Object?>{};
       final epic = <String, Object?>{
@@ -266,6 +278,29 @@ void main() {
         }
         if (path == '/api/products/hkh/conversations') {
           return jsonOk([conversation]);
+        }
+        if (path == '/api/epics/epic-1/messages') {
+          return jsonOk({
+            'messages': [
+              {
+                'id': 'm1',
+                'sender': 'USER',
+                'text': 'Mijn dossiers ontbreekt in de ontwerpen.',
+              },
+              {
+                'id': 'm2',
+                'sender': 'USER',
+                'authorRole': 'ARCHITECT',
+                'text': 'Dit past binnen de architectuur.',
+              },
+              {
+                'id': 'm3',
+                'sender': 'SYSTEM',
+                'text': 'De epic is bijgewerkt naar voorstelversie 2.',
+              },
+            ],
+            'hasMore': false,
+          });
         }
         if (path == '/api/epics/epic-1/discussions') {
           return jsonOk([

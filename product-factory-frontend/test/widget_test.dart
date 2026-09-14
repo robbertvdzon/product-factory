@@ -437,6 +437,60 @@ void main() {
     },
   );
 
+  for (final role in ['PRODUCT_OWNER', 'ARCHITECT', 'FACTORY_OWNER']) {
+    testWidgets(
+      '$role ziet alleen passende productinstellingen zonder doelgroepveld',
+      (tester) async {
+        final gateway = ResearchProductGateway(
+          assignment: const {
+            'audience': 'Bestaande doelgroep',
+            'goal': 'Een helder doel',
+            'publicGitUrl': 'https://github.com/example/app',
+            'version': 3,
+          },
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ProductWorkspacePage(
+                gateway: gateway,
+                section: ProductWorkspaceSection.settings,
+                initialProductId: 'hkh-autopilot',
+                actingRole: role,
+                isFactoryOwner: role == 'FACTORY_OWNER',
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          appText('Testomgevingen'),
+          role == 'PRODUCT_OWNER' ? findsNothing : findsOneWidget,
+        );
+        expect(
+          appText('Productbesturing en productafspraken'),
+          role == 'PRODUCT_OWNER' ? findsNothing : findsOneWidget,
+        );
+        expect(appText('Doelgroep: Bestaande doelgroep'), findsNothing);
+        if (role == 'PRODUCT_OWNER') {
+          await tester.ensureVisible(appText('Opdracht bewerken'));
+          await tester.tap(appText('Opdracht bewerken'));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('assignment-audience')),
+            findsNothing,
+          );
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('save-assignment')),
+          );
+          await tester.tap(find.byKey(const ValueKey('save-assignment')));
+          await tester.pumpAndSettle();
+          expect(gateway.savedAssignment?['audience'], 'Bestaande doelgroep');
+        }
+      },
+    );
+  }
+
   testWidgets('nieuw signaal opent een ruime meerregelige editor', (
     tester,
   ) async {

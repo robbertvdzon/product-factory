@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'external_link.dart';
 import 'conversation_images.dart';
+import 'conversation_timeline.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'configuration.dart';
@@ -106,6 +107,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       questionFilter = 'OPEN';
   int loadSequence = 0;
   String? draftProductId;
+  bool mobileConversation = false;
   bool get ownQuestions => widget.section == 'own-questions';
   bool get allProducts => productId == '__all__';
   bool closed(Json e) =>
@@ -129,21 +131,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           ));
   String productName(Object? id) =>
       products.where((p) => p.id == _text(id)).firstOrNull?.name ?? _text(id);
-  List<Json> get discussionMessages => discussions.isEmpty
-      ? _maps(conversation?['messages'])
-      : (discussions
-            .expand(
-              (d) => _maps(d['messages']).map(
-                (m) => <String, Object?>{
-                  ...m,
-                  'authorRole': m['authorRole'] ?? d['audienceRole'],
-                },
-              ),
-            )
-            .toList()
-          ..sort(
-            (a, b) => _text(a['createdAt']).compareTo(_text(b['createdAt'])),
-          ));
   String? screenKey;
   Timer? timer;
   final message = TextEditingController(), idea = TextEditingController();
@@ -208,7 +195,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         selected.map(
           (p) async => await Future.wait([
             api.request('/api/products/${p.id}/epics'),
-            api.request('/api/products/${p.id}/conversations'),
+            api.request(
+              '/api/products/${p.id}/conversations?includeMessages=false',
+            ),
             api.request('/api/products/${p.id}/questions'),
           ]),
         ),
@@ -248,7 +237,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       }
       if (nextEpic != null) {
         final detail = await Future.wait([
-          api.request('/api/epics/${_text(nextEpic['id'])}/discussions'),
+          api.request(
+            '/api/epics/${_text(nextEpic['id'])}/discussions?includeMessages=false',
+          ),
           api.request('/api/epics/${_text(nextEpic['id'])}/history'),
           api.request('/api/epics/${_text(nextEpic['id'])}/progress'),
         ]);
@@ -305,6 +296,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   Future<void> openEpic(Json value) async {
     setState(() {
       epic = value;
+      mobileConversation = false;
       tab = architect ? 'Impact' : 'Uitwerking';
       conversation = null;
       discussions = [];
@@ -335,12 +327,14 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     }
   }
 
-  Widget imagePicker() => Column(
+  Widget imagePicker({bool compact = false}) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      button('Afbeeldingen toevoegen', addImages),
-      const SizedBox(height: 8),
-      const Text('PNG, JPEG of WebP · maximaal 6 beelden, 4 MB per beeld'),
+      if (!compact) ...[
+        button('Afbeeldingen toevoegen', addImages),
+        const SizedBox(height: 8),
+        const Text('PNG, JPEG of WebP · maximaal 6 beelden, 4 MB per beeld'),
+      ],
       Wrap(
         spacing: 8,
         children: pendingImages
@@ -383,7 +377,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         ),
       );
       conversation = _map(
-        await api.request('/api/conversations/${_text(response['id'])}'),
+        await api.request(
+          '/api/conversations/${_text(response['id'])}?includeMessages=false',
+        ),
       );
     }
     await api.request(
@@ -440,7 +436,10 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
 
   Future<void> review(String decision, {String? asRole}) async {
     if (decision == 'REQUEST_CHANGE') {
-      setState(() => message.text = 'Pas deze epic aan: ');
+      setState(() {
+        message.text = 'Pas deze epic aan: ';
+        mobileConversation = true;
+      });
       return;
     }
     final reviewRole = asRole ?? actionRole;
@@ -638,6 +637,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: CircularProgressIndicator());
+    if ((epic != null || conversation != null) && !creating) {
+      return conversationWorkspace();
+    }
     return SingleChildScrollView(
       padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 30),
       child: Center(
@@ -646,37 +648,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (products.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey(productId),
-                    initialValue: productId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Project'),
-                    items: [
-                      if (products.length > 1 && widget.section != 'policy')
-                        const DropdownMenuItem(
-                          value: '__all__',
-                          child: Text('Alle projecten'),
-                        ),
-                      ...products.map(
-                        (p) =>
-                            DropdownMenuItem(value: p.id, child: Text(p.name)),
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() {
-                        productId = v;
-                        epic = null;
-                        conversation = null;
-                      });
-                      widget.onProductSelected?.call(v);
-                      unawaited(load());
-                    },
-                  ),
-                ),
+              if (products.isNotEmpty) projectSelector(),
               if (error != null)
                 MaterialBanner(
                   content: Text(error!),
@@ -771,6 +743,36 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     );
   }
 
+  Widget projectSelector() => Padding(
+    padding: const EdgeInsets.only(bottom: 20),
+    child: DropdownButtonFormField<String>(
+      key: ValueKey(productId),
+      initialValue: productId,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Project'),
+      items: [
+        if (products.length > 1 && widget.section != 'policy')
+          const DropdownMenuItem(
+            value: '__all__',
+            child: Text('Alle projecten'),
+          ),
+        ...products.map(
+          (p) => DropdownMenuItem(value: p.id, child: Text(p.name)),
+        ),
+      ],
+      onChanged: (v) {
+        if (v == null) return;
+        setState(() {
+          productId = v;
+          epic = null;
+          conversation = null;
+        });
+        widget.onProductSelected?.call(v);
+        unawaited(load());
+      },
+    ),
+  );
+
   void startConversation() => setState(() {
     creating = true;
     epic = null;
@@ -822,7 +824,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     trailing: const Icon(Icons.chevron_right),
     onTap: () => mutate(() async {
       conversation = _map(
-        await api.request('/api/conversations/${_text(c['id'])}'),
+        await api.request(
+          '/api/conversations/${_text(c['id'])}?includeMessages=false',
+        ),
       );
       discussions = [];
     }),
@@ -932,170 +936,206 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     final c = conversation;
     final request = _map(c?['request']);
     final proposal = _map(c?['changeProposal']);
-    final messages = epic == null ? _maps(c?['messages']) : discussionMessages;
-    return panel(
-      epic != null
+    final scope = epic != null
+        ? '/api/epics/${_text(epic!['id'])}/messages'
+        : '/api/conversations/${_text(c?['id'])}/messages';
+    return ConversationTimeline(
+      key: ValueKey(scope),
+      revision:
+          '${c?['version']}-${discussions.map((d) => d['version']).join('-')}',
+      fetch: ({String? before, String? after}) async => _map(
+        await api.request(
+          '$scope?limit=30${before == null ? '' : '&before=${Uri.encodeQueryComponent(before)}'}${after == null ? '' : '&after=${Uri.encodeQueryComponent(after)}'}',
+        ),
+      ),
+      title: epic != null
           ? 'Gesprek bij deze epic'
           : ownQuestions
           ? 'Mijn vraag aan AI'
           : 'Nieuwe epic uitwerken',
-      [
-        if (epic == null)
-          TextButton(
-            onPressed: () => setState(() {
-              conversation = null;
-              discussions = [];
-            }),
-            child: Text(ownQuestions ? '← Mijn vragen aan AI' : '← Mijn epics'),
-          ),
-        if (epic != null) text('PO, architect en AI · één gedeeld gesprek'),
-        ...questions
-            .where(
-              (q) =>
-                  epic != null && _text(q['epicLinkId']) == _text(epic!['id']),
-            )
-            .map(
-              (q) => notice(
-                'Vraag van ${_text(q['agentRole'])}',
-                '${_text(q['question'])}\n${q['answer'] == null ? 'Beantwoord deze vraag onder Vragen voor mij.' : 'Antwoord: ${_text(q['answer'])}'}',
+      status: c?['status'] == 'PROCESSING' || proposal['status'] == 'WORKING'
+          ? const Text('AI werkt aan je bericht…')
+          : const SizedBox.shrink(),
+      introduction: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...questions
+              .where(
+                (q) =>
+                    epic != null &&
+                    _text(q['epicLinkId']) == _text(epic!['id']),
+              )
+              .map(
+                (q) => notice(
+                  'Vraag van ${_text(q['agentRole'])}',
+                  '${_text(q['question'])}\n${q['answer'] == null ? 'Beantwoord deze vraag onder Vragen voor mij.' : 'Antwoord: ${_text(q['answer'])}'}',
+                ),
+              ),
+        ],
+      ),
+      messageBuilder: (m) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              m['sender'] == 'USER'
+                  ? m['authorRole'] == 'ARCHITECT'
+                        ? 'Architect'
+                        : 'Product owner'
+                  : m['sender'] == 'SYSTEM'
+                  ? 'Product Factory'
+                  : 'AI',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 5),
+            SelectableText(_text(m['text'])),
+            storedImages(_maps(m['attachments'])),
+            if (m['sender'] == 'SYSTEM' &&
+                _text(m['text']).contains(
+                  'bijgewerkt naar voorstelversie ${proposal['afterContentVersion']}.',
+                )) ...[
+              if (epic != null &&
+                  proposal['status'] == 'READY' &&
+                  proposal['afterContentVersion'] ==
+                      epic!['contentVersion']) ...[
+                notice(
+                  'AI stelt versie ${proposal['afterContentVersion']} voor',
+                  '${_text(proposal['summary']).isEmpty ? 'Bekijk de bijgewerkte inhoud en schermen.' : _text(proposal['summary'])} Je kunt via de chat verder bijstellen of vragen dit terug te draaien.',
+                ),
+                if (c?['status'] != 'PROCESSING' &&
+                    [
+                      'AWAITING_APPROVAL',
+                      'AWAITING_PRODUCT_OWNER_APPROVAL',
+                      'AWAITING_FACTORY_OWNER_APPROVAL',
+                      'AVAILABLE',
+                      'NEEDS_RESEARCH',
+                      'NEEDS_REFINEMENT',
+                    ].contains(epic!['status']))
+                  button(
+                    'Voorstel terugdraaien',
+                    () => mutate(() async {
+                      await api.request(
+                        '/api/conversations/${_text(c!['id'])}/revert-epic-change',
+                        method: 'POST',
+                        body: {
+                          'expectedVersion': c['version'],
+                          'expectedEpicVersion': epic!['version'],
+                        },
+                      );
+                    }),
+                  ),
+              ],
+            ],
+          ],
+        ),
+      ),
+      latest: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (c?['status'] == 'BLOCKED')
+            notice(
+              'Je bericht kon niet worden verwerkt',
+              'Je bericht en beelden zijn bewaard. Probeer opnieuw. Als de epic intussen is veranderd, bekijk de huidige versie en verstuur je wens opnieuw.',
+            ),
+          if (c?['status'] == 'BLOCKED')
+            button(
+              'Opnieuw proberen',
+              () => mutate(() async {
+                await api.request(
+                  '/api/conversations/${_text(c!['id'])}/retry',
+                  method: 'POST',
+                  body: {'expectedVersion': c['version']},
+                );
+              }),
+            ),
+          if (request.isNotEmpty && epic == null) ...[
+            const Divider(height: 28),
+            text(_text(_map(request['content'])['title'])),
+            text(_text(_map(request['content'])['summary'])),
+            if (['APPROVED', 'ROUTING'].contains(request['status']))
+              notice(
+                'Je epic wordt uitgewerkt',
+                'AI maakt de inhoud, schermen en architectuurimpact. De epic verschijnt hier vanzelf.',
+              ),
+            if (request['status'] == 'ROUTING_FAILED')
+              notice(
+                'Uitwerking wordt opnieuw geprobeerd',
+                'Je wens en afbeeldingen zijn bewaard. Je hoeft ze niet opnieuw in te voeren.',
+              ),
+            if (request['status'] == 'PROPOSED')
+              button(
+                'Maak eerste epicversie',
+                () => mutate(() async {
+                  await api.request(
+                    '/api/product-requests/${_text(request['id'])}/approve',
+                    method: 'POST',
+                    body: {
+                      'expectedVersion': request['version'],
+                      'requestVersion': request['currentVersion'],
+                    },
+                  );
+                }),
+                primary: true,
+              ),
+          ],
+        ],
+      ),
+      composer: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (epic == null)
+            TextButton(
+              onPressed: () => setState(() {
+                conversation = null;
+                discussions = [];
+              }),
+              child: Text(
+                ownQuestions ? '← Mijn vragen aan AI' : '← Mijn epics',
               ),
             ),
-        if (messages.isEmpty)
-          text('Stel een vraag of beschrijf wat je wilt aanpassen.'),
-        ...messages.map(
-          (m) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (c?['status'] != 'CLOSED' &&
+              !(epic == null &&
+                  ['APPROVED', 'ROUTING'].contains(request['status']))) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: message,
+              enabled: !saving && c?['status'] != 'PROCESSING',
+              minLines: 2,
+              maxLines: 4,
+              maxLength: epic == null ? 20000 : 8000,
+              decoration: const InputDecoration(
+                labelText: 'Stel een vraag of beschrijf je wens',
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: 12),
+            imagePicker(compact: true),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Text(
-                  m['sender'] == 'USER'
-                      ? m['authorRole'] == 'ARCHITECT'
-                            ? 'Architect'
-                            : 'Product owner'
-                      : m['sender'] == 'SYSTEM'
-                      ? 'Product Factory'
-                      : 'AI',
-                  style: Theme.of(context).textTheme.labelLarge,
+                IconButton(
+                  tooltip:
+                      'Afbeeldingen toevoegen · PNG, JPEG of WebP · maximaal 6 beelden, 4 MB per beeld',
+                  onPressed: saving || c?['status'] == 'PROCESSING'
+                      ? null
+                      : addImages,
+                  icon: const Icon(Icons.attach_file),
                 ),
-                const SizedBox(height: 5),
-                SelectableText(_text(m['text'])),
-                storedImages(_maps(m['attachments'])),
+                FilledButton(
+                  onPressed: saving || c?['status'] == 'PROCESSING'
+                      ? null
+                      : () => send(),
+                  child: const Text('Verstuur'),
+                ),
               ],
             ),
-          ),
-        ),
-        if (epic != null && proposal['status'] == 'WORKING')
-          notice(
-            'AI werkt aan een voorstel',
-            'De huidige inhoud blijft zichtbaar totdat de nieuwe versie klaar is.',
-          ),
-        if (epic != null &&
-            proposal['status'] == 'READY' &&
-            proposal['afterContentVersion'] == epic!['contentVersion']) ...[
-          notice(
-            'AI stelt versie ${proposal['afterContentVersion']} voor',
-            '${_text(proposal['summary']).isEmpty ? 'Bekijk de bijgewerkte inhoud en schermen.' : _text(proposal['summary'])} Je kunt via de chat verder bijstellen of vragen dit terug te draaien.',
-          ),
-          if (c?['status'] != 'PROCESSING' &&
-              [
-                'AWAITING_APPROVAL',
-                'AWAITING_PRODUCT_OWNER_APPROVAL',
-                'AWAITING_FACTORY_OWNER_APPROVAL',
-                'AVAILABLE',
-                'NEEDS_RESEARCH',
-                'NEEDS_REFINEMENT',
-              ].contains(epic!['status']))
-            button(
-              'Voorstel terugdraaien',
-              () => mutate(() async {
-                await api.request(
-                  '/api/conversations/${_text(c!['id'])}/revert-epic-change',
-                  method: 'POST',
-                  body: {
-                    'expectedVersion': c['version'],
-                    'expectedEpicVersion': epic!['version'],
-                  },
-                );
-              }),
-            ),
+          ],
         ],
-        if (c?['status'] == 'PROCESSING')
-          const ListTile(
-            leading: CircularProgressIndicator(),
-            title: Text(
-              'AI verwerkt je bericht. Je kunt deze pagina sluiten en later terugkomen.',
-            ),
-          ),
-        if (c?['status'] == 'BLOCKED')
-          notice(
-            'Je bericht kon niet worden verwerkt',
-            'Je bericht en beelden zijn bewaard. Probeer opnieuw. Als de epic intussen is veranderd, bekijk de huidige versie en verstuur je wens opnieuw.',
-          ),
-        if (c?['status'] == 'BLOCKED')
-          button(
-            'Opnieuw proberen',
-            () => mutate(() async {
-              await api.request(
-                '/api/conversations/${_text(c!['id'])}/retry',
-                method: 'POST',
-                body: {'expectedVersion': c['version']},
-              );
-            }),
-          ),
-        if (c?['status'] != 'PROCESSING' &&
-            c?['status'] != 'CLOSED' &&
-            !(epic == null &&
-                ['APPROVED', 'ROUTING'].contains(request['status']))) ...[
-          const SizedBox(height: 12),
-          TextField(
-            controller: message,
-            minLines: 3,
-            maxLines: 8,
-            maxLength: epic == null ? 20000 : 8000,
-            decoration: const InputDecoration(
-              labelText: 'Stel een vraag of beschrijf je wens',
-            ),
-          ),
-          const SizedBox(height: 12),
-          imagePicker(),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: button('Verstuur', () => send(), primary: true),
-          ),
-        ],
-        if (request.isNotEmpty && epic == null) ...[
-          const Divider(height: 28),
-          text(_text(_map(request['content'])['title'])),
-          text(_text(_map(request['content'])['summary'])),
-          if (['APPROVED', 'ROUTING'].contains(request['status']))
-            notice(
-              'Je epic wordt uitgewerkt',
-              'AI maakt de inhoud, schermen en architectuurimpact. De epic verschijnt hier vanzelf.',
-            ),
-          if (request['status'] == 'ROUTING_FAILED')
-            notice(
-              'Uitwerking wordt opnieuw geprobeerd',
-              'Je wens en afbeeldingen zijn bewaard. Je hoeft ze niet opnieuw in te voeren.',
-            ),
-          if (request['status'] == 'PROPOSED')
-            button(
-              'Maak eerste epicversie',
-              () => mutate(() async {
-                await api.request(
-                  '/api/product-requests/${_text(request['id'])}/approve',
-                  method: 'POST',
-                  body: {
-                    'expectedVersion': request['version'],
-                    'requestVersion': request['currentVersion'],
-                  },
-                );
-              }),
-              primary: true,
-            ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -1171,43 +1211,93 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             .toList(),
       ),
       const SizedBox(height: 20),
-      LayoutBuilder(
-        builder: (context, box) {
-          final content = tab == 'Uitwerking'
-              ? dossier()
-              : tab == 'Schermen'
-              ? Column(
-                  children: [
-                    storedImages(
-                      discussionMessages
-                          .expand((m) => _maps(m['attachments']))
-                          .toList(),
-                    ),
-                    uxPanel(),
-                  ],
-                )
-              : tab == 'Impact'
-              ? impactPanel()
-              : tab == 'Goedkeuring'
-              ? reviewPanel()
-              : progressPanel();
-          return box.maxWidth >= 900
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 3, child: content),
-                    const SizedBox(width: 20),
-                    Expanded(flex: 2, child: chatPanel()),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [content, chatPanel()],
-                );
-        },
-      ),
+      if (tab == 'Uitwerking')
+        dossier()
+      else if (tab == 'Schermen')
+        Column(
+          children: [
+            storedImages(
+              discussions.expand((c) => _maps(c['referenceImages'])).toList(),
+            ),
+            uxPanel(),
+          ],
+        )
+      else if (tab == 'Impact')
+        impactPanel()
+      else if (tab == 'Goedkeuring')
+        reviewPanel()
+      else
+        progressPanel(),
     ];
   }
+
+  Widget conversationWorkspace() => LayoutBuilder(
+    builder: (context, constraints) {
+      final narrow =
+          constraints.maxWidth < 900 ||
+          MediaQuery.textScalerOf(context).scale(16) > 24;
+      final dossierView = SingleChildScrollView(
+        primary: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: epic == null ? [] : epicPanel(),
+        ),
+      );
+      return Padding(
+        padding: EdgeInsets.all(narrow ? 12 : 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (products.isNotEmpty) projectSelector(),
+            if (error != null)
+              Text(
+                error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            if (saving) const LinearProgressIndicator(),
+            if (narrow && epic != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Epic'),
+                      selected: !mobileConversation,
+                      onSelected: (_) =>
+                          setState(() => mobileConversation = false),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Gesprek'),
+                      selected: mobileConversation,
+                      onSelected: (_) =>
+                          setState(() => mobileConversation = true),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: epic == null
+                  ? chatPanel()
+                  : narrow
+                  ? IndexedStack(
+                      index: mobileConversation ? 1 : 0,
+                      children: [dossierView, chatPanel()],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(flex: 3, child: dossierView),
+                        const SizedBox(width: 20),
+                        Expanded(flex: 2, child: chatPanel()),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 
   void reviewAction() => unawaited(review('APPROVE'));
   Widget dossier() => panel('Dit gaan we verbeteren', [
@@ -1412,6 +1502,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       button(
         'Feedback op dit scherm',
         () => setState(() {
+          mobileConversation = true;
           message.text =
               'Pas scherm ${selected['screenKey']} ($viewport), inhoudsversie ${epic!['contentVersion']}, aan: ';
         }),

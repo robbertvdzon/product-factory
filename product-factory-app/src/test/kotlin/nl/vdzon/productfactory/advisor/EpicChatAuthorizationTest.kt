@@ -38,4 +38,12 @@ class EpicChatAuthorizationTest {
         assertThrows<AccessDeniedException> { controller.image("image", null) }
         verify(images, never()).inputs(listOf("image"))
     }
+    @Test
+    fun `berichtpaginas van persoonlijke gesprekken vereisen dezelfde toegang`() {
+        `when`(service.getConversation(conversation.id, false)).thenReturn(conversation.copy(epicId = null, purpose = ConversationPurpose.QUESTION))
+        `when`(authorization.currentUserId(null)).thenReturn(user)
+        assertThrows<AccessDeniedException> { controller.messages("chat", null, null, null, 30) }
+        verify(service, never()).messagePage(listOf(conversation.id), null, null, 30)
+    }
+
 }

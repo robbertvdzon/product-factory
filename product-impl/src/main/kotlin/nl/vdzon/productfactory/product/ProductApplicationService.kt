@@ -67,7 +67,7 @@ class ProductApplicationService(
         val current = assignmentVersion(command.productId)
         requireVersion(current, command.expectedVersion, "Productopdracht")
         val nextVersion = current + 1
-        val audience = requiredText(command.audience, "Doelgroep")
+        val audience = command.audience.trim()
         val goal = requiredText(command.goal, "Productdoel")
         val gitUrl = validatePublicGitUrl(command.publicGitUrl)
         val aiSupplier = command.aiSupplier?.trim()?.ifBlank { null }

@@ -45,11 +45,16 @@ class EpicCollaborationController(private val policies: ProductGovernanceService
         governance.review(ReviewEpicCommand(epic.id,request.expectedVersion,request.role,authorization.currentUserId(authentication),request.decision,request.reason,request.idempotencyKey))
     }
     @GetMapping("/epics/{epicId}/discussions")
-    fun discussions(@PathVariable epicId: String,authentication: Authentication?): List<ProductConversationDetails> {
+    fun discussions(@PathVariable epicId: String,authentication: Authentication?, @RequestParam(defaultValue="true") includeMessages: Boolean = true): List<ProductConversationDetails> {
         val epic=queries.getEpic(EpicId(epicId));authorization.requireProduct(epic.productId,authentication)
-        return advisorQueries.findConversations(epic.productId).filter {
+        return advisorQueries.findConversations(epic.productId, includeMessages).filter {
             it.epicId==epicId || it.request?.linkedEpicId==epicId
         }.sortedWith(compareBy<ProductConversationDetails> { it.status == ConversationStatus.CLOSED }.thenBy { it.createdAt })
+    }
+    @GetMapping("/epics/{epicId}/messages")
+    fun messages(@PathVariable epicId: String, authentication: Authentication?, @RequestParam(required=false) before: String?, @RequestParam(required=false) after: String?, @RequestParam(defaultValue="30") limit: Int): ConversationMessagePage {
+        val conversations = discussions(epicId, authentication, false)
+        return advisorQueries.messagePage(conversations.map { it.id }, before, after, limit)
     }
     @PostMapping("/epics/{epicId}/discussions")
     @org.springframework.transaction.annotation.Transactional

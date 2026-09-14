@@ -676,15 +676,15 @@ class ProductAdvisorApplicationService(
         ))
     }
 
-    override fun findConversations(productId: ProductId): List<ProductConversationDetails> = jdbc.query(
+    override fun findConversations(productId: ProductId, includeMessages: Boolean): List<ProductConversationDetails> = jdbc.query(
         "SELECT conversation_id FROM pf_product_conversation WHERE product_id=? ORDER BY updated_at DESC",
         { rs, _ -> ProductConversationId(rs.getString(1)) }, productId.value,
-    ).map(::getConversation)
+    ).map { getConversation(it, includeMessages) }
 
-    override fun getConversation(id: ProductConversationId): ProductConversationDetails {
+    override fun getConversation(id: ProductConversationId, includeMessages: Boolean): ProductConversationDetails {
         val row = conversationRow(id)
         val conversationAttachments=attachments.list(id)
-        val messages = jdbc.query(
+        val messages = if (!includeMessages) emptyList() else jdbc.query(
             """SELECT message_id,sequence_number,sender,message_text,created_by,created_at,author_role FROM pf_product_conversation_message
                 WHERE conversation_id=? ORDER BY sequence_number""".trimIndent(),
             { rs, _ -> ProductConversationMessageDetails(
@@ -695,7 +695,31 @@ class ProductAdvisorApplicationService(
         )
         val request = jdbc.query("SELECT request_id FROM pf_product_request WHERE conversation_id=?", { rs, _ -> ProductRequestId(rs.getString(1)) }, id.value).singleOrNull()?.let(::getRequest)
         val context = jdbc.query("SELECT epic_id,audience_role FROM pf_product_conversation WHERE conversation_id=?",{rs,_->rs.getString(1) to ProductMembershipRole.valueOf(rs.getString(2))},id.value).single()
-        return ProductConversationDetails(row.id, row.productId, row.title, row.createdBy, row.status, row.version, row.createdAt, row.updatedAt, messages, request, context.first, context.second, ConversationPurpose.valueOf(jdbc.queryForObject("SELECT purpose FROM pf_product_conversation WHERE conversation_id=?",String::class.java,id.value)!!), changeProposal(id))
+        return ProductConversationDetails(row.id, row.productId, row.title, row.createdBy, row.status, row.version, row.createdAt, row.updatedAt, messages, request, context.first, context.second, ConversationPurpose.valueOf(jdbc.queryForObject("SELECT purpose FROM pf_product_conversation WHERE conversation_id=?",String::class.java,id.value)!!), changeProposal(id), conversationAttachments)
+    }
+
+    override fun messagePage(conversationIds: List<ProductConversationId>, before: String?, after: String?, limit: Int): ConversationMessagePage {
+        require(limit in 1..100) { "Ongeldige paginagrootte." }
+        require(before == null || after == null) { "Kies één paginarichting." }
+        if (conversationIds.isEmpty()) return ConversationMessagePage(emptyList(), false, null)
+        val ids = conversationIds.map { it.value }
+        val scope = "conversation_id IN (${ids.joinToString(",") { "?" }})"
+        val cursor = before ?: after
+        val cursorPosition = cursor?.let {
+            jdbc.query("SELECT created_at,conversation_id,sequence_number FROM pf_product_conversation_message WHERE $scope AND message_id=?", { rs, _ -> listOf(rs.getTimestamp(1).toInstant(), rs.getString(2), rs.getLong(3)) }, *(ids + it).toTypedArray()).singleOrNull()
+                ?: throw InvalidCommand("Dit bericht hoort niet bij het gesprek.")
+        }
+        val comparator = if (after != null) ">" else "<"
+        val direction = if (after != null) "ASC" else "DESC"
+        val pageFilter = if (cursor == null) "" else " AND (created_at,conversation_id,sequence_number) $comparator (?,?,?)"
+        val params = ids.map { it as Any }.toMutableList()
+        if (cursorPosition != null) params.addAll(cursorPosition)
+        params.add(limit + 1)
+        val images = conversationIds.flatMap { attachments.list(it) }.groupBy { it.messageId }
+        val rows = jdbc.query("SELECT message_id,sequence_number,sender,message_text,created_by,created_at,COALESCE(author_role,(SELECT c.audience_role FROM pf_product_conversation c WHERE c.conversation_id=pf_product_conversation_message.conversation_id)) FROM pf_product_conversation_message WHERE $scope$pageFilter ORDER BY created_at $direction,conversation_id $direction,sequence_number $direction LIMIT ?",
+            { rs, _ -> ProductConversationMessageDetails(ProductConversationMessageId(rs.getString(1)), rs.getLong(2), ConversationSender.valueOf(rs.getString(3)), rs.getString(4), rs.getString(5)?.let(::UserId), rs.getTimestamp(6).toInstant(), rs.getString(7)?.let(ProductMembershipRole::valueOf), images[rs.getString(1)].orEmpty()) }, *params.toTypedArray())
+        val page = rows.take(limit)
+        return ConversationMessagePage(if (after != null) page else page.reversed(), rows.size > limit, page.lastOrNull()?.id?.value)
     }
 
     override fun findRequests(productId: ProductId?): List<ProductRequestDetails> = jdbc.query(

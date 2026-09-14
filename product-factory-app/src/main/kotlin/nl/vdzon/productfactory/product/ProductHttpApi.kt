@@ -41,7 +41,7 @@ internal fun Authentication?.stakeholderActor(): ActorReference {
 
 data class CreateProductRequest(val requestedId: String? = null, val name: String, val status: ProductStatus = ProductStatus.ACTIVE, val idempotencyKey: String)
 data class DeleteProductRequest(val confirmation: String)
-data class AssignmentRequest(val audience: String, val goal: String, val publicGitUrl: String, val expectedVersion: Long, val idempotencyKey: String, val aiSupplier: String? = null, val aiModel: String? = null)
+data class AssignmentRequest(val audience: String = "", val goal: String, val publicGitUrl: String, val expectedVersion: Long, val idempotencyKey: String, val aiSupplier: String? = null, val aiModel: String? = null)
 data class TestConfigurationRequest(val acceptance: TestEnvironmentConfiguration, val production: TestEnvironmentConfiguration? = null, val expectedVersion: Long, val idempotencyKey: String)
 data class ProductStatusRequest(val status: ProductStatus, val expectedVersion: Long, val idempotencyKey: String)
 data class DispatchingRequest(val enabled: Boolean, val expectedVersion: Long, val idempotencyKey: String)

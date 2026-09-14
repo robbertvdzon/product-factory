@@ -27,8 +27,8 @@ class ProductAdvisorController(
     private val images: ConversationAttachmentService,
 ) {
     @GetMapping("/api/products/{productId}/conversations")
-    fun conversations(@PathVariable productId: String, authentication: Authentication?) =
-        authorization.requireProduct(ProductId(productId), authentication).let { service.findConversations(ProductId(productId)).filter { canRead(it,authentication) } }
+    fun conversations(@PathVariable productId: String, authentication: Authentication?, @RequestParam(defaultValue="true") includeMessages: Boolean = true) =
+        authorization.requireProduct(ProductId(productId), authentication).let { service.findConversations(ProductId(productId), includeMessages).filter { canRead(it,authentication) } }
 
     @PostMapping("/api/products/{productId}/conversations")
     @ResponseStatus(HttpStatus.CREATED)
@@ -44,9 +44,15 @@ class ProductAdvisorController(
     }
 
     @GetMapping("/api/conversations/{conversationId}")
-    fun conversation(@PathVariable conversationId: String, authentication: Authentication?) = service.getConversation(ProductConversationId(conversationId)).also {
+    fun conversation(@PathVariable conversationId: String, authentication: Authentication?, @RequestParam(defaultValue="true") includeMessages: Boolean = true) = service.getConversation(ProductConversationId(conversationId), includeMessages).also {
         authorization.requireProduct(it.productId, authentication)
         if (!canRead(it,authentication)) throw AccessDeniedException("Dit gesprek is persoonlijk.")
+    }
+
+    @GetMapping("/api/conversations/{conversationId}/messages")
+    fun messages(@PathVariable conversationId: String, authentication: Authentication?, @RequestParam(required=false) before: String?, @RequestParam(required=false) after: String?, @RequestParam(defaultValue="30") limit: Int): ConversationMessagePage {
+        conversation(conversationId, authentication, false)
+        return service.messagePage(listOf(ProductConversationId(conversationId)), before, after, limit)
     }
 
     @GetMapping("/api/conversation-images/{imageId}")
