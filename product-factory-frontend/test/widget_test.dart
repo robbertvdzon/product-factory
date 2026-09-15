@@ -90,6 +90,35 @@ void main() {
     expect(appText('Test Google-login'), findsOneWidget);
   });
 
+  testWidgets('tokenlogin logt uit als Google niet geïnitialiseerd is', (tester) async {
+    final gateway = FakeAuthenticationGateway(
+      sessionResult: Future.value(const AuthenticationStatus(
+        authenticated: true,
+        authRequired: true,
+        stakeholderEmail: 'acceptance-tester@product-factory.invalid',
+        csrfToken: 'agent-session-csrf',
+        environment: 'acceptance',
+      )),
+    );
+    await tester.pumpWidget(ProductFactoryApp(
+      productGateway: const FakeProductGateway(),
+      authenticationGateway: gateway,
+      versionGateway: FakeVersionGateway(),
+      federatedSignOut: () async => throw StateError('Google is niet geïnitialiseerd'),
+      googleLoginButtonBuilder: (_) => const Text('Opnieuw aanmelden'),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byType(FoundationPage), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Uitloggen'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.logoutCsrf, 'agent-session-csrf');
+    expect(find.byType(FoundationPage), findsNothing);
+    expect(appText('Opnieuw aanmelden'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('acceptatiebanner staat boven iedere funderingspagina', (
     tester,
   ) async {

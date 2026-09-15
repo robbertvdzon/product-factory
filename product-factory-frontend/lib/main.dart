@@ -128,14 +128,22 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
     });
     try {
       await widget.gateway.logout(_status?.csrfToken);
-      await widget.federatedSignOut?.call();
       if (!mounted) return;
+      final previous = _status;
       setState(
-        () => _status = const AuthenticationStatus(
+        () => _status = AuthenticationStatus(
           authenticated: false,
           authRequired: true,
+          environment: previous?.environment ?? 'local',
+          googleClientId: previous?.googleClientId,
         ),
       );
+      try {
+        await widget.federatedSignOut?.call();
+      } catch (_) {
+        // Een tokenlogin heeft mogelijk geen Google-sessie geïnitialiseerd.
+        // De eigen serversessie en gebruikersweergave zijn al uitgelogd.
+      }
     } on AuthenticationFailure catch (failure) {
       if (!mounted) return;
       setState(() => _error = failure.message);
