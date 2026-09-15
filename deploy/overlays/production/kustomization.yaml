@@ -7,8 +7,12 @@ resources:
 - database.yaml
 - sealed-secret-product-factory.yaml
 - ../../database
+- sealed-central-postgres.yaml
 patches:
 - path: backend-secret-patch.yaml
+- path: central-postgres-patch.yaml
+- path: pf_prod-retired-database.yaml
+- path: retired-backup-patch.yaml
 images:
 - digest: sha256:3a66dd6565fd6f5c72f05ec376d7af133001e09cd400194fa8e3e6773fb6932c
   name: ghcr.io/robbertvdzon/product-factory-backend

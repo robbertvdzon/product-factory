@@ -6,12 +6,14 @@ resources:
 - configmap.yaml
 - sealed-secret-agent-runtime.yaml
 - sealed-secret-ai-access.yaml
+- sealed-central-postgres.yaml
 patches:
 - path: routes-patch.yaml
 - path: backend-runtime-secret-patch.yaml
 - path: agent-access-patch.yaml
 - path: backend-memory.yaml
 - path: product-factory-frontend-memory.yaml
+- path: central-postgres-patch.yaml
 images:
 - digest: sha256:3cd15f29f0aced810fccc724e1ba385727f06324dd0b3d1edb5e87c865176e95
   name: ghcr.io/robbertvdzon/product-factory-backend

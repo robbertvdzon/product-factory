@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../base
+- configmap.yaml
+- sealed-runtime.yaml
+- sealed-ai-access.yaml
+patches:
+- path: central-postgres-patch.yaml
+- path: backend-runtime-secret-patch.yaml
+- path: agent-access-patch.yaml
+- path: ephemeral-artifacts.yaml
+- target:
+    kind: PersistentVolumeClaim
+    name: product-factory-ai-artifacts
+  patch: "$patch: delete\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n\
+    \  name: product-factory-ai-artifacts\n"
+- target:
+    kind: RoleBinding
+    name: product-factory-artifact-local-path-scc
+  patch: "$patch: delete\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\n\
+    metadata:\n  name: product-factory-artifact-local-path-scc\n"
+- target:
+    kind: Route
+    name: dashboard-frontend
+  patch: "- op: replace\n  path: /spec/host\n  value: preview-host-must-be-set.invalid"
+- target:
+    kind: Route
+    name: dashboard-backend
+  patch: "- op: replace\n  path: /spec/host\n  value: preview-api-host-must-be-set.invalid"
+images:
+- digest: sha256:3a66dd6565fd6f5c72f05ec376d7af133001e09cd400194fa8e3e6773fb6932c
+  name: ghcr.io/robbertvdzon/product-factory-backend
+  newName: ghcr.io/robbertvdzon/product-factory-backend
+- digest: sha256:cee6e0742e791d46ff4cbf096b1af238de3afbf47764e74fc60a7139d89664ca
+  name: ghcr.io/robbertvdzon/product-factory-frontend
+  newName: ghcr.io/robbertvdzon/product-factory-frontend
