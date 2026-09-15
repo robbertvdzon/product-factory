@@ -3,6 +3,7 @@ package nl.vdzon.productfactory.testbed
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import nl.vdzon.productfactory.config.RuntimeConfigurationGuard
 import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.mock.env.MockEnvironment
 
@@ -12,7 +13,10 @@ class AcceptanceSafetyGuardTest {
         val environment = safeEnvironment().withProperty("PF_AUTH_REQUIRED", "true")
             .withProperty("AI_ACCESS_TOKEN", "a".repeat(40))
             .withProperty("AI_ACCESS_EMAILS", "acceptance-tester@product-factory.invalid")
-        assertThatCode { AcceptanceSafetyGuard(environment).run(DefaultApplicationArguments()) }.doesNotThrowAnyException()
+        assertThatCode {
+            AcceptanceSafetyGuard(environment).run(DefaultApplicationArguments())
+            RuntimeConfigurationGuard(environment).run(DefaultApplicationArguments())
+        }.doesNotThrowAnyException()
         environment.withProperty("AI_ACCESS_EMAILS", "production@example.com")
         assertThatThrownBy { AcceptanceSafetyGuard(environment).run(DefaultApplicationArguments()) }
             .isInstanceOf(IllegalStateException::class.java).hasMessageContaining("synthetische")

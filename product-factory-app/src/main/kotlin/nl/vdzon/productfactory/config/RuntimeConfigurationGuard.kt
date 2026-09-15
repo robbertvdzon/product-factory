@@ -82,7 +82,7 @@ data class RuntimeSettings(
                 }
             }
             if (environment == RuntimeEnvironment.ACCEPTANCE) {
-                check(!authRequired) { "Acceptatie moet authenticatie expliciet uitgeschakeld houden." }
+                check(values["PF_AUTH_REQUIRED"] in setOf("true", "false")) { "Acceptatie vereist een expliciete authenticatiekeuze." }
                 check(values["PF_AGENT_RUNTIME_URL"] == "https://agent-runtime-acceptance.vdzonsoftware.nl") {
                     "Acceptatie mag alleen de Agent Runtime-acceptatieomgeving gebruiken."
                 }
