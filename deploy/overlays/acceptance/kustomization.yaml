@@ -11,9 +11,9 @@ patches:
 - path: backend-runtime-secret-patch.yaml
 - path: agent-access-patch.yaml
 images:
-- digest: sha256:d08d9abd7c74234d3341eca1f5d0feb17d5de42dffd20a87eb91d811e2796745
+- digest: sha256:aceb0fee6bf6669cbe4f23ccaddf11f557c7b01476b54f5616c273e74deaabca
   name: ghcr.io/robbertvdzon/product-factory-backend
   newName: ghcr.io/robbertvdzon/product-factory-backend
-- digest: sha256:e90d0267db043141213acc46a1f4ad15cd2b205bfec173ab3d545bb871ff5e64
+- digest: sha256:f8bb0d1ad2dc2a3f4e0c58322fbb619f79ebb3369e956419d7f75ca9c8b7817d
   name: ghcr.io/robbertvdzon/product-factory-frontend
   newName: ghcr.io/robbertvdzon/product-factory-frontend
