@@ -10,6 +10,8 @@ patches:
 - path: routes-patch.yaml
 - path: backend-runtime-secret-patch.yaml
 - path: agent-access-patch.yaml
+- path: backend-memory.yaml
+- path: product-factory-frontend-memory.yaml
 images:
 - digest: sha256:aceb0fee6bf6669cbe4f23ccaddf11f557c7b01476b54f5616c273e74deaabca
   name: ghcr.io/robbertvdzon/product-factory-backend
