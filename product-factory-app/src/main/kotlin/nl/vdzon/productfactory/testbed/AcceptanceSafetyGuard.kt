@@ -15,7 +15,14 @@ class AcceptanceSafetyGuard(
 ) : ApplicationRunner {
     override fun run(args: ApplicationArguments) {
         requireValue("PF_ENVIRONMENT", "acceptance")
-        requireValue("PF_AUTH_REQUIRED", "false")
+        val authentication = environment.getProperty("PF_AUTH_REQUIRED")
+        check(authentication in setOf("true", "false")) { "Acceptatie vereist een expliciete authenticatiekeuze." }
+        if (authentication == "true") {
+            check(environment.getProperty("AI_ACCESS_TOKEN", "").length >= 32) { "Geauthenticeerde acceptatie vereist een eigen testtoken." }
+            val identities = environment.getProperty("AI_ACCESS_EMAILS", "").split(',').map(String::trim).filter(String::isNotBlank)
+            check(identities.isNotEmpty() && identities.all { it.endsWith("@product-factory.invalid") }) { "Acceptatie vereist uitsluitend synthetische testidentiteiten." }
+            check(environment.getProperty("PF_DEBUG_TOKEN").isNullOrBlank()) { "Acceptatie weigert een productiedebugtoken." }
+        }
         requireValue("PF_SCHEDULES_ENABLED", "false")
         requireValue("PF_AGENT_RUNTIME_API_VERSION", "v2")
         requireValue("PF_AI_VENDOR_ID", "mock")

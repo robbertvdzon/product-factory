@@ -8,6 +8,17 @@ import org.springframework.mock.env.MockEnvironment
 
 class AcceptanceSafetyGuardTest {
     @Test
+    fun `acceptatie kan dezelfde authenticatieketen testen met een eigen synthetische identiteit`() {
+        val environment = safeEnvironment().withProperty("PF_AUTH_REQUIRED", "true")
+            .withProperty("AI_ACCESS_TOKEN", "a".repeat(40))
+            .withProperty("AI_ACCESS_EMAILS", "acceptance-tester@product-factory.invalid")
+        assertThatCode { AcceptanceSafetyGuard(environment).run(DefaultApplicationArguments()) }.doesNotThrowAnyException()
+        environment.withProperty("AI_ACCESS_EMAILS", "production@example.com")
+        assertThatThrownBy { AcceptanceSafetyGuard(environment).run(DefaultApplicationArguments()) }
+            .isInstanceOf(IllegalStateException::class.java).hasMessageContaining("synthetische")
+    }
+
+    @Test
     fun `veilige acceptatieconfiguratie start`() {
         assertThatCode { guard().run(DefaultApplicationArguments()) }.doesNotThrowAnyException()
     }

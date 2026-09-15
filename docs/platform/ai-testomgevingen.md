@@ -13,7 +13,7 @@ De controle op de draaiende revision vindt voor én na de test plaats.
 Acceptatie gebruikt nu echte applicatieauthenticatie met een eigen synthetisch testaccount. Open
 `/api/auth/agent-login` of POST naar `/api/auth/agent-session` met `X-AI-Access-Token` en `{"email":"acceptance-tester@product-factory.invalid"}`.
 De sessie gebruikt dezelfde cookies, CSRF-controle en rollen als normaal. De token staat alleen in
-de acceptatie-SealedSecret en als `PRODUCT_FACTORY__ACCEPTANCE_AGENT_TOKEN` bij de worker.
+de acceptatie-SealedSecret en als `PF__ACCEPTANCE_AGENT_TOKEN` bij de worker.
 Productie behoudt de bestaande debug-login, uitsluitend na toestemming voor de huidige begeleide taak.
 
 ## PR op acceptatie
