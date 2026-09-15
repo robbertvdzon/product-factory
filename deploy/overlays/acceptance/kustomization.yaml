@@ -13,9 +13,9 @@ patches:
 - path: backend-memory.yaml
 - path: product-factory-frontend-memory.yaml
 images:
-- digest: sha256:aceb0fee6bf6669cbe4f23ccaddf11f557c7b01476b54f5616c273e74deaabca
+- digest: sha256:3a66dd6565fd6f5c72f05ec376d7af133001e09cd400194fa8e3e6773fb6932c
   name: ghcr.io/robbertvdzon/product-factory-backend
   newName: ghcr.io/robbertvdzon/product-factory-backend
-- digest: sha256:f8bb0d1ad2dc2a3f4e0c58322fbb619f79ebb3369e956419d7f75ca9c8b7817d
+- digest: sha256:cee6e0742e791d46ff4cbf096b1af238de3afbf47764e74fc60a7139d89664ca
   name: ghcr.io/robbertvdzon/product-factory-frontend
   newName: ghcr.io/robbertvdzon/product-factory-frontend
