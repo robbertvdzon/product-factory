@@ -5,3 +5,6 @@ resources:
   - artifact-storage.yaml
   - routes.yaml
   - service-account.yaml
+patches:
+- path: backend-memory.yaml
+- path: product-factory-frontend-memory.yaml
