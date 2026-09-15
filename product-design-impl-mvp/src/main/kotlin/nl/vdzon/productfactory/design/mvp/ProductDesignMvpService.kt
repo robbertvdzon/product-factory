@@ -859,7 +859,7 @@ class ProductDesignMvpService(
     }
 
     @Transactional(readOnly = true)
-    override fun getEpic(epicId: EpicId): EpicDetails = epicRows("WHERE e.id=? AND v.version=e.current_version", epicId.value).singleOrNull()
+    override fun getEpic(epicId: EpicId): EpicDetails = epicRows("WHERE (e.id=? OR e.epic_number=?) AND v.version=e.current_version", epicId.value, epicId.value.lowercase().removePrefix("epic-").takeIf { epicId.value.lowercase().startsWith("epic-") }?.toLongOrNull() ?: -1L).singleOrNull()
         ?: throw AggregateNotFound("Epic ${epicId.value} bestaat niet.")
 
     @Transactional(readOnly = true)
@@ -890,7 +890,7 @@ class ProductDesignMvpService(
                  ) THEN 'AWAITING_FACTORY_OWNER_APPROVAL'
                  ELSE v.status END,
             v.version,e.created_at,$updatedAtColumn,e.verification_id,v.research_sources_json,v.readiness_json,v.ux_artifacts_json,v.ux_screens_json,v.refinement_reason,
-            e.source_product_request_id,e.source_product_request_version,v.content_version,v.impact_json
+            e.source_product_request_id,e.source_product_request_version,v.content_version,v.impact_json,e.epic_number
             FROM pf_epic e JOIN pf_epic_version v ON v.epic_id=e.id $where ORDER BY e.updated_at DESC,v.version DESC""".trimIndent(),
         { rs, _ ->
             EpicDetails(
@@ -904,6 +904,7 @@ class ProductDesignMvpService(
                 mapper.readValue(rs.getString(19), object : TypeReference<List<EpicUxScreen>>() {}),
                 rs.getString(20), rs.getString(21), rs.getObject(22)?.let { rs.getLong(22) },
                 rs.getLong(23), mapper.readValue(rs.getString(24), EpicImpactAssessment::class.java),
+                epicNumber = rs.getLong(25),
             )
         }, *args,
     ).map { epic ->

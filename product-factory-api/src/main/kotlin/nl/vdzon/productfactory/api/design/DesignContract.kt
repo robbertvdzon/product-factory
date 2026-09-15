@@ -65,7 +65,10 @@ data class EpicDetails(
     val contentVersion: Long = version,
     val impact: EpicImpactAssessment = EpicImpactAssessment(),
     val review: EpicReviewState? = null,
-)
+    val epicNumber: Long? = null,
+) {
+    val reference: String? get() = epicNumber?.let { "epic-$it" }
+}
 data class ApproveEpicCommand(val epicId: EpicId, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class RequestEpicRefinementCommand(val epicId: EpicId, val reason: String, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)
 data class ClaimEpicForPlanningCommand(val epicId: EpicId, val expectedVersion: Long, val actor: ActorReference, val idempotencyKey: String)

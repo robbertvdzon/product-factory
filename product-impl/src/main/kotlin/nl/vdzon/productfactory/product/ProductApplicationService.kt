@@ -91,6 +91,7 @@ class ProductApplicationService(
         requireVersion(current, command.expectedVersion, "Testconfiguratie")
         val acceptance = validateEnvironment(command.acceptance, false)
         val production = command.production?.let { validateEnvironment(it, true) }
+        if (production != null && production.baseUrl.trimEnd('/') == acceptance.baseUrl.trimEnd('/')) throw InvalidCommand("Testomgeving en productie moeten verschillende URLs hebben.")
         val nextVersion = current + 1
         val now = clock.instant()
         jdbc.update(
@@ -730,7 +731,14 @@ class ProductApplicationService(
         val data = normalizedTextList(input.dataBoundaries, "Datagrenzen", true)
         val access = normalizedTextList(input.accessBoundaries, "Toegangsgrenzen", true)
         if (production && access.isEmpty()) throw InvalidCommand("Productie vereist expliciete toegangsgrenzen.")
-        return TestEnvironmentConfiguration(name, baseUrl, routes, revisionEndpoint, revisionPath, data, access)
+        input.login?.let { login ->
+            if (production) throw InvalidCommand("Productie-login mag niet in automatische testconfiguratie staan.")
+            if (!login.credentialKey.matches(Regex("[A-Z][A-Z0-9_]*__(TEST|ACCEPTANCE|PREVIEW)_AGENT_TOKEN"))) throw InvalidCommand("Gebruik een expliciete testlogincredential.")
+            if (login.identity.isBlank() || login.identity.length > 320) throw InvalidCommand("Een testidentiteit is verplicht.")
+            if (!login.endpoint.startsWith("/") || login.endpoint.startsWith("//") || login.endpoint.contains("..")) throw InvalidCommand("Ongeldig loginendpoint.")
+            if (!login.tokenHeader.matches(Regex("[A-Za-z0-9-]{1,80}"))) throw InvalidCommand("Ongeldige tokenheader.")
+        }
+        return TestEnvironmentConfiguration(name, baseUrl, routes, revisionEndpoint, revisionPath, data, access, input.login)
     }
 
     private fun validatePublicGitUrl(value: String): String {

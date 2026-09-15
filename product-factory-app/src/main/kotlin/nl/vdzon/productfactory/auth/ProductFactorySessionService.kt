@@ -78,6 +78,13 @@ class ProductFactorySessionService(
     }
 
     @Transactional
+    fun createAgentSession(email: String, response: HttpServletResponse): AuthenticationStatus {
+        val target = users.findByEmail(email) ?: throw LoginRejected("Onbekende gebruiker voor agenttoegang.")
+        if (!target.active) throw LoginRejected("Account is niet actief.")
+        return createSession(target, response, lifetime = Duration.ofHours(1))
+    }
+
+    @Transactional
     fun createDebugSession(targetEmail: String?, actingRole: nl.vdzon.productfactory.api.advisor.ActingRole?, response: HttpServletResponse): AuthenticationStatus {
         val technicalUser = users.resolveOrCreate(DEBUG_AGENT_EMAIL, true)
         if (!technicalUser.active) throw LoginRejected("Technisch debug-account is niet actief.")
@@ -96,16 +103,17 @@ class ProductFactorySessionService(
         response: HttpServletResponse,
         viewedUser: nl.vdzon.productfactory.api.advisor.UserDetails? = null,
         viewedRole: nl.vdzon.productfactory.api.advisor.ActingRole? = null,
+        lifetime: Duration = SESSION_LIFETIME,
     ): AuthenticationStatus {
         val now = clock.instant()
         val sessionId = randomTokenHex(32)
         val csrfToken = randomTokenUrlSafe(32)
         repository.create(AuthenticationSession(
             sessionId, authenticatedUser.email, authenticatedUser.id.value, sha256Hex(csrfToken), now,
-            now.plus(SESSION_LIFETIME), viewedUser?.id?.value, viewedRole?.name,
+            now.plus(lifetime), viewedUser?.id?.value, viewedRole?.name,
         ))
-        addCookie(response, SESSION_COOKIE, signer.cookieValue(sessionId), httpOnly = true, SESSION_LIFETIME)
-        addCookie(response, CSRF_COOKIE, csrfToken, httpOnly = false, SESSION_LIFETIME)
+        addCookie(response, SESSION_COOKIE, signer.cookieValue(sessionId), httpOnly = true, lifetime)
+        addCookie(response, CSRF_COOKIE, csrfToken, httpOnly = false, lifetime)
         return authenticationStatus(viewedUser ?: authenticatedUser, csrfToken, authenticatedUser, viewedUser != null, viewedRole)
     }
 

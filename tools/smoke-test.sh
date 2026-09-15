@@ -8,7 +8,7 @@ case "$environment_name" in
   acceptance)
     frontend_url="https://product-factory-acceptance.vdzonsoftware.nl"
     backend_url="https://product-factory-api-acceptance.vdzonsoftware.nl"
-    expected_auth="false"
+    expected_auth="true"
     ;;
   production)
     frontend_url="https://product-factory.vdzonsoftware.nl"

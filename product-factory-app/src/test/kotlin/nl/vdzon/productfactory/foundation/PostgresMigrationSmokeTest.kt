@@ -13,6 +13,30 @@ import java.time.Instant
 @Testcontainers(disabledWithoutDocker = true)
 class PostgresMigrationSmokeTest {
     @Test
+    fun `epicnummers migreren chronologisch over producten en worden niet hergebruikt`() {
+        val database = "productfactory_epic_numbers"
+        createDatabase(database)
+        val url = databaseUrl(database)
+        Flyway.configure().dataSource(url, postgres.username, postgres.password).target("39").load().migrate()
+        val jdbc = InstantAwareJdbcTemplate(DriverManagerDataSource(url, postgres.username, postgres.password))
+        for (product in listOf("hkh", "pvdd")) {
+            jdbc.update("INSERT INTO pf_product(product_id,name,status,created_at,updated_at,updated_by_type,updated_by_id,version) VALUES (?,?,'ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'SYSTEM','test',1)", product, product)
+        }
+        fun insert(id: String, product: String, createdAt: String) = jdbc.update(
+            "INSERT INTO pf_epic(id,product_id,current_version,status,created_at,updated_at) VALUES (?,?,1,'AVAILABLE',CAST(? AS TIMESTAMP WITH TIME ZONE),CURRENT_TIMESTAMP)", id, product, createdAt)
+        insert("later", "hkh", "2026-09-02T00:00:00Z")
+        insert("earlier", "pvdd", "2026-09-01T00:00:00Z")
+        Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
+        assertThat(jdbc.queryForObject("SELECT epic_number FROM pf_epic WHERE id='earlier'", Long::class.java)).isEqualTo(1L)
+        assertThat(jdbc.queryForObject("SELECT epic_number FROM pf_epic WHERE id='later'", Long::class.java)).isEqualTo(2L)
+        insert("new", "pvdd", "2026-09-03T00:00:00Z")
+        assertThat(jdbc.queryForObject("SELECT epic_number FROM pf_epic WHERE id='new'", Long::class.java)).isEqualTo(3L)
+        jdbc.update("DELETE FROM pf_epic WHERE id='new'")
+        insert("next", "hkh", "2026-09-04T00:00:00Z")
+        assertThat(jdbc.queryForObject("SELECT epic_number FROM pf_epic WHERE id='next'", Long::class.java)).isEqualTo(4L)
+    }
+
+    @Test
     fun `JdbcTemplate bindt Instant als PostgreSQL timestamp`() {
         val database = "productfactory_instant_binding"
         createDatabase(database)
@@ -53,7 +77,7 @@ class PostgresMigrationSmokeTest {
         jdbc.update("INSERT INTO pf_product_conversation(conversation_id,product_id,title,created_by,status,created_at,updated_at,version) VALUES ('old-chat','old-product','Bestaand gesprek','old-user','OPEN',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1)")
         jdbc.update("INSERT INTO pf_product_conversation_message(message_id,conversation_id,sequence_number,sender,message_text,created_at,idempotency_key) VALUES ('old-message','old-chat',1,'USER','Bewaar mijn vraag',CURRENT_TIMESTAMP,'old-message-key')")
         val result = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(result.migrationsExecuted).isEqualTo(1)
+        assertThat(result.migrationsExecuted).isEqualTo(2)
         assertThat(jdbc.queryForObject("SELECT message_text FROM pf_product_conversation_message WHERE message_id='old-message'", String::class.java)).isEqualTo("Bewaar mijn vraag")
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_advisor_image", Long::class.java)).isZero()
         assertThat(jdbc.queryForObject("SELECT dispatching_enabled FROM pf_product WHERE product_id='old-product'", Boolean::class.java)).isTrue()
@@ -67,7 +91,7 @@ class PostgresMigrationSmokeTest {
             .load()
             .migrate()
 
-        assertThat(result.migrationsExecuted).isEqualTo(39)
+        assertThat(result.migrationsExecuted).isEqualTo(40)
         DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT version FROM flyway_schema_history WHERE success = TRUE").use { rows ->
@@ -149,6 +173,8 @@ class PostgresMigrationSmokeTest {
                     assertThat(rows.getString(1)).isEqualTo("38")
                     assertThat(rows.next()).isTrue()
                     assertThat(rows.getString(1)).isEqualTo("39")
+                    assertThat(rows.next()).isTrue()
+                    assertThat(rows.getString(1)).isEqualTo("40")
                     assertThat(rows.next()).isFalse()
                 }
             }
@@ -217,7 +243,7 @@ class PostgresMigrationSmokeTest {
                     "SELECT version FROM flyway_schema_history WHERE success = TRUE ORDER BY installed_rank DESC LIMIT 1",
                 ).use { rows ->
                     assertThat(rows.next()).isTrue()
-                    assertThat(rows.getString(1)).isEqualTo("39")
+                    assertThat(rows.getString(1)).isEqualTo("40")
                 }
             }
         }
@@ -232,7 +258,7 @@ class PostgresMigrationSmokeTest {
         assertThat(old.targetSchemaVersion.toString()).isEqualTo("8")
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(31)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(32)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_quality_process_session").use { rows ->
@@ -259,7 +285,7 @@ class PostgresMigrationSmokeTest {
         Flyway.configure().dataSource(url, postgres.username, postgres.password).target("9").load().migrate()
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
-        assertThat(upgraded.migrationsExecuted).isEqualTo(30)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(31)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_dispatcher_process_session").use { rows ->
@@ -283,7 +309,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(29)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(30)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT COUNT(*) FROM pf_schedule_run").use { rows ->
@@ -311,7 +337,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(28)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(29)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery(
@@ -352,7 +378,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(27)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(28)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery(
@@ -411,7 +437,7 @@ class PostgresMigrationSmokeTest {
 
         val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password).load().migrate()
 
-        assertThat(upgraded.migrationsExecuted).isEqualTo(26)
+        assertThat(upgraded.migrationsExecuted).isEqualTo(27)
         DriverManager.getConnection(url, postgres.username, postgres.password).use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeQuery("SELECT epic_approval_mode FROM pf_product WHERE product_id='approval-product'").use { rows ->

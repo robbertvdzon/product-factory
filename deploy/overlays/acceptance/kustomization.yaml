@@ -5,9 +5,11 @@ resources:
 - ../../base
 - configmap.yaml
 - sealed-secret-agent-runtime.yaml
+- sealed-secret-ai-access.yaml
 patches:
 - path: routes-patch.yaml
 - path: backend-runtime-secret-patch.yaml
+- path: agent-access-patch.yaml
 images:
 - digest: sha256:575ebee2a557c8d275fc82a029a797785c35fe0fb09807c2230573467f48d315
   name: ghcr.io/robbertvdzon/product-factory-backend

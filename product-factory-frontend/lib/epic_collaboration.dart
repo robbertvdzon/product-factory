@@ -1,3 +1,4 @@
+import 'epic_reference.dart';
 import 'display_timestamp.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -630,7 +631,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   );
   Widget epicRow(Json e) => ListTile(
     contentPadding: const EdgeInsets.symmetric(vertical: 10),
-    title: Text(_text(e['title'])),
+    title: Text(epicTitle(e)),
     subtitle: Text(
       '${productName(e['productId'])} · ${label(e['status'])}\n${needsAttention(e) ? 'Jouw aandacht nodig' : 'Geen actie van jou nodig'} · inhoudsversie ${e['contentVersion'] ?? e['version']}',
     ),
@@ -1241,7 +1242,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         ),
       ),
       Text(
-        _text(e['title']),
+        epicTitle(e),
         style: Theme.of(context).textTheme.headlineMedium,
       ),
       if (!architect)
@@ -1844,7 +1845,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     ),
     if (epic!['status'] == 'COMPLETED' && !architect)
       button('Bespreek een vervolgidee', () {
-        final title = _text(epic!['title']);
+        final title = epicTitle(epic!);
         final project = _text(epic!['productId']);
         startConversation();
         idea.text = 'Vervolg op $title: ';

@@ -75,6 +75,28 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `productieverzoek wordt uitsluitend tegen acceptatie uitgevoerd`() {
+        val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "production", 50, "production-request"))
+        completeSession(result(work, "PASSED"))
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().environment).isEqualTo("acceptance")
+    }
+
+    @Test
+    fun `deployment tijdens de test blokkeert goedkeuring`() {
+        val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "changed-deploy"))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        val job = runtime.onlyJob()
+        runtime.results[job.id] = result(work, "PASSED")
+        runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
+        revisions.revision = "b".repeat(40)
+        ai.reconcileActive()
+        quality.runProcessSession(productId)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
+        assertThat(jdbc.queryForObject("SELECT error_code FROM pf_quality_work_item WHERE id=?", String::class.java, work.value)).isEqualTo("TEST_ENVIRONMENT_CHANGED")
+    }
+
+    @Test
     fun `story wordt alleen tegen exacte live revision getest en levert snapshot`() {
         val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "verify-story"))
         completeSession(result(work, "PASSED"))

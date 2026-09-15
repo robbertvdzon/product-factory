@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-factory-backend
+spec:
+  template:
+    metadata:
+      annotations:
+        ai-access.vdzonsoftware.nl/config-version: '2026-09-15'
+    spec:
+      containers:
+      - name: backend
+        env:
+        - name: AI_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ai-access
+              key: AI_ACCESS_TOKEN
+        - name: AI_ACCESS_EMAILS
+          valueFrom:
+            secretKeyRef:
+              name: ai-access
+              key: AI_ACCESS_EMAILS
+        - name: AI_ACCESS_ALLOWED_ORIGINS
+          valueFrom:
+            secretKeyRef:
+              name: ai-access
+              key: AI_ACCESS_ALLOWED_ORIGINS
+        - name: PF_SESSION_SIGNING_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ai-access
+              key: PF_SESSION_SIGNING_SECRET
+        - name: PF_GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ai-access
+              key: PF_GOOGLE_CLIENT_ID
+        - name: PF_STAKEHOLDER_EMAILS
+          valueFrom:
+            secretKeyRef:
+              name: ai-access
+              key: PF_STAKEHOLDER_EMAILS
+        - name: PF_FACTORY_OWNER_EMAILS
+          valueFrom:
+            secretKeyRef:
+              name: ai-access
+              key: PF_FACTORY_OWNER_EMAILS

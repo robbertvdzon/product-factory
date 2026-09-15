@@ -1,3 +1,4 @@
+import 'epic_reference.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -1492,6 +1493,11 @@ class _EnvironmentDraft {
       data = TextEditingController(
         text: (value?['dataBoundaries'] as List? ?? const []).join('\n'),
       ),
+      loginKey = TextEditingController(text: _value((value?['login'] as Map?)?['credentialKey'])),
+      loginIdentity = TextEditingController(text: _value((value?['login'] as Map?)?['identity'])),
+      loginEndpoint = TextEditingController(text: _value((value?['login'] as Map?)?['endpoint']).isEmpty ? '/api/auth/agent-session' : _value((value?['login'] as Map?)?['endpoint'])),
+      loginHeader = TextEditingController(text: _value((value?['login'] as Map?)?['tokenHeader']).isEmpty ? 'X-AI-Access-Token' : _value((value?['login'] as Map?)?['tokenHeader'])),
+      loginRole = TextEditingController(text: _value((value?['login'] as Map?)?['role'])),
       access = TextEditingController(
         text: (value?['accessBoundaries'] as List? ?? const []).join('\n'),
       );
@@ -1502,7 +1508,7 @@ class _EnvironmentDraft {
       revisionJsonPath,
       routes,
       data,
-      access;
+      access, loginKey, loginIdentity, loginEndpoint, loginHeader, loginRole;
   List<String> lines(TextEditingController controller) => controller.text
       .split('\n')
       .map((v) => v.trim())
@@ -1516,6 +1522,11 @@ class _EnvironmentDraft {
     'revisionJsonPath': revisionJsonPath.text.trim(),
     'dataBoundaries': lines(data),
     'accessBoundaries': lines(access),
+    if (loginKey.text.trim().isNotEmpty) 'login': {
+      'credentialKey': loginKey.text.trim(), 'identity': loginIdentity.text.trim(),
+      'endpoint': loginEndpoint.text.trim(), 'tokenHeader': loginHeader.text.trim(),
+      if (loginRole.text.trim().isNotEmpty) 'role': loginRole.text.trim(),
+    },
   };
   void dispose() {
     for (final c in [
@@ -1525,7 +1536,7 @@ class _EnvironmentDraft {
       revisionJsonPath,
       routes,
       data,
-      access,
+      access, loginKey, loginIdentity, loginEndpoint, loginHeader, loginRole,
     ]) {
       c.dispose();
     }
@@ -1570,6 +1581,15 @@ class _TestConfigurationDialogState extends State<_TestConfigurationDialog> {
     tilePadding: EdgeInsets.zero,
     title: Text(title),
     children: [
+      if (title == 'Acceptatie') ...[
+        const Text('Gebruik een apart testaccount en een toegewezen credentialnaam. Vul hier nooit de tokenwaarde in.'),
+        TextField(controller: draft.loginKey, decoration: const InputDecoration(labelText: 'Testcredentialnaam (optioneel)', hintText: 'PROJECT__ACCEPTANCE_AGENT_TOKEN')),
+        TextField(controller: draft.loginIdentity, decoration: const InputDecoration(labelText: 'Testidentiteit')),
+        TextField(controller: draft.loginRole, decoration: const InputDecoration(labelText: 'Te controleren rol (optioneel)')),
+        TextField(controller: draft.loginEndpoint, decoration: const InputDecoration(labelText: 'Login-endpoint')),
+        TextField(controller: draft.loginHeader, decoration: const InputDecoration(labelText: 'Token-header')),
+        const SizedBox(height: 16),
+      ],
       TextField(
         controller: draft.name,
         decoration: const InputDecoration(labelText: 'Naam'),
@@ -2480,7 +2500,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               contentPadding: EdgeInsets.zero,
               onTap: () => _openEpic(data, epic),
               leading: const Icon(Icons.approval_outlined),
-              title: SelectableText('${epic['title']}'),
+              title: SelectableText(epicTitle(epic)),
               subtitle: SelectableText(
                 _epicStatusLabel(_value(epic['status'])),
               ),
@@ -2552,7 +2572,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                       onTap: () => _openEpic(data, epic),
                       leading: const _ToneChip('✓', tone: _Tone.ok),
                       title: Text(
-                        _value(epic['title']),
+                        epicTitle(epic),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -2948,7 +2968,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                     SelectableText(
                       [
                         if (story['type'] == 'BUGFIX') 'Bugfix',
-                        if (epic != null) 'epic “${epic['title']}”',
+                        if (epic != null) 'epic “${epicTitle(epic)}”',
                       ].join(' · '),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
@@ -3104,7 +3124,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
             ),
           );
         return _CollapsibleHistory(
-          title: epic == null ? 'Epic ${entry.key}' : _value(epic['title']),
+          title: epic == null ? 'Epic ${entry.key}' : epicTitle(epic),
           subtitle:
               '$delivered opgeleverd · ${entry.value.length - delivered} geannuleerd',
           childrenBuilder: () => stories
@@ -3207,7 +3227,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
         child: ExpansionTile(
           initiallyExpanded: true,
           leading: const Icon(Icons.view_agenda_outlined),
-          title: Text(epic == null ? 'Epic ${entry.key}' : '${epic['title']}'),
+          title: Text(epic == null ? 'Epic ${entry.key}' : epicTitle(epic)),
           subtitle: Text(
             '${entry.value.length} ${entry.value.length == 1 ? 'story' : 'stories'} · '
             '${epic == null ? entry.key : _epicStatusLabel(_value(epic['status']))}',
@@ -3376,7 +3396,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final epic = data.epics
         .where((candidate) => _value(candidate['id']) == targetId)
         .firstOrNull;
-    if (epic != null) return 'Epic · ${epic['title']}';
+    if (epic != null) return 'Epic · ${epicTitle(epic)}';
     final bug = data.bugs
         .where((candidate) => _value(candidate['id']) == targetId)
         .firstOrNull;
@@ -3663,7 +3683,7 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
                 children: [
                   Expanded(
                     child: Text(
-                      _value(epic['title']),
+                      epicTitle(epic),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),

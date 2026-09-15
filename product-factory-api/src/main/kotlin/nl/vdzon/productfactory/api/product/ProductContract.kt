@@ -35,6 +35,13 @@ data class UpdateProductAssignmentCommand(
     val aiSupplier: String? = null,
     val aiModel: String? = null,
 )
+data class TestLoginConfiguration(
+    val credentialKey: String,
+    val identity: String,
+    val endpoint: String = "/api/auth/agent-session",
+    val tokenHeader: String = "X-AI-Access-Token",
+    val role: String? = null,
+)
 data class TestEnvironmentConfiguration(
     val name: String,
     val baseUrl: String,
@@ -43,6 +50,7 @@ data class TestEnvironmentConfiguration(
     val revisionJsonPath: String,
     val dataBoundaries: List<String> = emptyList(),
     val accessBoundaries: List<String> = emptyList(),
+    val login: TestLoginConfiguration? = null,
 )
 data class ConfigureTestableProductCommand(
     val productId: ProductId,

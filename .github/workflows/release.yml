@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       revision:
-        description: Volledige, reeds geverifieerde main-revision
+        description: Volledige, reeds geverifieerde revision (main of eigen PR)
         required: true
         type: string
       verification_run_id:
@@ -16,11 +16,22 @@ on:
         required: true
         type: string
 
+      acceptance_only:
+        description: Alleen acceptatie deployen; productie blijft ongewijzigd
+        required: true
+        type: boolean
+        default: true
+      hold_minutes:
+        description: Reserveer acceptatie voor deze test (0 tot 60 minuten)
+        required: true
+        type: number
+        default: 30
+
 permissions: {}
 
 concurrency:
   group: product-factory-release-main
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   metadata:
@@ -44,6 +55,11 @@ jobs:
           set -euo pipefail
           actual_revision="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VERIFICATION_RUN_ID}" --jq .head_sha)"
           conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VERIFICATION_RUN_ID}" --jq .conclusion)"
+          [[ "$VERIFIED_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          workflow_path="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VERIFICATION_RUN_ID}" --jq .path)"
+          source_repository="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VERIFICATION_RUN_ID}" --jq .head_repository.full_name)"
+          test "$workflow_path" = '.github/workflows/verify.yml'
+          test "$source_repository" = "$GITHUB_REPOSITORY"
           test "$conclusion" = success
           test "$actual_revision" = "$VERIFIED_REVISION"
       - id: release
@@ -121,7 +137,7 @@ jobs:
   promote:
     needs: [metadata, backend, frontend]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 90
     permissions:
       contents: write
     steps:
@@ -135,6 +151,8 @@ jobs:
       - name: Promote through acceptance to production
         shell: bash
         env:
+          ACCEPTANCE_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.acceptance_only || false }}
+          HOLD_MINUTES: ${{ github.event_name == 'workflow_dispatch' && inputs.hold_minutes || 0 }}
           REVISION: ${{ needs.metadata.outputs.revision }}
           BACKEND_DIGEST: ${{ needs.backend.outputs.digest }}
           FRONTEND_DIGEST: ${{ needs.frontend.outputs.digest }}
@@ -145,7 +163,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
 
-          if [[ "$(git rev-parse origin/main)" != "$REVISION" ]]; then
+          if [[ "$ACCEPTANCE_ONLY" != true && "$(git rev-parse origin/main)" != "$REVISION" ]]; then
             echo "Release $REVISION is vervangen door een nieuwere main; promotie overgeslagen."
             exit 0
           fi
@@ -183,6 +201,14 @@ jobs:
           acceptance_commit="$(git rev-parse HEAD)"
 
           wait_for_environment acceptance
+          if [[ "$ACCEPTANCE_ONLY" = true ]]; then
+            [[ "$HOLD_MINUTES" =~ ^[0-9]+$ ]] && (( HOLD_MINUTES <= 60 ))
+            echo "Acceptatie is gereserveerd op $REVISION gedurende $HOLD_MINUTES minuten."
+            sleep "$((HOLD_MINUTES * 60))"
+            wait_for_environment acceptance
+            echo "Acceptatietestdeployment afgerond; geen productiepromotie."
+            exit 0
+          fi
 
           git fetch origin main
           if [[ "$(git rev-parse origin/main)" != "$acceptance_commit" ]]; then

@@ -917,7 +917,7 @@ class _EpicDetailDialogState extends State<_EpicDetailDialog> {
                       children: [
                         const _Eyebrow('Epic'),
                         SelectableText(
-                          _value(epic['title']),
+                          epicTitle(epic),
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),

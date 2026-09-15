@@ -55,6 +55,8 @@ class ProductFactorySecurityConfiguration(
                         .requestMatchers(
                             "/api/auth/google",
                             "/api/auth/debug-session",
+                            "/api/auth/agent-session",
+                            "/api/auth/agent-login",
                             "/api/auth/logout",
                             "/api/auth/session",
                             "/api/foundation",
@@ -85,6 +87,7 @@ class ProductFactorySecurityConfiguration(
             allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             allowedHeaders = listOf(
                 "Content-Type",
+                "X-AI-Access-Token",
                 ProductFactorySessionService.CSRF_HEADER,
                 AuthenticationController.DEBUG_TOKEN_HEADER,
             )
@@ -138,7 +141,7 @@ private class ProductFactorySessionFilter(
                 return
             }
             if (
-                request.requestURI !in setOf("/api/auth/google", "/api/auth/debug-session") &&
+                request.requestURI !in setOf("/api/auth/google", "/api/auth/debug-session", "/api/auth/agent-session") &&
                 session != null &&
                 !sessionService.validateCsrf(request, session)
             ) {

@@ -5,7 +5,7 @@ metadata:
 data:
   SPRING_PROFILES_ACTIVE: acceptance
   PF_ENVIRONMENT: acceptance
-  PF_AUTH_REQUIRED: "false"
+  PF_AUTH_REQUIRED: "true"
   PF_PUBLIC_FRONTEND_URL: https://product-factory-acceptance.vdzonsoftware.nl
   PF_PUBLIC_BACKEND_URL: https://product-factory-api-acceptance.vdzonsoftware.nl
   PF_SCHEDULES_ENABLED: "false"
