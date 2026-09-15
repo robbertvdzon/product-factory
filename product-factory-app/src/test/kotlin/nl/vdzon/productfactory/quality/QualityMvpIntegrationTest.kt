@@ -75,6 +75,19 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `tester schema begrenst de uitleg volgens het epic publicatiecontract`() {
+        quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "explanation-schema"))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        val properties = runtime.requests.single().responseSchema!!.path("properties").path("results").path("items").path("properties")
+        assertThat(properties.path("explanation").path("minLength").asInt()).isEqualTo(10)
+        assertThat(properties.path("explanation").path("maxLength").asInt()).isEqualTo(2000)
+        assertThat(properties.path("signalOutcome").path("maxLength").asInt()).isEqualTo(200)
+        ai.deleteAllOwnedExecutionData()
+        runtime.reset()
+    }
+
+    @Test
     fun `productieverzoek wordt uitsluitend tegen acceptatie uitgevoerd`() {
         val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "production", 50, "production-request"))
         completeSession(result(work, "PASSED"))
