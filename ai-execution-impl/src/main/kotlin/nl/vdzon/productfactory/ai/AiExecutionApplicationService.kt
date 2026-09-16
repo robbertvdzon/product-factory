@@ -90,7 +90,9 @@ class AiExecutionApplicationService(
             throw VersionConflict("De bevroren AI-jobconfiguratie is niet meer actueel.")
         }
         requireTrustedRole(command.productId, command.agentRole)
-        val environmentKeys = command.productId?.let { selectedEnvironmentKeys(it, command.agentRole).filter { key -> key.matches(Regex("[A-Z][A-Z0-9_]*__(TEST|ACCEPTANCE|PREVIEW)_[A-Z][A-Z0-9_]*")) && key.substringAfter("__").split('_').none { part -> part in setOf("PRODUCTION", "PROD", "PRD", "KUBECONFIG", "CLUSTER", "SIGNING", "REMEMBER", "PRIVATE", "WORKER", "GITHUB") } } }.orEmpty()
+        val environmentKeys = command.productId?.let {
+            selectedEnvironmentKeys(it, command.agentRole).filter { key -> executionCredentialAllowed(key, command) }
+        }.orEmpty()
         val runtimeIdempotencyKey = "pf-${command.idempotencyKey}".take(160)
         val runtimeRequest = RuntimeCreateJobRequest(
             idempotencyKey = runtimeIdempotencyKey,

@@ -284,6 +284,12 @@ class ProductAdvisorApplicationService(
                 "conversation" to getConversation(turn.conversationId),
                 "repository" to mapOf("url" to assignment.publicGitUrl, "commitSha" to sha),
                 "testConfiguration" to testConfiguration,
+                "productionReadAccess" to if (turn.productId.value == "pvdd") mapOf(
+                    "origin" to "https://pvdd.vdzonsoftware.nl",
+                    "credentialKey" to "PVDD__PRODUCTION_READ_ONLY_TOKEN",
+                    "header" to "X-AI-Read-Token",
+                    "instruction" to "Robbert heeft voor de PvdD-productadviseur productieleestoegang toegestaan. Gebruik uitsluitend de geselecteerde credential indien aanwezig. Deze aparte leescapability vervangt voor dit onderzoek de publieke routebeperking uit testConfiguration; gewone productielogins en mutaties blijven verboden. Lees gericht de GET-API voor vergaderingen, agendapunten, analyses, instellingen en beleid. De server bepaalt de toegestane routes en weigert andere routes/werkwoorden. Maak geen gewone sessie. Gebruik de browser alleen voor zichtbare UX. Injecteer bij Playwright de header via een route-handler uitsluitend voor origin https://pvdd.vdzonsoftware.nl en pad /api/; gebruik geen globale extraHTTPHeaders en stuur niets mee naar externe origins of redirects. Lees de credential uit de jobomgeving zonder hem af te drukken, in prompts, URLs of artifacts te zetten. Ontbreekt de key, meld ontbrekende leestoegang."
+                ) else null,
                 "allowedOutcomes" to (if (getConversation(turn.conversationId).purpose == ConversationPurpose.QUESTION || (getConversation(turn.conversationId).epicId != null && jdbc.queryForObject("SELECT intent FROM pf_product_advisor_turn WHERE turn_id=?",String::class.java,turnId) != "AUTO")) listOf("ANSWER", "ASK_FOLLOW_UP") else if (getConversation(turn.conversationId).epicId != null) listOf("ANSWER", "ASK_FOLLOW_UP", "PROPOSE_EPIC_UPDATE", "REVERT_EPIC_UPDATE") else listOf("ANSWER", "ASK_FOLLOW_UP", "PROPOSE_CHANGE")),
                 "latestChangeProposal" to changeProposal(turn.conversationId),
                 "conversationPurpose" to getConversation(turn.conversationId).purpose,
@@ -986,7 +992,7 @@ class ProductAdvisorApplicationService(
     companion object {
         const val AGENT_ROLE = "PRODUCT_ADVISOR"
         const val JOB_KEY = "PRODUCT_ADVISOR.CONVERSE"
-        const val PROMPT_VERSION = 5L
+        const val PROMPT_VERSION = 6L
         const val MAX_ATTEMPTS = 3
         const val MAX_HOTFIX_ROUTE_ATTEMPTS = 2
         val SHA = Regex("[0-9a-fA-F]{40}")

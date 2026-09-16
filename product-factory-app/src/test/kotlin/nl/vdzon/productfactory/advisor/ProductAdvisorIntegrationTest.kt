@@ -175,7 +175,7 @@ class ProductAdvisorIntegrationTest(
         assertThat(jdbc.queryForObject(
             "SELECT prompt_template_version FROM pf_ai_task WHERE product_id=? ORDER BY created_at DESC LIMIT 1",
             Long::class.java, productId.value,
-        )).isEqualTo(5L)
+        )).isEqualTo(6L)
         assertThat(submitted.environmentKeys).isEmpty()
         completeOnlyJob(mapper.createObjectNode().apply {
             put("message", "De bestaande route leest productcontext en voert zonder bevestiging niets uit.")

@@ -59,3 +59,13 @@ dubbele story ontstaan; na de tweede mislukte poging stopt automatische routerin
 Rollback zet de guard op `false` en kan daarna het vorige immutable image terugzetten. Flyway 21 is
 additief en hoeft niet te worden teruggedraaid. Trek bij mogelijke tokenblootstelling het dashboard-
 secret in Software Factory in en roteer beide kanten gecontroleerd.
+
+## PvdD-productie lezen (toestemming 16 september 2026)
+
+Voor `pvdd` is een beperkte uitzondering beschikbaar: activeer de geregistreerde key
+`PVDD__PRODUCTION_READ_ONLY_TOKEN` voor het product en verleen uitsluitend `PRODUCT_ADVISOR` toegang.
+Alleen `PRODUCT_ADVISOR.CONVERSE` vanuit capability `product-advisor` kan deze key selecteren, ook
+als een beheerder per ongeluk een testergrant toevoegt. De prompt beschrijft de aparte API-header,
+de exacte origin en de browsergrens. Zonder actieve productkey en rolgrant blijft toegang gesloten.
+De PvdD-app controleert zelf de leescapability; gewone productielogins blijven buiten de runtime.
+Bestaande gespreksbeurten houden hun bevroren context; een volgend bericht gebruikt de nieuwe toegang.
