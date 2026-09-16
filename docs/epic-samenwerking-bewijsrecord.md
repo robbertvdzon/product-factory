@@ -220,3 +220,18 @@ de nieuwe schrijfinstructie gebruiken.
 
 Verificatie: integratietest bewaart de volledige functionele en technische tekst bij publicatie;
 widgettests controleren scheiding, codeblokken en expliciet openen op een smal scherm.
+
+## Verwijderen sluit ook de voorbereiding af (2026-09-16)
+
+Een gerichte ontwerpsessie kan al een epic publiceren en daarna op een antwoord wachten.
+De definitieve koppeling van gesprek/verzoek naar epic bestaat dan nog niet. Verwijderen
+zoekt daarom ook via het bronverzoek van de epic. Het gesprek wordt verborgen met behoud
+van historie, verzoek en lopende ontwerpsessie worden geannuleerd, open vragen worden
+ingetrokken en resterende voorbereiding wordt beëindigd. Afgeronde werkitems blijven bewaard.
+De productclaim komt vrij voor een nieuw verzoek. Een eerder geselecteerde routeringsactie
+of late sessiefout mag de annulering niet ongedaan maken.
+
+Migratie V41 herstelt dezelfde relaties voor eerder verwijderde epics. De regressietest
+controleert normale verwijdering en migratieherstel, elk voor een afgeronde voorbereiding
+en een voorbereiding die op een antwoord wacht. Een nieuw gesprek blijft zichtbaar en
+kan daarna een eigen ontwerpsessie starten.

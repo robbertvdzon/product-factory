@@ -63,6 +63,9 @@ class ProductDesignMvpService(
         val claimed = transactions.execute { claimOrCreate(productId) } ?: error("Ontwerpsessieclaim ontbreekt.")
         runCatching {
             transactions.executeWithoutResult {
+                // A deletion may have cancelled this session after it was claimed.
+                val status = jdbc.queryForObject("SELECT status FROM pf_design_process_session WHERE id=? FOR UPDATE", String::class.java, claimed.session.id.value)
+                if (status == "CANCELLED") return@executeWithoutResult
                 if (claimed.created) startNewSession(claimed.session.id, productId) else when (claimed.session.status) {
                     ProcessSessionStatus.WAITING_FOR_AI -> resumeWaiting(claimed.session)
                     ProcessSessionStatus.BLOCKED -> if (claimed.session.errorCode == "AI_RESULT_MISSING") {
@@ -770,6 +773,13 @@ class ProductDesignMvpService(
         validateActor(command.actor)
         validateReason(command.reason)
         replay(command.idempotencyKey, fingerprint(command))?.let { return }
+        // Use the same lock order as publication: design session before epic.
+        jdbc.query(
+            """SELECT s.id FROM pf_design_process_session s WHERE s.active_product_id IS NOT NULL AND s.id IN (
+                SELECT w.process_session_id FROM pf_design_work_item w JOIN pf_product_request r ON r.request_id=w.request_id
+                WHERE r.linked_epic_id=? OR r.request_id=(SELECT source_product_request_id FROM pf_epic WHERE id=?)) FOR UPDATE""",
+            { rs, _ -> rs.getString(1) }, command.epicId.value, command.epicId.value,
+        )
         jdbc.queryForObject("SELECT current_version FROM pf_epic WHERE id=? FOR UPDATE", Long::class.java, command.epicId.value)
         val epic = getEpic(command.epicId)
         if (epic.version != command.expectedVersion) throw VersionConflict("De epic is intussen gewijzigd. Ververs en probeer opnieuw.")
@@ -780,7 +790,47 @@ class ProductDesignMvpService(
         val terminal = epic.status in setOf(EpicStatus.COMPLETED, EpicStatus.NOT_SUCCESSFUL, EpicStatus.CANCELLED, EpicStatus.WITHDRAWN, EpicStatus.SUPERSEDED)
         val version = if (terminal) epic.version else appendStatusVersion(epic, EpicStatus.CANCELLED, command.actor, reason=command.reason)
         jdbc.update("UPDATE pf_epic SET deleted_at=?,updated_at=? WHERE id=?", clock.instant(), clock.instant(), epic.id.value)
+        closeDeletedEpicPreparation(epic)
         recordCommand(command.idempotencyKey, fingerprint(command), epic.id, version)
+    }
+
+    /** Keep the history, but stop both linked and not-yet-linked preparation. */
+    private fun closeDeletedEpicPreparation(epic: EpicDetails) {
+        val now = clock.instant()
+        val reason = "De bijbehorende epic is verwijderd."
+        val requestIds = jdbc.query(
+            "SELECT request_id FROM pf_product_request WHERE linked_epic_id=? OR request_id=(SELECT source_product_request_id FROM pf_epic WHERE id=?) FOR UPDATE",
+            { rs, _ -> rs.getString(1) }, epic.id.value, epic.id.value,
+        )
+        for (requestId in requestIds) {
+            val sessions = jdbc.query(
+                "SELECT s.id,s.current_ai_task_id FROM pf_design_process_session s WHERE s.active_product_id IS NOT NULL AND s.id IN (SELECT process_session_id FROM pf_design_work_item WHERE request_id=?) FOR UPDATE",
+                { rs, _ -> rs.getString(1) to rs.getString(2) }, requestId,
+            )
+            for ((sessionId, taskId) in sessions) {
+                jdbc.update("UPDATE pf_design_process_session SET status='CANCELLED',active_product_id=NULL,call_claimed_until=NULL,error_code='EPIC_DELETED',blocked_reason=NULL,result_summary=?,updated_at=?,finished_at=? WHERE id=?", reason, now, now, sessionId)
+                taskId?.let { ai.cancelAiTask(AiTaskId(it), reason) }
+            }
+            jdbc.update("UPDATE pf_design_work_item SET status='FAILED',updated_at=? WHERE request_id=? AND status NOT IN ('DONE','FAILED')", now, requestId)
+            jdbc.update("UPDATE pf_product_request SET status='CANCELLED',delivery_status='CANCELLED',updated_at=?,version=version+1 WHERE request_id=? AND status<>'CANCELLED'", now, requestId)
+            jdbc.update("UPDATE pf_product_request_route SET status='CANCELLED',updated_at=? WHERE request_id=? AND status NOT IN ('DONE','CANCELLED')", now, requestId)
+        }
+        val conversations = jdbc.query(
+            """SELECT conversation_id FROM pf_product_conversation WHERE deleted_at IS NULL AND
+                (epic_id=? OR conversation_id IN (SELECT conversation_id FROM pf_product_request WHERE linked_epic_id=? OR request_id=(SELECT source_product_request_id FROM pf_epic WHERE id=?))) FOR UPDATE""",
+            { rs, _ -> rs.getString(1) }, epic.id.value, epic.id.value, epic.id.value,
+        )
+        for (conversationId in conversations) {
+            jdbc.update("UPDATE pf_product_conversation SET deleted_at=?,status='CLOSED',updated_at=?,version=version+1 WHERE conversation_id=?", now, now, conversationId)
+            jdbc.update("UPDATE pf_product_advisor_turn SET status='BLOCKED',safe_error_code='CONVERSATION_DELETED',updated_at=? WHERE conversation_id=? AND status IN ('PENDING','WAITING_FOR_AI')", now, conversationId)
+            jdbc.update("DELETE FROM pf_personal_notification WHERE target_type='CONVERSATION' AND target_id=?", conversationId)
+        }
+        jdbc.update(
+            """UPDATE pf_stakeholder_question SET status='WITHDRAWN',withdrawal_reason=?,withdrawn_at=?,updated_by_type='SYSTEM',updated_by_id='epic-deletion',version=version+1
+                WHERE status='OPEN' AND (epic_link_id=? OR product_request_id IN (
+                    SELECT request_id FROM pf_product_request WHERE linked_epic_id=? OR request_id=(SELECT source_product_request_id FROM pf_epic WHERE id=?)))""",
+            reason, now, epic.id.value, epic.id.value, epic.id.value,
+        )
     }
 
     @Transactional
@@ -1029,7 +1079,7 @@ class ProductDesignMvpService(
 
     private fun blockSession(sessionId: ProcessSessionId, code: String, message: String) {
         jdbc.update(
-            "UPDATE pf_design_process_session SET status='BLOCKED',blocked_reason=?,error_code=?,call_claimed_until=NULL,updated_at=? WHERE id=?",
+            "UPDATE pf_design_process_session SET status='BLOCKED',blocked_reason=?,error_code=?,call_claimed_until=NULL,updated_at=? WHERE id=? AND status<>'CANCELLED'",
             message.take(1000), code.take(160), clock.instant(), sessionId.value,
         )
         jdbc.update("UPDATE pf_design_work_item SET status='BLOCKED',updated_at=? WHERE process_session_id=? AND status='IN_PROGRESS'", clock.instant(), sessionId.value)

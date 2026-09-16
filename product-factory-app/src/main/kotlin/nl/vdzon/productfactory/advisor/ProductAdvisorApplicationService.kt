@@ -515,8 +515,10 @@ class ProductAdvisorApplicationService(
 
     private fun routeOne(id: ProductRequestId) {
         val details = getRequest(id)
-        if (details.status == ProductRequestStatus.ROUTED) return
-        transactions.executeWithoutResult {
+        if (details.status in setOf(ProductRequestStatus.ROUTED, ProductRequestStatus.CANCELLED)) return
+        val claimed = transactions.execute {
+            val currentStatus = jdbc.queryForObject("SELECT status FROM pf_product_request WHERE request_id=? FOR UPDATE", String::class.java, id.value)
+            if (currentStatus !in setOf("APPROVED", "ROUTING", "ROUTING_FAILED")) return@execute false
             val routeKey = "route-${details.id.value}-v${details.currentVersion}"
             val exists = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM pf_product_request_route WHERE request_id=? AND request_version=?",
@@ -533,7 +535,9 @@ class ProductAdvisorApplicationService(
                 clock.instant(), details.id.value, details.currentVersion,
             )
             jdbc.update("UPDATE pf_product_request SET status='ROUTING',safe_error_code=NULL,updated_at=?,version=version+1 WHERE request_id=?", clock.instant(), id.value)
-        }
+            true
+        } ?: false
+        if (!claimed) return
         when (details.content.type) {
             ProductRequestType.EPIC_CANDIDATE -> queueDesign(details)
             ProductRequestType.BUGFIX -> routeBugfix(details)
@@ -542,6 +546,7 @@ class ProductAdvisorApplicationService(
     }
 
     private fun queueDesign(request: ProductRequestDetails) = transactions.executeWithoutResult {
+        if (jdbc.queryForObject("SELECT status FROM pf_product_request WHERE request_id=? FOR UPDATE", String::class.java, request.id.value) != "ROUTING") return@executeWithoutResult
         val key = "design-${request.id.value}-v${request.currentVersion}"
         val exists = jdbc.queryForObject("SELECT COUNT(*) FROM pf_design_work_item WHERE idempotency_key=?", Long::class.java, key) ?: 0
         if (exists == 0L) jdbc.update(
@@ -661,12 +666,12 @@ class ProductAdvisorApplicationService(
 
     private fun markRouteFailure(id: ProductRequestId, code: String) = transactions.executeWithoutResult {
         jdbc.update(
-            "UPDATE pf_product_request SET status='ROUTING_FAILED',delivery_status='FAILED',safe_error_code=?,updated_at=?,version=version+1 WHERE request_id=? AND status<>'ROUTED'",
+            "UPDATE pf_product_request SET status='ROUTING_FAILED',delivery_status='FAILED',safe_error_code=?,updated_at=?,version=version+1 WHERE request_id=? AND status NOT IN ('ROUTED','CANCELLED')",
             code.take(160), clock.instant(), id.value,
         )
         val currentVersion = jdbc.queryForObject("SELECT current_version FROM pf_product_request WHERE request_id=?", Long::class.java, id.value)
         jdbc.update(
-            "UPDATE pf_product_request_route SET status='RETRY',safe_error_code=?,updated_at=? WHERE request_id=? AND request_version=? AND status<>'DONE'",
+            "UPDATE pf_product_request_route SET status='RETRY',safe_error_code=?,updated_at=? WHERE request_id=? AND request_version=? AND status NOT IN ('DONE','CANCELLED')",
             code.take(160), clock.instant(), id.value, currentVersion,
         )
     }

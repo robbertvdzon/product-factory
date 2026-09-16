@@ -817,7 +817,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Epic verwijderen?'),
-        content: Text('“${_text(e['title'])}” verdwijnt uit je epics. Openstaande stories worden gestopt en voor werk in uitvoering wordt annulering aangevraagd. Reeds opgeleverde wijzigingen blijven bestaan.'),
+        content: Text('“${_text(e['title'])}” verdwijnt uit je epics. De voorbereiding en bijbehorende open vragen worden afgesloten. Openstaande stories worden gestopt en voor werk in uitvoering wordt annulering aangevraagd. Reeds opgeleverde wijzigingen blijven bestaan.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuleren')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwijderen')),

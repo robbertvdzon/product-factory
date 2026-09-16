@@ -19,6 +19,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.springframework.core.io.ClassPathResource
+import org.springframework.jdbc.datasource.init.ScriptUtils
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -416,6 +420,62 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
 
         design.runProcessSession(productId)
         assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().aiTaskIds).hasSize(2)
+    }
+
+    @ParameterizedTest
+    @CsvSource("false,false", "false,true", "true,false", "true,true")
+    fun `verwijderen sluit voorbereiding en vragen af zonder nieuw gesprek te raken`(historicalRepair: Boolean, waitingForAnswer: Boolean) {
+        val owner = users.resolveOrCreate("delete-${productId.value}@example.test", true)
+        val conversation = advisor.createConversation(CreateConversationCommand(
+            productId, "Oude voorbereiding", owner.id, "old-preparation-${productId.value}",
+        ))
+        val requestId = insertDirectedRequest(conversation, owner.id)
+        advisor.approveRequest(ApproveProductRequestCommand(requestId, 1, 1, owner.id, "approve-old-${productId.value}"))
+        advisor.routeApprovedRequests()
+        val result = validEpic()
+        if (waitingForAnswer) {
+            (result.path("epic").path("readiness") as ObjectNode).apply {
+                put("readyForPlanning", false)
+                putArray("openQuestions").add("Welke uitleg moet op de lege toestand staan?")
+            }
+            result.putObject("stakeholderQuestion")
+                .put("question", "Welke uitleg moet op de lege toestand staan?")
+                .put("context", "Dit antwoord is nodig om de epic af te ronden.")
+        }
+        completeOnlyJob(result)
+        advisor.routeApprovedRequests()
+        val epic = queries.findEpics(EpicFilter(productId)).single()
+        val sessionId = jdbc.queryForObject("SELECT process_session_id FROM pf_design_work_item WHERE request_id=?", String::class.java, requestId.value)!!
+        val newConversation = advisor.createConversation(CreateConversationCommand(
+            productId, "Nieuwe voorbereiding", owner.id, "new-preparation-${productId.value}",
+        ))
+        if (historicalRepair) {
+            // Reproduce deletion by the previous release, including the missing final link.
+            jdbc.update("UPDATE pf_epic SET deleted_at=CURRENT_TIMESTAMP WHERE id=?", epic.id.value)
+            jdbc.dataSource!!.connection.use { connection ->
+                ScriptUtils.executeSqlScript(connection, ClassPathResource("db/migration/V41__close_deleted_epic_preparations.sql"))
+            }
+        } else {
+            design.deleteEpic(DeleteEpicCommand(epic.id, "Verwijder deze epic", epic.version, PROCESS, "delete-with-preparation-${productId.value}"))
+        }
+        assertThat(advisor.findConversations(productId).map { it.id }).containsExactly(newConversation)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_product_conversation WHERE conversation_id=?", Long::class.java, conversation.value)).isEqualTo(1)
+        assertThat(advisor.getRequest(requestId).status).isEqualTo(ProductRequestStatus.CANCELLED)
+        assertThat(productQueries.findStakeholderQuestions(StakeholderQuestionFilter(productId)).none { it.status == StakeholderQuestionStatus.OPEN }).isTrue()
+        if (waitingForAnswer) {
+            assertThat(queries.getProcessSession(ProcessSessionId(sessionId)).status).isEqualTo(ProcessSessionStatus.CANCELLED)
+            assertThat(jdbc.queryForObject("SELECT status FROM pf_design_work_item WHERE request_id=?", String::class.java, requestId.value)).isEqualTo("FAILED")
+        }
+        val jobsBefore = runtime.requests.size
+        advisor.routeApprovedRequests()
+        assertThat(runtime.requests).hasSize(jobsBefore)
+        assertThat(queries.findEpics(EpicFilter(productId))).isEmpty()
+        // The new request must be able to claim its own design session.
+        val newRequest = insertDirectedRequest(newConversation, owner.id)
+        advisor.approveRequest(ApproveProductRequestCommand(newRequest, 1, 1, owner.id, "approve-new-${productId.value}"))
+        advisor.routeApprovedRequests()
+        assertThat(jdbc.queryForObject("SELECT status FROM pf_design_work_item WHERE request_id=?", String::class.java, newRequest.value)).isEqualTo("IN_PROGRESS")
+        assertThat(jdbc.queryForObject("SELECT process_session_id FROM pf_design_work_item WHERE request_id=?", String::class.java, newRequest.value)).isNotEqualTo(sessionId)
     }
 
     @Test
