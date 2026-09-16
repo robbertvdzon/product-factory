@@ -100,6 +100,11 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   late final api = widget.api ?? CollaborationApi(widget.csrfToken);
   List<ProductSummary> products = [];
   List<Json> epics = [], conversations = [], questions = [];
+  Json activities = {};
+  Json activity(Json e) => _map(activities[_text(e['id'])]);
+  String activityLabel(Json e) => _text(activity(e)['label']).isEmpty
+      ? label(e['status'])
+      : _text(activity(e)['label']);
   Json policy = {}, progress = {}, environment = {};
   List<Json> versions = [], discussions = [], pendingImages = [];
   Json? epic, conversation;
@@ -116,23 +121,39 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   bool get allProducts => productId == '__all__';
   bool closed(Json e) =>
       ['COMPLETED', 'CANCELLED', 'WITHDRAWN'].contains(e['status']);
-  bool needsAttention(Json e) =>
-      !closed(e) &&
-      (([
-                'AWAITING_APPROVAL',
-                'AWAITING_PRODUCT_OWNER_APPROVAL',
-                'AWAITING_FACTORY_OWNER_APPROVAL',
-                'AVAILABLE',
-              ].contains(e['status']) &&
-              _map(e['review'])[architect
-                      ? 'architectApproved'
-                      : 'productOwnerApproved'] !=
-                  true) ||
-          questions.any(
-            (q) =>
-                q['status'] == 'OPEN' &&
-                _text(q['epicLinkId']) == _text(e['id']),
-          ));
+  bool pendingApproval(Json e) =>
+      _strings(activity(e)['pendingApprovalRoles']).contains(actionRole);
+  String attentionLabel(Json e) {
+    if (pendingApproval(e)) return 'Jouw goedkeuring ontbreekt nog';
+    if (needsAttention(e)) return 'Jouw aandacht nodig';
+    return 'Nu geen actie van jou nodig';
+  }
+
+  bool needsAttention(Json e) => !closed(e) && (activity(e).isNotEmpty
+      ? pendingApproval(e) ||
+            (activity(e)['state'] == 'WAITING_FOR_HUMAN' &&
+                activity(e)['waitingRole'] == actionRole) ||
+            questions.any(
+              (q) =>
+                  q['status'] == 'OPEN' &&
+                  _text(q['epicLinkId']) == _text(e['id']),
+            )
+      : !closed(e) &&
+            (([
+                      'AWAITING_APPROVAL',
+                      'AWAITING_PRODUCT_OWNER_APPROVAL',
+                      'AWAITING_FACTORY_OWNER_APPROVAL',
+                      'AVAILABLE',
+                    ].contains(e['status']) &&
+                    _map(e['review'])[architect
+                            ? 'architectApproved'
+                            : 'productOwnerApproved'] !=
+                        true) ||
+                questions.any(
+                  (q) =>
+                      q['status'] == 'OPEN' &&
+                      _text(q['epicLinkId']) == _text(e['id']),
+                )));
   String productName(Object? id) =>
       products.where((p) => p.id == _text(id)).firstOrNull?.name ?? _text(id);
   String? screenKey;
@@ -203,6 +224,10 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
               '/api/products/${p.id}/conversations?includeMessages=false',
             ),
             api.request('/api/products/${p.id}/questions'),
+            api.request(
+              '/api/products/${p.id}/epic-activities',
+              optional: true,
+            ),
           ]),
         ),
       );
@@ -261,6 +286,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         epics = nextEpics;
         conversations = nextConversations;
         questions = values.expand((v) => _maps(v[2])).toList();
+        activities = {for (final v in values) ..._map(v[3])};
         policy = nextPolicy;
         environment = nextEnvironment;
         progress = nextProgress;
@@ -554,7 +580,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   String label(Object? value) =>
       const {
         'NEEDS_RESEARCH': 'Onderzoek nodig',
-        'NEEDS_REFINEMENT': 'Wordt uitgewerkt',
+        'NEEDS_REFINEMENT': 'Uitwerking nog niet afgerond',
         'AWAITING_APPROVAL': 'Architect beoordeelt',
         'AWAITING_PRODUCT_OWNER_APPROVAL': 'Functioneel akkoord nodig',
         'AWAITING_FACTORY_OWNER_APPROVAL': 'Productrollen instellen',
@@ -633,7 +659,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     contentPadding: const EdgeInsets.symmetric(vertical: 10),
     title: Text(epicTitle(e)),
     subtitle: Text(
-      '${productName(e['productId'])} · ${label(e['status'])}\n${needsAttention(e) ? 'Jouw aandacht nodig' : 'Geen actie van jou nodig'} · inhoudsversie ${e['contentVersion'] ?? e['version']}',
+      '${productName(e['productId'])} · ${activityLabel(e)}\n${attentionLabel(e)} · inhoudsversie ${e['contentVersion'] ?? e['version']}',
     ),
     trailing: const Icon(Icons.chevron_right),
     onTap: () => openEpic(e),
@@ -1256,8 +1282,42 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         ),
       const SizedBox(height: 8),
       text(
-        'Inhoudsversie ${e['contentVersion'] ?? e['version']} · ${label(e['status'])}',
+        'Inhoudsversie ${e['contentVersion'] ?? e['version']} · ${activityLabel(e)}',
       ),
+      if (activity(e).isNotEmpty)
+        Card(
+          color: activity(e)['state'] == 'WAITING_FOR_HUMAN'
+              ? Theme.of(context).colorScheme.tertiaryContainer
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  activityLabel(e),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                text(_text(activity(e)['detail'])),
+                if (pendingApproval(e))
+                  text(
+                    _map(e['readiness'])['readyForPlanning'] == true
+                        ? 'Jouw goedkeuring ontbreekt nog. Geef akkoord of feedback bij Goedkeuring.'
+                        : 'Jouw goedkeuring ontbreekt nog. Je kunt beoordelen zodra de uitwerking klaar is.',
+                  ),
+                if (activity(e)['state'] == 'WAITING_FOR_HUMAN')
+                  text(
+                    activity(e)['waitingRole'] == actionRole
+                        ? 'Jij bent aan zet.'
+                        : activity(e)['waitingRole'] == 'ARCHITECT'
+                        ? 'De architect is aan zet.'
+                        : 'De PO is aan zet.',
+                  ),
+              ],
+            ),
+          ),
+        ),
       if (_text(_map(e['impact'])['changeSummary']).isNotEmpty)
         Card(
           child: ExpansionTile(
@@ -1267,7 +1327,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             children: [EpicMarkdown(_text(_map(e['impact'])['changeSummary']))],
           ),
         ),
-      if (_strings(review['blockers']).isNotEmpty)
+      if (_strings(review['blockers']).isNotEmpty && activity(e).isEmpty)
         notice(
           'Nog nodig voor de volgende stap',
           _strings(review['blockers']).join('\n'),
@@ -1747,12 +1807,24 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   }
 
   Widget progressPanel() => panel('Van idee naar oplevering', [
-    text(label(epic!['status'])),
-    Wrap(spacing: 12, runSpacing: 8, children: [
-      for (final entry in {'IN_PROGRESS': 'In ontwikkeling', 'DONE': 'Afgerond', 'TODO': 'Nog niet opgepakt'}.entries)
-        Chip(label: Text('${_maps(progress['stories']).where((s) => s['status'] == entry.key).length} · ${entry.value}')),
-    ]),
-    if (_map(progress['waitingOn']).isNotEmpty)
+    text(activityLabel(epic!)),
+    Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        for (final entry in {
+          'IN_PROGRESS': 'In ontwikkeling',
+          'DONE': 'Afgerond',
+          'TODO': 'Nog niet opgepakt',
+        }.entries)
+          Chip(
+            label: Text(
+              '${_maps(progress['stories']).where((s) => s['status'] == entry.key).length} · ${entry.value}',
+            ),
+          ),
+      ],
+    ),
+    if (activity(epic!).isEmpty && _map(progress['waitingOn']).isNotEmpty)
       text(
         '${_map(progress['waitingOn'])['title']}\n${_text(_map(progress['waitingOn'])['detail'])}',
       ),

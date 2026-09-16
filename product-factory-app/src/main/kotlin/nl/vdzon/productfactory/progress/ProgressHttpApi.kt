@@ -13,9 +13,13 @@ import org.springframework.web.bind.annotation.*
 class ProgressController(
     private val liveOverview: ProductLiveOverviewService,
     private val epicProgress: EpicProgressService,
+    private val epicActivity: EpicActivityService,
 ) {
     @GetMapping("/products/{productId}/live")
     fun live(@PathVariable productId: String) = liveOverview.overview(ProductId(productId))
+
+    @GetMapping("/products/{productId}/epic-activities")
+    fun activities(@PathVariable productId: String) = epicActivity.activities(ProductId(productId))
 
     @GetMapping("/epics/{epicId}/progress")
     fun progress(@PathVariable epicId: String) = epicProgress.progress(EpicId(epicId))

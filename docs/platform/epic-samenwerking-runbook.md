@@ -37,6 +37,18 @@ gefilterd op eigen open vragen en benodigde architectuurgoedkeuring. Beide rolle
 naar alle of afgeronde epics. **Alle projecten** combineert uitsluitend projecten waarvoor de
 actieve rol toegang heeft en geldt ook voor beide vragensecties.
 
+De status in overzicht en dossier benoemt wie nu aan zet is: **Product Factory werkt de epic uit**,
+**Wacht op de Product Factory** (nog op te pakken), of **Wacht op antwoord / goedkeuring of feedback**
+van de PO of architect. Een onderbroken uitwerking krijgt een aparte melding. Dit leesmodel gebruikt
+open vragen, actuele beoordelingen en de aan deze epic gekoppelde procesactiviteit; een generieke
+levenscyclusstatus zoals `NEEDS_REFINEMENT` betekent op zichzelf niet dat AI bezig is.
+De API `/api/products/{productId}/epic-activities` toont de verantwoordelijke rol zonder de inhoud
+van afgeschermde vragen te delen. Ontbrekende menselijke goedkeuringen staan daarnaast apart vermeld:
+ook wanneer eerst de andere rol moet antwoorden, ziet de PO **Jouw goedkeuring ontbreekt nog**.
+Deze epics vallen ook onder **Mijn aandacht nodig**. Beoordelen kan na afronding van de uitwerking.
+Klikken op het zijmenu **Mijn epics** sluit het geopende detail of gesprek en keert terug naar het
+overzicht, ook bij opnieuw klikken op de al geselecteerde sectie. Het gekozen project blijft behouden.
+
 PO en architect zien hetzelfde dossier: **Inhoud**, **Schermen**, **Architectuur**, **Goedkeuring**
 en **Voortgang**, met een gedeeld epicgesprek ernaast. Dossier en chat scrollen onafhankelijk
 binnen de beschikbare schermhoogte. De chatinvoer blijft onderaan staan. Op smalle schermen

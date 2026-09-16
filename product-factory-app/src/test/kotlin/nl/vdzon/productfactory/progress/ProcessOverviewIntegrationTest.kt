@@ -1,7 +1,8 @@
 package nl.vdzon.productfactory.progress
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import nl.vdzon.productfactory.api.design.EpicStatus
+import nl.vdzon.productfactory.api.design.*
+import nl.vdzon.productfactory.api.advisor.ProductMembershipRole
 import nl.vdzon.productfactory.api.design.ProductDesignQueryService
 import nl.vdzon.productfactory.api.dispatcher.SoftwareFactoryDispatcherQueryService
 import nl.vdzon.productfactory.api.planning.ProductPlanningQueryService
@@ -46,6 +47,7 @@ class ProcessOverviewIntegrationTest @Autowired constructor(
     private val qualityImpl: QualityMvpService,
     private val dispatcherImpl: SoftwareFactoryDispatcherMvpService,
     private val retention: ProcessHistoryRetention,
+    private val activity: EpicActivityService,
 ) {
     private var productId = ProductId("not-initialized")
     private lateinit var now: Instant
@@ -290,6 +292,54 @@ class ProcessOverviewIntegrationTest @Autowired constructor(
         val json = mapper.readTree(progress)
         assertThat(json.path("steps").map { it.path("state").asText() }).containsOnly("DONE")
         assertThat(json.path("timeline").map { it.path("kind").asText() }).contains("VERIFICATION_PASSED", "STORY_DELIVERED")
+    }
+
+    @Test
+    fun `activiteit onderscheidt werken wachtrij storing en antwoord per epic`() {
+        val id = insertEpic(listOf(EpicStatus.AVAILABLE), now)
+        jdbc.update("UPDATE pf_epic_version SET status='NEEDS_REFINEMENT' WHERE epic_id=?", id)
+        val epic = designQueries.getEpic(EpicId(id))
+        assertThat(activity.activity(epic).state).isEqualTo(EpicActivityState.QUEUED)
+        val session = insertSession("pf_design_process_session", "RUNNING", null, now)
+        jdbc.update("UPDATE pf_design_process_session SET active_product_id=?,snapshot_json=? WHERE id=?", productId.value,
+            mapper.writeValueAsString(mapOf("currentEpicToRefine" to mapOf("id" to id))), session)
+        assertThat(activity.activity(epic).state).isEqualTo(EpicActivityState.WORKING)
+        val otherId = insertEpic(listOf(EpicStatus.AVAILABLE), now)
+        assertThat(activity.activity(designQueries.getEpic(EpicId(otherId)).copy(status=EpicStatus.NEEDS_REFINEMENT)).state).isEqualTo(EpicActivityState.QUEUED)
+        jdbc.update("UPDATE pf_design_process_session SET status='BLOCKED',error_code='RUNTIME_FAILED' WHERE id=?", session)
+        assertThat(activity.activity(epic).state).isEqualTo(EpicActivityState.BLOCKED)
+        val question = productCommands.askStakeholder(AskStakeholderCommand(productId,"PRODUCT_DESIGNER_MVP","Mag deze functie alleen-lezen door AI worden bekeken?","Een besluit is nodig.",ProcessSessionId(session),
+            actor=ActorReference(ActorType.PROCESS,"PRODUCT_DESIGNER_MVP"),idempotencyKey="activity-question-$id",epicLinkId=epic.id,requestedRole=ProductMembershipRole.ARCHITECT))
+        val waiting = activity.activity(epic)
+        assertThat(waiting.state).isEqualTo(EpicActivityState.WAITING_FOR_HUMAN)
+        assertThat(waiting.waitingRole).isEqualTo(ProductMembershipRole.ARCHITECT)
+        assertThat(waiting.action).isEqualTo("ANSWER")
+        mockMvc.get("/api/products/${productId.value}/epic-activities").andExpect {
+            status { isOk() }
+            jsonPath("$.['$id'].label") { value("Wacht op antwoord van de architect") }
+        }
+        // A terminal epic must never show a stale question as current work.
+        assertThat(activity.activity(epic.copy(status=EpicStatus.COMPLETED)).state).isEqualTo(EpicActivityState.DONE)
+        productCommands.withdrawStakeholderQuestion(WithdrawStakeholderQuestionCommand(question,"Besluit vervallen",1,STAKEHOLDER,"withdraw-$id"))
+        assertThat(activity.activity(epic).state).isEqualTo(EpicActivityState.BLOCKED)
+    }
+
+    @Test
+    fun `goedkeuring of feedback wacht op de juiste menselijke rol en niet op automatische beoordeling`() {
+        val id = insertEpic(listOf(EpicStatus.AVAILABLE), now)
+        val policy = ProductGovernancePolicy(productId,configured=true,productOwnerMode=ResponsibilityMode.HUMAN)
+        jdbc.update("INSERT INTO pf_product_governance_policy(product_id,policy_json,version,updated_by,updated_at) VALUES (?,?,1,'test',?)",productId.value,mapper.writeValueAsString(policy),now)
+        val review = EpicReviewState(1,1,false,false,false,true,emptyList(),emptyList())
+        val epic = designQueries.getEpic(EpicId(id)).copy(readiness=EpicReadinessDetails(true,false,emptyList()),review=review)
+        assertThat(activity.activity(epic).pendingApprovalRoles).containsExactly(ProductMembershipRole.PRODUCT_OWNER, ProductMembershipRole.ARCHITECT)
+        assertThat(activity.activity(epic.copy(readiness=EpicReadinessDetails(false,false,emptyList()))).pendingApprovalRoles).contains(ProductMembershipRole.PRODUCT_OWNER)
+        assertThat(activity.activity(epic.copy(status=EpicStatus.COMPLETED)).pendingApprovalRoles).isEmpty()
+        assertThat(activity.activity(epic).waitingRole).isEqualTo(ProductMembershipRole.PRODUCT_OWNER)
+        assertThat(activity.activity(epic).label).isEqualTo("Wacht op goedkeuring of feedback van de PO")
+        assertThat(activity.activity(epic.copy(review=review.copy(productOwnerApproved=true))).waitingRole).isEqualTo(ProductMembershipRole.ARCHITECT)
+        jdbc.update("UPDATE pf_product_governance_policy SET policy_json=? WHERE product_id=?",mapper.writeValueAsString(policy.copy(productOwnerMode=ResponsibilityMode.AI)),productId.value)
+        assertThat(activity.activity(epic.copy(review=review.copy(architectRequired=false))).state).isEqualTo(EpicActivityState.QUEUED)
+        assertThat(activity.activity(epic.copy(review=review.copy(ready=true,productOwnerApproved=true,architectApproved=true))).state).isEqualTo(EpicActivityState.QUEUED)
     }
 
     private fun insertSession(table: String, status: String, summary: String?, startedAt: Instant, blockedReason: String? = null): String {

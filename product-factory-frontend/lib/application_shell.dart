@@ -137,6 +137,7 @@ class _ApplicationShellState extends State<ApplicationShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late _Destination _selected;
   String? _selectedProductId;
+  int _epicNavigationRevision = 0;
   String? _selectedConversationId;
   bool _updateAvailable = false;
   final VersionUpdateTracker _updateTracker = VersionUpdateTracker();
@@ -255,7 +256,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
         (!widget.isFactoryOwner && _selected != _Destination.settings) ||
         _selected == _Destination.design) {
       return EpicCollaborationPage(
-        key: ValueKey('collaboration-${widget.actingRole}-${_selected.name}'),
+        key: ValueKey(
+          'collaboration-${widget.actingRole}-${_selected.name}-$_epicNavigationRevision',
+        ),
         products: products,
         role: widget.actingRole ?? 'PRODUCT_OWNER',
         csrfToken: widget.csrfToken,
@@ -829,7 +832,14 @@ class _ApplicationShellState extends State<ApplicationShell> {
     if (destination != _Destination.conversations) {
       _selectedConversationId = null;
     }
-    if (_selected != destination) setState(() => _selected = destination);
+    setState(() {
+      _selected = destination;
+      // An explicit menu click also closes details within the current section.
+      if (destination == _Destination.overview ||
+          destination == _Destination.design) {
+        _epicNavigationRevision++;
+      }
+    });
     final location = _locationFor(destination, _selectedProductId);
     if (_navigationLocation.current != location) {
       _navigationLocation.push(location);
