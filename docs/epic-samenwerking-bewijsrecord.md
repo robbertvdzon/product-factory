@@ -235,3 +235,17 @@ Migratie V41 herstelt dezelfde relaties voor eerder verwijderde epics. De regres
 controleert normale verwijdering en migratieherstel, elk voor een afgeronde voorbereiding
 en een voorbereiding die op een antwoord wacht. Een nieuw gesprek blijft zichtbaar en
 kan daarna een eigen ontwerpsessie starten.
+
+## Eerste epicversie behoudt het oorspronkelijke gesprek (2026-09-16)
+
+Zodra Productontwerp de eerste epicversie publiceert, koppelt dezelfde transactie het
+bronverzoek, oorspronkelijke gesprek en werkitem aan die epic. De ontwerpsessie mag daarna
+nog doorwerken of op een antwoord wachten; dat maakt geen tweede voorbereiding in het overzicht.
+`ROUTING` blijft behouden totdat het ontwerp klaar is: de koppeling is geen goedkeuring of
+voortijdige afronding. De bestaande discussie- en berichtenroutes tonen zo de oorspronkelijke
+vraag en AI-antwoorden ook tijdens de uitwerking.
+
+Migratie V42 herstelt ontbrekende koppelingen voor precies één niet-verwijderde epic van de
+actuele verzoekversie. Verwijderde epics en geannuleerde verzoeken blijven buiten dit herstel.
+De integratietest controleert zowel nieuwe publicatie als herstel terwijl de ontwerper op een
+antwoord wacht, inclusief ophalen van het oorspronkelijke bericht via de epic-berichtenroute.

@@ -7,6 +7,39 @@ import 'package:product_factory_frontend/epic_collaboration.dart';
 import 'package:product_factory_frontend/product_workspace.dart';
 
 void main() {
+
+  testWidgets('wachtende epic behoudt het oorspronkelijke gesprek zonder dubbele voorbereiding', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1500, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final epic = {'id':'epic-7','productId':'pvdd','title':'Eerdere vergaderingen terugzien','status':'NEEDS_REFINEMENT','version':1,'contentVersion':1,'review':{'blockers':[]}};
+    final conversation = {'id':'chat-7','productId':'pvdd','title':'Mijn oorspronkelijke wens','purpose':'EPIC','epicId':'epic-7','status':'PROPOSAL_READY','version':3,'request':{'status':'ROUTING','linkedEpicId':'epic-7'}};
+    final responses = <String,Object>{
+      '/api/products':[{'id':'pvdd','name':'PvdD','status':'ACTIVE','dispatchingEnabled':true,'version':1}],
+      '/api/products/pvdd/epics':[epic],
+      '/api/products/pvdd/conversations':[conversation],
+      '/api/epics/epic-7/discussions':[conversation],
+      '/api/products/pvdd/questions':[{'id':'question-7','epicLinkId':'epic-7','status':'OPEN','question':'Wil je alle eerdere vergaderingen zien?','agentRole':'PRODUCT_DESIGNER_MVP'}],
+      '/api/epics/epic-7/messages':{'messages':[
+        {'id':'m1','sender':'USER','text':'Ik wil ook de oude agenda kunnen zien.'},
+        {'id':'m2','sender':'PRODUCT_ADVISOR','text':'De eerdere agenda en adviezen zijn bewaard.'},
+      ],'hasMore':false},
+      '/api/epics/epic-7/progress':{'steps':[],'stories':[]},
+    };
+    final client = MockClient((request) async => http.Response(jsonEncode(responses[request.url.path] ?? []),200,headers:{'content-type':'application/json'}));
+    await tester.pumpWidget(MaterialApp(home:Scaffold(body:EpicCollaborationPage(
+      products:HttpProductGateway(client:client),role:'PRODUCT_OWNER',initialProductId:'pvdd',api:CollaborationApi('csrf',client:client),
+    ))));
+    await tester.pumpAndSettle();
+    expect(find.text('Epics in voorbereiding'),findsNothing);
+    expect(find.text('Mijn oorspronkelijke wens'),findsNothing);
+    await tester.tap(find.text('Eerdere vergaderingen terugzien'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ik wil ook de oude agenda kunnen zien.'),findsOneWidget);
+    expect(find.text('De eerdere agenda en adviezen zijn bewaard.'),findsOneWidget);
+    expect(find.textContaining('Wil je alle eerdere vergaderingen zien?'),findsOneWidget);
+    expect(tester.takeException(),isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets('los gesprek verwijderen bevestigt de titel en blijft weg na verversen', (tester) async {
     var deleted = false;
     var deletes = 0;

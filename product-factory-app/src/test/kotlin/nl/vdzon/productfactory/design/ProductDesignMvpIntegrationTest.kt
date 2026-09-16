@@ -51,6 +51,7 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     private val jdbc: JdbcTemplate,
     private val governance: nl.vdzon.productfactory.design.mvp.EpicGovernanceApplicationService,
     private val policies: ProductGovernanceService,
+    private val collaboration: EpicCollaborationController,
 ) {
     private var productId = ProductId("not-initialized")
 
@@ -149,6 +150,24 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         completeOnlyJob(first)
         advisor.routeApprovedRequests()
 
+        val published = queries.findEpics(EpicFilter(productId)).single()
+        jdbc.update("INSERT INTO pf_product_conversation_message(message_id,conversation_id,sequence_number,sender,message_text,created_by,created_at,idempotency_key) VALUES (?,?,1,'USER',?,?,CURRENT_TIMESTAMP,?)",
+            "original-${productId.value}", conversation.value, "Ik wil eerdere vergaderingen terugzien.", owner.id.value, "original-${productId.value}")
+        for (repairOldPublication in listOf(false, true)) {
+            if (repairOldPublication) {
+                jdbc.update("UPDATE pf_product_conversation SET epic_id=NULL WHERE conversation_id=?", conversation.value)
+                jdbc.update("UPDATE pf_product_request SET linked_epic_id=NULL WHERE request_id=?", requestId.value)
+                jdbc.update("UPDATE pf_design_work_item SET epic_id=NULL WHERE request_id=?", requestId.value)
+                jdbc.dataSource!!.connection.use { connection ->
+                    ScriptUtils.executeSqlScript(connection, ClassPathResource("db/migration/V42__link_initial_epic_conversations.sql"))
+                }
+            }
+            assertThat(advisor.getConversation(conversation).epicId).isEqualTo(published.id.value)
+            assertThat(advisor.getRequest(requestId).linkedEpicId).isEqualTo(published.id.value)
+            assertThat(advisor.getRequest(requestId).status).isEqualTo(ProductRequestStatus.ROUTING)
+            assertThat(collaboration.discussions(published.id.value, null).map { it.id }).containsExactly(conversation)
+            assertThat(collaboration.messages(published.id.value, null, null, null, 30).messages.map { it.text }).containsExactly("Ik wil eerdere vergaderingen terugzien.")
+        }
         val question = productQueries.findStakeholderQuestions(StakeholderQuestionFilter(productId, "PRODUCT_DESIGNER_MVP")).single()
         assertThat(question.requestedRespondentUserId).isEqualTo(owner.id)
         assertThat(question.productRequestId).isEqualTo(requestId)
@@ -451,6 +470,11 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         ))
         if (historicalRepair) {
             // Reproduce deletion by the previous release, including the missing final link.
+            if (waitingForAnswer) {
+                jdbc.update("UPDATE pf_product_conversation SET epic_id=NULL WHERE conversation_id=?", conversation.value)
+                jdbc.update("UPDATE pf_product_request SET linked_epic_id=NULL WHERE request_id=?", requestId.value)
+                jdbc.update("UPDATE pf_design_work_item SET epic_id=NULL WHERE request_id=?", requestId.value)
+            }
             jdbc.update("UPDATE pf_epic SET deleted_at=CURRENT_TIMESTAMP WHERE id=?", epic.id.value)
             jdbc.dataSource!!.connection.use { connection ->
                 ScriptUtils.executeSqlScript(connection, ClassPathResource("db/migration/V41__close_deleted_epic_preparations.sql"))

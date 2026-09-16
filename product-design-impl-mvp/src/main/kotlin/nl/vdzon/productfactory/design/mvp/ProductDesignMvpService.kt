@@ -598,6 +598,13 @@ class ProductDesignMvpService(
             id.value, session.productId.value, 1L, status.aggregateStatus().name, now, now, directed?.requestId, directed?.requestVersion,
         )
         insertVersion(id, 1, draft, status, frozenInputs(sessionId), DESIGN_ACTOR, now)
+        if (directed != null) {
+            // The conversation belongs to the first published version, even while design
+            // waits for an answer. Routing is only completed by finishSession.
+            jdbc.update("UPDATE pf_product_conversation SET epic_id=?,purpose='EPIC',updated_at=?,version=version+1 WHERE conversation_id=? AND deleted_at IS NULL", id.value, now, directed.conversationId)
+            jdbc.update("UPDATE pf_product_request SET linked_epic_id=?,updated_at=?,version=version+1 WHERE request_id=? AND current_version=?", id.value, now, directed.requestId, directed.requestVersion)
+            jdbc.update("UPDATE pf_design_work_item SET epic_id=?,updated_at=? WHERE work_item_id=? AND process_session_id=?", id.value, now, directed.workItemId, sessionId.value)
+        }
         governance.recordAutomaticReviews(id)
         return getEpic(id)
     }
