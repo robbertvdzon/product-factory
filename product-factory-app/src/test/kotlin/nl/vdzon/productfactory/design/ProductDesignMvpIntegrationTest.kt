@@ -60,6 +60,20 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `epic houdt functionele uitleg en technische context samen beschikbaar voor planning`() {
+        design.runProcessSession(productId)
+        ai.dispatchPending()
+        assertThat(runtime.requests.last().prompt).contains("De lezer hoeft geen programmeur te zijn", "## Technische uitwerking", "De Planner ontvangt de volledige solution")
+        val result = validEpic()
+        val solution = "Je kunt eerdere vergaderingen openen en de bewaarde adviezen teruglezen.\n\n## Technische uitwerking\n\nGET /api/meetings; hergebruik de bestaande sessiebeveiliging."
+        (result.path("epic") as ObjectNode).put("solution", solution)
+        completeOnlyJob(result)
+        design.runProcessSession(productId)
+        val epic = queries.findEpics(EpicFilter(productId)).single()
+        assertThat(epic.solution).isEqualTo(solution)
+    }
+
+    @Test
     fun `gericht ProductRequest wordt door Productontwerp een complete epic met twee approvals`() {
         val owner = users.resolveOrCreate("owner-${productId.value}@example.test", true)
         val conversation = advisor.createConversation(CreateConversationCommand(

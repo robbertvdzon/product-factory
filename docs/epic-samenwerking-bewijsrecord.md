@@ -199,3 +199,24 @@ en 1 nog niet opgepakt; alleen actueel PO-akkoord en architect niet vereist. All
 bleef behouden bij herladen, instellingen en terugnavigatie. Instellingen toonden geen Git
 of opdrachtversie. Gesprekslijst en beide berichtrollen toonden lokale tijdstippen; de
 teruglink bleef boven het scrollbare gesprek. Factory-ownerrol hersteld en controletab gesloten.
+
+## Epic voor de PO, technische bijlage voor uitvoering (2026-09-16)
+
+Productontwerp schrijft titel, samenvatting, probleem, werking, schermuitleg, acceptatiecriteria
+en wijzigingssamenvatting in alledaags Nederlands. Criteria blijven concreet: scope, uitzonderingen
+en meetbare grenzen blijven behouden. Productadvies gebruikt dezelfde schrijfwijze voor voorstellen
+en feedback; technische onderbouwing blijft beschikbaar als bewijs.
+
+Noodzakelijke endpoints, SQL, codeverwijzingen, ontwerpkeuzes en technische testafspraken staan
+in `solution` onder de laatste kop `## Technische uitwerking`, met subkoppen vanaf niveau 3.
+De PO-werkplek toont deze bijlage standaard ingeklapt. De bestaande koppen `Technische route`
+en `Technische toelichting` worden ook herkend; een daaropvolgende functionele sectie zoals
+buiten scope blijft zichtbaar. Koppen binnen codeblokken worden niet als sectiegrens behandeld.
+
+Deze presentatiesplitsing wijzigt geen opgeslagen epic, versie of beoordeling. De planner blijft
+de volledige `solution` ontvangen. Er is geen nieuw API-veld of databasemigratie nodig.
+De promptversies van Productontwerp en Productadvies zijn verhoogd zodat nieuwe opdrachten
+de nieuwe schrijfinstructie gebruiken.
+
+Verificatie: integratietest bewaart de volledige functionele en technische tekst bij publicatie;
+widgettests controleren scheiding, codeblokken en expliciet openen op een smal scherm.

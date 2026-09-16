@@ -1382,29 +1382,33 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   );
 
   void reviewAction() => unawaited(review('APPROVE'));
-  Widget dossier() => panel('Dit gaan we verbeteren', [
-    EpicMarkdown([
-      '## Probleem',
-      readableEpicMarkdown(_text(epic!['problem'])),
-      '## Werking en scope',
-      readableEpicMarkdown(_text(epic!['solution'])),
-      '## Klaar als',
-      _strings(epic!['acceptanceCriteria']).map((x) => '- ${x.replaceAll('\n', '\n  ')}').join('\n'),
-    ].join('\n\n')),
-    if (versions.length > 1)
-      ExpansionTile(
-        title: const Text('Vorige versies vergelijken'),
-        children: versions
-            .where((v) => v['version'] != epic!['version'])
-            .map(
-              (v) => ListTile(
-                title: Text('Versie ${v['contentVersion'] ?? v['version']}'),
-                subtitle: EpicMarkdown(_text(v['solution'])),
-              ),
-            )
-            .toList(),
-      ),
-  ]);
+  Widget dossier() {
+    final solution = splitEpicSolution(_text(epic!['solution']));
+    return panel('Dit gaan we verbeteren', [
+      EpicMarkdown([
+        '## Probleem',
+        readableEpicMarkdown(_text(epic!['problem'])),
+        '## Werking en scope',
+        readableEpicMarkdown(solution.functional),
+        '## Klaar als',
+        _strings(epic!['acceptanceCriteria']).map((x) => '- ${x.replaceAll('\n', '\n  ')}').join('\n'),
+      ].join('\n\n')),
+      if (solution.technical.isNotEmpty) EpicTechnicalDetails(solution.technical),
+      if (versions.length > 1)
+        ExpansionTile(
+          title: const Text('Vorige versies vergelijken'),
+          children: versions
+              .where((v) => v['version'] != epic!['version'])
+              .map(
+                (v) => ListTile(
+                  title: Text('Versie ${v['contentVersion'] ?? v['version']}'),
+                  subtitle: EpicMarkdown(_text(v['solution'])),
+                ),
+              )
+              .toList(),
+        ),
+    ]);
+  }
   Widget impactPanel() {
     final impact = _map(epic!['impact']);
     final items = _maps(impact['items']);

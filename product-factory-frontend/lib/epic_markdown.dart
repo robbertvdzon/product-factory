@@ -16,6 +16,57 @@ String readableEpicMarkdown(String source) {
   }).join('\n\n');
 }
 
+/// Splits presentation only; the planner keeps receiving the complete solution.
+({String functional, String technical}) splitEpicSolution(String source) {
+  final functional = <String>[];
+  final technical = <String>[];
+  var inTechnical = false;
+  String? fence;
+  var fenceLength = 0;
+  final heading = RegExp(r'^ {0,3}(#{1,2})[ \t]+(.+?)[ \t]*#*[ \t]*$');
+  final technicalTitle = RegExp(
+    r'^Technische (uitwerking|route|toelichting)(?: \(.*\))?$',
+    caseSensitive: false,
+  );
+  for (final line in source.split('\n')) {
+    final codeFence = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$').firstMatch(line);
+    if (codeFence != null) {
+      final delimiter = codeFence[1]!;
+      if (fence == null) {
+        fence = delimiter[0];
+        fenceLength = delimiter.length;
+      } else if (delimiter[0] == fence && delimiter.length >= fenceLength && codeFence[2]!.trim().isEmpty) {
+        fence = null;
+      }
+    } else if (fence == null) {
+      final match = heading.firstMatch(line);
+      if (match != null) {
+        inTechnical = match[1] == '##' && technicalTitle.hasMatch(match[2]!.trim());
+        if (inTechnical) {
+          if (technical.isNotEmpty) technical.add('\n### ${match[2]}');
+          continue;
+        }
+      }
+    }
+    (inTechnical ? technical : functional).add(line);
+  }
+  return (functional: functional.join('\n').trim(), technical: technical.join('\n').trim());
+}
+
+class EpicTechnicalDetails extends StatelessWidget {
+  const EpicTechnicalDetails(this.data, {super.key});
+  final String data;
+
+  @override
+  Widget build(BuildContext context) => ExpansionTile(
+    title: const Text('Technische uitwerking'),
+    subtitle: const Text('Voor de planner en uitvoerende agents'),
+    childrenPadding: const EdgeInsets.all(16),
+    expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [EpicMarkdown(data)],
+  );
+}
+
 class EpicMarkdown extends StatelessWidget {
   const EpicMarkdown(this.data, {super.key});
   final String data;

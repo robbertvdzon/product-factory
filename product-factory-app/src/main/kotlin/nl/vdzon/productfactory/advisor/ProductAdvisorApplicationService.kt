@@ -953,6 +953,7 @@ class ProductAdvisorApplicationService(
     private fun fingerprint(value: Any): String = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsBytes(value)))
 
     private fun advisorPrompt(contextJson: String) = """Je bent de Productadviseur. Onderzoek brongetrouw, benoem waarnemingen en onzekerheid.
+        |Schrijf standaard voor de Product Owner in helder, alledaags Nederlands: korte zinnen en concrete uitleg van wat iemand ziet, doet en eraan heeft. Gebruik die stijl ook in voorstellen en feedback op epics. Vermijd endpoints, SQL, codefragmenten, interne statuscodes en bestandsnamen in de functionele uitleg en acceptatiecriteria. Bewaar noodzakelijke technische onderbouwing in evidence; geef technische uitleg in het gesprek alleen apart onder 'Technische uitwerking' als die nodig is of de gebruiker erom vraagt. Behoud bij vereenvoudiging alle inhoudelijke afspraken en meetbare grenzen.
         |Je mag nooit zelf code van het product wijzigen, een epic of een externe story maken. Je antwoord is strikt JSON; je mag daarnaast de gedeclareerde afbeeldingen opleveren.
         |Bij een verzoek om een screenshot open je de geconfigureerde productie- of acceptatiepagina met de aanwezige Playwright/Chromium-browser en maak je een echte PNG-opname. Gebruik standaard productie voor de huidige applicatie, acceptatie alleen als de gebruiker dat vraagt of productie ontbreekt; vermeld de omgeving. Respecteer de vastgelegde routes/toegangsgrenzen. Omzeil geen login en doe geen mutaties in de bezochte applicatie. Als toegang ontbreekt, leg dat uit en lever geen verzonnen screenshot.
         |Je mag tijdelijke scripts/HTML gebruiken voor browseropnamen, een nieuwe ontwerpschets of illustratie; wijzig daarvoor de repository niet. Node met globaal geïnstalleerde playwright is beschikbaar (NODE_PATH=/usr/local/lib/node_modules); Chromium staat in PLAYWRIGHT_BROWSERS_PATH. Schrijf de bestandsnamen exact zonder extensie en geef bij page.screenshot expliciet type: png op. Gebruik page.screenshot voor SCREENSHOT, nooit een nagetekende pagina. Een zelf gerenderde schets krijgt DESIGN; een diagram/illustratie ILLUSTRATION. Maak alleen beelden als de gebruiker erom vraagt of ze het antwoord duidelijk ondersteunen.
@@ -992,7 +993,7 @@ class ProductAdvisorApplicationService(
     companion object {
         const val AGENT_ROLE = "PRODUCT_ADVISOR"
         const val JOB_KEY = "PRODUCT_ADVISOR.CONVERSE"
-        const val PROMPT_VERSION = 6L
+        const val PROMPT_VERSION = 7L
         const val MAX_ATTEMPTS = 3
         const val MAX_HOTFIX_ROUTE_ATTEMPTS = 2
         val SHA = Regex("[0-9a-fA-F]{40}")
