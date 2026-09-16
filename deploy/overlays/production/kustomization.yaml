@@ -14,9 +14,9 @@ patches:
 - path: pf_prod-retired-database.yaml
 - path: retired-backup-patch.yaml
 images:
-- digest: sha256:f9920e2199d109d6cb74378c39b75d2bae2a87a21ebc0b04dea6df1e74dd9fc9
+- digest: sha256:824e53207b7fe5ea15b769406ba9f5f012da44114c651f880132c54bf11e98d2
   name: ghcr.io/robbertvdzon/product-factory-backend
   newName: ghcr.io/robbertvdzon/product-factory-backend
-- digest: sha256:560967892e2f56271af2a84cc8dc6cc8e634e87cf650c9ff7d2bed06b2ed42fb
+- digest: sha256:0f4535d2d50acdf8eb7a2232b382920b98a3237e908262653641cddf1b24a6c0
   name: ghcr.io/robbertvdzon/product-factory-frontend
   newName: ghcr.io/robbertvdzon/product-factory-frontend
