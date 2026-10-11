@@ -56,6 +56,8 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
         qualityImpl.deleteAllOwnedData()
         dispatcherImpl.deleteAllOwnedData()
         planningImpl.deleteAllOwnedData()
+        // De gedeelde testdatabase mag geen jobs bewaren die na runtime.reset() niet meer bestaan.
+        aiImpl.deleteAllOwnedExecutionData()
         mock.reset()
         runtime.reset()
         productId = ProductId("dispatcher-${UUID.randomUUID().toString().take(8)}")
@@ -72,6 +74,23 @@ class SoftwareFactoryDispatcherIntegrationTest @Autowired constructor(
     @AfterEach
     fun cleanDispatcherData() {
         dispatcherImpl.deleteAllOwnedData()
+    }
+
+    @Test
+    fun `voorbereiding ruimt achtergebleven AI jobs op voordat de runtime wordt gereset`() {
+        val previousTask = aiCommands.requestAiTask(RequestAiTaskCommand(
+            AiJobKey("PLANNING.SLICE_EPIC"), productId, "planning", null, "PLANNER_MVP", AiExecutionSelection("openai", "gpt-5.6-sol", AiExecutionMode.SUBSCRIPTION), 0,
+            1, "Nog niet afgerond AI-werk.", """{"type":"object"}""", executionTimeout = Duration.ofMinutes(5), idempotencyKey = "leftover-${productId.value}",
+        ))
+        aiImpl.dispatchPending()
+        val previousRuntimeJob = aiQueries.getAiTask(previousTask).runtimeJobId!!
+        assertThat(runtime.jobs.getValue(previousRuntimeJob).status).isEqualTo("QUEUED")
+
+        prepare()
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_task WHERE id=?", Long::class.java, previousTask.value)).isZero()
+        assertThat(runtime.jobs).doesNotContainKey(previousRuntimeJob)
+        assertThat(planningQueries.getStory(firstStory).uxArtifacts).hasSize(1)
     }
 
     @Test

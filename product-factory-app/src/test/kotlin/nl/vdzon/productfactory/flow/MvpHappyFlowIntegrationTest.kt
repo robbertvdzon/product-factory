@@ -21,6 +21,7 @@ import nl.vdzon.productfactory.planning.mvp.ProductPlanningMvpService
 import nl.vdzon.productfactory.quality.mvp.QualityMvpService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -57,13 +58,7 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
 
     @BeforeEach
     fun prepare() {
-        qualityImpl.deleteAllOwnedData()
-        dispatcherImpl.deleteAllOwnedData()
-        planningImpl.deleteAllOwnedData()
-        designImpl.deleteAllOwnedData()
-        ai.deleteAllOwnedExecutionData()
-        runtime.reset()
-        mockFactory.reset()
+        cleanData()
         productId = ProductId("mvp-${UUID.randomUUID().toString().take(8)}")
         productCommands.createProduct(CreateProductCommand(productId, "MVP happy flow", actor = STAKEHOLDER, idempotencyKey = "happy-product-${productId.value}"))
         productCommands.updateProductAssignment(UpdateProductAssignmentCommand(
@@ -75,6 +70,17 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
             null, 0, STAKEHOLDER, "happy-environment",
         ))
         productCommands.setProductDispatching(SetProductDispatchingCommand(productId, true, 1, STAKEHOLDER, "happy-dispatching"))
+    }
+
+    @AfterEach
+    fun cleanData() {
+        qualityImpl.deleteAllOwnedData()
+        dispatcherImpl.deleteAllOwnedData()
+        planningImpl.deleteAllOwnedData()
+        designImpl.deleteAllOwnedData()
+        ai.deleteAllOwnedExecutionData()
+        runtime.reset()
+        mockFactory.reset()
     }
 
     @Test
