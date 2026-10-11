@@ -71,6 +71,40 @@ class ProductAdvisorIntegrationTest(
     }
 
     @Test
+    fun `gespreksmetadata bevat de starter en unieke deelnemers zonder berichten te laden`() {
+        val participant = users.resolveOrCreate("participant-${productId.value}@example.test", true)
+        val unrelatedUser = users.resolveOrCreate("unrelated-${productId.value}@example.test", true)
+        val unrelatedConversation = advisor.createConversation(CreateConversationCommand(productId, "Ander gesprek", unrelatedUser.id, "participants-other-${productId.value}"))
+        fun insertMessage(chat: ProductConversationId, sequence: Int, sender: ConversationSender, author: UserId?) {
+            val id = UUID.randomUUID().toString()
+            jdbc.update(
+                "INSERT INTO pf_product_conversation_message(message_id,conversation_id,sequence_number,sender,message_text,created_by,created_at,idempotency_key) VALUES (?,?,?,?,?,?,?,?)",
+                id, chat.value, sequence, sender.name, "Bericht $sequence", author?.value, Instant.now(), id,
+            )
+        }
+        insertMessage(conversationId, 1, ConversationSender.USER, participant.id)
+        insertMessage(conversationId, 2, ConversationSender.PRODUCT_ADVISOR, null)
+        insertMessage(conversationId, 3, ConversationSender.USER, participant.id)
+        insertMessage(conversationId, 4, ConversationSender.SYSTEM, unrelatedUser.id)
+        insertMessage(conversationId, 5, ConversationSender.PRODUCT_ADVISOR, unrelatedUser.id)
+        insertMessage(unrelatedConversation, 1, ConversationSender.USER, unrelatedUser.id)
+
+        val metadata = advisor.findConversations(productId, false).single { it.id == conversationId }
+        assertThat(metadata.messages).isEmpty()
+        assertThat(metadata.participantUserIds).containsExactly(owner.id, participant.id)
+        assertThat(advisor.getConversation(conversationId).participantUserIds).isEqualTo(metadata.participantUserIds)
+        assertThat(mapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(metadata).path("participantUserIds").map { it.asText() })
+            .containsExactly(owner.id.value, participant.id.value)
+    }
+
+    @Test
+    fun `gespreksmetadata bevat ook de starter van een leeg gesprek`() {
+        val metadata = advisor.getConversation(conversationId, false)
+        assertThat(metadata.messages).isEmpty()
+        assertThat(metadata.participantUserIds).containsExactly(owner.id)
+    }
+
+    @Test
     fun `berichten laden in begrensde paginas zonder gaten bij gelijke tijden en nieuwe berichten`() {
         val other = advisor.createConversation(CreateConversationCommand(productId, "Ander gesprek", owner.id, "other-page-chat", audienceRole = ProductMembershipRole.ARCHITECT))
         val time = Instant.parse("2026-09-14T09:00:00Z")

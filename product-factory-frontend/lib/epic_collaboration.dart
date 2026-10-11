@@ -80,6 +80,8 @@ class EpicCollaborationPage extends StatefulWidget {
     required this.role,
     this.section = 'home',
     this.initialProductId,
+    this.initialConversationId,
+    this.onConversationSelected,
     this.csrfToken,
     this.onProductSelected,
     this.api,
@@ -90,6 +92,8 @@ class EpicCollaborationPage extends StatefulWidget {
   final String role;
   final String section;
   final String? initialProductId;
+  final String? initialConversationId;
+  final ValueChanged<String?>? onConversationSelected;
   final String? csrfToken;
   final ValueChanged<String>? onProductSelected;
   @override
@@ -117,6 +121,11 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   int loadSequence = 0;
   String? draftProductId;
   bool mobileConversation = false;
+  List<Json> activityUsers = [], productRequests = [];
+  Future<List<Json>>? activityUsersFuture;
+  String? activityPersonId, activityConversationId;
+  String activityView = 'conversations';
+  bool get activityOverview => factory && widget.section == 'activity';
   bool get ownQuestions => widget.section == 'own-questions';
   bool get allProducts => productId == '__all__';
   bool closed(Json e) =>
@@ -129,31 +138,33 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     return 'Nu geen actie van jou nodig';
   }
 
-  bool needsAttention(Json e) => !closed(e) && (activity(e).isNotEmpty
-      ? pendingApproval(e) ||
-            (activity(e)['state'] == 'WAITING_FOR_HUMAN' &&
-                activity(e)['waitingRole'] == actionRole) ||
-            questions.any(
-              (q) =>
-                  q['status'] == 'OPEN' &&
-                  _text(q['epicLinkId']) == _text(e['id']),
-            )
-      : !closed(e) &&
-            (([
-                      'AWAITING_APPROVAL',
-                      'AWAITING_PRODUCT_OWNER_APPROVAL',
-                      'AWAITING_FACTORY_OWNER_APPROVAL',
-                      'AVAILABLE',
-                    ].contains(e['status']) &&
-                    _map(e['review'])[architect
-                            ? 'architectApproved'
-                            : 'productOwnerApproved'] !=
-                        true) ||
+  bool needsAttention(Json e) =>
+      !closed(e) &&
+      (activity(e).isNotEmpty
+          ? pendingApproval(e) ||
+                (activity(e)['state'] == 'WAITING_FOR_HUMAN' &&
+                    activity(e)['waitingRole'] == actionRole) ||
                 questions.any(
                   (q) =>
                       q['status'] == 'OPEN' &&
                       _text(q['epicLinkId']) == _text(e['id']),
-                )));
+                )
+          : !closed(e) &&
+                (([
+                          'AWAITING_APPROVAL',
+                          'AWAITING_PRODUCT_OWNER_APPROVAL',
+                          'AWAITING_FACTORY_OWNER_APPROVAL',
+                          'AVAILABLE',
+                        ].contains(e['status']) &&
+                        _map(e['review'])[architect
+                                ? 'architectApproved'
+                                : 'productOwnerApproved'] !=
+                            true) ||
+                    questions.any(
+                      (q) =>
+                          q['status'] == 'OPEN' &&
+                          _text(q['epicLinkId']) == _text(e['id']),
+                    )));
   String productName(Object? id) =>
       products.where((p) => p.id == _text(id)).firstOrNull?.name ?? _text(id);
   String? screenKey;
@@ -168,6 +179,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   void initState() {
     super.initState();
     epicFilter = architect ? 'attention' : 'active';
+    activityConversationId = activityOverview
+        ? widget.initialConversationId
+        : null;
     unawaited(load());
     timer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (!saving) unawaited(load(silent: true));
@@ -186,17 +200,134 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   @override
   void didUpdateWidget(covariant EpicCollaborationPage old) {
     super.didUpdateWidget(old);
-    if (old.section != widget.section) {
+    var reload = false;
+    if (old.section != widget.section || old.role != widget.role) {
       epic = null;
       conversation = null;
       creating = false;
+      activityConversationId = activityOverview
+          ? widget.initialConversationId
+          : null;
+      reload = true;
     }
     if (old.initialProductId != widget.initialProductId) {
       productId = widget.initialProductId;
       epic = null;
       conversation = null;
+      reload = true;
+    }
+    if (activityOverview &&
+        old.initialConversationId != widget.initialConversationId &&
+        activityConversationId != widget.initialConversationId) {
+      activityConversationId = widget.initialConversationId;
+      epic = null;
+      conversation = null;
+      reload = true;
+    }
+    if (reload) {
+      loading = true;
       unawaited(load());
     }
+  }
+
+  Future<List<Json>> loadActivityUsers() => activityUsersFuture ??= api
+      .request('/api/admin/users')
+      .then(_maps)
+      .catchError((Object e) {
+        activityUsersFuture = null;
+        throw e;
+      });
+
+  Future<void> loadActivity(
+    List<ProductSummary> nextProducts,
+    String? selectedProductId,
+    int sequence, {
+    required bool silent,
+  }) async {
+    final selectedConversationId = activityConversationId;
+    final selectedEpicId = epic == null ? null : _text(epic!['id']);
+    // Resolve a deep link before applying the product filter, including links
+    // copied while another product was selected in the shell.
+    Json? selectedConversation;
+    if (selectedConversationId != null) {
+      selectedConversation = _map(
+        await api.request(
+          '/api/conversations/$selectedConversationId?includeMessages=false',
+        ),
+      );
+      final conversationProductId = _text(selectedConversation['productId']);
+      if (selectedProductId != '__all__' &&
+          selectedProductId != conversationProductId &&
+          nextProducts.any((p) => p.id == conversationProductId)) {
+        selectedProductId = conversationProductId;
+      }
+    }
+    final selected = selectedProductId == '__all__'
+        ? nextProducts
+        : nextProducts.where((p) => p.id == selectedProductId).toList();
+    final values = await Future.wait(
+      selected.map(
+        (p) async => Future.wait([
+          api.request('/api/products/${p.id}/epics'),
+          api.request(
+            '/api/products/${p.id}/conversations?includeMessages=false',
+          ),
+          api.request('/api/products/${p.id}/product-requests'),
+          api.request('/api/products/${p.id}/epic-activities', optional: true),
+        ]),
+      ),
+    );
+    if (!mounted || sequence != loadSequence || !activityOverview) return;
+    final nextUsers = await loadActivityUsers();
+    final nextEpics = values.expand((v) => _maps(v[0])).toList();
+    final nextConversations = values.expand((v) => _maps(v[1])).toList();
+    final nextRequests = values.expand((v) => _maps(v[2])).toList();
+    final nextEpic = nextEpics
+        .where((e) => _text(e['id']) == selectedEpicId)
+        .firstOrNull;
+    List<Json> nextDiscussions = [], nextVersions = [], nextQuestions = [];
+    Json nextProgress = {}, nextEnvironment = {};
+    if (nextEpic != null) {
+      final details = await Future.wait([
+        api.request(
+          '/api/epics/${_text(nextEpic['id'])}/discussions?includeMessages=false',
+        ),
+        api.request('/api/epics/${_text(nextEpic['id'])}/history'),
+        api.request('/api/epics/${_text(nextEpic['id'])}/progress'),
+        api.request('/api/products/${_text(nextEpic['productId'])}/questions'),
+        api.request(
+          '/api/products/${_text(nextEpic['productId'])}/test-configuration',
+          optional: true,
+        ),
+      ]);
+      nextDiscussions = _maps(details[0]);
+      nextVersions = _maps(details[1]);
+      nextProgress = _map(details[2]);
+      nextQuestions = _maps(details[3]);
+      nextEnvironment = _map(details[4]);
+      selectedConversation =
+          nextDiscussions.where((c) => c['status'] != 'CLOSED').firstOrNull ??
+          nextDiscussions.firstOrNull;
+    }
+    if (!mounted || sequence != loadSequence) return;
+    setState(() {
+      products = nextProducts;
+      productId = selectedProductId;
+      activityUsers = nextUsers;
+      epics = nextEpics;
+      conversations = nextConversations;
+      productRequests = nextRequests;
+      activities = {for (final v in values) ..._map(v[3])};
+      epic = nextEpic;
+      conversation = selectedConversation;
+      discussions = nextDiscussions;
+      versions = nextVersions;
+      questions = nextQuestions;
+      progress = nextProgress;
+      environment = nextEnvironment;
+      loading = false;
+      if (!silent) error = null;
+    });
   }
 
   Future<void> load({bool silent = false}) async {
@@ -212,6 +343,10 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       }
       if (id != '__all__' && !nextProducts.any((p) => p.id == id)) {
         id = nextProducts.firstOrNull?.id;
+      }
+      if (activityOverview) {
+        await loadActivity(nextProducts, id, sequence, silent: silent);
+        return;
       }
       final selected = id == '__all__'
           ? nextProducts
@@ -325,6 +460,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
 
   Future<void> openEpic(Json value) async {
     setState(() {
+      loadSequence++;
+      activityConversationId = null;
       epic = value;
       mobileConversation = false;
       tab = architect ? 'Impact' : 'Uitwerking';
@@ -334,6 +471,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       pendingImages = [];
       message.clear();
     });
+    if (activityOverview) widget.onConversationSelected?.call(null);
     await load();
   }
 
@@ -695,6 +833,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                   'Nog geen producttoegang',
                   'De factory owner kan je een productrol toewijzen.',
                 )
+              else if (activityOverview)
+                ...activityHome()
               else if (widget.section == 'policy')
                 policyPanel()
               else if (widget.section == 'questions' && epic == null)
@@ -781,7 +921,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       isExpanded: true,
       decoration: const InputDecoration(labelText: 'Project'),
       items: [
-        if (products.length > 1 && widget.section != 'policy')
+        if ((products.length > 1 || allProducts) && widget.section != 'policy')
           const DropdownMenuItem(
             value: '__all__',
             child: Text('Alle projecten'),
@@ -793,15 +933,239 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       onChanged: (v) {
         if (v == null) return;
         setState(() {
+          loadSequence++;
+          loading = true;
           productId = v;
+          activityConversationId = null;
           epic = null;
           conversation = null;
         });
+        if (activityOverview) widget.onConversationSelected?.call(null);
         widget.onProductSelected?.call(v);
         unawaited(load());
       },
     ),
   );
+
+  String personName(Object? id) {
+    final userId = _text(id);
+    final user = activityUsers
+        .where((u) => _text(u['id']) == userId)
+        .firstOrNull;
+    final name = _text(user?['displayName']).trim();
+    final email = _text(user?['email']).trim();
+    return name.isNotEmpty
+        ? name
+        : email.isNotEmpty
+        ? email
+        : userId.isEmpty
+        ? 'Onbekend'
+        : userId;
+  }
+
+  String personRole(Object? role) =>
+      const {
+        'PRODUCT_OWNER': 'Product owner',
+        'ARCHITECT': 'Architect',
+        'FACTORY_OWNER': 'Factory owner',
+      }[_text(role)] ??
+      'Gebruiker';
+
+  String conversationPurpose(Json c) => c['epicId'] != null
+      ? 'Epicbespreking'
+      : c['purpose'] == 'QUESTION'
+      ? 'Vraag aan AI'
+      : c['purpose'] == 'EPIC' || _map(c['request']).isNotEmpty
+      ? 'Epic voorbereiden'
+      : 'Gesprek';
+
+  String conversationStatus(Json c) =>
+      const {
+        'OPEN': 'Open',
+        'PROCESSING': 'AI verwerkt een bericht',
+        'WAITING_FOR_USER': 'Wacht op antwoord',
+        'PROPOSAL_READY': 'Voorstel gereed',
+        'BLOCKED': 'Verwerking vraagt aandacht',
+        'CLOSED': 'Gesloten',
+      }[_text(c['status'])] ??
+      _text(c['status']);
+
+  Json? epicRequest(Json e) {
+    final requestId = _text(e['sourceProductRequestId']);
+    final requests = [
+      ...productRequests,
+      ...conversations
+          .map((c) => _map(c['request']))
+          .where((r) => r.isNotEmpty),
+    ];
+    if (requestId.isNotEmpty) {
+      return requests.where((r) => _text(r['id']) == requestId).firstOrNull;
+    }
+    return requests
+        .where((r) => _text(r['linkedEpicId']) == _text(e['id']))
+        .firstOrNull;
+  }
+
+  String epicRequester(Json e) {
+    final request = epicRequest(e);
+    return request == null
+        ? 'Aanvrager niet bekend'
+        : 'Aangevraagd door ${personName(request['requestedBy'])}';
+  }
+
+  List<Json> recentFirst(Iterable<Json> values) =>
+      values.toList()
+        ..sort((a, b) => activityTime(b).compareTo(activityTime(a)));
+
+  int activityTime(Json value) =>
+      DateTime.tryParse(
+        _text(value['updatedAt'] ?? value['createdAt']),
+      )?.microsecondsSinceEpoch ??
+      0;
+
+  List<Widget> activityHome() {
+    final people =
+        <String>{
+          ...activityUsers.map((u) => _text(u['id'])),
+          ...conversations.map((c) => _text(c['createdBy'])),
+          ...conversations.expand((c) => _strings(c['participantUserIds'])),
+          ...productRequests.map((r) => _text(r['requestedBy'])),
+          ?activityPersonId,
+        }.where((id) => id.isNotEmpty).toList()..sort(
+          (a, b) => personName(
+            a,
+          ).toLowerCase().compareTo(personName(b).toLowerCase()),
+        );
+    final visibleConversations = recentFirst(
+      conversations.where(
+        (c) =>
+            activityPersonId == null ||
+            _text(c['createdBy']) == activityPersonId ||
+            _strings(c['participantUserIds']).contains(activityPersonId),
+      ),
+    );
+    final visibleEpics = recentFirst(
+      epics.where(
+        (e) =>
+            activityPersonId == null ||
+            _text(epicRequest(e)?['requestedBy']) == activityPersonId,
+      ),
+    );
+    return [
+      Text(
+        'Gesprekken en epics',
+        style: Theme.of(context).textTheme.headlineMedium,
+      ),
+      text('Lees de AI-gesprekken mee en bekijk welke epics zijn aangevraagd.'),
+      DropdownButtonFormField<String>(
+        key: const ValueKey('activity-person-filter'),
+        initialValue: activityPersonId ?? '__all__',
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Persoon'),
+        items: [
+          const DropdownMenuItem(
+            value: '__all__',
+            child: Text('Alle personen'),
+          ),
+          ...people.map(
+            (id) => DropdownMenuItem(
+              value: id,
+              child: Text(personName(id), overflow: TextOverflow.ellipsis),
+            ),
+          ),
+        ],
+        onChanged: (value) => setState(
+          () => activityPersonId = value == '__all__' ? null : value,
+        ),
+      ),
+      const SizedBox(height: 18),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          ChoiceChip(
+            key: const ValueKey('activity-conversations'),
+            label: const Text('Gesprekken'),
+            selected: activityView == 'conversations',
+            onSelected: (_) => setState(() => activityView = 'conversations'),
+          ),
+          ChoiceChip(
+            key: const ValueKey('activity-epics'),
+            label: const Text('Epics'),
+            selected: activityView == 'epics',
+            onSelected: (_) => setState(() => activityView = 'epics'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      text(
+        activityView == 'conversations'
+            ? 'Alle gesprekken die deze persoon heeft gestart of waaraan deze heeft deelgenomen. Nieuwste activiteit eerst.'
+            : 'Epics van de oorspronkelijke aanvrager, inclusief afgeronde epics. Nieuwste activiteit eerst.',
+      ),
+      panel(
+        '',
+        activityView == 'conversations'
+            ? visibleConversations.isEmpty
+                  ? [text('Geen gesprekken binnen dit filter.')]
+                  : visibleConversations
+                        .map(
+                          (c) => ListTile(
+                            key: ValueKey(
+                              'activity-conversation-${_text(c['id'])}',
+                            ),
+                            title: Text(_text(c['title'])),
+                            subtitle: Text(
+                              '${productName(c['productId'])} · ${conversationPurpose(c)} · ${conversationStatus(c)}\nGestart door ${personName(c['createdBy'])} · ${personRole(c['audienceRole'])}\nLaatste activiteit: ${displayTimestamp(c['updatedAt'])}',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => openActivityConversation(c),
+                          ),
+                        )
+                        .toList()
+            : visibleEpics.isEmpty
+            ? [text('Geen epics binnen dit filter.')]
+            : visibleEpics
+                  .map(
+                    (e) => ListTile(
+                      key: ValueKey('activity-epic-${_text(e['id'])}'),
+                      title: Text(epicTitle(e)),
+                      subtitle: Text(
+                        '${productName(e['productId'])} · ${activityLabel(e)}\n${epicRequester(e)}\nAangemaakt: ${displayTimestamp(e['createdAt'])}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => openEpic(e),
+                    ),
+                  )
+                  .toList(),
+      ),
+    ];
+  }
+
+  Future<void> openActivityConversation(Json c) async {
+    setState(() {
+      loadSequence++;
+      activityConversationId = _text(c['id']);
+      conversation = c;
+      epic = null;
+      discussions = [];
+      creating = false;
+      error = null;
+    });
+    widget.onConversationSelected?.call(activityConversationId);
+    await load();
+  }
+
+  void backToOverview() {
+    setState(() {
+      loadSequence++;
+      activityConversationId = null;
+      conversation = null;
+      epic = null;
+      discussions = [];
+    });
+    if (activityOverview) widget.onConversationSelected?.call(null);
+  }
 
   void startConversation() => setState(() {
     creating = true;
@@ -843,16 +1207,28 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Epic verwijderen?'),
-        content: Text('“${_text(e['title'])}” verdwijnt uit je epics. De voorbereiding en bijbehorende open vragen worden afgesloten. Openstaande stories worden gestopt en voor werk in uitvoering wordt annulering aangevraagd. Reeds opgeleverde wijzigingen blijven bestaan.'),
+        content: Text(
+          '“${_text(e['title'])}” verdwijnt uit je epics. De voorbereiding en bijbehorende open vragen worden afgesloten. Openstaande stories worden gestopt en voor werk in uitvoering wordt annulering aangevraagd. Reeds opgeleverde wijzigingen blijven bestaan.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuleren')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwijderen')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuleren'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Verwijderen'),
+          ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
     await mutate(() async {
-      await api.request('/api/epics/${_text(e['id'])}', method: 'DELETE', body: {'expectedVersion': e['version']});
+      await api.request(
+        '/api/epics/${_text(e['id'])}',
+        method: 'DELETE',
+        body: {'expectedVersion': e['version']},
+      );
       loadSequence++;
       epic = null;
       conversation = null;
@@ -865,16 +1241,28 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Gesprek verwijderen?'),
-        content: Text('“${_text(c['title'])}” verdwijnt uit je gesprekken. Je kunt het daarna niet meer openen.'),
+        content: Text(
+          '“${_text(c['title'])}” verdwijnt uit je gesprekken. Je kunt het daarna niet meer openen.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuleren')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwijderen')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuleren'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Verwijderen'),
+          ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
     await mutate(() async {
-      await api.request('/api/conversations/${_text(c['id'])}', method: 'DELETE', body: {'expectedVersion': c['version']});
+      await api.request(
+        '/api/conversations/${_text(c['id'])}',
+        method: 'DELETE',
+        body: {'expectedVersion': c['version']},
+      );
       loadSequence++;
       conversations.removeWhere((item) => _text(item['id']) == _text(c['id']));
       if (_text(conversation?['id']) == _text(c['id'])) conversation = null;
@@ -897,7 +1285,10 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     trailing: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (ownQuestions && c['request'] == null && c['epicId'] == null && c['purpose'] != 'EPIC')
+        if (ownQuestions &&
+            c['request'] == null &&
+            c['epicId'] == null &&
+            c['purpose'] != 'EPIC')
           IconButton(
             tooltip: 'Gesprek verwijderen',
             onPressed: saving ? null : () => deleteConversation(c),
@@ -1020,10 +1411,12 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     final c = conversation;
     final request = _map(c?['request']);
     final proposal = _map(c?['changeProposal']);
+    final selectedLinkedEpic = linkedEpic(c);
     final scope = epic != null
         ? '/api/epics/${_text(epic!['id'])}/messages'
         : '/api/conversations/${_text(c?['id'])}/messages';
     bool currentProposalMessage(Json m) =>
+        !activityOverview &&
         epic != null &&
         proposal['status'] == 'READY' &&
         proposal['afterContentVersion'] == epic!['contentVersion'] &&
@@ -1032,13 +1425,21 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           'bijgewerkt naar voorstelversie ${proposal['afterContentVersion']}.',
         );
     return ConversationTimeline(
-      header: epic == null ? Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton(
-          onPressed: () => setState(() { conversation = null; discussions = []; }),
-          child: Text(ownQuestions ? '← Mijn vragen aan AI' : '← Mijn epics'),
-        ),
-      ) : const SizedBox.shrink(),
+      header: epic == null
+          ? Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: backToOverview,
+                child: Text(
+                  activityOverview
+                      ? '← Gesprekken en epics'
+                      : ownQuestions
+                      ? '← Mijn vragen aan AI'
+                      : '← Mijn epics',
+                ),
+              ),
+            )
+          : const SizedBox.shrink(),
       key: ValueKey(scope),
       revision:
           '${c?['version']}-${discussions.map((d) => d['version']).join('-')}',
@@ -1049,15 +1450,25 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       ),
       title: epic != null
           ? 'Gesprek bij deze epic'
+          : activityOverview
+          ? _text(c?['title'])
           : ownQuestions
           ? 'Mijn vraag aan AI'
           : 'Nieuwe epic uitwerken',
       status: c?['status'] == 'PROCESSING' || proposal['status'] == 'WORKING'
-          ? const Text('AI werkt aan je bericht…')
+          ? Text(
+              activityOverview
+                  ? 'AI verwerkt een bericht…'
+                  : 'AI werkt aan je bericht…',
+            )
           : const SizedBox.shrink(),
       introduction: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (activityOverview && c != null && epic == null)
+            text(
+              '${productName(c['productId'])} · ${conversationPurpose(c)} · ${conversationStatus(c)}\nGestart door ${personName(c['createdBy'])} · ${personRole(c['audienceRole'])}',
+            ),
           ...questions
               .where(
                 (q) =>
@@ -1067,7 +1478,11 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
               .map(
                 (q) => notice(
                   'Vraag van ${_text(q['agentRole'])}',
-                  '${_text(q['question'])}\n${q['answer'] == null ? 'Beantwoord deze vraag onder Vragen voor mij.' : 'Antwoord: ${_text(q['answer'])}'}',
+                  '${_text(q['question'])}\n${q['answer'] == null
+                      ? activityOverview
+                            ? 'Nog niet beantwoord.'
+                            : 'Beantwoord deze vraag onder Vragen voor mij.'
+                      : 'Antwoord: ${_text(q['answer'])}'}',
                 ),
               ),
         ],
@@ -1079,7 +1494,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           children: [
             Text(
               m['sender'] == 'USER'
-                  ? m['authorRole'] == 'ARCHITECT'
+                  ? activityOverview
+                        ? '${personName(m['createdBy'])} · ${personRole(m['authorRole'])}'
+                        : m['authorRole'] == 'ARCHITECT'
                         ? 'Architect'
                         : 'Product owner'
                   : m['sender'] == 'SYSTEM'
@@ -1088,7 +1505,13 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
               style: Theme.of(context).textTheme.labelLarge,
             ),
             if (displayTimestamp(m['createdAt']).isNotEmpty)
-              Text(displayTimestamp(m['createdAt']), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              Text(
+                displayTimestamp(m['createdAt']),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             const SizedBox(height: 5),
             if (!currentProposalMessage(m)) SelectableText(_text(m['text'])),
             storedImages(_maps(m['attachments'])),
@@ -1100,7 +1523,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                   '${AppConfiguration.backendUrl.replaceAll(RegExp(r'/$'), '')}/api/advisor-images/${_text(image['id'])}',
                 ),
               ),
-            if (m['sender'] == 'SYSTEM' &&
+            if (!activityOverview &&
+                m['sender'] == 'SYSTEM' &&
                 _text(m['text']).contains(
                   'bijgewerkt naar voorstelversie ${proposal['afterContentVersion']}.',
                 )) ...[
@@ -1142,12 +1566,24 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       latest: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (c?['status'] == 'BLOCKED')
-            notice(
-              'Je bericht kon niet worden verwerkt',
-              'Je bericht en beelden zijn bewaard. Probeer opnieuw. Als de epic intussen is veranderd, bekijk de huidige versie en verstuur je wens opnieuw.',
+          if (activityOverview && epic == null && selectedLinkedEpic != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: button(
+                'Open gekoppelde epic',
+                () => openEpic(selectedLinkedEpic),
+              ),
             ),
           if (c?['status'] == 'BLOCKED')
+            notice(
+              activityOverview
+                  ? 'Bericht kon niet worden verwerkt'
+                  : 'Je bericht kon niet worden verwerkt',
+              activityOverview
+                  ? 'Het gesprek wacht op een nieuwe poging door een deelnemer.'
+                  : 'Je bericht en beelden zijn bewaard. Probeer opnieuw. Als de epic intussen is veranderd, bekijk de huidige versie en verstuur je wens opnieuw.',
+            ),
+          if (!activityOverview && c?['status'] == 'BLOCKED')
             button(
               'Opnieuw proberen',
               () => mutate(() async {
@@ -1164,15 +1600,21 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             text(_text(_map(request['content'])['summary'])),
             if (['APPROVED', 'ROUTING'].contains(request['status']))
               notice(
-                'Je epic wordt uitgewerkt',
-                'AI maakt de inhoud, schermen en architectuurimpact. De epic verschijnt hier vanzelf.',
+                activityOverview
+                    ? 'Epic wordt uitgewerkt'
+                    : 'Je epic wordt uitgewerkt',
+                activityOverview
+                    ? 'AI maakt de inhoud, schermen en architectuurimpact.'
+                    : 'AI maakt de inhoud, schermen en architectuurimpact. De epic verschijnt hier vanzelf.',
               ),
             if (request['status'] == 'ROUTING_FAILED')
               notice(
                 'Uitwerking wordt opnieuw geprobeerd',
-                'Je wens en afbeeldingen zijn bewaard. Je hoeft ze niet opnieuw in te voeren.',
+                activityOverview
+                    ? 'De wens en afbeeldingen zijn bewaard.'
+                    : 'Je wens en afbeeldingen zijn bewaard. Je hoeft ze niet opnieuw in te voeren.',
               ),
-            if (request['status'] == 'PROPOSED')
+            if (!activityOverview && request['status'] == 'PROPOSED')
               button(
                 'Maak eerste epicversie',
                 () => mutate(() async {
@@ -1190,51 +1632,56 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           ],
         ],
       ),
-      composer: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (c?['status'] != 'CLOSED' &&
-              !(epic == null &&
-                  ['APPROVED', 'ROUTING'].contains(request['status']))) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: message,
-              enabled: !saving && c?['status'] != 'PROCESSING',
-              minLines: 2,
-              maxLines: 4,
-              maxLength: epic == null ? 20000 : 8000,
-              decoration: const InputDecoration(
-                labelText: 'Stel een vraag of beschrijf je wens',
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 12),
-            imagePicker(compact: true),
-            const SizedBox(height: 12),
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              spacing: 8,
-              runSpacing: 8,
+      composer: activityOverview
+          ? const SizedBox.shrink()
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                IconButton(
-                  tooltip:
-                      'Afbeeldingen toevoegen · PNG, JPEG of WebP · maximaal 6 beelden, 4 MB per beeld',
-                  onPressed: saving || c?['status'] == 'PROCESSING'
-                      ? null
-                      : addImages,
-                  icon: const Icon(Icons.attach_file),
-                ),
-                FilledButton(
-                  onPressed: saving || c?['status'] == 'PROCESSING'
-                      ? null
-                      : () => send(),
-                  child: const Text('Verstuur'),
-                ),
+                if (c?['status'] != 'CLOSED' &&
+                    !(epic == null &&
+                        [
+                          'APPROVED',
+                          'ROUTING',
+                        ].contains(request['status']))) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: message,
+                    enabled: !saving && c?['status'] != 'PROCESSING',
+                    minLines: 2,
+                    maxLines: 4,
+                    maxLength: epic == null ? 20000 : 8000,
+                    decoration: const InputDecoration(
+                      labelText: 'Stel een vraag of beschrijf je wens',
+                      counterText: '',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  imagePicker(compact: true),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      IconButton(
+                        tooltip:
+                            'Afbeeldingen toevoegen · PNG, JPEG of WebP · maximaal 6 beelden, 4 MB per beeld',
+                        onPressed: saving || c?['status'] == 'PROCESSING'
+                            ? null
+                            : addImages,
+                        icon: const Icon(Icons.attach_file),
+                      ),
+                      FilledButton(
+                        onPressed: saving || c?['status'] == 'PROCESSING'
+                            ? null
+                            : () => send(),
+                        child: const Text('Verstuur'),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
-          ],
-        ],
-      ),
     );
   }
 
@@ -1253,13 +1700,11 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       Align(
         alignment: Alignment.centerLeft,
         child: TextButton(
-          onPressed: () => setState(() {
-            epic = null;
-            conversation = null;
-            discussions = [];
-          }),
+          onPressed: backToOverview,
           child: Text(
-            widget.section == 'questions'
+            activityOverview
+                ? '← Gesprekken en epics'
+                : widget.section == 'questions'
                 ? '← Vragen voor mij'
                 : architect
                 ? '← Epics'
@@ -1267,11 +1712,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           ),
         ),
       ),
-      Text(
-        epicTitle(e),
-        style: Theme.of(context).textTheme.headlineMedium,
-      ),
-      if (!architect)
+      Text(epicTitle(e), style: Theme.of(context).textTheme.headlineMedium),
+      if (!architect && !activityOverview)
         Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
@@ -1300,7 +1742,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                 ),
                 const SizedBox(height: 8),
                 text(_text(activity(e)['detail'])),
-                if (pendingApproval(e))
+                if (!activityOverview && pendingApproval(e))
                   text(
                     _map(e['readiness'])['readyForPlanning'] == true
                         ? 'Jouw goedkeuring ontbreekt nog. Geef akkoord of feedback bij Goedkeuring.'
@@ -1308,7 +1750,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                   ),
                 if (activity(e)['state'] == 'WAITING_FOR_HUMAN')
                   text(
-                    activity(e)['waitingRole'] == actionRole
+                    !activityOverview &&
+                            activity(e)['waitingRole'] == actionRole
                         ? 'Jij bent aan zet.'
                         : activity(e)['waitingRole'] == 'ARCHITECT'
                         ? 'De architect is aan zet.'
@@ -1318,6 +1761,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             ),
           ),
         ),
+      if (activityOverview) text(epicRequester(e)),
       if (_text(_map(e['impact'])['changeSummary']).isNotEmpty)
         Card(
           child: ExpansionTile(
@@ -1397,6 +1841,11 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             if (saving) const LinearProgressIndicator(),
+            if (activityOverview)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text('Alleen lezen'),
+              ),
             if (narrow && epic != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -1445,15 +1894,20 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   Widget dossier() {
     final solution = splitEpicSolution(_text(epic!['solution']));
     return panel('Dit gaan we verbeteren', [
-      EpicMarkdown([
-        '## Probleem',
-        readableEpicMarkdown(_text(epic!['problem'])),
-        '## Werking en scope',
-        readableEpicMarkdown(solution.functional),
-        '## Klaar als',
-        _strings(epic!['acceptanceCriteria']).map((x) => '- ${x.replaceAll('\n', '\n  ')}').join('\n'),
-      ].join('\n\n')),
-      if (solution.technical.isNotEmpty) EpicTechnicalDetails(solution.technical),
+      EpicMarkdown(
+        [
+          '## Probleem',
+          readableEpicMarkdown(_text(epic!['problem'])),
+          '## Werking en scope',
+          readableEpicMarkdown(solution.functional),
+          '## Klaar als',
+          _strings(
+            epic!['acceptanceCriteria'],
+          ).map((x) => '- ${x.replaceAll('\n', '\n  ')}').join('\n'),
+        ].join('\n\n'),
+      ),
+      if (solution.technical.isNotEmpty)
+        EpicTechnicalDetails(solution.technical),
       if (versions.length > 1)
         ExpansionTile(
           title: const Text('Vorige versies vergelijken'),
@@ -1469,6 +1923,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         ),
     ]);
   }
+
   Widget impactPanel() {
     final impact = _map(epic!['impact']);
     final items = _maps(impact['items']);
@@ -1552,20 +2007,21 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                     text(
                       'Extra jobs/dag: ${ai['estimatedAdditionalJobsPerDay'] ?? 'onbekend'} · maandkosten: ${ai['estimatedMonthlyCostEuro'] ?? 'onbekend'}',
                     ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: button('Onderzoek met AI', () {
-                      setState(() {
-                        tab = 'Impact';
-                      });
-                      unawaited(
-                        send(
-                          preset:
-                              'Onderzoek ${category(i['category'])}: ${i['summary']}. Wat verandert precies, waarom en welke alternatieven zijn er? Onderbouw met code en architectuurbesluiten.',
-                        ),
-                      );
-                    }),
-                  ),
+                  if (!activityOverview)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: button('Onderzoek met AI', () {
+                        setState(() {
+                          tab = 'Impact';
+                        });
+                        unawaited(
+                          send(
+                            preset:
+                                'Onderzoek ${category(i['category'])}: ${i['summary']}. Wat verandert precies, waarom en welke alternatieven zijn er? Onderbouw met code en architectuurbesluiten.',
+                          ),
+                        );
+                      }),
+                    ),
                 ],
               ),
             ),
@@ -1647,36 +2103,77 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       text(
         '${selected['screenKey']} · ${selected['state']} · inhoudsversie ${epic!['contentVersion']}',
       ),
-      button(
-        'Feedback op dit scherm',
-        () => setState(() {
-          mobileConversation = true;
-          message.text =
-              'Pas scherm ${selected['screenKey']} ($viewport), inhoudsversie ${epic!['contentVersion']}, aan: ';
-        }),
-      ),
+      if (!activityOverview)
+        button(
+          'Feedback op dit scherm',
+          () => setState(() {
+            mobileConversation = true;
+            message.text =
+                'Pas scherm ${selected['screenKey']} ($viewport), inhoudsversie ${epic!['contentVersion']}, aan: ';
+          }),
+        ),
     ]);
   }
 
   Widget reviewPanel() {
     final r = _map(epic!['review']);
     final version = epic!['contentVersion'] ?? epic!['version'];
-    Widget approval(String role, String name, bool approved, {bool required = true}) {
-      final record = _maps(r['records']).where((record) => record['contentVersion'] == version &&
-          record['role'] == role && record['policyVersion'] == r['policyVersion']).lastOrNull;
+    Widget approval(
+      String role,
+      String name,
+      bool approved, {
+      bool required = true,
+    }) {
+      final record = _maps(r['records'])
+          .where(
+            (record) =>
+                record['contentVersion'] == version &&
+                record['role'] == role &&
+                record['policyVersion'] == r['policyVersion'],
+          )
+          .lastOrNull;
       return ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: Icon(!required ? Icons.remove_circle_outline : approved ? Icons.check_circle_outline : Icons.pending_outlined),
-        title: Text('$name: ${!required ? 'Niet vereist voor deze epic' : approved ? 'Akkoord' : 'Goedkeuring nodig'}'),
-        subtitle: required && record != null ? Text([
-          _text(record['reason']), displayTimestamp(record['createdAt']),
-        ].where((s) => s.isNotEmpty).join('\n')) : null,
+        leading: Icon(
+          !required
+              ? Icons.remove_circle_outline
+              : approved
+              ? Icons.check_circle_outline
+              : Icons.pending_outlined,
+        ),
+        title: Text(
+          '$name: ${!required
+              ? 'Niet vereist voor deze epic'
+              : approved
+              ? 'Akkoord'
+              : 'Goedkeuring nodig'}',
+        ),
+        subtitle: required && record != null
+            ? Text(
+                [
+                  _text(record['reason']),
+                  displayTimestamp(record['createdAt']),
+                ].where((s) => s.isNotEmpty).join('\n'),
+              )
+            : null,
       );
     }
+
     return panel('Goedkeuring van de huidige versie', [
-      text('Inhoudsversie $version. Bij nieuwe inhoud worden de vereiste goedkeuringen opnieuw beoordeeld.'),
-      approval('PRODUCT_OWNER', 'Product owner', r['productOwnerApproved'] == true),
-      approval('ARCHITECT', 'Architect', r['architectApproved'] == true, required: r['architectRequired'] != false),
+      text(
+        'Inhoudsversie $version. Bij nieuwe inhoud worden de vereiste goedkeuringen opnieuw beoordeeld.',
+      ),
+      approval(
+        'PRODUCT_OWNER',
+        'Product owner',
+        r['productOwnerApproved'] == true,
+      ),
+      approval(
+        'ARCHITECT',
+        'Architect',
+        r['architectApproved'] == true,
+        required: r['architectRequired'] != false,
+      ),
       if (!factory &&
           !closed(epic!) &&
           _map(epic!['review'])[architect
@@ -1698,7 +2195,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
               button('Vraag onderzoek', () => review('REQUEST_RESEARCH')),
           ],
         ),
-      if (factory)
+      if (factory && !activityOverview)
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -1786,8 +2283,10 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                   ),
                 ),
               if (q['answer'] != null)
-                text('Jouw antwoord: ${_text(q['answer'])}'),
-              if (q['status'] == 'OPEN')
+                text(
+                  '${activityOverview ? 'Antwoord' : 'Jouw antwoord'}: ${_text(q['answer'])}',
+                ),
+              if (!activityOverview && q['status'] == 'OPEN')
                 button('Beantwoord vraag', () async {
                   final answer = await ask('Je antwoord', _text(q['question']));
                   if (answer == null) return;
@@ -1834,13 +2333,21 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         leading: Icon(
           step['state'] == 'DONE'
               ? Icons.check_circle_outline
-              : step['state'] == 'CURRENT' ? Icons.play_circle_outline : Icons.radio_button_unchecked,
-          color: step['state'] == 'CURRENT' ? Theme.of(context).colorScheme.primary : null,
+              : step['state'] == 'CURRENT'
+              ? Icons.play_circle_outline
+              : Icons.radio_button_unchecked,
+          color: step['state'] == 'CURRENT'
+              ? Theme.of(context).colorScheme.primary
+              : null,
         ),
         title: Text(_text(step['label'])),
-        subtitle: Text(step['key'] == 'BUILD'
-            ? '${_maps(progress['stories']).where((s) => s['status'] == 'DONE').length} van ${_maps(progress['stories']).length} stories afgerond'
-            : displayTimestamp(step['detail']).isNotEmpty ? displayTimestamp(step['detail']) : _text(step['detail'])),
+        subtitle: Text(
+          step['key'] == 'BUILD'
+              ? '${_maps(progress['stories']).where((s) => s['status'] == 'DONE').length} van ${_maps(progress['stories']).length} stories afgerond'
+              : displayTimestamp(step['detail']).isNotEmpty
+              ? displayTimestamp(step['detail'])
+              : _text(step['detail']),
+        ),
       ),
     ),
     for (final entry in environment.entries.where(
@@ -1919,7 +2426,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           )
           .toList(),
     ),
-    if (epic!['status'] == 'COMPLETED' && !architect)
+    if (epic!['status'] == 'COMPLETED' && !architect && !activityOverview)
       button('Bespreek een vervolgidee', () {
         final title = epicTitle(epic!);
         final project = _text(epic!['productId']);

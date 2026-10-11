@@ -10,7 +10,6 @@ import 'navigation_location.dart';
 import 'page_refresh.dart';
 import 'page_reload.dart';
 import 'product_workspace.dart';
-import 'product_conversations.dart';
 import 'epic_collaboration.dart';
 import 'product_factory_theme.dart';
 import 'testbed.dart';
@@ -342,22 +341,15 @@ class _ApplicationShellState extends State<ApplicationShell> {
         isFactoryOwner: widget.isFactoryOwner,
         productMemberships: widget.productMemberships,
       ),
-      _Destination.conversations => ProductConversationsPage(
+      _Destination.conversations => EpicCollaborationPage(
+        key: const ValueKey('factory-activity'),
         products: products,
-        initialProductId: _selectedProductId == '__all__'
-            ? null
-            : _selectedProductId,
+        role: 'FACTORY_OWNER',
+        section: 'activity',
+        initialProductId: _selectedProductId,
         initialConversationId: _selectedConversationId,
         onProductSelected: _selectProduct,
         onConversationSelected: _selectConversation,
-        onOpenDesign: (productId) {
-          _selectProduct(productId);
-          _select(_Destination.design);
-        },
-        onOpenQuestions: (productId) {
-          _selectProduct(productId);
-          _select(_Destination.meetings);
-        },
         csrfToken: widget.csrfToken,
       ),
       _Destination.management => _ManagementHub(onSelect: _select),

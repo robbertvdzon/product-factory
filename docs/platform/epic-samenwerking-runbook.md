@@ -24,6 +24,27 @@ de backend automatische beoordelingen vast; buiten het mandaat blijft een verkla
 De factory owner kan in iedere menselijke productrol handelen; automatische AI-besluiten blijven
 gebonden aan het vastgelegde mandaat.
 
+## Inzage voor de factory owner
+
+De factory owner opent **Gesprekken** voor het overzicht **Gesprekken en epics**. Kies een
+project en een persoon, of laat beide op alle staan. **Gesprekken** toont zowel gesprekken die
+de persoon heeft gestart als gesprekken waaraan die heeft deelgenomen, inclusief losse vragen
+aan AI en epicgesprekken. Bij ieder gesprek staan de starter en de laatste activiteit. Openen
+toont de berichten en afbeeldingen van precies dat gesprek, met naam en rol van de afzender.
+
+**Epics** filtert op de oorspronkelijke aanvrager van het productverzoek. Meepraten over een
+epic maakt iemand niet de aanvrager. Epics zonder bronverzoek blijven zichtbaar bij alle personen,
+zonder een menselijke aanvrager te verzinnen. Ook afgeronde epics zijn zichtbaar.
+Vanuit een gekoppeld gesprek kan de factory owner de epic openen en inhoud, schermen,
+architectuur, beoordelingen en voortgang bekijken. Dit overzicht en de geopende details zijn
+alleen-lezen; meekijken verstuurt geen AI-bericht en wijzigt geen epic.
+
+De bestaande product- en gespreksautorisatie blijft gelden. De globale inzage geldt alleen in de
+actieve factory-ownerrol. Persoonlijke PO-/architectgesprekken blijven voor andere productleden
+afgeschermd; epicgesprekken zijn gedeeld binnen het product. Verwijderde gesprekken worden niet
+opnieuw zichtbaar gemaakt. De gesprekken-API geeft ook bij `includeMessages=false` de starter en
+unieke menselijke deelnemers in `participantUserIds`, zodat filteren geen berichtinhoud vereist.
+
 ## Van idee naar uitvoering
 
 De PO opent **Mijn epics → Nieuwe epic**, kiest een project en beschrijft de wens in de chat.

@@ -85,6 +85,7 @@ data class ProductConversationDetails(
     val purpose: ConversationPurpose = ConversationPurpose.LEGACY,
     val changeProposal: EpicChatProposal? = null,
     val referenceImages: List<ConversationAttachment> = emptyList(),
+    val participantUserIds: List<UserId> = emptyList(),
 )
 data class ProductRequestVersionDetails(
     val version: Long,

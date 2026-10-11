@@ -739,7 +739,11 @@ class ProductAdvisorApplicationService(
         )
         val request = jdbc.query("SELECT request_id FROM pf_product_request WHERE conversation_id=?", { rs, _ -> ProductRequestId(rs.getString(1)) }, id.value).singleOrNull()?.let(::getRequest)
         val context = jdbc.query("SELECT epic_id,audience_role FROM pf_product_conversation WHERE conversation_id=?",{rs,_->rs.getString(1) to ProductMembershipRole.valueOf(rs.getString(2))},id.value).single()
-        return ProductConversationDetails(row.id, row.productId, row.title, row.createdBy, row.status, row.version, row.createdAt, row.updatedAt, withImages(messages), request, context.first, context.second, ConversationPurpose.valueOf(jdbc.queryForObject("SELECT purpose FROM pf_product_conversation WHERE conversation_id=?",String::class.java,id.value)!!), changeProposal(id), conversationAttachments)
+        val participantUserIds = (listOf(row.createdBy) + jdbc.query(
+            "SELECT DISTINCT created_by FROM pf_product_conversation_message WHERE conversation_id=? AND sender='USER' AND created_by IS NOT NULL ORDER BY created_by",
+            { rs, _ -> UserId(rs.getString(1)) }, id.value,
+        )).distinct()
+        return ProductConversationDetails(row.id, row.productId, row.title, row.createdBy, row.status, row.version, row.createdAt, row.updatedAt, withImages(messages), request, context.first, context.second, ConversationPurpose.valueOf(jdbc.queryForObject("SELECT purpose FROM pf_product_conversation WHERE conversation_id=?",String::class.java,id.value)!!), changeProposal(id), conversationAttachments, participantUserIds)
     }
 
     override fun messagePage(conversationIds: List<ProductConversationId>, before: String?, after: String?, limit: Int): ConversationMessagePage {

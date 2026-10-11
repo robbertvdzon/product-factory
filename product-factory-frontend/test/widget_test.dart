@@ -4,9 +4,12 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:product_factory_frontend/authentication.dart';
 import 'package:product_factory_frontend/build_identity.dart';
 import 'package:product_factory_frontend/frontend_version_monitor.dart';
+import 'package:product_factory_frontend/epic_collaboration.dart';
 import 'package:product_factory_frontend/main.dart';
 import 'package:product_factory_frontend/memory_ai_management.dart';
 import 'package:product_factory_frontend/navigation_location.dart';
@@ -230,6 +233,28 @@ void main() {
     expect(navigation.current.queryParameters['product'], '__all__');
     expect(tester.takeException(), isNull);
   });
+
+  for (final factoryOwner in [true, false]) {
+    testWidgets('gesprekken opent ${factoryOwner ? 'factory-inzage' : 'eigen vragen'} voor de actieve rol', (tester) async {
+      final navigation = FakeNavigationLocation(Uri.parse('/gesprekken?product=__all__'));
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(home: FoundationPage(
+          showAcceptanceBanner: false,
+          productGateway: const FakeProductGateway(),
+          versionGateway: FakeVersionGateway(),
+          navigationLocation: navigation,
+          isFactoryOwner: factoryOwner,
+          actingRole: factoryOwner ? 'FACTORY_OWNER' : 'PRODUCT_OWNER',
+        )));
+        await tester.pumpAndSettle();
+        final page = tester.widget<EpicCollaborationPage>(find.byType(EpicCollaborationPage));
+        expect(page.role, factoryOwner ? 'FACTORY_OWNER' : 'PRODUCT_OWNER');
+        expect(page.section, factoryOwner ? 'activity' : 'own-questions');
+        expect(navigation.current.queryParameters['product'], '__all__');
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, () => MockClient((_) async => http.Response('[]', 200)));
+    });
+  }
 
   testWidgets('factory owner kan als product owner werken en terugschakelen', (
     tester,
