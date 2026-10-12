@@ -122,6 +122,7 @@ data class ProductRequestDetails(
     val version: Long,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val preparationStatus: DesignWorkItemStatus? = null,
 )
 data class PersonalActionDetails(
     val key: String,

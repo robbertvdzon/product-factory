@@ -96,7 +96,9 @@ class ProductDesignMvpService(
         }
         val sessionId = ProcessSessionId(UUID.randomUUID().toString())
         val directedWorkId = jdbc.query(
-            "SELECT work_item_id FROM pf_design_work_item WHERE product_id=? AND status='PENDING' ORDER BY created_at",
+            """SELECT w.work_item_id FROM pf_design_work_item w JOIN pf_product_request r ON r.request_id=w.request_id
+                WHERE w.product_id=? AND w.status='PENDING' AND w.request_version=r.current_version
+                  AND r.status IN ('APPROVED','ROUTING','ROUTING_FAILED') ORDER BY w.created_at""".trimIndent(),
             { rs, _ -> rs.getString(1) }, productId.value,
         ).firstOrNull()
         try {
@@ -135,7 +137,7 @@ class ProductDesignMvpService(
         val stories = planningQueries.ifAvailable?.findStories(StoryFilter(productId, statuses = setOf(StoryStatus.TODO, StoryStatus.IN_PROGRESS, StoryStatus.DONE))).orEmpty()
         val bugs = qualityQueries.ifAvailable?.findBugs(BugFilter(productId)).orEmpty()
         val qualitySnapshot = qualityQueries.ifAvailable?.getCurrentQuality(productId)
-        val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant())
+        val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant()).map { it.copy(readBy = emptyList()) }
         val directedWork = directedWork(sessionId)
 
         val sources = buildList {
@@ -185,20 +187,24 @@ class ProductDesignMvpService(
     private fun requestTask(sessionId: ProcessSessionId, productId: ProductId, snapshotJson: String, gitUrl: String, gitSha: String, attempt: Int) {
         // A prior iteration can publish memory before asking a human a question. Freeze the
         // current memory for each new task, while preserving the repository/design snapshot.
-        val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant())
+        val currentMemory = memory.getMemoryAt(productId, ROLE, clock.instant()).map { it.copy(readBy = emptyList()) }
         val questions = products.findStakeholderQuestions(StakeholderQuestionFilter(productId))
         val signals = products.findUserSignals(UserSignalFilter(productId, statuses = setOf(UserSignalStatus.OPEN, UserSignalStatus.IN_REVIEW)))
         val previous = getProcessSession(sessionId)
         val taskSnapshot = (mapper.readTree(snapshotJson) as ObjectNode).apply {
             set<JsonNode>("agentMemory", mapper.valueToTree(currentMemory))
             set<JsonNode>("stakeholderQuestions", mapper.valueToTree(questions))
+            // These questions were refreshed in full; omissions from the previous prompt no longer apply.
+            (path("contextCoverage").path("history") as? ObjectNode)?.remove("stakeholderQuestions")
             set<JsonNode>("signals", mapper.valueToTree(signals))
             remove("previousValidationError")
             if (previous.errorCode in setOf("DESIGN_INPUT_INVALID", "DESIGN_VERSION_CONFLICT")) {
                 put("previousValidationError", previous.blockedReason)
             }
         }
-        val taskSnapshotJson = mapper.writeValueAsString(taskSnapshot)
+        val taskSnapshotJson = DesignerPromptContext(mapper).serialize(
+            taskSnapshot, sessionId.value, MAX_PROMPT_CHARACTERS - designPrompt("").length,
+        )
         val inputs = (frozenInputs(sessionId).filter { it.type !in setOf("MEMORY_VERSION", "STAKEHOLDER_QUESTION", "USER_SIGNAL") } +
             currentMemory.map { SourceReference("MEMORY_VERSION", it.activeVersionId.value, 1) } +
             questions.map { SourceReference("STAKEHOLDER_QUESTION", it.id.value, it.version) } +
@@ -1179,13 +1185,14 @@ class ProductDesignMvpService(
     }
     private fun fingerprint(value: Any) = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsBytes(value)))
     private fun safeCode(error: Throwable) = when (error) {
+        is DesignContextTooLarge -> "DESIGN_CONTEXT_TOO_LARGE"
         is InvalidCommand -> "DESIGN_INPUT_INVALID"
         is VersionConflict -> "DESIGN_VERSION_CONFLICT"
         is CapabilityNotAvailable -> "CAPABILITY_NOT_AVAILABLE"
         else -> "DESIGN_SESSION_FAILED"
     }
     private fun safeMessage(error: Throwable) = when (error) {
-        is InvalidCommand, is VersionConflict, is CapabilityNotAvailable -> error.message ?: "Ontwerpsessie is geblokkeerd."
+        is DesignContextTooLarge, is InvalidCommand, is VersionConflict, is CapabilityNotAvailable -> error.message ?: "Ontwerpsessie is geblokkeerd."
         else -> "Ontwerpsessie kon veilig niet worden voortgezet."
     }
 
@@ -1311,7 +1318,8 @@ $snapshotJson"""
         private val ROLE = AgentRoleKey("PRODUCT_DESIGNER_MVP")
         private val JOB_KEY = AiJobKey("PRODUCT_DESIGN.CREATE_EPIC")
         private val DESIGN_ACTOR = ActorReference(ActorType.PROCESS, "product-design-mvp")
-        private const val PROMPT_TEMPLATE_VERSION = 9L
+        private const val PROMPT_TEMPLATE_VERSION = 10L
+        private const val MAX_PROMPT_CHARACTERS = 200_000
         private val CALL_CLAIM = Duration.ofMinutes(5)
         private const val MAX_DESIGN_ITERATIONS = 3
         private const val MIN_VALIDATED_EXTERNAL_SOURCES = 2

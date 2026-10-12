@@ -302,6 +302,45 @@ class ProductAdvisorIntegrationTest(
     }
 
     @Test
+    fun `voorbereidingsstatus maakt ontwerpblokkades zichtbaar zonder interne fouten of oude aanvragen te lekken`() {
+        val request = insertRequest(ProductRequestType.EPIC_CANDIDATE)
+        advisor.approveRequest(ApproveProductRequestCommand(request, 1, 1, owner.id, "approve-projection-${productId.value}"))
+        advisor.routeApprovedRequests()
+        val session = jdbc.queryForObject("SELECT process_session_id FROM pf_design_work_item WHERE request_id=?", String::class.java, request.value)!!
+        jdbc.update("UPDATE pf_design_work_item SET status='BLOCKED' WHERE request_id=?", request.value)
+        jdbc.update("UPDATE pf_design_process_session SET status='BLOCKED',error_code='DESIGN_CONTEXT_TOO_LARGE',blocked_reason='private failure details' WHERE id=?", session)
+
+        val version = advisor.getRequest(request).version
+        assertThat(advisor.getRequest(request).preparationStatus).isEqualTo(DesignWorkItemStatus.BLOCKED)
+        assertThat(advisor.getConversation(conversationId, false).request?.preparationStatus).isEqualTo(DesignWorkItemStatus.BLOCKED)
+        val serialized = mapper.writeValueAsString(advisor.findRequests(productId))
+        assertThat(serialized).contains("\"preparationStatus\":\"BLOCKED\"").doesNotContain("DESIGN_CONTEXT_TOO_LARGE", "private failure details")
+        assertThat(advisor.getRequest(request).version).isEqualTo(version)
+        assertThat(advisor.getRequest(request).status).isEqualTo(ProductRequestStatus.ROUTING)
+
+        jdbc.update("UPDATE pf_design_work_item SET status='IN_PROGRESS' WHERE request_id=?", request.value)
+        assertThat(advisor.getRequest(request).preparationStatus).isEqualTo(DesignWorkItemStatus.BLOCKED)
+        jdbc.update("UPDATE pf_design_process_session SET error_code='WAITING_FOR_USER' WHERE id=?", session)
+        assertThat(advisor.getRequest(request).preparationStatus).isEqualTo(DesignWorkItemStatus.WAITING_FOR_USER)
+        jdbc.update("UPDATE pf_design_process_session SET status='WAITING_FOR_AI',error_code=NULL WHERE id=?", session)
+        assertThat(advisor.getRequest(request).preparationStatus).isEqualTo(DesignWorkItemStatus.IN_PROGRESS)
+
+        jdbc.update("UPDATE pf_design_work_item SET request_version=2 WHERE request_id=?", request.value)
+        assertThat(advisor.getRequest(request).preparationStatus).isNull()
+        jdbc.update("UPDATE pf_design_work_item SET request_version=1 WHERE request_id=?", request.value)
+        jdbc.update("UPDATE pf_product_request SET status='CANCELLED' WHERE request_id=?", request.value)
+        assertThat(advisor.getRequest(request).preparationStatus).isNull()
+        jdbc.update("UPDATE pf_product_request SET status='ROUTING',linked_epic_id='published-epic' WHERE request_id=?", request.value)
+        assertThat(advisor.getRequest(request).preparationStatus).isNull()
+        jdbc.update("UPDATE pf_product_request SET linked_epic_id=NULL WHERE request_id=?", request.value)
+        jdbc.update("UPDATE pf_design_process_session SET status='CANCELLED' WHERE id=?", session)
+        assertThat(advisor.getRequest(request).preparationStatus).isNull()
+        jdbc.update("UPDATE pf_design_process_session SET status='BLOCKED' WHERE id=?", session)
+        jdbc.update("UPDATE pf_product_conversation SET deleted_at=? WHERE conversation_id=?", Instant.now(), conversationId.value)
+        assertThat(advisor.getRequest(request).preparationStatus).isNull()
+    }
+
+    @Test
     fun `nieuwe epic gaat zonder extra voorstelgoedkeuring naar ontwerp inclusief afbeeldingen`() {
         val id=advisor.createConversation(CreateConversationCommand(productId,"Nieuwe epic",owner.id,"new-epic",purpose=ConversationPurpose.EPIC))
         val image=ConversationImageInput("voorbeeld.png","image/png","iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==")

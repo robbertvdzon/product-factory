@@ -979,7 +979,30 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       ? 'Epic voorbereiden'
       : 'Gesprek';
 
+  String? preparationLabel(Json request) => const {
+    'PENDING': 'Wacht op uitwerking',
+    'IN_PROGRESS': 'Epic wordt uitgewerkt',
+    'BLOCKED': 'Uitwerking geblokkeerd',
+    'WAITING_FOR_USER': 'Wacht op antwoord',
+    'FAILED': 'Uitwerking mislukt',
+  }[_text(request['preparationStatus'])];
+
+  String preparationDetail(
+    Json request,
+  ) => switch (request['preparationStatus']) {
+    'BLOCKED' =>
+      'De AI-uitwerking kon niet verder. De aanvraag is bewaard; er is nog geen epic gemaakt. De factory owner kan de blokkade onderzoeken.',
+    'WAITING_FOR_USER' =>
+      'De uitwerking wacht op antwoord van de toegewezen productrol. Bekijk de open vragen bij dit product.',
+    'FAILED' =>
+      'De uitwerking is gestopt. De aanvraag is bewaard; er is nog geen epic gemaakt. De factory owner kan de oorzaak onderzoeken.',
+    'PENDING' =>
+      'De aanvraag is ontvangen en wacht tot de uitwerking kan starten.',
+    _ => 'AI maakt de inhoud, schermen en architectuurimpact.',
+  };
+
   String conversationStatus(Json c) =>
+      preparationLabel(_map(c['request'])) ??
       const {
         'OPEN': 'Open',
         'PROCESSING': 'AI verwerkt een bericht',
@@ -1051,6 +1074,27 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             _text(epicRequest(e)?['requestedBy']) == activityPersonId,
       ),
     );
+    final preparations = recentFirst(
+      conversations.where((c) {
+        final request = _map(c['request']);
+        return request.isNotEmpty &&
+            (c['purpose'] == 'EPIC' ||
+                _map(request['content'])['type'] == 'EPIC_CANDIDATE') &&
+            [
+              'PROPOSED',
+              'APPROVED',
+              'ROUTING',
+              'ROUTING_FAILED',
+            ].contains(request['status']) &&
+            c['epicId'] == null &&
+            request['linkedEpicId'] == null &&
+            !epics.any(
+              (e) => _text(e['sourceProductRequestId']) == _text(request['id']),
+            ) &&
+            (activityPersonId == null ||
+                _text(request['requestedBy']) == activityPersonId);
+      }),
+    );
     return [
       Text(
         'Gesprekken en epics',
@@ -1103,6 +1147,26 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             ? 'Alle gesprekken die deze persoon heeft gestart of waaraan deze heeft deelgenomen. Nieuwste activiteit eerst.'
             : 'Epics van de oorspronkelijke aanvrager, inclusief afgeronde epics. Nieuwste activiteit eerst.',
       ),
+      if (activityView == 'epics' && preparations.isNotEmpty)
+        panel(
+          'Epics in voorbereiding',
+          preparations.map((c) {
+            final request = _map(c['request']);
+            return ListTile(
+              key: ValueKey('activity-preparation-${_text(request['id'])}'),
+              title: Text(
+                _text(_map(request['content'])['title']).isEmpty
+                    ? _text(c['title'])
+                    : _text(_map(request['content'])['title']),
+              ),
+              subtitle: Text(
+                '${productName(c['productId'])} · ${conversationStatus(c)}\nAangevraagd door ${personName(request['requestedBy'])}',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => openActivityConversation(c),
+            );
+          }).toList(),
+        ),
       panel(
         '',
         activityView == 'conversations'
@@ -1272,15 +1336,15 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   Widget conversationRow(Json c) => ListTile(
     title: Text(_text(c['title'])),
     subtitle: Text(
-      '${productName(c['productId'])} · ${c['status'] == 'PROCESSING'
-          ? 'AI werkt aan je bericht'
-          : c['status'] == 'BLOCKED'
-          ? 'Verwerking vraagt aandacht'
-          : _map(c['request'])['status'] == 'ROUTING_FAILED'
-          ? 'Uitwerking wordt opnieuw geprobeerd'
-          : _map(c['request'])['status'] == 'ROUTING' || _map(c['request'])['status'] == 'APPROVED'
-          ? 'AI maakt de epic'
-          : 'Open gesprek'}${displayTimestamp(c['updatedAt']).isEmpty ? '' : '\nLaatste activiteit: ${displayTimestamp(c['updatedAt'])}'}',
+      '${productName(c['productId'])} · ${preparationLabel(_map(c['request'])) ?? (c['status'] == 'PROCESSING'
+              ? 'AI werkt aan je bericht'
+              : c['status'] == 'BLOCKED'
+              ? 'Verwerking vraagt aandacht'
+              : _map(c['request'])['status'] == 'ROUTING_FAILED'
+              ? 'Uitwerking wordt opnieuw geprobeerd'
+              : _map(c['request'])['status'] == 'ROUTING' || _map(c['request'])['status'] == 'APPROVED'
+              ? 'AI maakt de epic'
+              : 'Open gesprek')}${displayTimestamp(c['updatedAt']).isEmpty ? '' : '\nLaatste activiteit: ${displayTimestamp(c['updatedAt'])}'}',
     ),
     trailing: Row(
       mainAxisSize: MainAxisSize.min,
@@ -1442,7 +1506,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           : const SizedBox.shrink(),
       key: ValueKey(scope),
       revision:
-          '${c?['version']}-${discussions.map((d) => d['version']).join('-')}',
+          '${c?['version']}-${request['preparationStatus']}-${discussions.map((d) => d['version']).join('-')}',
       fetch: ({String? before, String? after}) async => _map(
         await api.request(
           '$scope?limit=30${before == null ? '' : '&before=${Uri.encodeQueryComponent(before)}'}${after == null ? '' : '&after=${Uri.encodeQueryComponent(after)}'}',
@@ -1598,7 +1662,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
             const Divider(height: 28),
             text(_text(_map(request['content'])['title'])),
             text(_text(_map(request['content'])['summary'])),
-            if (['APPROVED', 'ROUTING'].contains(request['status']))
+            if (preparationLabel(request) != null)
+              notice(preparationLabel(request)!, preparationDetail(request))
+            else if (['APPROVED', 'ROUTING'].contains(request['status']))
               notice(
                 activityOverview
                     ? 'Epic wordt uitgewerkt'
@@ -1607,7 +1673,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                     ? 'AI maakt de inhoud, schermen en architectuurimpact.'
                     : 'AI maakt de inhoud, schermen en architectuurimpact. De epic verschijnt hier vanzelf.',
               ),
-            if (request['status'] == 'ROUTING_FAILED')
+            if (preparationLabel(request) == null &&
+                request['status'] == 'ROUTING_FAILED')
               notice(
                 'Uitwerking wordt opnieuw geprobeerd',
                 activityOverview

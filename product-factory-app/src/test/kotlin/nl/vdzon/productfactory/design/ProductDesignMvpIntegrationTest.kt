@@ -78,6 +78,136 @@ class ProductDesignMvpIntegrationTest @Autowired constructor(
         assertThat(epic.solution).isEqualTo(solution)
     }
 
+    @ParameterizedTest
+    @CsvSource("true", "false")
+    fun `oude geblokkeerde aanvraag herstelt met begrensde historie en publiceert dezelfde epic`(missingSnapshot: Boolean) {
+        val owner = users.resolveOrCreate("context-owner-${productId.value}@example.test", true)
+        val conversation = advisor.createConversation(CreateConversationCommand(
+            productId, "Gerichte verbetering na oude contextblokkade", owner.id, "context-conversation-${productId.value}",
+        ))
+        val requestId = insertDirectedRequest(conversation, owner.id)
+        advisor.approveRequest(ApproveProductRequestCommand(requestId, 1, 1, owner.id, "context-approve-${productId.value}"))
+        advisor.routeApprovedRequests()
+        val session = queries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        val saved = jdbc.queryForMap("SELECT snapshot_json,git_url,git_commit_sha FROM pf_design_process_session WHERE id=?", session.id.value)
+        val oldSnapshot = mapper.readTree(saved["snapshot_json"] as String) as ObjectNode
+        val historicalContent = "Uitgebreide technische historie van een afgeronde story. ".repeat(1_000)
+        val historicEpic = UUID.randomUUID().toString()
+        try {
+            repeat(7) { index ->
+                val storyId = UUID.randomUUID().toString()
+                jdbc.update(
+                    """INSERT INTO pf_story(id,product_id,epic_id,epic_version,type,status,current_version,sequence_number,created_at,updated_at)
+                        VALUES (?,?,?,1,'PRODUCT_STORY','DONE',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)""".trimIndent(),
+                    storyId, productId.value, historicEpic, index + 1L,
+                )
+                jdbc.update(
+                    """INSERT INTO pf_story_version(story_id,version,title,summary,content,acceptance_criteria_json,dependencies_json,source_references_json,created_at)
+                        VALUES (?,1,?,?,?,'[]','[]','[]',CURRENT_TIMESTAMP)""".trimIndent(),
+                    storyId, "Historische story $index", "Dit eerdere werk is al opgeleverd.", historicalContent,
+                )
+                oldSnapshot.withArray("downstreamStories").addObject().apply {
+                    put("id", storyId); put("version", 1); put("status", "DONE")
+                    put("title", "Historische story $index"); put("summary", "Dit eerdere werk is al opgeleverd.")
+                    put("content", historicalContent)
+                }
+            }
+            assertThat(mapper.writeValueAsString(oldSnapshot).length).isGreaterThan(200_000)
+            ai.deleteAllOwnedExecutionData()
+            // Both states existed in older deployments: transaction rollback before the snapshot,
+            // or an already frozen snapshot that became too large during a later design iteration.
+            jdbc.update(
+                """UPDATE pf_design_process_session SET status='BLOCKED',snapshot_json=?,git_url=?,git_commit_sha=?,
+                    current_ai_task_id=NULL,ai_task_ids_json='[]',ai_attempt=0,call_claimed_until=NULL,
+                    error_code='DESIGN_INPUT_INVALID',blocked_reason='De complete AI-prompt is leeg of te groot.' WHERE id=?""".trimIndent(),
+                if (missingSnapshot) null else mapper.writeValueAsString(oldSnapshot),
+                if (missingSnapshot) null else saved["git_url"], if (missingSnapshot) null else saved["git_commit_sha"], session.id.value,
+            )
+            jdbc.update("UPDATE pf_design_work_item SET status='BLOCKED' WHERE process_session_id=?", session.id.value)
+
+            design.runProcessSession(productId)
+            val resumed = queries.findProcessSessions(ProcessSessionFilter(productId)).single()
+            assertThat(resumed.id).isEqualTo(session.id)
+            assertThat(resumed.status).withFailMessage("%s: %s", resumed.errorCode, resumed.blockedReason).isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
+            ai.dispatchPending()
+            val prompt = runtime.requests.single().prompt
+            assertThat(prompt.length).isLessThanOrEqualTo(200_000)
+            val context = mapper.readTree(prompt.substringAfter("Bevroren context:\n"))
+            assertThat(context.path("directedProductRequest")).isEqualTo(oldSnapshot.path("directedProductRequest"))
+            assertThat(context.path("downstreamStories")).hasSize(7)
+            assertThat(prompt).doesNotContain(historicalContent)
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_story_version WHERE content=?", Int::class.java, historicalContent)).isEqualTo(7)
+
+            completeOnlyJob(validEpic())
+            design.runProcessSession(productId)
+            val request = advisor.getRequest(requestId)
+            assertThat(request.status).isEqualTo(ProductRequestStatus.ROUTED)
+            assertThat(queries.findEpics(EpicFilter(productId)).single().id.value).isEqualTo(request.linkedEpicId)
+            assertThat(queries.findProcessSessions(ProcessSessionFilter(productId)).single().status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        } finally {
+            jdbc.update("DELETE FROM pf_story_version WHERE story_id IN (SELECT id FROM pf_story WHERE product_id=?)", productId.value)
+            jdbc.update("DELETE FROM pf_story WHERE product_id=?", productId.value)
+        }
+    }
+
+    @Test
+    fun `te grote noodzakelijke context blokkeert herkenbaar zonder AI taak of inhoudsverlies`() {
+        design.runProcessSession(productId)
+        val session = queries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        val snapshot = mapper.readTree(jdbc.queryForObject("SELECT snapshot_json FROM pf_design_process_session WHERE id=?", String::class.java, session.id.value)) as ObjectNode
+        (snapshot.path("assignment") as ObjectNode).put("goal", "Deze noodzakelijke afspraak moet bewaard blijven. ".repeat(5_000))
+        val frozenJson = mapper.writeValueAsString(snapshot)
+        ai.deleteAllOwnedExecutionData()
+        jdbc.update(
+            """UPDATE pf_design_process_session SET status='BLOCKED',snapshot_json=?,current_ai_task_id=NULL,
+                ai_task_ids_json='[]',ai_attempt=0,error_code='DESIGN_INPUT_INVALID',call_claimed_until=NULL WHERE id=?""".trimIndent(),
+            frozenJson, session.id.value,
+        )
+
+        design.runProcessSession(productId)
+
+        val blocked = queries.getProcessSession(session.id)
+        assertThat(blocked.status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(blocked.errorCode).isEqualTo("DESIGN_CONTEXT_TOO_LARGE")
+        assertThat(blocked.blockedReason).contains("De noodzakelijke ontwerpcontext is te groot")
+        assertThat(blocked.aiTaskIds).isEmpty()
+        assertThat(jdbc.queryForObject("SELECT snapshot_json FROM pf_design_process_session WHERE id=?", String::class.java, session.id.value)).isEqualTo(frozenJson)
+        ai.dispatchPending()
+        assertThat(runtime.requests).isEmpty()
+    }
+
+    @Test
+    fun `gerichte claim slaat ingetrokken en verouderde aanvragen over voor geldige wachtende aanvraag`() {
+        val owner = users.resolveOrCreate("queue-owner-${productId.value}@example.test", true)
+        val requests = (0..2).map { index ->
+            val conversation = advisor.createConversation(CreateConversationCommand(
+                productId, "Wachtende aanvraag $index", owner.id, "queue-conversation-$index-${productId.value}",
+            ))
+            insertDirectedRequest(conversation, owner.id).also { request ->
+                jdbc.update("UPDATE pf_product_request SET status=?,current_version=? WHERE request_id=?",
+                    if (index == 0) "CANCELLED" else "APPROVED", if (index == 1) 2L else 1L, request.value)
+                val created = java.time.Instant.now().minusSeconds(100L - index)
+                jdbc.update(
+                    """INSERT INTO pf_design_work_item(work_item_id,product_id,request_id,request_version,purpose,status,created_at,updated_at,idempotency_key)
+                        VALUES (?,?,?,1,'CREATE_EPIC_FROM_PRODUCT_REQUEST','PENDING',?,?,?)""".trimIndent(),
+                    UUID.randomUUID().toString(), productId.value, request.value, created, created, "queue-work-${request.value}",
+                )
+            }
+        }
+
+        design.runProcessSession(productId)
+
+        val session = queries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        assertThat(session.status).isEqualTo(ProcessSessionStatus.WAITING_FOR_AI)
+        assertThat(jdbc.queryForObject("SELECT request_id FROM pf_design_work_item WHERE process_session_id=?", String::class.java, session.id.value)).isEqualTo(requests.last().value)
+        requests.take(2).forEach { request ->
+            assertThat(jdbc.queryForObject("SELECT status FROM pf_design_work_item WHERE request_id=?", String::class.java, request.value)).isEqualTo("PENDING")
+        }
+        ai.dispatchPending()
+        val context = mapper.readTree(runtime.requests.single().prompt.substringAfter("Bevroren context:\n"))
+        assertThat(context.at("/directedProductRequest/requestId").asText()).isEqualTo(requests.last().value)
+    }
+
     @Test
     fun `gericht ProductRequest wordt door Productontwerp een complete epic met twee approvals`() {
         val owner = users.resolveOrCreate("owner-${productId.value}@example.test", true)

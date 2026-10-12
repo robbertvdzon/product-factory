@@ -96,6 +96,37 @@ class AutomaticProductProcessingTest @Autowired constructor(
         automatic.check(id.value,ScheduledProcess.SOFTWARE_FACTORY_DISPATCHER)
         assertThat(jdbc.queryForObject("SELECT failure_count FROM pf_automation_process WHERE product_id=?",Int::class.java,id.value)).isZero()
     }
+    @Test fun `te grote ontwerpcontext wordt ondanks eerdere antwoorden niet automatisch herhaald`() {
+        val session = UUID.randomUUID().toString()
+        val question = UUID.randomUUID().toString()
+        jdbc.update(
+            """INSERT INTO pf_design_process_session(id,product_id,active_product_id,status,implementation_artifact,
+                implementation_variant,implementation_version,implementation_revision,inputs_json,memory_version_ids_json,
+                ai_task_ids_json,publications_json,error_code,started_at,updated_at)
+                VALUES (?,?,?,'BLOCKED','test','test','1','test','{}','[]','[]','[]','DESIGN_CONTEXT_TOO_LARGE',?,?)""",
+            session, id.value, id.value, clock.now, clock.now,
+        )
+        jdbc.update(
+            """INSERT INTO pf_stakeholder_question(question_id,product_id,agent_role,question,context,process_session_id,
+                linked_objects_json,status,answer,created_at,answered_at,updated_by_type,updated_by_id,version)
+                VALUES (?,?,'PRODUCT_DESIGNER_MVP','Welke tekst?','Ontwerpvraag',?,'[]','ANSWERED','Bevestigd',?,?,'SYSTEM','test',1)""",
+            question, id.value, session, clock.now, clock.now,
+        )
+
+        repeat(10) {
+            automatic.check(id.value, ScheduledProcess.PRODUCT_DESIGN)
+            clock.now = clock.now.plusSeconds(600)
+        }
+        jdbc.update("UPDATE pf_stakeholder_question SET version=2 WHERE question_id=?", question)
+        automatic.check(id.value, ScheduledProcess.PRODUCT_DESIGN)
+
+        verifyNoInteractions(design)
+
+        // The permanent context error must not disable normal resumption after a user's answer.
+        jdbc.update("UPDATE pf_design_process_session SET error_code='WAITING_FOR_USER' WHERE id=?", session)
+        automatic.check(id.value, ScheduledProcess.PRODUCT_DESIGN)
+        verify(design, times(1)).runProcessSession(id)
+    }
     @Test fun `databaselease voorkomt dubbel werk en herstelt na een herstart`() {
         jdbc.update("INSERT INTO pf_automation_state(product_id,next_check_at) VALUES (?,?)",id.value,clock.now)
         assertThat(automatic.claim(id.value,"first",clock.now)).isTrue()

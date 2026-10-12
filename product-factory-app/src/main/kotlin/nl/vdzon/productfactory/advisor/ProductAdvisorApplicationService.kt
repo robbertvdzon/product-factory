@@ -494,7 +494,7 @@ class ProductAdvisorApplicationService(
     override fun routeApprovedRequests(limit: Int) {
         jdbc.query(
             """SELECT request_id FROM pf_product_request
-                WHERE status='APPROVED'
+                WHERE (status='APPROVED'
                    OR (status IN ('ROUTING','ROUTING_FAILED') AND (
                        request_type<>'HOTFIX' OR (
                            ? AND COALESCE((
@@ -503,7 +503,12 @@ class ProductAdvisorApplicationService(
                                  AND route.request_version=pf_product_request.current_version
                            ), 0) < ?
                        )
-                   ))
+                   )))
+                  AND (request_type<>'EPIC_CANDIDATE' OR status<>'ROUTING' OR NOT EXISTS (
+                      SELECT 1 FROM pf_design_work_item w
+                      WHERE w.request_id=pf_product_request.request_id
+                        AND w.request_version=pf_product_request.current_version
+                  ))
                 ORDER BY updated_at""".trimIndent(),
             { rs, _ -> ProductRequestId(rs.getString(1)) },
             hotfixEnabled,
@@ -571,8 +576,18 @@ class ProductAdvisorApplicationService(
             clock.instant(),
         )
         jdbc.query(
-            "SELECT DISTINCT w.product_id FROM pf_design_work_item w JOIN pf_product p ON p.product_id=w.product_id WHERE p.status='ACTIVE' AND w.status IN ('PENDING','IN_PROGRESS','BLOCKED') ORDER BY w.product_id",
+            """SELECT DISTINCT w.product_id FROM pf_design_work_item w
+                JOIN pf_product p ON p.product_id=w.product_id
+                JOIN pf_product_request r ON r.request_id=w.request_id AND r.current_version=w.request_version
+                LEFT JOIN pf_design_process_session s ON s.active_product_id=w.product_id
+                WHERE p.status='ACTIVE' AND w.status IN ('PENDING','IN_PROGRESS','BLOCKED')
+                  AND r.status IN ('APPROVED','ROUTING','ROUTING_FAILED')
+                  AND (s.id IS NULL OR s.status<>'BLOCKED'
+                    OR (s.error_code='WAITING_FOR_USER' AND w.process_session_id=s.id AND w.status='BLOCKED')
+                    OR (COALESCE(s.error_code,'') NOT IN ('WAITING_FOR_USER','DESIGN_CONTEXT_TOO_LARGE') AND s.updated_at<=?))
+                ORDER BY w.product_id""".trimIndent(),
             { rs, _ -> ProductId(rs.getString(1)) },
+            clock.instant().minusSeconds(DESIGN_RETRY_DELAY_SECONDS),
         ).take(limit).forEach { productId ->
             runCatching { productDesign.runProcessSession(productId) }
                 .onFailure { error ->
@@ -798,7 +813,30 @@ class ProductAdvisorApplicationService(
             { rs, _ -> ProductRequestApprovalDetails(UserId(rs.getString(1)), rs.getLong(2), rs.getTimestamp(3).toInstant()) }, id.value,
         )
         return ProductRequestDetails(row.id, row.productId, row.conversationId, row.requestedBy, row.status, row.currentVersion, v, approvals,
-            row.linkedEpicId, row.externalStoryKey, row.deliveryStatus, row.deliveredCommitSha, row.safeErrorCode, row.version, row.createdAt, row.updatedAt)
+            row.linkedEpicId, row.externalStoryKey, row.deliveryStatus, row.deliveredCommitSha, row.safeErrorCode, row.version, row.createdAt, row.updatedAt,
+            preparationStatus(row, v.type))
+    }
+
+    private fun preparationStatus(row: RequestRow, type: ProductRequestType): DesignWorkItemStatus? {
+        if (type != ProductRequestType.EPIC_CANDIDATE || row.linkedEpicId != null ||
+            row.status !in setOf(ProductRequestStatus.APPROVED, ProductRequestStatus.ROUTING, ProductRequestStatus.ROUTING_FAILED)) return null
+        return jdbc.query(
+            """SELECT w.status,s.status,s.error_code FROM pf_design_work_item w
+                JOIN pf_product_conversation c ON c.conversation_id=? AND c.deleted_at IS NULL
+                LEFT JOIN pf_design_process_session s ON s.id=w.process_session_id
+                WHERE w.request_id=? AND w.request_version=? AND (s.status IS NULL OR s.status<>'CANCELLED')
+                ORDER BY w.updated_at DESC LIMIT 1""".trimIndent(),
+            { rs, _ ->
+                val workStatus = DesignWorkItemStatus.valueOf(rs.getString(1))
+                when {
+                    workStatus == DesignWorkItemStatus.DONE -> null
+                    workStatus == DesignWorkItemStatus.WAITING_FOR_USER || rs.getString(3) == "WAITING_FOR_USER" -> DesignWorkItemStatus.WAITING_FOR_USER
+                    workStatus == DesignWorkItemStatus.FAILED -> DesignWorkItemStatus.FAILED
+                    workStatus == DesignWorkItemStatus.BLOCKED || rs.getString(2) == "BLOCKED" -> DesignWorkItemStatus.BLOCKED
+                    else -> workStatus
+                }
+            }, row.conversationId.value, row.id.value, row.currentVersion,
+        ).firstOrNull()
     }
 
     override fun findActions(userId: UserId): List<PersonalActionDetails> {
@@ -1005,6 +1043,7 @@ class ProductAdvisorApplicationService(
         const val PROMPT_VERSION = 7L
         const val MAX_ATTEMPTS = 3
         const val MAX_HOTFIX_ROUTE_ATTEMPTS = 2
+        private const val DESIGN_RETRY_DELAY_SECONDS = 300L
         val SHA = Regex("[0-9a-fA-F]{40}")
         val RESPONSE_SCHEMA = """{"type":"object","additionalProperties":false,"required":["message","outcome","observations","proposal","images"],"properties":{"message":{"type":"string","minLength":1,"maxLength":20000},"outcome":{"type":"string","enum":["ANSWER","ASK_FOLLOW_UP","PROPOSE_CHANGE","PROPOSE_EPIC_UPDATE","REVERT_EPIC_UPDATE"]},"observations":{"type":"array","items":{"type":"string","minLength":1,"maxLength":4000}},"proposal":{"type":["object","null"],"additionalProperties":false,"required":["type","title","summary","problem","userImpact","currentBehavior","desiredBehavior","evidence","gitCommitSha","acceptanceCriteria","scope","boundaries","excludedHotfixCategories"],"properties":{"type":{"type":"string","enum":["HOTFIX","BUGFIX","EPIC_CANDIDATE"]},"title":{"type":"string","minLength":1,"maxLength":200},"summary":{"type":"string","minLength":1,"maxLength":20000},"problem":{"type":"string","minLength":1,"maxLength":20000},"userImpact":{"type":"string","minLength":1,"maxLength":20000},"currentBehavior":{"type":"string","minLength":1,"maxLength":20000},"desiredBehavior":{"type":"string","minLength":1,"maxLength":20000},"evidence":{"type":"array","items":{"type":"string","minLength":1,"maxLength":4000}},"gitCommitSha":{"type":"string","pattern":"^[0-9a-fA-F]{40}$"},"acceptanceCriteria":{"type":"array","minItems":1,"items":{"type":"string","minLength":1,"maxLength":4000}},"scope":{"type":"array","minItems":1,"items":{"type":"string","minLength":1,"maxLength":4000}},"boundaries":{"type":"array","items":{"type":"string","minLength":1,"maxLength":4000}},"excludedHotfixCategories":{"type":"array","items":{"type":"string","minLength":1,"maxLength":200}}}},"images":{"type":"array","maxItems":4,"items":{"type":"object","additionalProperties":false,"required":["artifactName","kind","caption","sourceUrl","environment"],"properties":{"artifactName":{"type":"string","enum":["chat-image-01","chat-image-02","chat-image-03","chat-image-04"]},"kind":{"type":"string","enum":["SCREENSHOT","DESIGN","ILLUSTRATION"]},"caption":{"type":"string","minLength":1,"maxLength":500},"sourceUrl":{"type":["string","null"]},"environment":{"type":"string","enum":["PRODUCTION","ACCEPTANCE","DESIGN"]}}}}}}"""
     }

@@ -35,6 +35,11 @@ toont de berichten en afbeeldingen van precies dat gesprek, met naam en rol van 
 **Epics** filtert op de oorspronkelijke aanvrager van het productverzoek. Meepraten over een
 epic maakt iemand niet de aanvrager. Epics zonder bronverzoek blijven zichtbaar bij alle personen,
 zonder een menselijke aanvrager te verzinnen. Ook afgeronde epics zijn zichtbaar.
+Aanvragen waarvoor nog geen epic is gepubliceerd staan apart onder **Epics in voorbereiding**.
+Daar geldt hetzelfde aanvragerfilter. Openen toont het oorspronkelijke gesprek en de actuele
+uitwerkingsstatus: wachtend, bezig, geblokkeerd, wachtend op antwoord of mislukt. Een bewaarde
+aanvraag is dus zichtbaar voordat de eerste epicversie bestaat; een blokkade wordt niet als
+lopende AI-uitwerking weergegeven.
 Vanuit een gekoppeld gesprek kan de factory owner de epic openen en inhoud, schermen,
 architectuur, beoordelingen en voortgang bekijken. Dit overzicht en de geopende details zijn
 alleen-lezen; meekijken verstuurt geen AI-bericht en wijzigt geen epic.
@@ -191,6 +196,23 @@ Flyway 35 voegt een index toe voor het gericht ophalen van berichtpagina’s.
 Een versieconflict vraagt verversen en opnieuw beoordelen. Een niet-onderbouwde impact vraagt
 onderzoek of verfijning; een ontbrekende rol wordt via Leden toegewezen. Factorybeheer houdt
 runs, planning, kwaliteit, Runtime-instellingen en herstelacties in de bestaande werkplek.
+
+### Vastgelopen epicuitwerking
+
+Productontwerp begrenst de volledige AI-prompt op 200.000 tekens. De actuele aanvraag,
+productopdracht, afspraken, besluiten, herzienbare epics en relevante vragen blijven volledig
+behouden. Oudere epics, stories, bugs en niet-relevante beantwoorde vragen krijgen samenvattingen
+binnen het resterende budget, met een expliciete vermelding van eventueel weggelaten historie.
+De leesaudit van agentgeheugen gaat niet mee naar AI en telt niet mee als gewijzigde ontwerpinput.
+Bronverwijzingen blijven in de procesregistratie bewaard.
+
+Een eerder geblokkeerde sessie gebruikt bij hervatting dezelfde contextbegrenzing, ook als de
+eerste poging nog geen snapshot of AI-taak kon opslaan. Tijdelijke blokkades worden automatisch
+na minimaal vijf minuten opnieuw geprobeerd; een tweede aanvraag kan deze wachttijd niet
+omzeilen. Een open procesvraag wordt pas hervat wanneer alle gekoppelde vragen zijn beantwoord.
+Als alleen de noodzakelijke context al te groot is, krijgt de sessie `DESIGN_CONTEXT_TOO_LARGE`.
+Die fout wordt niet automatisch herhaald: inspecteer de blokkeringsreden en verklein de
+noodzakelijke invoer voordat de sessie bewust opnieuw wordt gestart. De aanvraag blijft bewaard.
 
 ### Losse gesprekken verwijderen
 

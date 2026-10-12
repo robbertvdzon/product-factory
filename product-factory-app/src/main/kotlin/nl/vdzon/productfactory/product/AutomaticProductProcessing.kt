@@ -109,11 +109,12 @@ class AutomaticProductProcessing(
     /** Only local metadata is inspected. Git, AI and remote factory calls happen after a work decision. */
     private fun workKey(id: String, process: ScheduledProcess): String? {
         val sessionTable = table(process)
-        val open = jdbc.queryForList("SELECT id,status,current_ai_task_id,call_claimed_until FROM $sessionTable WHERE active_product_id=?", id).firstOrNull()
+        val open = jdbc.queryForList("SELECT id,status,current_ai_task_id,call_claimed_until,error_code FROM $sessionTable WHERE active_product_id=?", id).firstOrNull()
         if (open != null) {
             val session = open["id"].toString()
             if (process != ScheduledProcess.QUALITY_ASSURANCE) {
                 if (open["status"] == "BLOCKED") {
+                    if (process == ScheduledProcess.PRODUCT_DESIGN && open["error_code"] == "DESIGN_CONTEXT_TOO_LARGE") return null
                     val answers = jdbc.queryForList("SELECT question_id,version FROM pf_stakeholder_question WHERE process_session_id=? AND status='ANSWERED' ORDER BY question_id", session)
                     return if (answers.isEmpty()) null else hash(listOf(session, answers))
                 }

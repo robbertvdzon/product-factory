@@ -140,6 +140,58 @@ void main() {
   );
 
   testWidgets(
+    'factory owner ziet geblokkeerde epicaanvragen bij Mark zonder een bestaande epic te suggereren',
+    (tester) async {
+      final fixture = ActivityFixture(includePreparations: true);
+      await fixture.mount(tester);
+      await selectMark(tester);
+      await tester.tap(find.byKey(const ValueKey('activity-epics')));
+      await tester.pumpAndSettle();
+      expect(find.text('Epics in voorbereiding'), findsOneWidget);
+      expect(find.text('Nieuwe aanvraag van Mark'), findsOneWidget);
+      expect(find.text('Nieuwe aanvraag van Anna'), findsNothing);
+      expect(find.text('Ingetrokken aanvraag'), findsNothing);
+      expect(find.textContaining('Uitwerking geblokkeerd'), findsOneWidget);
+      await tester.ensureVisible(find.text('Nieuwe aanvraag van Mark'));
+      await tester.tap(find.text('Nieuwe aanvraag van Mark'));
+      await tester.pumpAndSettle();
+      expect(find.text('Uitwerking geblokkeerd'), findsOneWidget);
+      expect(
+        find.textContaining('er is nog geen epic gemaakt'),
+        findsOneWidget,
+      );
+      expect(find.text('Epic wordt uitgewerkt'), findsNothing);
+      expect(find.text('Open gekoppelde epic'), findsNothing);
+      expect(find.byType(TextField), findsNothing);
+      expect(fixture.methods.toSet(), {'GET'});
+      fixture.preparationStatus = 'IN_PROGRESS';
+      await tester.pump(const Duration(seconds: 9));
+      await tester.pumpAndSettle();
+      expect(find.text('Uitwerking geblokkeerd'), findsNothing);
+      expect(find.text('Epic wordt uitgewerkt'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'product owner ziet waarom de eerste epicversie nog niet beschikbaar is',
+    (tester) async {
+      final fixture = ActivityFixture(includePreparations: true);
+      await fixture.mount(tester, role: 'PRODUCT_OWNER', section: 'home');
+      expect(find.textContaining('Uitwerking geblokkeerd'), findsWidgets);
+      await tester.ensureVisible(find.text('Nieuwe aanvraag van Mark'));
+      await tester.tap(find.text('Nieuwe aanvraag van Mark'));
+      await tester.pumpAndSettle();
+      expect(find.text('Uitwerking geblokkeerd'), findsOneWidget);
+      expect(find.textContaining('De aanvraag is bewaard'), findsOneWidget);
+      expect(find.text('Je epic wordt uitgewerkt'), findsNothing);
+      expect(find.text('Opnieuw proberen'), findsNothing);
+      expect(fixture.methods.toSet(), {'GET'});
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
     'product wisselen behoudt persoonfilter en negeert een late verversing',
     (tester) async {
       final fixture = ActivityFixture();
@@ -191,6 +243,9 @@ Future<void> selectMark(WidgetTester tester) async {
 }
 
 class ActivityFixture {
+  ActivityFixture({this.includePreparations = false});
+  final bool includePreparations;
+  String preparationStatus = 'BLOCKED';
   final paths = <String>[];
   final methods = <String>[];
   Completer<void>? delayNextConversations;
@@ -306,7 +361,29 @@ class ActivityFixture {
       'linkedEpicId': 'epic-anna',
       'status': 'ROUTED',
     },
+    if (includePreparations) ...[
+      preparation('pending-mark', 'mark', 'Nieuwe aanvraag van Mark'),
+      preparation('pending-anna', 'anna', 'Nieuwe aanvraag van Anna'),
+      {
+        ...preparation('cancelled-mark', 'mark', 'Ingetrokken aanvraag'),
+        'status': 'CANCELLED',
+      },
+    ],
   ];
+
+  Json preparation(String id, String user, String title) => {
+    'id': id,
+    'productId': 'pvdd',
+    'requestedBy': user,
+    'conversationId': id,
+    'status': 'ROUTING',
+    'preparationStatus': preparationStatus,
+    'content': {
+      'title': title,
+      'summary': 'De gewenste verbetering',
+      'type': 'EPIC_CANDIDATE',
+    },
+  };
 
   List<Json> get conversations => [
     chat('mark-question', 'Vraag van Mark', 'mark', status: 'BLOCKED'),
@@ -319,7 +396,19 @@ class ActivityFixture {
       epicId: 'epic-anna',
     ),
     chat('mark-epic', 'Eerste idee van Mark', 'mark', request: requests.first),
-    chat('anna-epic', 'Eerste idee van Anna', 'anna', request: requests.last),
+    chat('anna-epic', 'Eerste idee van Anna', 'anna', request: requests[1]),
+    if (includePreparations)
+      ...requests
+          .skip(2)
+          .map(
+            (r) => chat(
+              r['conversationId'] as String,
+              (r['content'] as Map)['title'] as String,
+              r['requestedBy'] as String,
+              status: 'PROPOSAL_READY',
+              request: r,
+            ),
+          ),
   ];
 
   Json chat(
