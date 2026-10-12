@@ -564,6 +564,156 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `gericht fixturegat bewaart vier opgeleverde stories als context en publiceert alleen het restant zonder UX`() {
+        val completed = publishCompletedEpicWithFourStories()
+        val gap = requestFixtureGap()
+        runtime.reset()
+        planning.runProcessSession(productId)
+        ai.dispatchPending()
+        val selectionContext = mapper.readTree(runtime.requests.single().prompt.substringAfter("\\n"))
+        assertThat(selectionContext.path("completedStories")).hasSize(4)
+        assertThat(selectionContext.path("epicPlanningScopes").single().path("mode").asText()).isEqualTo("TARGETED")
+        completed.forEach { story ->
+            val frozen = selectionContext.path("completedStories").single { it.path("id").asText() == story.id.value }
+            assertThat(frozen.path("title").asText()).isEqualTo(story.title)
+            assertThat(frozen.path("content").asText()).isEqualTo(story.content)
+            assertThat(frozen.path("acceptanceCriteria").map(JsonNode::asText)).containsExactlyElementsOf(story.acceptanceCriteria)
+            assertThat(frozen.path("deliveredCommitSha").asText()).isEqualTo(story.deliveredCommitSha)
+        }
+        completeDispatchedJob(selection())
+        planning.runProcessSession(productId)
+        runtime.reset()
+        ai.dispatchPending()
+        val planningContext = mapper.readTree(runtime.requests.single().prompt.substringAfter("Compacte bevroren planningscontext:\n"))
+        assertThat(planningContext.path("completedStories")).isEqualTo(selectionContext.path("completedStories"))
+        assertThat(planningContext.path("epicPlanningScopes").single().path("mode").asText()).isEqualTo("TARGETED")
+        val activeSession = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single { it.status == ProcessSessionStatus.WAITING_FOR_AI }
+        val inputs = mapper.readTree(jdbc.queryForObject("SELECT inputs_json FROM pf_planning_process_session WHERE id=?", String::class.java, activeSession.id.value))
+        completed.forEach { story ->
+            assertThat(inputs.any { it.path("type").asText() == "STORY" && it.path("id").asText() == story.id.value && it.path("version").asLong() == story.version }).isTrue()
+        }
+        val fixturePlan = fixtureGapPlan(gap)
+        (fixturePlan.path("gapResolutions")[0] as ObjectNode).put("reason", "Alleen de ontbrekende fixture is nodig. ".repeat(60).take(2000))
+        completeDispatchedJob(fixturePlan)
+        planning.runProcessSession(productId)
+
+        val stories = planningQueries.findStories(StoryFilter(productId))
+        assertThat(stories.filter { it.status == StoryStatus.DONE }).containsExactlyInAnyOrderElementsOf(completed)
+        assertThat(stories.filter { it.status == StoryStatus.TODO }.map { it.title }).containsExactly("Fixture voor lege vergaderagenda")
+        assertThat(stories.single { it.status == StoryStatus.TODO }.uxDesign).isNull()
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().status).isEqualTo(WorkItemStatus.DONE)
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().resultSummary).contains("Gericht dekkingsgat", "Nieuwe stories")
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().resultSummary!!.length).isLessThanOrEqualTo(2000)
+    }
+
+    @Test
+    fun `reeds gedekt gapwerk eindigt zonder nieuwe stories met expliciete bronnen en nieuwe verificatie`() {
+        val completed = publishCompletedEpicWithFourStories()
+        val gap = requestFixtureGap()
+        startGapPlanning()
+        completeDispatchedJob(coveredGapPlan(gap, completed.first().id))
+        planning.runProcessSession(productId)
+
+        assertThat(planningQueries.findStories(StoryFilter(productId))).containsExactlyInAnyOrderElementsOf(completed)
+        val work = planningQueries.findPlanningWorkItems(productId).single()
+        assertThat(work.status).isEqualTo(WorkItemStatus.DONE)
+        assertThat(work.resultSummary).contains(completed.first().id.value, "Bestaande dekking")
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId))).allSatisfy { assertThat(it.status).isEqualTo(ProcessSessionStatus.SUCCEEDED) }
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.VERIFYING)
+        assertThat(pendingVerifyEpicEffects()).containsExactly(epic.id.value)
+    }
+
+    @Test
+    fun `gericht gapwerk weigert extra volledige epicstories buiten de opgegeven gapresolutie`() {
+        val completed = publishCompletedEpicWithFourStories()
+        val gap = requestFixtureGap()
+        startGapPlanning()
+        val result = fixtureGapPlan(gap)
+        (result.path("stories") as com.fasterxml.jackson.databind.node.ArrayNode).add(plan().path("stories")[0])
+        (result.path("todoOrder") as com.fasterxml.jackson.databind.node.ArrayNode).add("overview")
+        completeDispatchedJob(result)
+        planning.runProcessSession(productId)
+
+        assertThat(planningQueries.findStories(StoryFilter(productId))).containsExactlyInAnyOrderElementsOf(completed)
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().status).isEqualTo(WorkItemStatus.BLOCKED)
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single { it.status == ProcessSessionStatus.BLOCKED }.blockedReason)
+            .contains("buiten het expliciet afgehandelde dekkingsgat")
+    }
+
+    @Test
+    fun `gapwerk mag niet met een leeg plan zonder bestaande dekking verdwijnen`() {
+        val completed = publishCompletedEpicWithFourStories()
+        val gap = requestFixtureGap()
+        startGapPlanning()
+        val result = coveredGapPlan(gap, completed.first().id)
+        (result.path("gapResolutions")[0] as ObjectNode).putArray("coveredByStoryIds")
+        completeDispatchedJob(result)
+        planning.runProcessSession(productId)
+
+        assertThat(planningQueries.findStories(StoryFilter(productId))).containsExactlyInAnyOrderElementsOf(completed)
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().status).isEqualTo(WorkItemStatus.BLOCKED)
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single { it.status == ProcessSessionStatus.BLOCKED }.blockedReason)
+            .contains("zonder nieuwe story of bestaande dekking")
+    }
+
+    @Test
+    fun `no change gapresolutie weigert dekking die na de momentopname is geannuleerd`() {
+        val completed = publishCompletedEpicWithFourStories()
+        val gap = requestFixtureGap()
+        startGapPlanning()
+        completeDispatchedJob(coveredGapPlan(gap, completed.first().id))
+        jdbc.update("UPDATE pf_story SET status='CANCELLED' WHERE id=?", completed.first().id.value)
+        planning.runProcessSession(productId)
+
+        assertThat(planningQueries.getBacklog(productId)).isEmpty()
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().status).isEqualTo(WorkItemStatus.BLOCKED)
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single { it.status == ProcessSessionStatus.BLOCKED }.errorCode)
+            .isEqualTo("PLANNING_VERSION_CONFLICT")
+        assertThat(pendingVerifyEpicEffects()).isEmpty()
+    }
+
+    @Test
+    fun `oude gerichte context zonder DONE bronmateriaal blokkeert zonder automatische herplanning`() {
+        val completed = publishCompletedEpicWithFourStories()
+        val gap = requestFixtureGap()
+        startGapPlanning()
+        val before = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single { it.status == ProcessSessionStatus.WAITING_FOR_AI }
+        val snapshot = mapper.readTree(jdbc.queryForObject("SELECT snapshot_json FROM pf_planning_process_session WHERE id=?", String::class.java, before.id.value)) as ObjectNode
+        snapshot.remove("completedStories"); snapshot.remove("epicPlanningScopes")
+        jdbc.update("UPDATE pf_planning_process_session SET snapshot_json=? WHERE id=?", mapper.writeValueAsString(snapshot), before.id.value)
+        jdbc.update("UPDATE pf_ai_task SET prompt_template_version=6 WHERE id=?", before.aiTaskIds.last().value)
+        completeDispatchedJob(fixtureGapPlan(gap))
+        planning.runProcessSession(productId)
+        repeat(3) { planningOrchestrator.resumeReady() }
+
+        val blocked = planningQueries.getProcessSession(before.id)
+        assertThat(blocked.status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(blocked.errorCode).isEqualTo("PLANNING_VERSION_CONFLICT")
+        assertThat(blocked.blockedReason).contains("nieuwe planningssessie")
+        assertThat(blocked.aiTaskIds).containsExactlyElementsOf(before.aiTaskIds)
+        assertThat(planningQueries.findStories(StoryFilter(productId))).containsExactlyInAnyOrderElementsOf(completed)
+    }
+
+    @Test
+    fun `draftkey mag bestaande TODO story niet aliasen of haar volgnummer wijzigen`() {
+        publishPlan()
+        val existing = planningQueries.getBacklog(productId)
+        epic = designQueries.getEpic(epic.id)
+        planning.requestEpicReprioritization(RequestEpicReprioritizationCommand(
+            productId, epic.id, "Behoud de bestaande stories en bepaal hun volgorde.", 50, STAKEHOLDER, "alias-existing-story",
+        ))
+        startGapPlanning()
+        val result = plan()
+        (result.path("stories")[0] as ObjectNode).put("draftKey", existing.first().id.value)
+        completeDispatchedJob(result)
+        planning.runProcessSession(productId)
+
+        assertThat(planningQueries.getBacklog(productId)).containsExactlyElementsOf(existing)
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single { it.status == ProcessSessionStatus.BLOCKED }.blockedReason)
+            .contains("bestaande story-id")
+    }
+
+    @Test
     fun `terminale plannertaak herstelt legacy blokkade en probeert begrensd automatisch opnieuw`() {
         planning.runProcessSession(productId)
         completeOnlyJob(selection())
@@ -651,14 +801,68 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
             .isEqualTo(PlanningWorkItemType.REPLAN_CANCELLED_DEPENDENCY)
     }
 
-    private fun publishPlan() {
+    private fun publishPlan(result: ObjectNode = plan()) {
         planning.runProcessSession(productId)
         completeOnlyJob(selection())
         planning.runProcessSession(productId)
         runtime.reset()
         ai.dispatchPending()
-        completeDispatchedJob(plan())
+        completeDispatchedJob(result)
         planning.runProcessSession(productId)
+    }
+
+    private fun publishCompletedEpicWithFourStories(): List<StoryDetails> {
+        val result = plan()
+        val stories = result.path("stories") as com.fasterxml.jackson.databind.node.ArrayNode
+        listOf("workflow" to "Vergaderacties uitvoeren", "privacy" to "Vergadergegevens afschermen").forEach { (key, title) ->
+            stories.add((stories[0] as ObjectNode).deepCopy().apply {
+                put("draftKey", key); put("title", title); putNull("uxDesign"); putArray("uxArtifactNames")
+            })
+            (result.path("todoOrder") as com.fasterxml.jackson.databind.node.ArrayNode).add(key)
+        }
+        publishPlan(result)
+        jdbc.update("UPDATE pf_story SET status='DONE',delivered_commit_sha=? WHERE product_id=?", "d".repeat(40), productId.value)
+        epic = designQueries.getEpic(epic.id)
+        return planningQueries.findStories(StoryFilter(productId))
+    }
+
+    private fun requestFixtureGap() = planning.requestEpicGapPlanning(RequestEpicGapPlanningCommand(
+        productId, epic.id, epic.version, VerificationId(UUID.randomUUID().toString()),
+        listOf("Een vaste acceptatiefixture voor de lege vergaderagenda ontbreekt; het productgedrag is al opgeleverd."),
+        PROCESS, "fixture-gap-${productId.value}",
+    ))
+
+    private fun startGapPlanning() {
+        runtime.reset()
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planning.runProcessSession(productId)
+        runtime.reset()
+        ai.dispatchPending()
+    }
+
+    private fun fixtureGapPlan(gap: PlanningWorkItemId) = plan().apply {
+        val fixture = (path("stories")[0] as ObjectNode).deepCopy().apply {
+            put("draftKey", "fixture"); put("title", "Fixture voor lege vergaderagenda")
+            put("summary", "Acceptatie kan het reeds opgeleverde lege-agendagedrag herhaalbaar controleren.")
+            put("content", "Voeg uitsluitend een vaste lege vergaderagenda aan de acceptatie-fixtures toe. Behoud de bestaande schermen, autorisatie en gebruikersflow; deze zijn al opgeleverd.")
+            putArray("acceptanceCriteria").add("De acceptatietest kan de lege vergaderagenda uit een vaste fixture laden.")
+            putNull("uxDesign"); putArray("uxArtifactNames"); putArray("coveredAcceptanceCriteriaIndexes")
+        }
+        putArray("stories").add(fixture)
+        putArray("todoOrder").add("fixture")
+        putArray("gapResolutions").addObject().apply {
+            put("workItemId", gap.value); putArray("newStoryKeys").add("fixture"); putArray("coveredByStoryIds")
+            put("reason", "Alle productfunctionaliteit is opgeleverd; alleen de vaste acceptatiefixture ontbreekt nog.")
+        }
+    }
+
+    private fun coveredGapPlan(gap: PlanningWorkItemId, story: StoryId) = plan().apply {
+        putArray("stories"); putArray("todoOrder")
+        putArray("gapResolutions").addObject().apply {
+            put("workItemId", gap.value); putArray("newStoryKeys"); putArray("coveredByStoryIds").add(story.value)
+            put("reason", "De bestaande opgeleverde story bevat deze fixture al; de bevroren oplevercommit dekt het gemelde gat.")
+        }
     }
 
     private fun publishEpic(): EpicDetails {
@@ -751,6 +955,7 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
         }
         putArray("todoOrder").add("overview").add("evidence")
         putArray("refinementRequests")
+        putArray("gapResolutions")
         putNull("stakeholderQuestion")
         putArray("memoryChanges")
     }

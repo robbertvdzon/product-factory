@@ -201,6 +201,7 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
     }
 
     private fun plan(epic: EpicDetails) = mapper.createObjectNode().apply {
+        putArray("gapResolutions")
         put("outcome", "PUBLISH_PLAN")
         putArray("stories").addObject().apply {
             put("draftKey", "appointments-overview")
@@ -236,6 +237,8 @@ class MvpHappyFlowIntegrationTest @Autowired constructor(
                 putArray("artifacts")
             })
             putArray("missingCoverage")
+            putArray("implementationGaps")
+            putArray("testBlockers")
             putArray("bugs")
             put("explanation", "De bedoelde gebruikerswaarde is volledig en reproduceerbaar aangetoond.")
             put("signalOutcome", "Geen afwijking gevonden")

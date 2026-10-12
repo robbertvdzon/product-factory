@@ -18,7 +18,8 @@ uitgebreide variant op, nooit beide.
   inputmomentopname beoordeeld.
 - Normaal kiest een run één nieuwe `AVAILABLE` hoofdepic; dit is geen technische limiet. Dezelfde
   agent mag meerdere urgente epics uit dezelfde momentopname kiezen wanneer dat nodig is.
-- De agent levert de complete storyset voor een gekozen epic, niet alleen de eerstvolgende stories.
+- Voor een nieuwe epic levert de agent de complete storyset. Bij een actieve epic met gericht
+  herstelwerk plant zij uitsluitend het expliciete restant en behoudt zij bestaande dekking.
 - De agent maakt ook de volledige productbrede volgorde van alle `TODO`-stories.
 - Gewone applicatiecode claimt, valideert, schrijft en roept modulecommands aan.
 - Er is geen extra intern planningsgeheugen en er zijn geen gespecialiseerde agents of duurzame
@@ -39,7 +40,8 @@ De Planner:
 - vergelijkt beschikbare epics met productdoel, besluiten en bestaand werk;
 - kiest zo nodig één of meer epics om te claimen;
 - verwerkt bugfix-, dekkingsgat-, prioriteits- en herplanwerk;
-- verdeelt iedere gekozen epic volledig in kleine, zelfstandig uitvoerbare stories;
+- verdeelt iedere nieuw gekozen epic volledig in kleine, zelfstandig uitvoerbare stories en voegt
+  bij een actieve epic alleen gericht resterend werk toe;
 - neemt het relevante bevroren UX-ontwerp zelfstandig op in iedere story waarop UX van toepassing
   is;
 - controleert dat de stories samen de volledige oplossing en alle acceptatiecriteria afdekken;
@@ -114,13 +116,21 @@ atomair publiceren en workitems afronden
 Applicatiecode claimt of hervat de run voor het opgegeven product. Een bestaande processessie en
 haar reeds geclaimde `IN_PLANNING` epic gaan altijd voor nieuw werk. Alleen zonder onafgeronde
 sessie claimt zij de op dat moment `PENDING` workitems van dit product en leest zij één vaste
-momentopname van beschikbare epics, bestaande open stories, productopdracht, geldige besluiten,
+momentopname van beschikbare epics, bestaande open stories, relevante opgeleverde stories,
+productopdracht, geldige besluiten,
 exacte bug- en verificatiebronnen en het actuele geheugen van `PLANNER_MVP`.
 
 Git, acceptatie en veilige productie-informatie worden alleen toegevoegd als zij nodig zijn om
 bestaande routes, schermen of technische grenzen te begrijpen. Alle gebruikte bron- en
 geheugenversies en de bevroren commit-SHA komen op de processessie. De worker checkt die SHA zelf
 uit in de tijdelijke Dockeromgeving.
+
+Relevante `DONE`-stories worden met titel, inhoud, acceptatiecriteria, storyversie en oplevercommit
+bevroren. Zowel de selectiestap als de planningsstap ontvangt diezelfde inhoud als `completedStories`;
+de gebruikte storyversies staan in de bronverwijzingen van de sessie. `epicPlanningScopes` markeert
+per epic `INITIAL` of `TARGETED`. Een gerichte planningssessie uit een oudere versie die deze context
+mist, blokkeert expliciet en vereist een nieuwe sessie; een promptupgrade maakt ontbrekend
+bronmateriaal niet alsnog betrouwbaar.
 
 ### Stap 2 — werk beoordelen en epic claimen
 
@@ -143,6 +153,19 @@ epicversie en maakt vervolgens:
 - de volledige storyset voor de gekozen epic;
 - gerichte bugfix- en dekkingsgatstories;
 - de definitieve volgorde van alle bestaande en nieuwe `TODO`-stories.
+
+Bij `TARGETED` worden al opgeleverde of geplande functies niet opnieuw gebouwd. Ieder geclaimd
+`PLAN_EPIC_GAP` krijgt exact één `gapResolutions`-resultaat met `workItemId`, `newStoryKeys`,
+`coveredByStoryIds` en een inhoudelijke `reason`. Nieuwe gerichte stories verwijzen zo naar het
+daadwerkelijk geclaimde gat. Wanneer bestaande stories het gat al dekken, mag `stories` leeg blijven,
+maar zijn expliciete bestaande dekkingsbronnen en een onderbouwing verplicht. Het workitem bewaart
+de uitkomst en de AI-uitvoer bewaart de volledige afweging. Zodra alle epicstories klaar zijn, volgt
+via het normale idempotente effect opnieuw epicverificatie.
+
+Volledige epicdekking en verplichte aanwezigheid van het epic-UX gelden voor `INITIAL`. Een gericht
+backendrestant hoeft niet opnieuw de bestaande schermen te beschrijven; `uxDesign=null`, lege
+`uxArtifactNames` en lege `coveredAcceptanceCriteriaIndexes` zijn daarvoor toegestaan. Nieuwe
+visuele stories blijven hun toepasselijke ontwerp en bestaande artifactnamen expliciet koppelen.
 
 Bij een `REPRIORITIZE_EPIC` kan het resultaat uitsluitend een nieuwe volgorde zijn als er al complete
 stories bestaan. Een `IN_PROGRESS` story wordt niet herschikt of onderbroken.
@@ -169,6 +192,12 @@ Gewone code controleert minimaal:
 - afwezigheid van een annuleringsmarker voor iedere epic waarvoor nieuwe stories worden
   gepubliceerd;
 - dat alleen geclaimde workitems als afgehandeld worden gemarkeerd.
+- dat gapresoluties alle geclaimde dekkingsgaten afhandelen, nieuwe gerichte stories uniek koppelen
+  en uitsluitend actuele, niet-geannuleerde dekkingsstories van dezelfde epic gebruiken;
+- dat een nieuwe `draftKey` nooit een bestaande story-id hergebruikt.
+
+Deze verwijzingscontroles leggen de scope vast. Zij bewijzen geen semantische gelijkheid van vrije
+storytekst; de Planner vergelijkt daarvoor de expliciete opdracht met het bevroren bestaande werk.
 
 Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
 AI-uitvoering. Eindigt die taak definitief als `FAILED`, dan maakt de planningscoordinator binnen

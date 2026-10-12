@@ -172,6 +172,26 @@ De Tester classificeert ontbrekend of onjuist gedrag als:
 
 De agent schrijft nog niets naar de publieke entiteiten en roept geen modulecommands aan.
 
+Het testercontract vanaf promptversie 3 houdt implementatie en testbewijs gescheiden:
+
+- `testBlockers` benoemt onvoldoende bewijs/testdata, ontbrekende toegang, ontbrekende browser of
+  andere testcapaciteit, of een ongeschikte testomgeving. Een acceptatiemock met maar één vergadering
+  bewijst geen defect in gedrag voor meerdere vergaderingen. Ook het ontbreken van een browser is
+  geen productdefect. Iedere testblokkade maakt de verificatie retrybaar `BLOCKED`; zij publiceert
+  geen bugs, ontwikkelstories of kwaliteitssnapshot en laat een epic `VERIFYING`.
+- `implementationGaps` bevat alleen bewezen ontbrekend gedrag voor een letterlijk overgenomen
+  bevroren epiccriterium, met observatie, bewijs, de IDs van alle beoordeelde `DONE`-stories en een
+  uitleg waarom die stories dit gedrag niet afdekken. Gewone code controleert criterium en IDs en
+  weigert criteria die al letterlijk door een opgeleverde story zijn afgedekt. De planner vergelijkt
+  ook anders geformuleerde dekking opnieuw met de opgeleverde stories.
+- `missingCoverage` is rapportage van resterende of ongeteste dekking en triggert geen plancommand.
+  Een negatieve uitslag zonder bewezen implementatiegat of reproduceerbare bug wordt `BLOCKED`.
+  Een negatieve bugfixhertest kan met bewijs dezelfde open bug behouden zonder een nieuwe bug.
+
+Nog lopende taken met een oudere prompt kunnen hun positieve verificatie publiceren. Negatieve
+oude resultaten worden veilig `BLOCKED` en via hetzelfde workitem opnieuw getest met het nieuwe
+contract; oude ongetypeerde dekkingsgaten maken daardoor na de uitrol geen ontwikkelwerk meer.
+
 ### Stap 5 — deterministisch valideren en publiceren
 
 Gewone code controleert minimaal:

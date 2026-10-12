@@ -83,6 +83,11 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(properties.path("explanation").path("minLength").asInt()).isEqualTo(10)
         assertThat(properties.path("explanation").path("maxLength").asInt()).isEqualTo(2000)
         assertThat(properties.path("signalOutcome").path("maxLength").asInt()).isEqualTo(200)
+        assertThat(properties.path("testBlockers").path("items").path("properties").path("type").path("enum").map { it.asText() })
+            .containsExactlyInAnyOrder("INSUFFICIENT_TEST_EVIDENCE", "TEST_ACCESS_UNAVAILABLE", "TEST_CAPABILITY_UNAVAILABLE", "TEST_ENVIRONMENT_UNAVAILABLE")
+        assertThat(properties.path("implementationGaps").path("items").path("required").map { it.asText() })
+            .contains("criterion", "observedBehaviour", "coverageExplanation", "reviewedStoryIds", "evidence")
+        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(3L)
         ai.deleteAllOwnedExecutionData()
         runtime.reset()
     }
@@ -139,22 +144,23 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `achterlopende deployment blokkeert niet meer maar de tester test gewoon wat er draait`() {
+    fun `tester onderzoekt actuele deployment maar een afwijzing zonder bewezen defect blijft geblokkeerd`() {
         revisions.revision = "b".repeat(40)
         val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "deployment-lagging"))
         completeSession(result(work, "NEEDS_WORK"))
 
         val item = qualityQueries.findQualityWorkItems(productId).single()
-        assertThat(item.status).isEqualTo(WorkItemStatus.DONE)
+        assertThat(item.status).isEqualTo(WorkItemStatus.BLOCKED)
         assertThat(item.attemptCount).isEqualTo(1)
         val verification = qualityQueries.findVerifications(VerificationFilter(productId)).single()
-        assertThat(verification.outcome).isEqualTo(VerificationOutcome.NEEDS_WORK)
+        assertThat(verification.outcome).isEqualTo(VerificationOutcome.BLOCKED)
         assertThat(verification.testedRevision).isEqualTo("b".repeat(40))
         assertThat(verification.requiredCommitSha).isEqualTo(SHA)
     }
 
     @Test
-    fun `epic needs work publiceert dekkingsbewijs en gericht planwerk`() {
+    fun `epic needs work publiceert bewezen nieuw criterium en afzonderlijke reproduceerbare bug`() {
+        jdbc.update("UPDATE pf_epic_version SET acceptance_criteria_json=? WHERE epic_id=? AND version=1", mapper.writeValueAsString(listOf(CRITERION, MISSING_CRITERION)), epicId.value)
         jdbc.update("UPDATE pf_epic SET status='VERIFYING' WHERE id=?", epicId.value)
         jdbc.update("UPDATE pf_epic_version SET status='VERIFYING' WHERE epic_id=? AND version=1", epicId.value)
         val epic = designQueries.getEpic(epicId)
@@ -162,7 +168,8 @@ class QualityMvpIntegrationTest @Autowired constructor(
         completeSession(result(work, "NEEDS_WORK").apply {
             (path("results")[0] as ObjectNode).apply {
                 put("explanation", "De kernroute mist aantoonbaar het tweede afgesproken resultaat.")
-                putArray("missingCoverage").add(CRITERION)
+                putArray("missingCoverage").add(MISSING_CRITERION)
+                putArray("implementationGaps").add(implementationGap(MISSING_CRITERION))
                 putArray("bugs").addObject().apply {
                     put("title", "Epicroute verliest bewijs")
                     put("summary", "De complete epicroute toont het opgeslagen bewijs niet betrouwbaar.")
@@ -176,7 +183,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
             }
         })
 
-        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().missingCoverage).containsExactly(CRITERION)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().missingCoverage).containsExactly(MISSING_CRITERION)
         assertThat(qualityQueries.findBugs(BugFilter(productId))).hasSize(1)
         assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.ACTIVE)
         assertThat(planningQueries.findPlanningWorkItems(productId).map { it.type })
@@ -200,6 +207,179 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.COMPLETED)
         assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.DONE)
         assertThat(planningQueries.findPlanningWorkItems(productId)).isEmpty()
+    }
+
+    @Test
+    fun `een mockvergadering en ontbrekende browser blokkeren verificatie zonder nieuwe stories of bugs`() {
+        val work = epicVerification("missing-test-evidence")
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).apply {
+                putArray("missingCoverage").add("Meerdere vergaderingen binnen tien dagen zijn niet live getest.")
+                putArray("testBlockers").apply {
+                    addObject().put("type", "INSUFFICIENT_TEST_EVIDENCE").put("reason", "De acceptatiemock bevat slechts één vergadering; het scenario met drie vergaderingen kan niet worden uitgevoerd.")
+                    addObject().put("type", "TEST_CAPABILITY_UNAVAILABLE").put("reason", "Er is geen browser beschikbaar om de agenda en de uitkomsten per vergadering visueel te controleren.")
+                }
+                // Zelfs een onjuist meegestuurde bug of gap mag de testblokkade niet omzetten in ontwikkeling.
+                putArray("implementationGaps").add(implementationGap(CRITERION))
+                putArray("bugs").addObject().put("title", "Ongeteste schermen")
+            }
+        })
+
+        assertBlockedWithoutDevelopment(work)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().blockedReason)
+            .contains("slechts één vergadering", "geen browser")
+        assertThat(qualityQueries.getCurrentQuality(productId)).isNull()
+        quality.retryQualityWorkItem(work)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.PENDING)
+    }
+
+    @Test
+    fun `vrije ontbrekende dekking zonder bewezen implementatiegat plant niets`() {
+        val work = epicVerification("unclassified-coverage")
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).putArray("missingCoverage").add("Het scenario is nog niet bewezen.")
+        })
+        assertBlockedWithoutDevelopment(work)
+    }
+
+    @Test
+    fun `meerdere lange testblokkades blijven een retrybare verificatie met begrensde reden`() {
+        val work = epicVerification("long-test-blockers")
+        val firstReason = "Testdata ontbreekt: " + "a".repeat(950)
+        val secondReason = "Browser ontbreekt: " + "b".repeat(950)
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).putArray("testBlockers").apply {
+                addObject().put("type", "INSUFFICIENT_TEST_EVIDENCE").put("reason", firstReason)
+                addObject().put("type", "TEST_CAPABILITY_UNAVAILABLE").put("reason", secondReason)
+            }
+        })
+
+        assertBlockedWithoutDevelopment(work)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().blockedReason).hasSize(1000)
+        val stored = jdbc.queryForObject("SELECT response_json FROM pf_ai_task_result WHERE task_id IN (SELECT id FROM pf_ai_task WHERE product_id=?)", String::class.java, productId.value)
+        assertThat(stored).contains(firstReason, secondReason)
+    }
+
+    @Test
+    fun `lang geldig implementatiebewijs blijft volledig bewaard met begrensde plansamenvatting`() {
+        val anotherCriterion = "De Stakeholder archiveert het bewijs vanuit het overzicht."
+        jdbc.update("UPDATE pf_epic_version SET acceptance_criteria_json=? WHERE epic_id=? AND version=1", mapper.writeValueAsString(listOf(CRITERION, MISSING_CRITERION, anotherCriterion)), epicId.value)
+        val work = epicVerification("long-gap-evidence")
+        val proofText = "Observeerbaar bewijs: " + "c".repeat(9500)
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).putArray("implementationGaps").apply {
+                listOf(MISSING_CRITERION, anotherCriterion).forEach { criterion ->
+                    add(implementationGap(criterion).apply {
+                        put("observedBehaviour", "Waargenomen: " + "a".repeat(1900))
+                        put("coverageExplanation", "Beoordeling van DONE-stories: " + "b".repeat(1900))
+                        set<ObjectNode>("evidence", proof(proofText))
+                    })
+                }
+            }
+        })
+
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.DONE)
+        val planned = planningQueries.findPlanningWorkItems(productId).single()
+        assertThat(planned.type).isEqualTo(PlanningWorkItemType.PLAN_EPIC_GAP)
+        assertThat(planned.explanation.length).isBetween(9000, 10_000)
+        assertThat(planned.explanation).contains("Epiccriterium[1]", "Epiccriterium[2]", MISSING_CRITERION, anotherCriterion)
+        val stored = jdbc.queryForObject("SELECT response_json FROM pf_ai_task_result WHERE task_id IN (SELECT id FROM pf_ai_task WHERE product_id=?)", String::class.java, productId.value)
+        assertThat(stored).contains(proofText)
+    }
+
+    @Test
+    fun `bestaand DONE criterium kan niet opnieuw als implementatiegat worden gepland`() {
+        val work = epicVerification("already-delivered-gap")
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).putArray("implementationGaps").add(implementationGap(CRITERION))
+        })
+        assertBlockedWithoutDevelopment(work)
+    }
+
+    @Test
+    fun `implementatiegat buiten het bevroren epiccriterium wordt afgewezen`() {
+        val work = epicVerification("out-of-scope-gap")
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).putArray("implementationGaps").add(implementationGap(MISSING_CRITERION))
+        })
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.FAILED)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
+        assertThat(planningQueries.findPlanningWorkItems(productId)).isEmpty()
+    }
+
+    @Test
+    fun `implementatiegat zonder review van alle DONE stories wordt afgewezen`() {
+        jdbc.update("UPDATE pf_epic_version SET acceptance_criteria_json=? WHERE epic_id=? AND version=1", mapper.writeValueAsString(listOf(CRITERION, MISSING_CRITERION)), epicId.value)
+        val work = epicVerification("incomplete-done-review")
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).putArray("implementationGaps").add(implementationGap(MISSING_CRITERION).apply {
+                putArray("reviewedStoryIds")
+            })
+        })
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.FAILED)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
+        assertThat(planningQueries.findPlanningWorkItems(productId)).isEmpty()
+    }
+
+    @Test
+    fun `lopende oude NEEDS_WORK wordt opnieuw getest zonder oude dekkingsgaten te plannen`() {
+        val work = epicVerification("legacy-gap")
+        quality.runProcessSession(productId)
+        jdbc.update("UPDATE pf_ai_task SET prompt_template_version=2 WHERE product_id=?", productId.value)
+        ai.dispatchPending()
+        val job = runtime.onlyJob()
+        runtime.results[job.id] = result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).apply {
+                remove("implementationGaps")
+                remove("testBlockers")
+                putArray("missingCoverage").add("Meerdere vergaderingen en screenshots zijn niet verifieerbaar.")
+            }
+        }
+        runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
+        ai.reconcileActive()
+        quality.runProcessSession(productId)
+
+        assertBlockedWithoutDevelopment(work)
+    }
+
+    @Test
+    fun `lopende oude PASSED kan nog steeds worden gepubliceerd`() {
+        val work = epicVerification("legacy-passed")
+        quality.runProcessSession(productId)
+        jdbc.update("UPDATE pf_ai_task SET prompt_template_version=2 WHERE product_id=?", productId.value)
+        ai.dispatchPending()
+        val job = runtime.onlyJob()
+        runtime.results[job.id] = result(work, "PASSED").apply {
+            (path("results")[0] as ObjectNode).apply {
+                remove("implementationGaps")
+                remove("testBlockers")
+            }
+        }
+        runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
+        ai.reconcileActive()
+        quality.runProcessSession(productId)
+
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.COMPLETED)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().outcome).isEqualTo(VerificationOutcome.PASSED)
+    }
+
+    private fun epicVerification(key: String): QualityWorkItemId {
+        jdbc.update("UPDATE pf_epic SET status='VERIFYING' WHERE id=?", epicId.value)
+        jdbc.update("UPDATE pf_epic_version SET status='VERIFYING' WHERE epic_id=? AND version=1", epicId.value)
+        val epic = designQueries.getEpic(epicId)
+        return quality.requestEpicVerification(RequestEpicVerificationCommand(productId, epic.id, epic.version, "acceptance", 80, key))
+    }
+
+    private fun assertBlockedWithoutDevelopment(work: QualityWorkItemId) {
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.VERIFYING)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().outcome).isEqualTo(VerificationOutcome.BLOCKED)
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(item.id).isEqualTo(work)
+        assertThat(item.status).isEqualTo(WorkItemStatus.BLOCKED)
+        assertThat(item.retryable).isTrue()
+        assertThat(planningQueries.findPlanningWorkItems(productId)).isEmpty()
+        assertThat(qualityQueries.findBugs(BugFilter(productId))).isEmpty()
+        assertThat(planningQueries.findStories(StoryFilter(productId))).hasSize(1)
     }
 
     @Test
@@ -355,11 +535,21 @@ class QualityMvpIntegrationTest @Autowired constructor(
             putArray("checks").add("Hoofdroute vanaf een bekende schone uitgangssituatie uitgevoerd.")
             set<ObjectNode>("evidence", proof("Werkelijk gedrag is in de geconfigureerde acceptatieomgeving geobserveerd en herhaald."))
             putArray("missingCoverage")
+            putArray("implementationGaps")
+            putArray("testBlockers")
             putArray("bugs")
             put("explanation", "De waarneming is herleidbaar tot het exacte bevroren doel.")
             put("signalOutcome", "Geen probleem gevonden")
         }
         putArray("memoryChanges")
+    }
+
+    private fun implementationGap(criterion: String) = mapper.createObjectNode().apply {
+        put("criterion", criterion)
+        put("observedBehaviour", "De uitgevoerde exportactie ontbreekt aantoonbaar in de geconfigureerde acceptatieomgeving.")
+        put("coverageExplanation", "De opgeleverde story biedt alleen het bewijsdetail; geen van de opgeleverde stories bevat exportgedrag.")
+        putArray("reviewedStoryIds").add(storyId.value)
+        set<ObjectNode>("evidence", proof("De test van de concrete exportroute bevestigt dat de vereiste functionaliteit ontbreekt."))
     }
 
     private fun proof(description: String) = mapper.createObjectNode().apply {
@@ -417,6 +607,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
 
     companion object {
         private const val SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        private const val MISSING_CRITERION = "De Stakeholder exporteert het bewijs vanuit het overzicht."
         private const val CRITERION = "De Stakeholder opent aantoonbaar het opgeslagen bewijs vanuit het overzicht."
         private val STAKEHOLDER = ActorReference(ActorType.STAKEHOLDER, "stakeholder@example.com")
     }
