@@ -156,6 +156,19 @@ uit; `MOCKED` gebruikt server-side het voorbereide resultaat. Screenshots en log
 begrensde artifacts terug; secrets en repository- of applicatietekst worden nooit als instructies
 vertrouwd.
 
+Vanaf promptversie 4 krijgt de Tester een uitvoerbare browserstartcontrole: globale Node Playwright
+via `NODE_PATH`, Chromium via `PLAYWRIGHT_BROWSERS_PATH` (standaard `/ms-playwright`) en headless
+starten met `--no-sandbox`. Ontbrekende Python Playwright of een ontbrekend Chromium-commando in
+`PATH` geldt niet als bewijs dat de browser ontbreekt. De startcontrole opent alleen `about:blank`;
+vervolgens moet de Tester de echte schermhandelingen en vereiste viewports op acceptatie testen.
+Zonder vereist schermbewijs blijft de verificatie `BLOCKED`.
+
+De testlogincredential gaat uitsluitend naar het ingestelde relatieve loginendpoint op de
+acceptatie-origin, zonder redirects en zonder globale browserheaders met de credential. De echte
+PNG-screenshots gebruiken de gedeclareerde namen `/job/output/artifacts/evidence-01` tot en met
+`evidence-50`, zonder extensie en met expliciet PNG-formaat. Een mislukte browserstart of ontbrekende
+acceptatiefixture blijft een testblokkade; de Tester wijkt niet uit naar productie.
+
 ### Stap 4 — reproduceren en classificeren
 
 Bij een mogelijke productafwijking herhaalt de Tester de relevante stappen binnen dezelfde sessie
@@ -188,9 +201,10 @@ Het testercontract vanaf promptversie 3 houdt implementatie en testbewijs gesche
   Een negatieve uitslag zonder bewezen implementatiegat of reproduceerbare bug wordt `BLOCKED`.
   Een negatieve bugfixhertest kan met bewijs dezelfde open bug behouden zonder een nieuwe bug.
 
-Nog lopende taken met een oudere prompt kunnen hun positieve verificatie publiceren. Negatieve
-oude resultaten worden veilig `BLOCKED` en via hetzelfde workitem opnieuw getest met het nieuwe
-contract; oude ongetypeerde dekkingsgaten maken daardoor na de uitrol geen ontwikkelwerk meer.
+Nog lopende taken van vóór promptversie 3 kunnen hun positieve verificatie publiceren. Negatieve
+resultaten van die oude taken worden veilig `BLOCKED` en via hetzelfde workitem opnieuw getest
+met het gestructureerde contract; oude ongetypeerde dekkingsgaten maken daardoor na de uitrol geen
+ontwikkelwerk meer. Resultaten vanaf versie 3 blijven compatibel bij de browserinstructies van versie 4.
 
 ### Stap 5 — deterministisch valideren en publiceren
 

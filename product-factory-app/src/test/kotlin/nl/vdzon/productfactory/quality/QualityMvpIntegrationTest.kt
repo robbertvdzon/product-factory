@@ -87,7 +87,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
             .containsExactlyInAnyOrder("INSUFFICIENT_TEST_EVIDENCE", "TEST_ACCESS_UNAVAILABLE", "TEST_CAPABILITY_UNAVAILABLE", "TEST_ENVIRONMENT_UNAVAILABLE")
         assertThat(properties.path("implementationGaps").path("items").path("required").map { it.asText() })
             .contains("criterion", "observedBehaviour", "coverageExplanation", "reviewedStoryIds", "evidence")
-        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(3L)
+        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(4L)
         ai.deleteAllOwnedExecutionData()
         runtime.reset()
     }
@@ -97,6 +97,49 @@ class QualityMvpIntegrationTest @Autowired constructor(
         val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "production", 50, "production-request"))
         completeSession(result(work, "PASSED"))
         assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().environment).isEqualTo("acceptance")
+    }
+
+    @Test
+    fun `tester krijgt uitvoerbare Node browserinstructies en uitsluitend de acceptatieomgeving`() {
+        val configuration = productQueries.getTestableProduct(productId)
+        productCommands.configureTestableProduct(ConfigureTestableProductCommand(
+            productId, configuration.acceptance,
+            TestEnvironmentConfiguration(
+                "production", "https://production.example.test", listOf("/"), "/api/version", "$.commit",
+                accessBoundaries = listOf("Alleen begeleide handmatige toegang."),
+            ),
+            configuration.version, STAKEHOLDER, "browser-instructions-${productId.value}",
+        ))
+        quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "production", 50, "browser-instructions"))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+
+        assertThat(runtime.requests.single().prompt)
+            .contains("NODE_PATH=\"${'$'}(npm root -g)\"")
+            .contains("PLAYWRIGHT_BROWSERS_PATH=\"${'$'}{PLAYWRIGHT_BROWSERS_PATH:-/ms-playwright}\"")
+            .contains("const { chromium } = require('playwright');")
+            .contains("chromium.launch({ headless: true, args: ['--no-sandbox'] })")
+            .contains("await browser.close();")
+            .contains("Een geslaagde startcontrole of API-call bewijst geen werkend scherm")
+            .contains("browserContext.request.post met maxRedirects: 0")
+            .contains("gebruik geen globale extraHTTPHeaders met de credential")
+            .contains("path: '/job/output/artifacts/evidence-01', type: 'png'")
+            .contains("TEST_CAPABILITY_UNAVAILABLE")
+            .contains("https://acceptance.example.test")
+            .doesNotContain("https://production.example.test")
+        val artifacts = mapper.readTree(jdbc.queryForObject(
+            """SELECT s.output_artifacts_json FROM pf_ai_task_specification s
+               JOIN pf_ai_task t ON t.id=s.task_id WHERE t.product_id=?""",
+            String::class.java, productId.value,
+        ))
+        assertThat(artifacts.map { it.path("name").asText() })
+            .containsExactlyElementsOf((1..50).map { "evidence-${it.toString().padStart(2, '0')}" })
+        artifacts.forEach {
+            assertThat(it.path("mimeTypes").map { type -> type.asText() }).containsExactly("image/png")
+            assertThat(it.path("maxBytes").asLong()).isEqualTo(5L * 1024 * 1024)
+        }
+        ai.deleteAllOwnedExecutionData()
+        runtime.reset()
     }
 
     @Test
@@ -343,6 +386,20 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `lopende v3 NEEDS_WORK behoudt bewezen implementatiegaten na browserpromptupdate`() {
+        jdbc.update("UPDATE pf_epic_version SET acceptance_criteria_json=? WHERE epic_id=? AND version=1", mapper.writeValueAsString(listOf(CRITERION, MISSING_CRITERION)), epicId.value)
+        val work = epicVerification("v3-proven-gap")
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).putArray("implementationGaps").add(implementationGap(MISSING_CRITERION))
+        }, promptVersion = 3L)
+
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().outcome).isEqualTo(VerificationOutcome.NEEDS_WORK)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.DONE)
+        assertThat(planningQueries.findPlanningWorkItems(productId).map { it.type }).containsExactly(PlanningWorkItemType.PLAN_EPIC_GAP)
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.ACTIVE)
+    }
+
+    @Test
     fun `lopende oude PASSED kan nog steeds worden gepubliceerd`() {
         val work = epicVerification("legacy-passed")
         quality.runProcessSession(productId)
@@ -517,8 +574,9 @@ class QualityMvpIntegrationTest @Autowired constructor(
         )
     }
 
-    private fun completeSession(result: ObjectNode) {
+    private fun completeSession(result: ObjectNode, promptVersion: Long? = null) {
         quality.runProcessSession(productId)
+        promptVersion?.let { jdbc.update("UPDATE pf_ai_task SET prompt_template_version=? WHERE product_id=?", it, productId.value) }
         ai.dispatchPending()
         val job = runtime.onlyJob()
         runtime.results[job.id] = result
