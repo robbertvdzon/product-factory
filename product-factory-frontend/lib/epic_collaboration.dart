@@ -84,6 +84,7 @@ class EpicCollaborationPage extends StatefulWidget {
     this.onConversationSelected,
     this.csrfToken,
     this.onProductSelected,
+    this.onOpenQuestions,
     this.api,
     super.key,
   });
@@ -96,6 +97,7 @@ class EpicCollaborationPage extends StatefulWidget {
   final ValueChanged<String?>? onConversationSelected;
   final String? csrfToken;
   final ValueChanged<String>? onProductSelected;
+  final VoidCallback? onOpenQuestions;
   @override
   State<EpicCollaborationPage> createState() => _EpicCollaborationPageState();
 }
@@ -132,8 +134,47 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       ['COMPLETED', 'CANCELLED', 'WITHDRAWN'].contains(e['status']);
   bool pendingApproval(Json e) =>
       _strings(activity(e)['pendingApprovalRoles']).contains(actionRole);
+  bool waitingForMyAnswer(Json e) =>
+      activity(e)['state'] == 'WAITING_FOR_HUMAN' &&
+      activity(e)['action'] == 'ANSWER' &&
+      activity(e)['waitingRole'] == actionRole;
+  bool readyForReview(Json e) =>
+      !closed(e) &&
+      !['NEEDS_REFINEMENT', 'NEEDS_RESEARCH'].contains(e['status']) &&
+      _map(e['readiness'])['readyForPlanning'] != false;
+  bool questionBelongsToEpic(Json q, Json e) {
+    final epicId = _text(e['id']);
+    final requestId = _text(e['sourceProductRequestId']);
+    final storyIds = _text(epic?['id']) == epicId
+        ? _maps(progress['stories']).map((s) => _text(s['id'])).toSet()
+        : <String>{};
+    return _text(q['epicLinkId']) == epicId ||
+        (requestId.isNotEmpty && _text(q['productRequestId']) == requestId) ||
+        storyIds.contains(_text(q['storyLinkId'])) ||
+        _maps(q['linkedObjects']).any(
+          (source) =>
+              (source['type'] == 'EPIC' && _text(source['id']) == epicId) ||
+              (source['type'] == 'STORY' &&
+                  storyIds.contains(_text(source['id']))),
+        );
+  }
+
+  List<Json> openEpicQuestions(Json e) => questions
+      .where(
+        (q) =>
+            q['status'] == 'OPEN' &&
+            questionBelongsToEpic(q, e) &&
+            (activityOverview || q['requestedRole'] == actionRole),
+      )
+      .toList();
+
   String attentionLabel(Json e) {
-    if (pendingApproval(e)) return 'Jouw goedkeuring ontbreekt nog';
+    if (waitingForMyAnswer(e)) return 'Jouw antwoord is nodig';
+    if (pendingApproval(e)) {
+      return readyForReview(e)
+          ? 'Jouw goedkeuring ontbreekt nog'
+          : 'Goedkeuring volgt na de uitwerking';
+    }
     if (needsAttention(e)) return 'Jouw aandacht nodig';
     return 'Nu geen actie van jou nodig';
   }
@@ -1755,6 +1796,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   List<Widget> epicPanel() {
     final e = epic!;
     final review = _map(e['review']);
+    final actionableQuestions = openEpicQuestions(e);
     final tabs = [
       'Uitwerking',
       'Schermen',
@@ -1809,11 +1851,13 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                 ),
                 const SizedBox(height: 8),
                 text(_text(activity(e)['detail'])),
-                if (!activityOverview && pendingApproval(e))
+                if (!activityOverview &&
+                    pendingApproval(e) &&
+                    !waitingForMyAnswer(e))
                   text(
-                    _map(e['readiness'])['readyForPlanning'] == true
+                    readyForReview(e)
                         ? 'Jouw goedkeuring ontbreekt nog. Geef akkoord of feedback bij Goedkeuring.'
-                        : 'Jouw goedkeuring ontbreekt nog. Je kunt beoordelen zodra de uitwerking klaar is.',
+                        : 'Goedkeuring volgt zodra de uitwerking klaar is.',
                   ),
                 if (activity(e)['state'] == 'WAITING_FOR_HUMAN')
                   text(
@@ -1824,9 +1868,23 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                         ? 'De architect is aan zet.'
                         : 'De PO is aan zet.',
                   ),
+                if (!activityOverview &&
+                    waitingForMyAnswer(e) &&
+                    actionableQuestions.isEmpty)
+                  if (widget.onOpenQuestions != null)
+                    button('Open Vragen voor mij', widget.onOpenQuestions!)
+                  else
+                    text('Open Vragen voor mij in het menu om te antwoorden.'),
               ],
             ),
           ),
+        ),
+      if (actionableQuestions.isNotEmpty)
+        questionPanel(
+          entries: actionableQuestions,
+          title: activityOverview
+              ? 'Open vragen bij deze epic'
+              : 'Beantwoord de open vraag',
         ),
       if (activityOverview) text(epicRequester(e)),
       if (_text(_map(e['impact'])['changeSummary']).isNotEmpty)
@@ -2185,6 +2243,7 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
   Widget reviewPanel() {
     final r = _map(epic!['review']);
     final version = epic!['contentVersion'] ?? epic!['version'];
+    final canReview = readyForReview(epic!);
     Widget approval(
       String role,
       String name,
@@ -2230,6 +2289,12 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       text(
         'Inhoudsversie $version. Bij nieuwe inhoud worden de vereiste goedkeuringen opnieuw beoordeeld.',
       ),
+      if (!canReview && !closed(epic!))
+        text(
+          openEpicQuestions(epic!).isNotEmpty && !activityOverview
+              ? 'Beantwoord eerst de open vraag hierboven. Daarna werkt de Product Factory de epic verder uit. Goedkeuring is beschikbaar zodra de uitwerking klaar is.'
+              : 'Deze epic wordt nog uitgewerkt. Goedkeuring is beschikbaar zodra de uitwerking klaar is.',
+        ),
       approval(
         'PRODUCT_OWNER',
         'Product owner',
@@ -2242,12 +2307,11 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         required: r['architectRequired'] != false,
       ),
       if (!factory &&
-          !closed(epic!) &&
+          canReview &&
           _map(epic!['review'])[architect
                   ? 'architectApproved'
                   : 'productOwnerApproved'] !=
-              true &&
-          !['NEEDS_REFINEMENT', 'NEEDS_RESEARCH'].contains(epic!['status']))
+              true)
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -2267,13 +2331,13 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (r['productOwnerApproved'] != true)
+            if (canReview && r['productOwnerApproved'] != true)
               button(
                 'Functioneel akkoord als superuser',
                 () => review('APPROVE', asRole: 'PRODUCT_OWNER'),
                 primary: true,
               ),
-            if (r['architectApproved'] != true)
+            if (canReview && r['architectApproved'] != true)
               button(
                 'Architectuur akkoord als superuser',
                 () => review('APPROVE', asRole: 'ARCHITECT'),
@@ -2292,15 +2356,18 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
     ]);
   }
 
-  Widget questionPanel() {
-    final visible = questions
-        .where(
-          (q) =>
-              q['status'] == questionFilter &&
-              (epic == null || _text(q['epicLinkId']) == _text(epic!['id'])),
-        )
-        .toList();
-    return panel('Vragen voor mij', [
+  Widget questionPanel({List<Json>? entries, String? title}) {
+    final visible =
+        entries ??
+        questions
+            .where(
+              (q) =>
+                  q['status'] == questionFilter &&
+                  (activityOverview || q['requestedRole'] == actionRole) &&
+                  (epic == null || questionBelongsToEpic(q, epic!)),
+            )
+            .toList();
+    return panel(title ?? 'Vragen voor mij', [
       if (epic == null)
         Wrap(
           spacing: 8,
@@ -2353,7 +2420,9 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                 text(
                   '${activityOverview ? 'Antwoord' : 'Jouw antwoord'}: ${_text(q['answer'])}',
                 ),
-              if (!activityOverview && q['status'] == 'OPEN')
+              if (!activityOverview &&
+                  q['status'] == 'OPEN' &&
+                  q['requestedRole'] == actionRole)
                 button('Beantwoord vraag', () async {
                   final answer = await ask('Je antwoord', _text(q['question']));
                   if (answer == null) return;
@@ -2431,8 +2500,6 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
         'De epic is geverifieerd',
         'De controle van de geleverde versie is geslaagd. Beschikbaarheid in productie volgt de deployment van het product.',
       ),
-    if (openQuestions.any((q) => _text(q['epicLinkId']) == _text(epic!['id'])))
-      questionPanel(),
     Text('Stories', style: Theme.of(context).textTheme.titleMedium),
     ..._maps(progress['stories']).map(
       (story) => ExpansionTile(

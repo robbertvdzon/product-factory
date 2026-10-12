@@ -256,23 +256,30 @@ class ProductApplicationService(
         requireProduct(command.productId)
         val id = StakeholderQuestionId(UUID.randomUUID().toString())
         val now = clock.instant()
-        val respondent = command.requestedRespondentUserId
+        val respondents = command.requestedRespondentUserId?.let { listOf(it) }
             ?: command.productRequestId?.let { requestId -> jdbc.query(
-                "SELECT requested_by FROM pf_product_request WHERE request_id=? AND product_id=?",
-                { rs, _ -> UserId(rs.getString(1)) }, requestId.value, command.productId.value,
-            ).singleOrNull() }
+                """SELECT r.requested_by FROM pf_product_request r
+                    JOIN pf_user_account u ON u.user_id=r.requested_by AND u.active=TRUE
+                    JOIN pf_product_membership m ON m.user_id=r.requested_by AND m.product_id=r.product_id
+                    WHERE r.request_id=? AND r.product_id=? AND m.role=? AND m.status='ACTIVE'""".trimIndent(),
+                { rs, _ -> UserId(rs.getString(1)) }, requestId.value, command.productId.value, command.requestedRole.name,
+            ).singleOrNull()?.let { listOf(it) } }
             ?: jdbc.query(
-                "SELECT user_id FROM pf_product_membership WHERE product_id=? AND role=? AND status='ACTIVE' ORDER BY granted_at",
+                """SELECT m.user_id FROM pf_product_membership m
+                    JOIN pf_user_account u ON u.user_id=m.user_id AND u.active=TRUE
+                    WHERE m.product_id=? AND m.role=? AND m.status='ACTIVE' ORDER BY m.granted_at,m.user_id""".trimIndent(),
                 { rs, _ -> UserId(rs.getString(1)) }, command.productId.value, command.requestedRole.name,
-            ).firstOrNull()
-        respondent?.let {
+            )
+        // Zonder specifieke geadresseerde blijft een vraag zichtbaar voor alle bevoegde rolleden.
+        val respondent = respondents.singleOrNull()
+        respondents.forEach {
             val valid = jdbc.queryForObject(
                 """SELECT COUNT(*) FROM pf_user_account u WHERE u.user_id=? AND u.active=TRUE AND (
                     EXISTS (SELECT 1 FROM pf_user_global_role r WHERE r.user_id=u.user_id AND r.role='FACTORY_OWNER') OR
-                    EXISTS (SELECT 1 FROM pf_product_membership m WHERE m.user_id=u.user_id AND m.product_id=? AND m.status='ACTIVE'))""".trimIndent(),
-                Long::class.java, it.value, command.productId.value,
+                    EXISTS (SELECT 1 FROM pf_product_membership m WHERE m.user_id=u.user_id AND m.product_id=? AND m.role=? AND m.status='ACTIVE'))""".trimIndent(),
+                Long::class.java, it.value, command.productId.value, command.requestedRole.name,
             ) ?: 0
-            if (valid == 0L) throw InvalidCommand("De geadresseerde heeft geen actieve producttoegang.")
+            if (valid == 0L) throw InvalidCommand("De geadresseerde heeft niet de gevraagde productrol of factory-ownerrechten.")
         }
         jdbc.update(
             """INSERT INTO pf_stakeholder_question(question_id,product_id,agent_role,question,context,process_session_id,linked_objects_json,status,
@@ -284,7 +291,7 @@ class ProductApplicationService(
             respondent?.value, command.productRequestId?.value, command.epicLinkId?.value, command.storyLinkId?.value,
         )
         jdbc.update("UPDATE pf_stakeholder_question SET requested_role=? WHERE question_id=?",command.requestedRole.name,id.value)
-        respondent?.let {
+        respondents.forEach {
             try {
                 jdbc.update(
                     """INSERT INTO pf_personal_notification(notification_id,recipient_user_id,product_id,event_key,kind,title,target_type,target_id,created_at)

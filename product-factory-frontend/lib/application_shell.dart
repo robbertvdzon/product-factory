@@ -263,6 +263,7 @@ class _ApplicationShellState extends State<ApplicationShell> {
         csrfToken: widget.csrfToken,
         initialProductId: _selectedProductId,
         onProductSelected: _selectProduct,
+        onOpenQuestions: () => _select(_Destination.meetings),
         section: _selected == _Destination.governance
             ? 'policy'
             : _selected == _Destination.meetings
@@ -496,7 +497,9 @@ class _ApplicationShellState extends State<ApplicationShell> {
                 ActionChip(
                   avatar: const Icon(Icons.visibility_outlined, size: 16),
                   label: const Text('Terug naar factory owner'),
-                  tooltip: 'Je werkt nu als product owner',
+                  tooltip: widget.actingRole == 'ARCHITECT'
+                      ? 'Je werkt nu als architect'
+                      : 'Je werkt nu als product owner',
                   onPressed: () => widget.onSwitchRole!('FACTORY_OWNER'),
                 ),
               ],

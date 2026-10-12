@@ -72,6 +72,15 @@ void main() {
             jsonEncode(
               request.url.path.endsWith('/epic-activities')
                   ? {'epic-7': activity}
+                  : request.url.path.endsWith('/epics') &&
+                        scenario['action'] == 'REVIEW'
+                  ? [
+                      {
+                        ...epic,
+                        'status': 'AWAITING_APPROVAL',
+                        'readiness': {'readyForPlanning': true},
+                      },
+                    ]
                   : responses[request.url.path] ?? [],
             ),
             200,
@@ -100,7 +109,11 @@ void main() {
         expect(find.textContaining(scenario['label']! as String), findsWidgets);
         if (scenario.containsKey('pendingApprovalRoles')) {
           expect(
-            find.textContaining('Jouw goedkeuring ontbreekt nog'),
+            find.textContaining(
+              scenario['action'] == 'REVIEW'
+                  ? 'Jouw goedkeuring ontbreekt nog'
+                  : 'Goedkeuring volgt na de uitwerking',
+            ),
             findsOneWidget,
           );
           expect(find.textContaining('geen actie van jou nodig'), findsNothing);

@@ -115,6 +115,17 @@ in. Product-AI beschrijft de belasting van het te wijzigen product, niet de agen
 gekoppelde epic. **Mijn vragen aan AI** bevat persoonlijke gesprekken over de applicatie; deze
 maken nooit automatisch een epic. Het oude notificatieblok met losse vinkjes vervalt in deze werkplek.
 
+Een open vraag voor jouw rol staat ook direct boven de epictabs, met **Beantwoord vraag**.
+Een benodigd antwoord krijgt daar voorrang op de latere goedkeuring. Zolang de uitwerking nog
+niet gereed is, legt **Goedkeuring** uit waarom akkoord geven nog niet beschikbaar is.
+Na beantwoording verwerkt Product Factory het antwoord; daarna verschijnt de goedkeuringsactie
+wanneer de inhoud klaar is. Meekijken als factory owner blijft in **Gesprekken en epics** alleen-lezen.
+
+Procesvragen worden aan de gevraagde productrol toegewezen. De oorspronkelijke aanvrager krijgt
+de vraag alleen persoonlijk als die ook die rol heeft. Bij meerdere mogelijke rolhouders is de
+vraag voor de rol beschikbaar en krijgt ieder een melding; een expliciet gekozen ontvanger blijft
+persoonlijk toegewezen. Een architectvraag kan zo niet onzichtbaar bij een PO blijven hangen.
+
 Beelden zijn maximaal 4 MiB per stuk, 6 per bericht en samen 8 MiB per bericht. Een gesprek bevat
 maximaal 10 beelden en 10 MiB. Ze worden duurzaam opgeslagen, alleen met product-/gesprekstoegang
 opgehaald en als IMAGE-bestanden aan de betreffende AI-opdracht doorgegeven.
