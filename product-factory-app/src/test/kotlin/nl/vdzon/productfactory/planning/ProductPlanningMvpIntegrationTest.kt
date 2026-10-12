@@ -351,6 +351,187 @@ class ProductPlanningMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `afgekeurd UX resultaat herstelt automatisch met concrete feedback en dezelfde bevroren context`() {
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planningOrchestrator.resumeReady()
+        val sessionId = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().id
+        runtime.reset()
+        ai.dispatchPending()
+        val initialRequest = runtime.requests.single()
+        val frozenContext = initialRequest.prompt.substringAfter("Compacte bevroren planningscontext:\n")
+        assertThat(mapper.readTree(frozenContext).path("selectedEpics").single().path("uxDesign").asText()).isEqualTo(epic.uxDesign)
+        assertThat(initialRequest.prompt).contains("stories[].uxDesign", "stories[].uxArtifactNames", "selectedEpics[].uxArtifacts")
+        completeDispatchedJob(plan().also { result -> result.path("stories").forEach { (it as ObjectNode).putNull("uxDesign") } })
+
+        planningOrchestrator.resumeReady()
+        assertThat(planningQueries.getProcessSession(sessionId).blockedReason).isEqualTo("Storyset mist het bevroren UX-ontwerp.")
+        assertThat(planningQueries.findStories(StoryFilter(productId))).isEmpty()
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.IN_PLANNING)
+        planningOrchestrator.resumeReady()
+        planningOrchestrator.resumeReady()
+
+        runtime.reset()
+        ai.dispatchPending()
+        val retry = runtime.requests.single()
+        assertThat(retry.prompt).contains("\"validationError\":\"Storyset mist het bevroren UX-ontwerp.\"")
+        assertThat(retry.prompt.substringAfter("Compacte bevroren planningscontext:\n")).isEqualTo(frozenContext)
+        assertThat(retry.repositorySnapshot).isEqualTo(initialRequest.repositorySnapshot)
+        completeDispatchedJob(plan().also { result -> (result.path("stories")[0] as ObjectNode).putArray("uxArtifactNames") })
+        planningOrchestrator.resumeReady()
+        assertThat(planningQueries.getProcessSession(sessionId).blockedReason).isEqualTo("Visuele story mist een expliciete koppeling met een UX-model.")
+        assertThat(planningQueries.findStories(StoryFilter(productId))).isEmpty()
+        planningOrchestrator.resumeReady()
+
+        runtime.reset()
+        ai.dispatchPending()
+        val finalRetry = runtime.requests.single()
+        assertThat(finalRetry.prompt).contains("\"validationError\":\"Visuele story mist een expliciete koppeling met een UX-model.\"")
+        assertThat(finalRetry.prompt.substringAfter("Compacte bevroren planningscontext:\n")).isEqualTo(frozenContext)
+        completeDispatchedJob(plan())
+        planningOrchestrator.resumeReady()
+        planningOrchestrator.resumeReady()
+
+        val completed = planningQueries.getProcessSession(sessionId)
+        assertThat(completed.status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(completed.aiTaskIds).hasSize(4)
+        assertThat(completed.errorCode).isNull()
+        assertThat(planningQueries.findProcessSessions(ProcessSessionFilter(productId))).hasSize(1)
+        assertThat(planningQueries.getBacklog(productId)).hasSize(2)
+        assertThat(planningQueries.getBacklog(productId).first().uxArtifacts.map { it.name }).containsExactly("ux-main-desktop.png")
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.ACTIVE)
+    }
+
+    @Test
+    fun `inhoudelijk ongeldige AI resultaten stoppen na drie automatische pogingen zonder gedeeltelijke publicatie`() {
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planningOrchestrator.resumeReady()
+        val sessionId = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single().id
+
+        repeat(3) {
+            runtime.reset()
+            ai.dispatchPending()
+            completeDispatchedJob(plan().also { result -> result.path("stories").forEach { (it as ObjectNode).putNull("uxDesign") } })
+            planningOrchestrator.resumeReady()
+            assertThat(planningQueries.getProcessSession(sessionId).status).isEqualTo(ProcessSessionStatus.BLOCKED)
+            planningOrchestrator.resumeReady()
+        }
+        repeat(3) { planningOrchestrator.resumeReady() }
+
+        val blocked = planningQueries.getProcessSession(sessionId)
+        assertThat(blocked.status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(blocked.errorCode).isEqualTo("PLANNING_RESULT_INVALID")
+        assertThat(blocked.blockedReason).isEqualTo("Storyset mist het bevroren UX-ontwerp.")
+        assertThat(blocked.aiTaskIds).hasSize(4)
+        assertThat(planningQueries.findStories(StoryFilter(productId))).isEmpty()
+        assertThat(designQueries.getEpic(epic.id).status).isEqualTo(EpicStatus.IN_PLANNING)
+    }
+
+    @Test
+    fun `annulering voorkomt automatisch promptupgradeherstel en publicatie van een later geslaagd resultaat`() {
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planningOrchestrator.resumeReady()
+        runtime.reset()
+        ai.dispatchPending()
+        completeDispatchedJob(plan())
+        val before = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        jdbc.update("UPDATE pf_planning_process_session SET status='BLOCKED',error_code='PLANNING_RESULT_INVALID' WHERE id=?", before.id.value)
+        jdbc.update("UPDATE pf_ai_task SET status='CANCELLED',prompt_template_version=1 WHERE id=?", before.aiTaskIds.last().value)
+        planningOrchestrator.resumeReady()
+        assertThat(planningQueries.getProcessSession(before.id).aiTaskIds).containsExactlyElementsOf(before.aiTaskIds)
+
+        jdbc.update("UPDATE pf_ai_task SET status='SUCCEEDED',cancel_requested=TRUE WHERE id=?", before.aiTaskIds.last().value)
+        planningOrchestrator.resumeReady()
+        assertThat(planningQueries.getProcessSession(before.id).aiTaskIds).containsExactlyElementsOf(before.aiTaskIds)
+
+        jdbc.update("UPDATE pf_planning_process_session SET status='WAITING_FOR_AI' WHERE id=?", before.id.value)
+        planningOrchestrator.resumeReady()
+        planningOrchestrator.resumeReady()
+        val after = planningQueries.getProcessSession(before.id)
+        assertThat(after.status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(after.blockedReason).contains("geannuleerd")
+        assertThat(after.aiTaskIds).containsExactlyElementsOf(before.aiTaskIds)
+        assertThat(planningQueries.findStories(StoryFilter(productId))).isEmpty()
+    }
+
+    @Test
+    fun `automatisch herstel respecteert productpauze maar verwerkt een reeds gereed resultaat`() {
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planningOrchestrator.resumeReady()
+        runtime.reset()
+        ai.dispatchPending()
+        completeDispatchedJob(plan().also { result -> result.path("stories").forEach { (it as ObjectNode).putNull("uxDesign") } })
+        planningOrchestrator.resumeReady()
+        val blocked = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single()
+
+        jdbc.update("UPDATE pf_product SET dispatching_enabled=FALSE WHERE product_id=?", productId.value)
+        planningOrchestrator.resumeReady()
+        assertThat(planningQueries.getProcessSession(blocked.id).aiTaskIds).containsExactlyElementsOf(blocked.aiTaskIds)
+        jdbc.update("UPDATE pf_product SET dispatching_enabled=TRUE,status='INACTIVE' WHERE product_id=?", productId.value)
+        planningOrchestrator.resumeReady()
+        assertThat(planningQueries.getProcessSession(blocked.id).aiTaskIds).containsExactlyElementsOf(blocked.aiTaskIds)
+
+        jdbc.update("UPDATE pf_product SET status='ACTIVE' WHERE product_id=?", productId.value)
+        planningOrchestrator.resumeReady()
+        runtime.reset()
+        ai.dispatchPending()
+        completeDispatchedJob(plan())
+        jdbc.update("UPDATE pf_product SET dispatching_enabled=FALSE WHERE product_id=?", productId.value)
+        planningOrchestrator.resumeReady()
+        assertThat(planningQueries.getProcessSession(blocked.id).status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(planningQueries.findStories(StoryFilter(productId))).hasSize(2)
+    }
+
+    @Test
+    fun `oude prompt start geen automatische herhaallus voor een publicatieconflict`() {
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planningOrchestrator.resumeReady()
+        runtime.reset()
+        ai.dispatchPending()
+        completeDispatchedJob(plan())
+        val blocked = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        jdbc.update("UPDATE pf_ai_task SET prompt_template_version=1 WHERE id=?", blocked.aiTaskIds.last().value)
+        jdbc.update("UPDATE pf_planning_process_session SET status='BLOCKED',error_code='PLANNING_PUBLICATION_CONFLICT' WHERE id=?", blocked.id.value)
+        repeat(3) { planningOrchestrator.resumeReady() }
+
+        val after = planningQueries.getProcessSession(blocked.id)
+        assertThat(after.status).isEqualTo(ProcessSessionStatus.BLOCKED)
+        assertThat(after.aiTaskIds).containsExactlyElementsOf(blocked.aiTaskIds)
+        assertThat(planningQueries.findStories(StoryFilter(productId))).isEmpty()
+    }
+
+    @Test
+    fun `verouderde blokkadestatus start geen tweede AI poging naast een lopende taak`() {
+        val workItem = planning.requestManualReplan(RequestManualReplanCommand(
+            productId, "Controleer het bestaande plan opnieuw.", emptyList(), STAKEHOLDER, "stale-blocked-work",
+        ))
+        planning.runProcessSession(productId)
+        completeOnlyJob(selection())
+        planningOrchestrator.resumeReady()
+        val before = planningQueries.findProcessSessions(ProcessSessionFilter(productId)).single()
+        jdbc.update("UPDATE pf_planning_process_session SET status='BLOCKED',error_code='PLANNING_RESULT_INVALID' WHERE id=?", before.id.value)
+        jdbc.update("UPDATE pf_planning_work_item SET status='BLOCKED',error_code='PLANNING_RESULT_INVALID' WHERE id=?", workItem.value)
+
+        planning.runProcessSession(productId)
+        assertThat(planningQueries.findPlanningWorkItems(productId).single().status).isEqualTo(WorkItemStatus.IN_PROGRESS)
+        runtime.reset()
+        ai.dispatchPending()
+        planning.runProcessSession(productId)
+
+        assertThat(planningQueries.getProcessSession(before.id).aiTaskIds).containsExactlyElementsOf(before.aiTaskIds)
+        assertThat(runtime.requests).hasSize(1)
+        assertThat(jdbc.queryForObject("SELECT call_claimed_until FROM pf_planning_process_session WHERE id=?", java.sql.Timestamp::class.java, before.id.value)).isNull()
+        completeDispatchedJob(plan())
+        planningOrchestrator.resumeReady()
+        assertThat(planningQueries.getProcessSession(before.id).status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(planningQueries.findStories(StoryFilter(productId))).hasSize(2)
+    }
+
+    @Test
     fun `gerichte herprioritering van actieve epic herschikt alleen todo stories`() {
         publishPlan()
         val before = planningQueries.getBacklog(productId)

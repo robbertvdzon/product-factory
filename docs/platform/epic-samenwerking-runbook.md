@@ -68,6 +68,10 @@ De status in overzicht en dossier benoemt wie nu aan zet is: **Product Factory w
 van de PO of architect. Een onderbroken uitwerking krijgt een aparte melding. Dit leesmodel gebruikt
 open vragen, actuele beoordelingen en de aan deze epic gekoppelde procesactiviteit; een generieke
 levenscyclusstatus zoals `NEEDS_REFINEMENT` betekent op zichzelf niet dat AI bezig is.
+Ook tijdens planning bepaalt de actuele, aan de epicversie gekoppelde sessie de status: wachten
+op een worker, actief plannen, een resultaat verwerken of geblokkeerd zijn. Een planningsblokkade
+toont een begrijpelijke reden en blijft niet als lopende planning zichtbaar. Een oude sessie of
+een sessie voor een andere epic bepaalt deze status niet.
 De API `/api/products/{productId}/epic-activities` toont de verantwoordelijke rol zonder de inhoud
 van afgeschermde vragen te delen. Ontbrekende menselijke goedkeuringen staan daarnaast apart vermeld:
 ook wanneer eerst de andere rol moet antwoorden, ziet de PO **Jouw goedkeuring ontbreekt nog**.

@@ -94,10 +94,46 @@ class EpicActivityService(
                 if (running > 0) EpicActivity(EpicActivityState.WORKING, "Product Factory bouwt en test", "De uitvoering van de epic is bezig.")
                 else queued("De Product Factory moet de volgende bouw- of controlestap oppakken.")
             }
-            EpicStatus.IN_PLANNING -> EpicActivity(EpicActivityState.QUEUED, "Product Factory is aan zet: planning", "De epic wordt opgepakt voor het plannen van de uitvoering.")
+            EpicStatus.IN_PLANNING -> planningActivity(epic)
             EpicStatus.VERIFYING -> EpicActivity(EpicActivityState.QUEUED, "Product Factory is aan zet: controle", "De epic wacht op afronding van de automatische kwaliteitscontrole.")
             else -> queued("De Product Factory moet de volgende automatische stap oppakken.")
         }
+    }
+
+    private fun planningActivity(epic: EpicDetails): EpicActivity {
+        // A product can have several epics. Only the active session's frozen selection owns
+        // this planning state; an older selection must not describe a newer epic version.
+        val session = jdbc.query(
+            """SELECT s.status,s.error_code,s.selected_epics_json,t.status AS task_status
+                FROM pf_planning_process_session s LEFT JOIN pf_ai_task t ON t.id=s.current_ai_task_id
+                WHERE s.product_id=? AND s.active_product_id=? AND s.phase='PLANNING'
+                    AND s.status IN ('RUNNING','WAITING_FOR_AI','BLOCKED','FAILED')""",
+            { rs, _ -> PlanningActivity(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4)) },
+            epic.productId.value, epic.productId.value,
+        ).singleOrNull()?.takeIf { candidate ->
+            mapper.readTree(candidate.selectedEpics).any {
+                it.path("id").asText() == epic.id.value && it.path("expectedStateVersion").asLong(-1) == epic.version
+            }
+        }
+        if (session?.status in setOf("BLOCKED", "FAILED") || session?.task in setOf("FAILED", "CANCELLED")) {
+            val detail = when (session?.error) {
+                "PLANNING_RESULT_INVALID" -> "Het AI-plan voldoet niet aan alle inhoudelijke controles. De planning is gepauzeerd en vraagt aandacht van de beheerder."
+                "PLANNING_VERSION_CONFLICT" -> "De epic of backlog is gewijzigd tijdens het plannen. De planning is gepauzeerd en vraagt aandacht van de beheerder."
+                "PLANNING_PUBLICATION_CONFLICT" -> "Het plan kon door een conflict in de backlog niet worden opgeslagen. De planning is gepauzeerd en vraagt aandacht van de beheerder."
+                else -> "De automatische planning is onderbroken en vraagt aandacht van de beheerder."
+            }
+            return EpicActivity(EpicActivityState.BLOCKED, "Planning geblokkeerd", detail)
+        }
+        if (session?.task == "RUNNING")
+            return EpicActivity(EpicActivityState.WORKING, "Product Factory maakt de planning", "De AI werkt de epic uit in uitvoerbare stories.")
+        if (session?.status == "RUNNING")
+            return EpicActivity(EpicActivityState.WORKING, "Product Factory verwerkt de planning", "De Product Factory bereidt de planning voor of controleert en verwerkt het plan.")
+        if (session?.status == "WAITING_FOR_AI") return when (session.task) {
+            "SUCCEEDED" -> queued("Het AI-plan is klaar en wacht op controle en verwerking door de Product Factory.")
+            "WAITING_FOR_WORKER" -> queued("De planning wacht op beschikbare AI-capaciteit.")
+            else -> queued("De planningsopdracht staat klaar en wacht tot de AI begint.")
+        }
+        return EpicActivity(EpicActivityState.QUEUED, "Product Factory is aan zet: planning", "De epic wordt opgepakt voor het plannen van de uitvoering.")
     }
 
     private fun human(role: ProductMembershipRole, action: String): EpicActivity {
@@ -109,4 +145,5 @@ class EpicActivityService(
     }
     private fun queued(detail: String) = EpicActivity(EpicActivityState.QUEUED, "Wacht op de Product Factory", detail)
     private data class DesignActivity(val status: String, val error: String?, val snapshot: String?, val task: String?, val epicId: String?, val requestId: String?)
+    private data class PlanningActivity(val status: String, val error: String?, val selectedEpics: String, val task: String?)
 }

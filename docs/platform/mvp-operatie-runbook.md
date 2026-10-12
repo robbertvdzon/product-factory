@@ -12,8 +12,11 @@ starten**. Een `WAITING_FOR_AI`-sessie wordt hervat; een actieve call geeft bewu
 schedulerrun. Maak alleen een nieuwe sessie wanneer de bestaande sessie een terminale eindstatus
 heeft.
 
-Productplanning hervat een terminale AI-taak automatisch en probeert een technische taakfout
-maximaal drie keer met dezelfde bevroren context. Handmatig hervatten is pas nodig wanneer die
+Productplanning hervat een terminale AI-taak automatisch en probeert een technische taakfout of
+inhoudelijk afgekeurd resultaat maximaal drie keer met dezelfde bevroren context. Een inhoudelijke
+afwijzing gaat als feedback mee naar de volgende poging; er worden pas stories gepubliceerd nadat
+het hele plan is gevalideerd. Een nieuwe plannerprompt kan een oude blokkade eenmalig herstellen.
+Geannuleerde taken worden niet automatisch herstart. Handmatig hervatten is pas nodig wanneer de
 begrensde retryreeks als `BLOCKED` eindigt of wanneer configuratie eerst moest worden hersteld.
 
 ## AI-job uitgeschakeld of terminaal mislukt

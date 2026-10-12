@@ -70,8 +70,11 @@ rol opvragen.
 Voor iedere Planner-taak leest de procesruntime de betreffende `AiJobConfiguration`, neemt provider en
 model als vaste taakwaarden over en gebruikt [AI-uitvoering](../../gedeelde-modules/ai-uitvoering.md). Een sessie met open
 taken krijgt `WAITING_FOR_AI`. De planningscoordinator hervat haar zodra de taak terminaal is,
-zonder dubbele taak of handmatige vervolgklik. Een technische taakfout krijgt maximaal drie
-automatische pogingen met dezelfde bevroren context; daarna wordt de sessie zichtbaar `BLOCKED`.
+zonder dubbele taak of handmatige vervolgklik. Een technische taakfout of inhoudelijk afgekeurd
+AI-resultaat krijgt maximaal drie automatische pogingen met dezelfde bevroren context. Bij een
+inhoudelijke afwijzing ontvangt de volgende poging ook de concrete validatiefout. Daarna blijft
+de sessie zichtbaar `BLOCKED`. Een verbeterde plannerprompt kan een oude blokkade eenmalig
+opnieuw proberen; een geannuleerde taak wordt niet automatisch hervat.
 
 ## Verloop van één processessie
 
@@ -168,11 +171,14 @@ Gewone code controleert minimaal:
 - dat alleen geclaimde workitems als afgehandeld worden gemarkeerd.
 
 Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt van
-AI-uitvoering. Eindigt die taak definitief als `FAILED`, dan wordt de processessie zichtbaar
-`BLOCKED` en maakt een latere productrun na back-off een nieuwe taak voor dezelfde epicclaim. De
+AI-uitvoering. Eindigt die taak definitief als `FAILED`, dan maakt de planningscoordinator binnen
+de retrylimiet een nieuwe taak voor dezelfde epicclaim. Na de limiet blijft de sessie `BLOCKED`. De
 epic blijft `IN_PLANNING` en wordt niet door nieuw werk gepasseerd. Een inhoudelijk ongeldig concept
-wordt niet gepubliceerd. Er start in de MVP geen
-aparte critic-agent; de fout blijft zichtbaar op de processessie en betrokken workitems.
+wordt niet gepubliceerd. Dezelfde planner krijgt binnen de begrensde retryreeks de afkeurreden mee
+en maakt een nieuw resultaat. Daarbij neemt hij het bestaande UX-ontwerp op in de relevante
+storyvelden en koppelt hij de bijbehorende bestaande UX-artifacts. De contractcontrole blijft
+verplicht. Er start in de MVP geen aparte critic-agent; een blijvende fout staat op de processessie,
+betrokken workitems en de statuskaart van de gekoppelde epic.
 
 ### Stap 5 — atomair publiceren
 

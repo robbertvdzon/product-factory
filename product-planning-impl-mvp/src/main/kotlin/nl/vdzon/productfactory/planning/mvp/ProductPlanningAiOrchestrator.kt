@@ -20,10 +20,12 @@ class ProductPlanningAiOrchestrator(
         val products = jdbc.query(
             """SELECT DISTINCT s.product_id FROM pf_planning_process_session s
                 JOIN pf_ai_task t ON t.id=s.current_ai_task_id
-                WHERE (s.status='WAITING_FOR_AI' AND t.status IN ('SUCCEEDED','FAILED','CANCELLED'))
-                   OR (s.status='BLOCKED' AND t.status IN ('SUCCEEDED','FAILED','CANCELLED') AND
-                       ((t.status='FAILED' AND s.ai_attempt < ?) OR
-                        (t.job_key='PLANNING.SLICE_EPIC' AND t.prompt_template_version < ?)))
+                JOIN pf_product p ON p.product_id=s.product_id
+                WHERE s.active_product_id=s.product_id
+                  AND ((s.status='WAITING_FOR_AI' AND t.status IN ('SUCCEEDED','FAILED','CANCELLED'))
+                   OR (s.status='BLOCKED' AND p.status='ACTIVE' AND p.dispatching_enabled=TRUE AND t.cancel_requested=FALSE
+                       AND (t.status='FAILED' OR (t.status='SUCCEEDED' AND s.error_code='PLANNING_RESULT_INVALID'))
+                       AND (s.ai_attempt < ? OR (t.job_key='PLANNING.SLICE_EPIC' AND t.prompt_template_version < ?))))
                 ORDER BY s.product_id LIMIT 20""".trimIndent(),
             { rs, _ -> ProductId(rs.getString(1)) },
             ProductPlanningMvpService.MAX_AUTOMATIC_AI_ATTEMPTS,
