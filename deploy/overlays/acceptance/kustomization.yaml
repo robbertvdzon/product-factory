@@ -15,9 +15,9 @@ patches:
 - path: product-factory-frontend-memory.yaml
 - path: central-postgres-patch.yaml
 images:
-- digest: sha256:3ec6e30f4e26f3745d3c439d6c36817c28f3b8d7dd5ead3c2a0a82747cee7aba
+- digest: sha256:068c78b9da7299ef46e12949c5cffb3ddd37911e20242a51a3872be60f392770
   name: ghcr.io/robbertvdzon/product-factory-backend
   newName: ghcr.io/robbertvdzon/product-factory-backend
-- digest: sha256:c3bbca0e342e7b0c92775716bcf8aa719fdfd60bf487adfcc0709cc62269d719
+- digest: sha256:b2ad32116ec8a4151f6de405101f33abcce3557545ca7cba6d1d91f88b0c9349
   name: ghcr.io/robbertvdzon/product-factory-frontend
   newName: ghcr.io/robbertvdzon/product-factory-frontend
