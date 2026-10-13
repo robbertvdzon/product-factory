@@ -70,6 +70,7 @@ class EpicProgressService(
     private val quality: QualityQueryService,
     private val dispatcher: SoftwareFactoryDispatcherQueryService,
     private val products: nl.vdzon.productfactory.api.product.ProductQueryService,
+    private val verification: EpicVerificationActivityService,
 ) {
     fun progress(epicId: EpicId): EpicProgress {
         val epic = design.getEpic(epicId)
@@ -237,10 +238,9 @@ class EpicProgressService(
                 epic.updatedAt, null, "Daarna verstuurt de dispatcher de stories naar Software Factory.",
             )
             EpicStatus.ACTIVE -> activeWaitingOn(context)
-            EpicStatus.VERIFYING -> EpicWaitingOn(
-                EpicWaitingActor.QUALITY, "Wacht op Kwaliteit", "Kwaliteit verifieert de epic als geheel.",
-                epic.updatedAt, null, "Bij goedkeuring is de epic afgerond; bij afkeur volgen bugfixes.",
-            )
+            EpicStatus.VERIFYING -> verification.current(epic).let {
+                EpicWaitingOn(EpicWaitingActor.QUALITY, it.label, it.detail, it.since, it.reference, it.next)
+            }
             else -> null
         }
     }

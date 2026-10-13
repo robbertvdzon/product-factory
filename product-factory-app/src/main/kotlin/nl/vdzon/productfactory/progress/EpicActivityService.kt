@@ -16,6 +16,7 @@ data class EpicActivity(
     val waitingRole: ProductMembershipRole? = null,
     val action: String? = null,
     val pendingApprovalRoles: List<ProductMembershipRole> = emptyList(),
+    val next: String? = null,
 )
 
 /** Current responsibility, separate from the epic's lifecycle and future approval gates. */
@@ -26,6 +27,7 @@ class EpicActivityService(
     private val policies: ProductGovernanceService,
     private val jdbc: JdbcTemplate,
     private val mapper: ObjectMapper,
+    private val verification: EpicVerificationActivityService,
 ) {
     fun activities(productId: ProductId): Map<String, EpicActivity> {
         val questions = products.findStakeholderQuestions(StakeholderQuestionFilter(productId))
@@ -95,7 +97,7 @@ class EpicActivityService(
                 else queued("De Product Factory moet de volgende bouw- of controlestap oppakken.")
             }
             EpicStatus.IN_PLANNING -> planningActivity(epic)
-            EpicStatus.VERIFYING -> EpicActivity(EpicActivityState.QUEUED, "Product Factory is aan zet: controle", "De epic wacht op afronding van de automatische kwaliteitscontrole.")
+            EpicStatus.VERIFYING -> verification.current(epic).let { EpicActivity(it.state, it.label, it.detail, next = it.next) }
             else -> queued("De Product Factory moet de volgende automatische stap oppakken.")
         }
     }

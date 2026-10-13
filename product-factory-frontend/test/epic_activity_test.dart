@@ -45,6 +45,12 @@ void main() {
       'detail': 'De volgende stap moet nog worden opgepakt.',
     },
     {
+      'state': 'BLOCKED',
+      'label': 'Verificatie geblokkeerd',
+      'detail': 'De acceptatieroute voor testscenario’s geeft HTTP 404.',
+      'next': 'Herstel de testvoorwaarde en hervat de verificatie.',
+    },
+    {
       'state': 'WAITING_FOR_HUMAN',
       'label': 'Wacht op antwoord van de architect',
       'waitingRole': 'ARCHITECT',
@@ -72,6 +78,9 @@ void main() {
             jsonEncode(
               request.url.path.endsWith('/epic-activities')
                   ? {'epic-7': activity}
+                  : request.url.path.endsWith('/epics') &&
+                        scenario['state'] == 'BLOCKED'
+                  ? [{...epic, 'status': 'VERIFYING'}]
                   : request.url.path.endsWith('/epics') &&
                         scenario['action'] == 'REVIEW'
                   ? [
@@ -127,6 +136,12 @@ void main() {
         );
         await tester.tap(find.text('Eerdere vergaderingen terugzien'));
         await tester.pumpAndSettle();
+        if (scenario['next'] != null) {
+          expect(find.text(scenario['detail']! as String), findsOneWidget);
+          expect(find.text(scenario['next']! as String), findsOneWidget);
+          expect(find.text('Jij bent aan zet.'), findsNothing);
+          expect(find.text('Wordt gecontroleerd'), findsNothing);
+        }
         if (scenario['waitingRole'] == 'ARCHITECT') {
           expect(find.text('De architect is aan zet.'), findsOneWidget);
         }

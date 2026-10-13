@@ -13,6 +13,7 @@ import nl.vdzon.productfactory.api.quality.*
 import nl.vdzon.productfactory.api.shared.*
 import nl.vdzon.productfactory.planning.mvp.ProductPlanningMvpService
 import nl.vdzon.productfactory.quality.mvp.QualityMvpService
+import nl.vdzon.productfactory.quality.mvp.TransientTestEnvironmentFailure
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,6 +26,10 @@ import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.UUID
 
 @SpringBootTest(properties = ["PF_AUTH_REQUIRED=false"])
@@ -44,7 +49,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
     private val revisions: FakeDeploymentRevisionResolver,
     private val mapper: ObjectMapper,
     private val jdbc: JdbcTemplate,
-    private val clock: Clock,
+    private val clock: MutableQualityClock,
 ) {
     private var productId = ProductId("not-initialized")
     private var epicId = EpicId("not-initialized")
@@ -57,6 +62,8 @@ class QualityMvpIntegrationTest @Autowired constructor(
         ai.deleteAllOwnedExecutionData()
         runtime.reset()
         revisions.revision = SHA
+        revisions.failure = null
+        clock.now = Instant.parse("2026-10-13T08:00:00Z")
         productId = ProductId("quality-${UUID.randomUUID().toString().take(8)}")
         epicId = EpicId(UUID.randomUUID().toString())
         storyId = StoryId(UUID.randomUUID().toString())
@@ -84,10 +91,10 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(properties.path("explanation").path("maxLength").asInt()).isEqualTo(2000)
         assertThat(properties.path("signalOutcome").path("maxLength").asInt()).isEqualTo(200)
         assertThat(properties.path("testBlockers").path("items").path("properties").path("type").path("enum").map { it.asText() })
-            .containsExactlyInAnyOrder("INSUFFICIENT_TEST_EVIDENCE", "TEST_ACCESS_UNAVAILABLE", "TEST_CAPABILITY_UNAVAILABLE", "TEST_ENVIRONMENT_UNAVAILABLE")
+            .containsExactlyInAnyOrder("INSUFFICIENT_TEST_EVIDENCE", "TEST_ACCESS_UNAVAILABLE", "TEST_CAPABILITY_UNAVAILABLE", "TEST_ENVIRONMENT_UNAVAILABLE", "TRANSIENT_TECHNICAL_FAILURE")
         assertThat(properties.path("implementationGaps").path("items").path("required").map { it.asText() })
             .contains("criterion", "observedBehaviour", "coverageExplanation", "reviewedStoryIds", "evidence")
-        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(4L)
+        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(5L)
         ai.deleteAllOwnedExecutionData()
         runtime.reset()
     }
@@ -274,6 +281,179 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(qualityQueries.getCurrentQuality(productId)).isNull()
         quality.retryQualityWorkItem(work)
         assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.PENDING)
+    }
+
+    @Test
+    fun `structurele of ongetypeerde blokkade start ook na een week geen nieuwe test`() {
+        val work = epicVerification("structural-no-retry")
+        completeSession(result(work, "BLOCKED").apply {
+            (path("results")[0] as ObjectNode).put("blockedReason", "De vereiste acceptatietestvoorziening ontbreekt; herstel is nodig.")
+        })
+        clock.advance(Duration.ofDays(7))
+        repeat(3) { quality.runProcessSession(productId); ai.dispatchPending() }
+
+        assertBlockedWithoutDevelopment(work)
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(item.retryAfter).isNull()
+        assertThat(item.attentionNeeded).isTrue()
+        assertThat(item.attemptCount).isEqualTo(1)
+        assertThat(runtime.requests).hasSize(1)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).hasSize(1)
+    }
+
+    @Test
+    fun `uitsluitend tijdelijke technische storing hervat na backoff hetzelfde werkitem`() {
+        val work = epicVerification("transient-retry")
+        completeSession(result(work, "BLOCKED").apply {
+            (path("results")[0] as ObjectNode).putArray("testBlockers").addObject()
+                .put("type", "TRANSIENT_TECHNICAL_FAILURE")
+                .put("reason", "De werkende testorigin antwoordt tijdelijk met HTTP 503 tijdens de gecontroleerde test.")
+        })
+        val blocked = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(blocked.retryAfter).isEqualTo(clock.instant().plus(Duration.ofMinutes(15)))
+        assertThat(blocked.attentionNeeded).isFalse()
+        clock.advance(Duration.ofMinutes(14))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        assertThat(runtime.requests).hasSize(1)
+        clock.advance(Duration.ofMinutes(1))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        val retried = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(retried.id).isEqualTo(work)
+        assertThat(retried.attemptCount).isEqualTo(2)
+        assertThat(retried.status).isEqualTo(WorkItemStatus.IN_PROGRESS)
+        assertThat(runtime.requests).hasSize(2)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).hasSize(1)
+        assertThat(planningQueries.findPlanningWorkItems(productId)).isEmpty()
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        assertThat(runtime.requests).hasSize(2)
+    }
+
+    @Test
+    fun `structurele blokkade heeft voorrang op tijdelijke technische storing`() {
+        val work = epicVerification("mixed-blockers")
+        completeSession(result(work, "BLOCKED").apply {
+            (path("results")[0] as ObjectNode).putArray("testBlockers").apply {
+                addObject().put("type", "TRANSIENT_TECHNICAL_FAILURE").put("reason", "De testorigin gaf tijdelijk HTTP 503 terug bij de browsercontrole.")
+                addObject().put("type", "TEST_ACCESS_UNAVAILABLE").put("reason", "De benodigde testcredential is niet geconfigureerd en moet eerst worden ingericht.")
+            }
+        })
+        clock.advance(Duration.ofDays(7))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        assertBlockedWithoutDevelopment(work)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().retryAfter).isNull()
+        assertThat(runtime.requests).hasSize(1)
+    }
+
+    @Test
+    fun `ongeldig testerresultaat wacht op herstel zonder automatische nieuwe uitvoering`() {
+        val work = epicVerification("invalid-no-retry")
+        completeSession(result(work, "PASSED").apply {
+            (path("results")[0] as ObjectNode).put("workItemId", "onbekend-workitem")
+        })
+        clock.advance(Duration.ofDays(7))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(item.status).isEqualTo(WorkItemStatus.FAILED)
+        assertThat(item.errorCode).isEqualTo("QUALITY_RESULT_INVALID")
+        assertThat(item.retryable).isTrue()
+        assertThat(item.retryAfter).isNull()
+        assertThat(item.attentionNeeded).isTrue()
+        assertThat(item.attemptCount).isEqualTo(1)
+        assertThat(runtime.requests).hasSize(1)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
+        assertThat(planningQueries.findPlanningWorkItems(productId)).isEmpty()
+    }
+
+    @Test
+    fun `runtime rate limit krijgt backoff maar onbekende uitvoeringsfout niet`() {
+        val work = epicVerification("runtime-rate-limit")
+        failRuntime("PROVIDER_RATE_LIMIT")
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().retryAfter)
+            .isEqualTo(clock.instant().plus(Duration.ofMinutes(15)))
+        quality.retryQualityWorkItem(work)
+        failRuntime("ENGINE_FAILED")
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(item.status).isEqualTo(WorkItemStatus.FAILED)
+        assertThat(item.retryAfter).isNull()
+        assertThat(item.attentionNeeded).isTrue()
+        clock.advance(Duration.ofDays(7))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        assertThat(runtime.requests).hasSize(2)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
+        assertThat(planningQueries.findPlanningWorkItems(productId)).isEmpty()
+    }
+
+    @Test
+    fun `uitgeputte runtime testtijd wordt niet automatisch met een nieuw budget herhaald`() {
+        epicVerification("runtime-budget-exhausted")
+        failRuntime("EXECUTION_TIMEOUT")
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().retryAfter).isNull()
+        clock.advance(Duration.ofDays(7))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        assertThat(runtime.requests).hasSize(1)
+    }
+
+    @Test
+    fun `tijdelijke revisionstoring krijgt backoff en configuratiefout wacht op herstel`() {
+        val work = epicVerification("revision-transient")
+        revisions.failure = TransientTestEnvironmentFailure("Revisionendpoint antwoordt tijdelijk HTTP 503.")
+        quality.runProcessSession(productId)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().retryAfter)
+            .isEqualTo(clock.instant().plus(Duration.ofMinutes(15)))
+        quality.retryQualityWorkItem(work)
+        revisions.failure = InvalidCommand("Revisionendpoint antwoordt HTTP 404 wegens een verkeerde configuratie.")
+        quality.runProcessSession(productId)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().retryAfter).isNull()
+        assertThat(runtime.requests).isEmpty()
+    }
+
+    @Test
+    fun `opgeleverde fixture met reproduceerbare 404 vraagt een bugfix en geen nieuwe epicstories`() {
+        jdbc.update("UPDATE pf_story_version SET title=?,acceptance_criteria_json=? WHERE story_id=? AND version=1",
+            "Acceptatiescenarios bedienen", mapper.writeValueAsString(listOf("De gedocumenteerde acceptatieroute bedient meerdere vergaderingen.")), storyId.value)
+        val work = epicVerification("broken-delivered-fixture")
+        completeSession(result(work, "NEEDS_WORK").apply {
+            (path("results")[0] as ObjectNode).apply {
+                putArray("missingCoverage").add("Schermcontrole van drie vergaderingen kon door de defecte scenarioroute niet worden uitgevoerd.")
+                putArray("bugs").addObject().apply {
+                    put("title", "Opgeleverde acceptatiescenarioroute geeft 404")
+                    put("summary", "De opgeleverde fixturebediening is op acceptatie niet bereikbaar.")
+                    put("actualBehaviour", "Na succesvolle testlogin geeft de gedocumenteerde /api/test/scenario route herhaald HTTP 404 op revision $SHA.")
+                    put("expectedBehaviour", "De in DONE-story ${storyId.value} beloofde route stelt het scenario met meerdere vergaderingen beschikbaar.")
+                    putArray("reproductionSteps").add("Controleer acceptatierevision $SHA.").add("Log in met de geconfigureerde testlogin.").add("Open de toegestane /api/test/scenario route tweemaal en observeer 404.")
+                    put("impact", "De opgeleverde testvoorziening werkt niet en verhindert de resterende epiccontrole.")
+                    put("severity", "P1")
+                    set<ObjectNode>("evidence", proof("Login geslaagd en juiste revision gecontroleerd; de toegestane scenarioroute antwoordt reproduceerbaar 404."))
+                }
+            }
+        })
+        assertThat(runtime.requests.single().prompt)
+            .contains("Een beloofde en als DONE opgeleverde testvoorziening is zelf afgesproken productgedrag")
+            .contains("Gebruik voor dezelfde oorzaak geen testBlocker en geen implementationGap")
+            .contains("Een reproduceerbare 404, ontbrekende configuratie/fixture/credential, 401/403, uitgeputte testtijd of onbekende oorzaak is niet tijdelijk")
+        repeat(2) { quality.runProcessSession(productId) }
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId)).single().outcome).isEqualTo(VerificationOutcome.NEEDS_WORK)
+        assertThat(qualityQueries.findBugs(BugFilter(productId))).hasSize(1)
+        assertThat(planningQueries.findPlanningWorkItems(productId).map { it.type }).containsExactly(PlanningWorkItemType.PLAN_BUGFIX)
+        assertThat(planningQueries.getStory(storyId).status).isEqualTo(StoryStatus.DONE)
+        assertThat(planningQueries.findStories(StoryFilter(productId))).hasSize(1)
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.ACTIVE)
+    }
+
+    private fun failRuntime(errorCode: String) {
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        val job = runtime.jobs.values.last()
+        runtime.jobs[job.id] = job.copy(status = "FAILED", phase = "FAILED", errorCode = errorCode, errorMessage = "Veilige uitvoeringsfout.")
+        ai.reconcileActive()
+        quality.runProcessSession(productId)
     }
 
     @Test
@@ -652,6 +832,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
     @TestConfiguration
     class Fakes {
         @Bean @Primary fun fakeRuntime() = FakeRuntime()
+        @Bean @Primary fun qualityClock() = MutableQualityClock()
         @Bean @Primary fun fakeGit(): PublicGitRevisionResolver = object : PublicGitRevisionResolver {
             override fun resolveHead(publicGitUrl: String) = SHA
         }
@@ -660,7 +841,18 @@ class QualityMvpIntegrationTest @Autowired constructor(
 
     class FakeDeploymentRevisionResolver : DeploymentRevisionResolver {
         var revision: String = SHA
-        override fun resolve(baseUrl: String, revisionEndpoint: String, revisionJsonPath: String) = revision
+        var failure: Throwable? = null
+        override fun resolve(baseUrl: String, revisionEndpoint: String, revisionJsonPath: String): String {
+            failure?.let { throw it }
+            return revision
+        }
+    }
+
+    class MutableQualityClock(var now: Instant = Instant.parse("2026-10-13T08:00:00Z")) : Clock() {
+        override fun instant(): Instant = now
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+        override fun withZone(zone: ZoneId): Clock = this
+        fun advance(duration: Duration) { now = now.plus(duration) }
     }
 
     companion object {

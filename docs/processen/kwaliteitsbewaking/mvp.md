@@ -99,8 +99,10 @@ atomair publiceren + vervolgcommands + QualitySnapshot
 
 ### Stap 1 — claimen en omgeving controleren
 
-Applicatiecode zet eerst retrybare `BLOCKED`- of `FAILED`-workitems van het opgegeven product waarvan
-`retryAfter` is verstreken terug op `PENDING`. Daarna claimt of hervat zij de run voor dat product en
+Applicatiecode zet eerst `BLOCKED`- of `FAILED`-workitems van het opgegeven product waarvan een
+expliciete `retryAfter` is verstreken terug op `PENDING`. Alleen aantoonbaar tijdelijke technische
+storingen krijgen zo’n tijdstip. `retryable=true` betekent dat bewust handmatig hervatten is toegestaan;
+zonder `retryAfter` start er geen automatische herhaling. Daarna claimt of hervat zij de run voor dat product en
 alle `PENDING` workitems uit de vaste startmomentopname. Een ander product kan gelijktijdig een eigen
 kwaliteitssessie uitvoeren.
 Daarna leest zij per opdracht de exacte epic-, story-, bug-, opleverings- en signaalversies plus
@@ -108,12 +110,14 @@ Daarna leest zij per opdracht de exacte epic-, story-, bug-, opleverings- en sig
 bron- en geheugenversies vast.
 
 De Tester controleert bereikbaarheid, werkelijk gedeployde revision en accountgrenzen vóór
-inhoudelijk testen. Voor story- en bugfixwerk moet de omgeving de
-`Story.deliveredCommitSha` aantoonbaar bevatten. Een achterlopende deployment wordt
-`DEPLOYMENT_PENDING`; een onbereikbare omgeving of ontbrekende toegang krijgt een andere concrete
-blokkadereden. In alle gevallen verhoogt Kwaliteitsbewaking `attemptCount`, maakt zij het workitem
-retrybaar `BLOCKED`, berekent zij `retryAfter` volgens de vaste back-off en publiceert zij nooit een
-productbug. Een blokkade vóór werkelijk testwerk maakt geen `QualitySnapshot`.
+inhoudelijk testen. De werkelijk gedeployde revision wordt vastgelegd naast de vereiste
+`Story.deliveredCommitSha`; een latere commit wordt niet uitsluitend op SHA-ongelijkheid geweigerd.
+Een onbereikbare omgeving of ontbrekende toegang krijgt een concrete blokkadereden en verhoogt
+`attemptCount`. Ontbrekende credentials, configuratie of een ongeldige revisionresponse worden
+handmatig hervatbaar `BLOCKED` zonder `retryAfter`. Alleen expliciete tijdelijke transportfouten
+(timeout/connect) of HTTP 408/429/502/503/504 krijgen back-off. HTTP 401/403/404 en ongeclassificeerd
+falen krijgen geen automatische nieuwe test. Een blokkade vóór werkelijk testwerk maakt geen
+productbug of `QualitySnapshot`.
 
 ### Stap 2 — opdrachten ordenen
 
@@ -161,13 +165,21 @@ via `NODE_PATH`, Chromium via `PLAYWRIGHT_BROWSERS_PATH` (standaard `/ms-playwri
 starten met `--no-sandbox`. Ontbrekende Python Playwright of een ontbrekend Chromium-commando in
 `PATH` geldt niet als bewijs dat de browser ontbreekt. De startcontrole opent alleen `about:blank`;
 vervolgens moet de Tester de echte schermhandelingen en vereiste viewports op acceptatie testen.
-Zonder vereist schermbewijs blijft de verificatie `BLOCKED`.
+Zonder vereist schermbewijs én zonder bewezen defect blijft de verificatie `BLOCKED`.
 
 De testlogincredential gaat uitsluitend naar het ingestelde relatieve loginendpoint op de
 acceptatie-origin, zonder redirects en zonder globale browserheaders met de credential. De echte
 PNG-screenshots gebruiken de gedeclareerde namen `/job/output/artifacts/evidence-01` tot en met
-`evidence-50`, zonder extensie en met expliciet PNG-formaat. Een mislukte browserstart of ontbrekende
-acceptatiefixture blijft een testblokkade; de Tester wijkt niet uit naar productie.
+`evidence-50`, zonder extensie en met expliciet PNG-formaat. Een mislukte browserstart of nog niet
+opgeleverde acceptatiefixture blijft een testblokkade; de Tester wijkt niet uit naar productie.
+
+Vanaf promptversie 5 onderscheidt de Tester dit van een defect in een beloofde, als `DONE`
+opgeleverde testvoorziening. Bij een juiste acceptatierevision en werkende login is een
+reproduceerbare 404 op de gedocumenteerde, toegestane scenarioroute een bug in de bestaande story.
+De uitkomst is `NEEDS_WORK` met route, revision, story-id en herhaald waargenomen respons als bewijs.
+Tests die daardoor niet uitvoerbaar waren staan in `missingCoverage`; dezelfde oorzaak wordt niet
+ook als `testBlocker` of `implementationGap` gemeld. De gewone bugfixcyclus vraagt één gerichte
+`PLAN_BUGFIX` aan, zonder nieuwe epicstories te bedenken.
 
 ### Stap 4 — reproduceren en classificeren
 
@@ -190,8 +202,15 @@ Het testercontract vanaf promptversie 3 houdt implementatie en testbewijs gesche
 - `testBlockers` benoemt onvoldoende bewijs/testdata, ontbrekende toegang, ontbrekende browser of
   andere testcapaciteit, of een ongeschikte testomgeving. Een acceptatiemock met maar één vergadering
   bewijst geen defect in gedrag voor meerdere vergaderingen. Ook het ontbreken van een browser is
-  geen productdefect. Iedere testblokkade maakt de verificatie retrybaar `BLOCKED`; zij publiceert
-  geen bugs, ontwikkelstories of kwaliteitssnapshot en laat een epic `VERIFYING`.
+  geen productdefect. Iedere testblokkade maakt de verificatie handmatig hervatbaar `BLOCKED`; zij
+  publiceert geen bugs, ontwikkelstories of kwaliteitssnapshot en laat een epic `VERIFYING`.
+  `retryAfter` blijft leeg voor deze structurele oorzaken en de workitem vraagt direct aandacht.
+- `TRANSIENT_TECHNICAL_FAILURE` is vanaf promptversie 5 uitsluitend voor aantoonbaar tijdelijke
+  technische storing, zoals een netwerk-timeout, tijdelijke HTTP 503 of rate limit. Het bewijs
+  vermeldt waarom een latere poging zonder wijziging zinvol is. Alleen als alle testblokkades dit
+  type hebben krijgt hetzelfde workitem een `retryAfter`; één structurele blokkade heeft voorrang.
+  Een reproduceerbare 404, ontbrekende configuratie of credential, 401/403, uitgeputte testtijd of
+  onbekende oorzaak valt hier niet onder.
 - `implementationGaps` bevat alleen bewezen ontbrekend gedrag voor een letterlijk overgenomen
   bevroren epiccriterium, met observatie, bewijs, de IDs van alle beoordeelde `DONE`-stories en een
   uitleg waarom die stories dit gedrag niet afdekken. Gewone code controleert criterium en IDs en
@@ -202,9 +221,10 @@ Het testercontract vanaf promptversie 3 houdt implementatie en testbewijs gesche
   Een negatieve bugfixhertest kan met bewijs dezelfde open bug behouden zonder een nieuwe bug.
 
 Nog lopende taken van vóór promptversie 3 kunnen hun positieve verificatie publiceren. Negatieve
-resultaten van die oude taken worden veilig `BLOCKED` en via hetzelfde workitem opnieuw getest
-met het gestructureerde contract; oude ongetypeerde dekkingsgaten maken daardoor na de uitrol geen
-ontwikkelwerk meer. Resultaten vanaf versie 3 blijven compatibel bij de browserinstructies van versie 4.
+resultaten van die oude taken worden veilig `BLOCKED` zonder automatische herhaling. Ze kunnen
+bewust via hetzelfde workitem opnieuw worden getest met het gestructureerde contract; oude
+ongetypeerde dekkingsgaten maken daardoor na de uitrol geen ontwikkelwerk meer. Resultaten vanaf
+versie 3 blijven compatibel bij de browserinstructies van versie 4 en retryclassificatie van versie 5.
 
 ### Stap 5 — deterministisch valideren en publiceren
 
@@ -260,12 +280,20 @@ De publieke eisen aan bewijs, verificaties, bugs en epicoordelen blijven ongewij
 ## Fouten en hervatten
 
 - Een technische toolfout wordt geen productbevinding.
-- Retrybare blokkades volgen 15 minuten, 1 uur, 4 uur en daarna maximaal 24 uur back-off zonder
-  maximaal aantal domeinpogingen.
+- Alleen expliciet tijdelijke technische storingen volgen 15 minuten, 1 uur, 4 uur en daarna
+  maximaal 24 uur back-off zonder maximaal aantal domeinpogingen. `retryable=true` alleen is geen
+  opdracht om opnieuw te proberen: `retryAfter` is daarvoor vereist.
+- Structurele of ongeclassificeerde blokkades en ongeldig testerresultaat krijgen geen `retryAfter`.
+  Ze vragen direct aandacht; een herhaling zonder herstel zou dezelfde uitkomst geven.
+- De Runtime beheert eigen begrensde uitvoeringspogingen. Na een definitieve taakfout plant kwaliteit
+  alleen bij `PROVIDER_RATE_LIMIT` of `WORKER_LEASE_EXPIRED` een nieuwe test. Onbekende fouten,
+  `ENGINE_FAILED` en uitgeputte uitvoerings-/testbudgetten blijven wachten op bewust herstel.
+- Historische geplande retries zonder expliciet bewijs van tijdelijk falen worden bij deze wijziging
+  stilgezet; eerdere pogingen, resultaten en handmatig hervatten blijven behouden.
 - `retryQualityWorkItem(...)` behoudt `attemptCount` en historie, maakt het item direct `PENDING` en
   laat de UI daarna zo nodig de normale processessie starten.
 - Een verlopen claim kan met dezelfde inputmomentopname worden hervat.
-- Een gewijzigde doel- of omgevingsversie blokkeert publicatie en wacht op een volgende run.
+- Een gewijzigde doel- of omgevingsversie blokkeert publicatie en wacht op een bewuste herstart.
 - Een technisch mislukte uitvoering krijgt binnen dezelfde `AiTask` een begrensde nieuwe attempt
   van AI-uitvoering.
 - Een inhoudelijk ongeldig concept wordt niet gepubliceerd; er start geen tweede critic-agent.

@@ -136,8 +136,8 @@ class QualityMvpService(
             }
             val revision = runCatching {
                 deployments.resolve(environment.baseUrl, environment.revisionEndpoint, environment.revisionJsonPath)
-            }.getOrElse {
-                blockWorkItem(item.id, "TEST_ENVIRONMENT_UNAVAILABLE", "Doelomgeving of revisionendpoint is niet bereikbaar.")
+            }.getOrElse { error ->
+                blockWorkItem(item.id, "TEST_ENVIRONMENT_UNAVAILABLE", "Doelomgeving of revisionendpoint is niet bereikbaar.", isTransientTechnicalFailure(error))
                 return@forEach
             }
             deployed[item.targetEnvironment] = revision
@@ -233,7 +233,8 @@ class QualityMvpService(
                 }
                 publishResult(session, resolved.result, task.promptTemplateVersion)
             }
-            AiTaskStatus.FAILED, AiTaskStatus.CANCELLED -> throw QualityTaskFailed("Testertaak eindigde zonder resultaat.")
+            AiTaskStatus.FAILED -> throw QualityTaskFailed(task.errorCode ?: aiQueries.getAiTaskResult(taskId)?.errorCode)
+            AiTaskStatus.CANCELLED -> throw QualityTaskFailed("CANCELLED")
             else -> jdbc.update(
                 "UPDATE pf_quality_process_session SET call_claimed_until=NULL,updated_at=? WHERE id=?",
                 clock.instant(), session.id.value,
@@ -250,9 +251,10 @@ class QualityMvpService(
         val frozen = jdbc.queryForObject("SELECT frozen_context_json FROM pf_quality_process_session WHERE id=?", String::class.java, session.id.value)
             ?.let(mapper::readTree) ?: throw InvalidCommand("Bevroren testomgeving ontbreekt.")
         val testEnvironment = mapper.treeToValue(frozen.path("testableProduct").path("acceptance"), TestEnvironmentConfiguration::class.java)
-        val currentRevision = runCatching { deployments.resolve(testEnvironment.baseUrl, testEnvironment.revisionEndpoint, testEnvironment.revisionJsonPath) }.getOrNull()
+        val revisionCheck = runCatching { deployments.resolve(testEnvironment.baseUrl, testEnvironment.revisionEndpoint, testEnvironment.revisionJsonPath) }
+        val currentRevision = revisionCheck.getOrNull()
         if (eligible.any { currentRevision == null || deployedRevision(session.id, it.targetEnvironment) != currentRevision }) {
-            eligible.forEach { blockWorkItem(it.id, "TEST_ENVIRONMENT_CHANGED", "De testomgeving is tijdens de test gewijzigd of niet meer bereikbaar; het resultaat kan niet worden goedgekeurd.") }
+            eligible.forEach { blockWorkItem(it.id, "TEST_ENVIRONMENT_CHANGED", "De testomgeving is tijdens de test gewijzigd of niet meer bereikbaar; het resultaat kan niet worden goedgekeurd.", revisionCheck.exceptionOrNull()?.let(::isTransientTechnicalFailure) == true) }
             finishSession(session.id, "Kwaliteitswerk wacht op een stabiele testomgeving.", emptyList())
             return
         }
@@ -309,7 +311,7 @@ class QualityMvpService(
             }
             applyOutcome(item, target, outcome, verificationId, node, assessment.implementationGaps)
             if (outcome == VerificationOutcome.BLOCKED) {
-                blockWorkItem(item.id, "QUALITY_RESULT_BLOCKED", blockedReason!!)
+                blockWorkItem(item.id, if (assessment.automaticRetry) "QUALITY_TRANSIENT_TECHNICAL_FAILURE" else "QUALITY_RESULT_BLOCKED", blockedReason!!, assessment.automaticRetry)
                 risks += blockedReason
             } else {
                 hasCompletedVerification = true
@@ -342,7 +344,10 @@ class QualityMvpService(
             if (blocker.path("type").asText() !in TEST_BLOCKER_TYPES) throw InvalidCommand("Ongeldig type testblokkade.")
             requiredText(blocker, "reason", 10, 1000).also(::rejectSensitive)
         }
-        if (blockerReasons.isNotEmpty()) return ResultAssessment(VerificationOutcome.BLOCKED, blockerReasons.joinToString("; "))
+        if (blockerReasons.isNotEmpty()) return ResultAssessment(
+            VerificationOutcome.BLOCKED, blockerReasons.joinToString("; "),
+            automaticRetry = blockers.all { it.path("type").asText() == "TRANSIENT_TECHNICAL_FAILURE" },
+        )
         if (outcome == VerificationOutcome.BLOCKED) return ResultAssessment(outcome, reason)
         val verifiedGaps = gaps.map { gap ->
             if (item.type != QualityWorkItemType.VERIFY_EPIC || outcome !in setOf(VerificationOutcome.NEEDS_WORK, VerificationOutcome.FAILED)) {
@@ -678,10 +683,14 @@ class QualityMvpService(
            blocked_reason,attempt_count,last_attempt_at,retryable,retry_after,created_at,version,claimed_by_session_id FROM pf_quality_work_item $where""",
         { rs, _ ->
             val id = QualityWorkItemId(rs.getString(1))
+            val status = WorkItemStatus.valueOf(rs.getString(9))
+            val retryAfter = rs.getTimestamp(16)?.toInstant()
+            val attentionNeeded = status in setOf(WorkItemStatus.BLOCKED, WorkItemStatus.FAILED) &&
+                (retryAfter == null || rs.getInt(13) >= 5)
             QualityWorkItemDetails(
                 id, ProductId(rs.getString(2)), QualityWorkItemType.valueOf(rs.getString(3)), SourceReference(rs.getString(4), rs.getString(5), rs.getLong(6)),
                 rs.getString(7), rs.getInt(8), WorkItemStatus.valueOf(rs.getString(9)), rs.getString(10), rs.getString(11), rs.getString(12),
-                rs.getInt(13), rs.getTimestamp(14)?.toInstant(), rs.getBoolean(15), rs.getTimestamp(16)?.toInstant(), rs.getInt(13) >= 5,
+                rs.getInt(13), rs.getTimestamp(14)?.toInstant(), rs.getBoolean(15), retryAfter, attentionNeeded,
                 rs.getTimestamp(17).toInstant(), rs.getLong(18), rs.getString(19)?.let(::ProcessSessionId), attemptRows(id),
             )
         }, *args,
@@ -773,9 +782,9 @@ class QualityMvpService(
     private fun parseOutcome(value: String): VerificationOutcome =
         runCatching { VerificationOutcome.valueOf(value) }.getOrElse { throw InvalidCommand("Ongeldige verificatie-uitkomst.") }
 
-    private fun blockWorkItem(id: QualityWorkItemId, code: String, reason: String) {
+    private fun blockWorkItem(id: QualityWorkItemId, code: String, reason: String, automaticRetry: Boolean = false) {
         val item = workItemRows("WHERE id=?", id.value).single()
-        val retry = clock.instant().plus(backoff(item.attemptCount))
+        val retry = if (automaticRetry) clock.instant().plus(backoff(item.attemptCount)) else null
         val now = clock.instant()
         jdbc.update(
             """UPDATE pf_quality_work_item SET status='BLOCKED',error_code=?,blocked_reason=?,retryable=TRUE,retry_after=?,updated_at=?,
@@ -804,10 +813,15 @@ class QualityMvpService(
 
     private fun failSession(id: ProcessSessionId, error: Throwable) {
         val now = clock.instant()
-        val code = if (error is InvalidCommand || error is VersionConflict) "QUALITY_RESULT_INVALID" else "QUALITY_TASK_FAILED"
+        val automaticRetry = isTransientTechnicalFailure(error)
+        val code = when {
+            automaticRetry -> "QUALITY_TRANSIENT_TECHNICAL_FAILURE"
+            error is InvalidCommand || error is VersionConflict -> "QUALITY_RESULT_INVALID"
+            else -> "QUALITY_TASK_FAILED"
+        }
         val reason = if (error is InvalidCommand || error is VersionConflict) error.message.orEmpty() else "Kwaliteitssessie kon veilig niet worden afgerond."
         workItemRows("WHERE claimed_by_session_id=? AND status='IN_PROGRESS'", id.value).forEach { item ->
-            val retry = now.plus(backoff(item.attemptCount))
+            val retry = if (automaticRetry) now.plus(backoff(item.attemptCount)) else null
             jdbc.update(
                 """UPDATE pf_quality_work_item SET status='FAILED',error_code=?,blocked_reason=?,retryable=TRUE,retry_after=?,updated_at=?,version=version+1 WHERE id=?""",
                 code, reason.take(1000), retry, now, item.id.value,
@@ -823,6 +837,12 @@ class QualityMvpService(
             code, reason.take(1000), now, now, id.value,
         )
     }
+
+    // Het runtimecontract geeft geen generieke retryable-vlag door. Onbekende fouten,
+    // budgetuitputting en resultaatvalidatie mogen dus niet opnieuw een complete test starten.
+    private fun isTransientTechnicalFailure(error: Throwable): Boolean =
+        error is TransientTestEnvironmentFailure ||
+            (error is QualityTaskFailed && error.runtimeCode in TRANSIENT_RUNTIME_ERROR_CODES)
 
     private fun finishSession(id: ProcessSessionId, summary: String, publications: List<SourceReference>) {
         val now = clock.instant()
@@ -915,21 +935,23 @@ class QualityMvpService(
 
     private fun versionedTesterPrompt(context: String) =
         BROWSER_INSTRUCTIONS + "\n" +
-        """Maak expliciet onderscheid tussen ontbrekende implementatie en ontbrekend testbewijs. testBlockers bevat gestructureerde blokkades: INSUFFICIENT_TEST_EVIDENCE voor ontbrekende testdata/fixtures of onvoldoende bewijs, TEST_ACCESS_UNAVAILABLE voor toegang, TEST_CAPABILITY_UNAVAILABLE voor ontbrekende browser/tooling/capaciteit, TEST_ENVIRONMENT_UNAVAILABLE voor een ongeschikte omgeving. Eén mockvergadering waarmee een scenario met meerdere vergaderingen niet te testen is, of geen browser waarmee schermgedrag niet te controleren is, betekent BLOCKED met testBlockers; nooit NEEDS_WORK, een implementatiegat of een productbug. Bij testBlockers zijn implementationGaps, bugs en resolvedBugIds leeg. missingCoverage rapporteert uitsluitend ongeteste of resterende dekking en vraagt nooit productwerk aan.
-        Alleen een werkelijk geobserveerd ontbrekend epiccriterium dat door geen enkele opgeleverde story wordt afgedekt mag in implementationGaps staan. Neem criterion letterlijk over uit detail.epic.acceptanceCriteria, vermeld observedBehaviour en evidence van de uitgevoerde test, vergelijk alle detail.stories (DONE) en neem hun exacte id's in reviewedStoryIds op. Leg in coverageExplanation uit waarom die opgeleverde stories dit gedrag niet al afdekken. Gedrag dat volgens een opgeleverde story hoort te werken maar reproduceerbaar faalt is een bug, geen nieuw implementatiegat. Een bewezen bug gaat in bugs met concrete werkelijke/verwachte uitkomst, reproduceerstappen en testbewijs. Ontbrekende toegang, fixtures, browser of testtijd is op zichzelf nooit een bug. Als geen bewezen implementatiegat of reproduceerbare bug beschikbaar is, kies BLOCKED en benoem de testvoorwaarde. Een bugfixhertest mag met bewijs van dezelfde nog optredende bug FAILED teruggeven zonder die bug opnieuw aan te maken.
+        """Maak expliciet onderscheid tussen ontbrekende implementatie, defect afgesproken gedrag en ontbrekend testbewijs. testBlockers bevat gestructureerde blokkades: INSUFFICIENT_TEST_EVIDENCE voor ontbrekende testdata/fixtures of onvoldoende bewijs zonder bewezen defect, TEST_ACCESS_UNAVAILABLE voor toegang, TEST_CAPABILITY_UNAVAILABLE voor ontbrekende browser/tooling/capaciteit, TEST_ENVIRONMENT_UNAVAILABLE voor een ongeschikte omgeving. Deze voorwaarden vereisen herstel of een bewuste herstart en worden niet automatisch opnieuw geprobeerd. Eén mockvergadering waarmee een scenario met meerdere vergaderingen niet te testen is, of geen browser waarmee schermgedrag niet te controleren is, bewijst op zichzelf geen productbug.
+        Gebruik TRANSIENT_TECHNICAL_FAILURE uitsluitend bij aantoonbaar tijdelijk technisch falen, zoals een netwerk-timeout, tijdelijke HTTP 503 of rate limit. Vermeld de waargenomen technische fout en waarom een latere poging zonder wijziging zinvol is. Een reproduceerbare 404, ontbrekende configuratie/fixture/credential, 401/403, uitgeputte testtijd of onbekende oorzaak is niet tijdelijk. Zodra ook een structurele testblokkade aanwezig is, heeft die voorrang en volgt geen automatische herhaling. Raad nooit dat een blokkade vanzelf verdwijnt.
+        Een beloofde en als DONE opgeleverde testvoorziening is zelf afgesproken productgedrag. Controleer de gedeployde acceptatierevisie en de login: als de juiste revision draait en de login werkt, maar de gedocumenteerde en toegestane scenarioroute reproduceerbaar 404 geeft of de beloofde fixture defect is, rapporteer NEEDS_WORK met een concrete bug in die bestaande story. Benoem de bestaande story-id, route, revision, verwachte voorziening en geobserveerde respons in het bugbewijs. Gebruik voor dezelfde oorzaak geen testBlocker en geen implementationGap; zet tests die daardoor niet konden worden uitgevoerd in missingCoverage. Dit vraagt één gerichte bugfix, geen nieuwe epicstories. Claim geen geslaagde schermtest voor niet uitgevoerde scenario's. Is niet bewezen dat de voorziening is opgeleverd of ontbreken toegang of capaciteit werkelijk, kies wel BLOCKED met de concrete testvoorwaarde.
+        Bij testBlockers zijn implementationGaps, bugs en resolvedBugIds leeg. missingCoverage rapporteert uitsluitend ongeteste of resterende dekking en vraagt nooit productwerk aan. Alleen een werkelijk geobserveerd ontbrekend epiccriterium dat door geen enkele opgeleverde story wordt afgedekt mag in implementationGaps staan. Neem criterion letterlijk over uit detail.epic.acceptanceCriteria, vermeld observedBehaviour en evidence van de uitgevoerde test, vergelijk alle detail.stories (DONE) en neem hun exacte id's in reviewedStoryIds op. Leg in coverageExplanation uit waarom die opgeleverde stories dit gedrag niet al afdekken. Gedrag dat volgens een opgeleverde story hoort te werken maar reproduceerbaar faalt is een bug, geen nieuw implementatiegat. Een bewezen bug gaat in bugs met concrete werkelijke/verwachte uitkomst, reproduceerstappen en testbewijs. Als geen bewezen implementatiegat of reproduceerbare bug beschikbaar is, kies BLOCKED en benoem de testvoorwaarde. Een bugfixhertest mag met bewijs van dezelfde nog optredende bug FAILED teruggeven zonder die bug opnieuw aan te maken.
         """.trimIndent() + "\n" +
         "Bewijs gebruikt expliciet type EXTERNAL_URL met veld url (artifactName null), of type RUNTIME_ARTIFACT met een vooraf gedeclareerd artifactName evidence-01 tot en met evidence-50 en mediaType image/png (url null). Verzin nooit een download-URL of bestandsnaam.\n" + testerPrompt(context)
 
     private data class ClaimedSession(val session: ProcessSessionDetails, val created: Boolean)
     private data class Target(val type: VerificationTargetType, val id: String, val version: Long)
-    private data class ResultAssessment(val outcome: VerificationOutcome, val blockedReason: String?, val implementationGaps: List<String> = emptyList())
+    private data class ResultAssessment(val outcome: VerificationOutcome, val blockedReason: String?, val implementationGaps: List<String> = emptyList(), val automaticRetry: Boolean = false)
     private data class ResolvedEvidenceResult(val result: JsonNode, val references: List<ArtifactReference>)
-    private class QualityTaskFailed(message: String) : RuntimeException(message)
+    private class QualityTaskFailed(val runtimeCode: String?) : RuntimeException("Testertaak eindigde zonder resultaat.")
 
     companion object {
         private const val IMPLEMENTATION_ARTIFACT = "quality-impl-mvp"
         private const val IMPLEMENTATION_VARIANT = "single-tester"
-        private const val PROMPT_VERSION = 4L
+        private const val PROMPT_VERSION = 5L
         private const val STRUCTURED_TEST_RESULT_VERSION = 3L
         private val BROWSER_INSTRUCTIONS = """
             Browserinstructies voor de Tester:
@@ -952,11 +974,12 @@ class QualityMvpService(
             ```
             Gebruik dezelfde NODE_PATH en PLAYWRIGHT_BROWSERS_PATH voor de echte browserscripts. Werkt deze startcontrole niet, rapporteer TEST_CAPABILITY_UNAVAILABLE met de uitgevoerde controle en een korte fout zonder gevoelige gegevens. Installeer niet op eigen initiatief andere browsers of packages en wijzig geen runtimeconfiguratie. Ontbrekende browsercapaciteit is geen productbug.
             Test vervolgens de werkelijk gedeployde applicatie op testableProduct.acceptance.baseUrl, binnen allowedRoutes; bezoek nooit productie. Controleer de ingestelde revision, testlogin en effectieve identiteit. Verstuur de logincredential alleen naar het geconfigureerde relatieve loginendpoint op deze acceptatie-origin, zonder redirects te volgen; gebruik geen globale extraHTTPHeaders met de credential. Gebruik bijvoorbeeld browserContext.request.post met maxRedirects: 0 en laat de browser daarna dezelfde sessiecookies gebruiken. Toon geen credentials, cookies of sessietokens.
-            Doorloop de vereiste schermhandelingen met Playwright op de echte pagina, inclusief relevante lege en fouttoestanden en desktop-/mobiele viewport als responsive gedrag wordt gevraagd. Een geslaagde startcontrole of API-call bewijst geen werkend scherm. Leg in checks vast welke handelingen en viewports werkelijk getest zijn; ontbreekt verplicht schermbewijs, kies BLOCKED met de concrete testblokkade.
+            Doorloop de vereiste schermhandelingen met Playwright op de echte pagina, inclusief relevante lege en fouttoestanden en desktop-/mobiele viewport als responsive gedrag wordt gevraagd. Een geslaagde startcontrole of API-call bewijst geen werkend scherm. Leg in checks vast welke handelingen en viewports werkelijk getest zijn. Ontbrekend schermbewijs zonder bewezen defect betekent BLOCKED; een bewezen defect in een opgeleverde voorziening gaat naar bugs, met de daardoor onuitgevoerde schermtests in missingCoverage.
             Maak echte PNG-screenshots met bijvoorbeeld await page.screenshot({ path: '/job/output/artifacts/evidence-01', type: 'png' }); gebruik de exact gedeclareerde bestandsnamen evidence-01 t/m evidence-50 zonder toegevoegde extensie. Koppel ieder geproduceerd bestand exact één keer in evidence.artifacts met type RUNTIME_ARTIFACT, artifactName evidence-01 (of het gebruikte nummer), mediaType image/png en url null. Maak geen screenshot van de logincredential of van about:blank als applicatiebewijs.
-            Gebruik voor testscenario's alleen gedocumenteerde, toegestane acceptatieroutes. Als de benodigde fixture of scenariobediening niet bereikbaar is, rapporteer INSUFFICIENT_TEST_EVIDENCE of TEST_ENVIRONMENT_UNAVAILABLE met de ontbrekende testvoorwaarde. Zoek geen productietoegang als uitweg.
+            Gebruik voor testscenario's alleen gedocumenteerde, toegestane acceptatieroutes. Maak onderscheid tussen een nog ontbrekende testvoorwaarde (BLOCKED) en een reproduceerbaar defect in een als DONE opgeleverde fixture of scenariobediening (NEEDS_WORK met bug). Zoek geen productietoegang als uitweg.
         """.trimIndent()
-        private val TEST_BLOCKER_TYPES = setOf("INSUFFICIENT_TEST_EVIDENCE", "TEST_ACCESS_UNAVAILABLE", "TEST_CAPABILITY_UNAVAILABLE", "TEST_ENVIRONMENT_UNAVAILABLE")
+        private val TEST_BLOCKER_TYPES = setOf("INSUFFICIENT_TEST_EVIDENCE", "TEST_ACCESS_UNAVAILABLE", "TEST_CAPABILITY_UNAVAILABLE", "TEST_ENVIRONMENT_UNAVAILABLE", "TRANSIENT_TECHNICAL_FAILURE")
+        private val TRANSIENT_RUNTIME_ERROR_CODES = setOf("PROVIDER_RATE_LIMIT", "WORKER_LEASE_EXPIRED")
         private val ROLE = AgentRoleKey("TESTER_MVP")
         private val JOB = AiJobKey("QUALITY.VERIFY_EPIC")
         private val PROCESS_ACTOR = ActorReference(ActorType.PROCESS, "quality-mvp")
@@ -976,7 +999,7 @@ class QualityMvpService(
             val result = path("properties").path("results").path("items")
             (result.path("required") as com.fasterxml.jackson.databind.node.ArrayNode).add("implementationGaps").add("testBlockers")
             val properties = result.path("properties") as com.fasterxml.jackson.databind.node.ObjectNode
-            properties.set<JsonNode>("testBlockers", ObjectMapper().readTree("""{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","reason"],"properties":{"type":{"type":"string","enum":["INSUFFICIENT_TEST_EVIDENCE","TEST_ACCESS_UNAVAILABLE","TEST_CAPABILITY_UNAVAILABLE","TEST_ENVIRONMENT_UNAVAILABLE"]},"reason":{"type":"string","minLength":10,"maxLength":1000}}}}"""))
+            properties.set<JsonNode>("testBlockers", ObjectMapper().readTree("""{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","reason"],"properties":{"type":{"type":"string","enum":["INSUFFICIENT_TEST_EVIDENCE","TEST_ACCESS_UNAVAILABLE","TEST_CAPABILITY_UNAVAILABLE","TEST_ENVIRONMENT_UNAVAILABLE","TRANSIENT_TECHNICAL_FAILURE"]},"reason":{"type":"string","minLength":10,"maxLength":1000}}}}"""))
             val gap = ObjectMapper().readTree("""{"type":"array","items":{"type":"object","additionalProperties":false,"required":["criterion","observedBehaviour","coverageExplanation","reviewedStoryIds","evidence"],"properties":{"criterion":{"type":"string","minLength":1,"maxLength":10000},"observedBehaviour":{"type":"string","minLength":10,"maxLength":2000},"coverageExplanation":{"type":"string","minLength":10,"maxLength":2000},"reviewedStoryIds":{"type":"array","items":{"type":"string"}}}}}""")
             (gap.path("items").path("properties") as com.fasterxml.jackson.databind.node.ObjectNode).set<JsonNode>("evidence", properties.path("evidence").deepCopy<JsonNode>())
             properties.set<JsonNode>("implementationGaps", gap)

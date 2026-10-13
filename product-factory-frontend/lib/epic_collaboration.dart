@@ -1851,6 +1851,8 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
                 ),
                 const SizedBox(height: 8),
                 text(_text(activity(e)['detail'])),
+                if (_text(activity(e)['next']).isNotEmpty)
+                  text(_text(activity(e)['next'])),
                 if (!activityOverview &&
                     pendingApproval(e) &&
                     !waitingForMyAnswer(e))

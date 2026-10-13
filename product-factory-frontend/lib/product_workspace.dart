@@ -1135,7 +1135,7 @@ String _epicStatusLabel(String status) => switch (status) {
   'AVAILABLE' => 'Klaar voor planning',
   'IN_PLANNING' => 'Wordt gepland',
   'ACTIVE' => 'In uitvoering',
-  'VERIFYING' => 'Wordt gecontroleerd',
+  'VERIFYING' => 'In verificatie',
   'COMPLETED' => 'Afgerond',
   'NOT_SUCCESSFUL' => 'Niet geslaagd',
   'SUPERSEDED' => 'Vervangen',
@@ -3508,14 +3508,23 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
       ),
       subtitle: SelectableText(
         '${item['blockedReason'] ?? item['result'] ?? 'Gericht testwerk staat klaar.'}\n'
-        'Poging ${item['attemptCount']} · retry ${item['retryAfter'] ?? 'niet gepland'}',
+        'Poging ${item['attemptCount']}'
+        '${item['retryAfter'] != null
+            ? ' · volgende poging ${_shortDateTime(_parseInstant(item['retryAfter'])!)}'
+            : item['status'] == 'BLOCKED' || item['status'] == 'FAILED'
+            ? ' · Wacht op herstel · geen automatische herhaling'
+            : ''}',
       ),
       trailing: item['retryable'] == true
           ? TextButton(
               onPressed: () => _mutate(
                 () => widget.gateway.retryQualityWorkItem(_value(item['id'])),
               ),
-              child: const Text('Retry now'),
+              child: Text(
+                item['retryAfter'] == null
+                    ? 'Na herstel hervatten'
+                    : 'Nu opnieuw proberen',
+              ),
             )
           : null,
       isThreeLine: true,
