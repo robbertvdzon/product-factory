@@ -11,6 +11,7 @@ import nl.vdzon.productfactory.api.planning.*
 import nl.vdzon.productfactory.api.product.*
 import nl.vdzon.productfactory.api.quality.*
 import nl.vdzon.productfactory.api.shared.*
+import nl.vdzon.productfactory.product.AutomaticProductProcessing
 import nl.vdzon.productfactory.planning.mvp.ProductPlanningMvpService
 import nl.vdzon.productfactory.quality.mvp.QualityMvpService
 import nl.vdzon.productfactory.quality.mvp.TransientTestEnvironmentFailure
@@ -47,6 +48,8 @@ class QualityMvpIntegrationTest @Autowired constructor(
     private val ai: AiExecutionApplicationService,
     private val runtime: FakeRuntime,
     private val revisions: FakeDeploymentRevisionResolver,
+    private val gitRevisions: FakeGitRevisionResolver,
+    private val automatic: AutomaticProductProcessing,
     private val mapper: ObjectMapper,
     private val jdbc: JdbcTemplate,
     private val clock: MutableQualityClock,
@@ -63,6 +66,9 @@ class QualityMvpIntegrationTest @Autowired constructor(
         runtime.reset()
         revisions.revision = SHA
         revisions.failure = null
+        revisions.afterResolve = null
+        revisions.resolveCalls = 0
+        gitRevisions.reset()
         clock.now = Instant.parse("2026-10-13T08:00:00Z")
         productId = ProductId("quality-${UUID.randomUUID().toString().take(8)}")
         epicId = EpicId(UUID.randomUUID().toString())
@@ -194,8 +200,9 @@ class QualityMvpIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `tester onderzoekt actuele deployment maar een afwijzing zonder bewezen defect blijft geblokkeerd`() {
+    fun `tester mag een bewezen nieuwere deployment testen maar afwijzing zonder defect blijft geblokkeerd`() {
         revisions.revision = "b".repeat(40)
+        gitRevisions.ancestors[revisions.revision] = setOf(SHA)
         val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "deployment-lagging"))
         completeSession(result(work, "NEEDS_WORK"))
 
@@ -206,6 +213,220 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(verification.outcome).isEqualTo(VerificationOutcome.BLOCKED)
         assertThat(verification.testedRevision).isEqualTo("b".repeat(40))
         assertThat(verification.requiredCommitSha).isEqualTo(SHA)
+    }
+
+    @Test
+    fun `achterlopende deployment wacht zonder testpoging en start automatisch zodra een latere revision alles bevat`() {
+        val oldRevision = "b".repeat(40)
+        val laterRevision = "c".repeat(40)
+        gitRevisions.ancestors[oldRevision] = emptySet()
+        gitRevisions.ancestors[laterRevision] = setOf(SHA)
+        revisions.revision = oldRevision
+        val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "deployment-wait"))
+
+        automatic.check(productId.value, ScheduledProcess.QUALITY_ASSURANCE)
+        ai.dispatchPending()
+        val waiting = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(waiting.id).isEqualTo(work)
+        assertThat(waiting.status).isEqualTo(WorkItemStatus.PENDING)
+        assertThat(waiting.errorCode).isEqualTo("WAITING_FOR_DEPLOYMENT")
+        assertThat(waiting.blockedReason).contains(oldRevision.take(12), SHA.take(12))
+        assertThat(waiting.attemptCount).isZero()
+        assertThat(waiting.lastAttemptAt).isNull()
+        assertThat(waiting.attempts).isEmpty()
+        assertThat(waiting.retryAfter).isNull()
+        assertThat(waiting.retryable).isFalse()
+        assertThat(runtime.requests).isEmpty()
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
+
+        // Both the scheduler and a direct process call respect the deployment polling interval.
+        clock.advance(Duration.ofSeconds(59))
+        repeat(3) {
+            automatic.check(productId.value, ScheduledProcess.QUALITY_ASSURANCE)
+            quality.runProcessSession(productId)
+        }
+        assertThat(gitRevisions.checks).hasSize(1)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().version).isEqualTo(waiting.version)
+        clock.advance(Duration.ofSeconds(1))
+        automatic.check(productId.value, ScheduledProcess.QUALITY_ASSURANCE)
+        val checkedAgain = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(checkedAgain.version).isEqualTo(waiting.version + 1)
+        assertThat(checkedAgain.attempts).isEmpty()
+        assertThat(gitRevisions.checks).hasSize(2)
+
+        revisions.revision = laterRevision
+        clock.advance(Duration.ofSeconds(60))
+        automatic.check(productId.value, ScheduledProcess.QUALITY_ASSURANCE)
+        ai.dispatchPending()
+        val started = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(started.status).isEqualTo(WorkItemStatus.IN_PROGRESS)
+        assertThat(started.attemptCount).isEqualTo(1)
+        assertThat(started.attempts).hasSize(1)
+        assertThat(started.errorCode).isNull()
+        assertThat(started.blockedReason).isNull()
+        assertThat(runtime.requests).hasSize(1)
+        automatic.check(productId.value, ScheduledProcess.QUALITY_ASSURANCE)
+        ai.dispatchPending()
+        assertThat(runtime.requests).hasSize(1)
+    }
+
+    @Test
+    fun `epic wacht op alle opgeleverde commits en negeert geannuleerde stories`() {
+        val other = StoryId(UUID.randomUUID().toString())
+        val cancelled = StoryId(UUID.randomUUID().toString())
+        val otherSha = "b".repeat(40)
+        val cancelledSha = "c".repeat(40)
+        val deployed = "d".repeat(40)
+        insertStory(other, StoryType.PRODUCT_STORY, null, null)
+        insertStory(cancelled, StoryType.PRODUCT_STORY, null, null)
+        jdbc.update("UPDATE pf_story SET delivered_commit_sha=? WHERE id=?", otherSha, other.value)
+        jdbc.update("UPDATE pf_story SET status='CANCELLED',delivered_commit_sha=? WHERE id=?", cancelledSha, cancelled.value)
+        epicVerification("all-deliveries")
+        revisions.revision = deployed
+        gitRevisions.ancestors[deployed] = setOf(SHA)
+
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        assertThat(gitRevisions.checks.single()).isEqualTo(deployed to setOf(SHA, otherSha))
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().attemptCount).isZero()
+        assertThat(runtime.requests).isEmpty()
+        gitRevisions.ancestors[deployed] = setOf(SHA, otherSha)
+        clock.advance(Duration.ofSeconds(60))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        assertThat(runtime.requests).hasSize(1)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().attemptCount).isEqualTo(1)
+        assertThat(runtime.requests.single().prompt).doesNotContain(cancelled.value)
+    }
+
+    @Test
+    fun `epiccontext bevat exact de stories waarvan de commits voor de gate zijn bevroren`() {
+        val deliveredDuringCheck = StoryId(UUID.randomUUID().toString())
+        val laterSha = "b".repeat(40)
+        epicVerification("frozen-delivery-snapshot")
+        gitRevisions.onCheck = {
+            insertStory(deliveredDuringCheck, StoryType.PRODUCT_STORY, null, null)
+            jdbc.update("UPDATE pf_story SET delivered_commit_sha=? WHERE id=?", laterSha, deliveredDuringCheck.value)
+        }
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+
+        assertThat(gitRevisions.checks.single()).isEqualTo(SHA to setOf(SHA))
+        assertThat(planningQueries.findStories(StoryFilter(productId, epicId = epicId, statuses = setOf(StoryStatus.DONE)))).hasSize(2)
+        assertThat(runtime.requests.single().prompt).contains(storyId.value).doesNotContain(deliveredDuringCheck.value, laterSha)
+        val context = mapper.readTree(jdbc.queryForObject(
+            "SELECT frozen_context_json FROM pf_quality_process_session WHERE product_id=? AND status='WAITING_FOR_AI'",
+            String::class.java, productId.value,
+        ))
+        assertThat(context.path("workItems")[0].path("detail").path("stories").map { it.path("id").asText() })
+            .containsExactly(storyId.value)
+    }
+
+    @Test
+    fun `batch gebruikt dezelfde deploymentrevision voor iedere gate en de AI context`() {
+        val other = StoryId(UUID.randomUUID().toString())
+        val otherSha = "b".repeat(40)
+        val checkedRevision = "c".repeat(40)
+        val changedRevision = "d".repeat(40)
+        insertStory(other, StoryType.PRODUCT_STORY, null, null)
+        jdbc.update("UPDATE pf_story SET delivered_commit_sha=? WHERE id=?", otherSha, other.value)
+        gitRevisions.ancestors[checkedRevision] = setOf(SHA, otherSha)
+        gitRevisions.ancestors[changedRevision] = setOf(otherSha)
+        revisions.revision = checkedRevision
+        revisions.afterResolve = { revisions.revision = changedRevision }
+        quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 80, "batch-first"))
+        quality.requestStoryVerification(RequestStoryVerificationCommand(productId, other, 1, "acceptance", 70, "batch-second"))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+
+        assertThat(revisions.resolveCalls).isEqualTo(1)
+        assertThat(gitRevisions.checks).containsExactly(checkedRevision to setOf(SHA), checkedRevision to setOf(otherSha))
+        assertThat(runtime.requests).hasSize(1)
+        val context = mapper.readTree(jdbc.queryForObject(
+            "SELECT frozen_context_json FROM pf_quality_process_session WHERE product_id=? AND status='WAITING_FOR_AI'",
+            String::class.java, productId.value,
+        ))
+        assertThat(context.path("deployedRevisions").path("acceptance").asText()).isEqualTo(checkedRevision)
+        assertThat(context.path("workItems").size()).isEqualTo(2)
+        assertThat(runtime.requests.single().prompt).doesNotContain(changedRevision)
+    }
+
+    @Test
+    fun `bugfixhertest wacht op zijn eigen oplevercommit`() {
+        val bug = BugId(UUID.randomUUID().toString())
+        val fix = StoryId(UUID.randomUUID().toString())
+        val fixSha = "b".repeat(40)
+        insertBug(bug)
+        insertStory(fix, StoryType.BUGFIX, bug, 1)
+        jdbc.update("UPDATE pf_story SET delivered_commit_sha=? WHERE id=?", fixSha, fix.value)
+        quality.requestBugfixRetest(RequestBugfixRetestCommand(productId, bug, fix, 1, "acceptance", "retest-waits-for-fix"))
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+
+        assertThat(gitRevisions.checks.single()).isEqualTo(SHA to setOf(fixSha))
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().errorCode).isEqualTo("WAITING_FOR_DEPLOYMENT")
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().attemptCount).isZero()
+        assertThat(runtime.requests).isEmpty()
+    }
+
+    @Test
+    fun `onbekende ancestry blokkeert handmatig zonder AI of testpoging`() {
+        revisions.revision = "b".repeat(40)
+        epicVerification("unknown-ancestry")
+        quality.runProcessSession(productId)
+        clock.advance(Duration.ofDays(7))
+        automatic.check(productId.value, ScheduledProcess.QUALITY_ASSURANCE)
+        ai.dispatchPending()
+
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(item.status).isEqualTo(WorkItemStatus.BLOCKED)
+        assertThat(item.errorCode).isEqualTo("DEPLOYMENT_REVISION_UNVERIFIED")
+        assertThat(item.retryAfter).isNull()
+        assertThat(item.retryable).isTrue()
+        assertThat(item.attentionNeeded).isTrue()
+        assertThat(item.attemptCount).isZero()
+        assertThat(item.attempts).isEmpty()
+        assertThat(runtime.requests).isEmpty()
+    }
+
+    @Test
+    fun `ontbrekende oplevercommit wordt geen veronderstelde geslaagde deploymentcontrole`() {
+        jdbc.update("UPDATE pf_story SET delivered_commit_sha=NULL WHERE id=?", storyId.value)
+        epicVerification("missing-delivery-commit")
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(item.status).isEqualTo(WorkItemStatus.BLOCKED)
+        assertThat(item.errorCode).isEqualTo("DEPLOYMENT_REVISION_UNVERIFIED")
+        assertThat(item.blockedReason).contains("oplevercommit")
+        assertThat(item.retryAfter).isNull()
+        assertThat(item.attemptCount).isZero()
+        assertThat(gitRevisions.checks).isEmpty()
+        assertThat(runtime.requests).isEmpty()
+    }
+
+    @Test
+    fun `deploymentwachten en startblokkade behouden het bewijs van een eerdere testpoging`() {
+        val work = epicVerification("preserved-attempt-history")
+        completeSession(result(work, "BLOCKED").apply {
+            (path("results")[0] as ObjectNode).put("blockedReason", "De beloofde testvoorziening moet eerst worden hersteld.")
+        })
+        val historicalAttempt = qualityQueries.findQualityWorkItems(productId).single().attempts.single()
+        quality.retryQualityWorkItem(work)
+        revisions.revision = "b".repeat(40)
+        gitRevisions.ancestors[revisions.revision] = emptySet()
+        quality.runProcessSession(productId)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().attempts).containsExactly(historicalAttempt)
+
+        revisions.failure = InvalidCommand("Revisionendpoint is niet geconfigureerd.")
+        clock.advance(Duration.ofSeconds(60))
+        quality.runProcessSession(productId)
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(item.status).isEqualTo(WorkItemStatus.BLOCKED)
+        assertThat(item.attemptCount).isEqualTo(1)
+        assertThat(item.attempts).containsExactly(historicalAttempt)
+        assertThat(item.retryAfter).isNull()
+        assertThat(runtime.requests).hasSize(1)
     }
 
     @Test
@@ -833,18 +1054,40 @@ class QualityMvpIntegrationTest @Autowired constructor(
     class Fakes {
         @Bean @Primary fun fakeRuntime() = FakeRuntime()
         @Bean @Primary fun qualityClock() = MutableQualityClock()
-        @Bean @Primary fun fakeGit(): PublicGitRevisionResolver = object : PublicGitRevisionResolver {
-            override fun resolveHead(publicGitUrl: String) = SHA
-        }
+        @Bean @Primary fun fakeGit() = FakeGitRevisionResolver()
         @Bean @Primary fun fakeDeploymentRevision() = FakeDeploymentRevisionResolver()
+    }
+
+    class FakeGitRevisionResolver : PublicGitRevisionResolver {
+        val ancestors = mutableMapOf<String, Set<String>>()
+        val checks = mutableListOf<Pair<String, Set<String>>>()
+        var onCheck: (() -> Unit)? = null
+        fun reset() {
+            ancestors.clear()
+            ancestors[SHA] = emptySet()
+            checks.clear()
+            onCheck = null
+        }
+        override fun resolveHead(publicGitUrl: String) = SHA
+        override fun containsCommits(publicGitUrl: String, deployedRevision: String, requiredCommitShas: Set<String>): Boolean {
+            checks += deployedRevision to requiredCommitShas
+            onCheck?.invoke()
+            val known = ancestors[deployedRevision] ?: throw InvalidCommand("Deployed revision is onbekend.")
+            return (known + deployedRevision).containsAll(requiredCommitShas)
+        }
     }
 
     class FakeDeploymentRevisionResolver : DeploymentRevisionResolver {
         var revision: String = SHA
         var failure: Throwable? = null
+        var afterResolve: (() -> Unit)? = null
+        var resolveCalls = 0
         override fun resolve(baseUrl: String, revisionEndpoint: String, revisionJsonPath: String): String {
+            resolveCalls++
             failure?.let { throw it }
-            return revision
+            val resolved = revision
+            afterResolve?.invoke()
+            return resolved
         }
     }
 

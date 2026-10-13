@@ -11,7 +11,7 @@ class EpicVerificationActivityService(private val jdbc: JdbcTemplate) {
     fun current(epic: EpicDetails): EpicVerificationActivity {
         val work = jdbc.query(
             """SELECT w.id,w.status,w.blocked_reason,w.retry_after,w.updated_at,
-                    s.status AS session_status,t.status AS task_status
+                    s.status AS session_status,t.status AS task_status,w.error_code
                 FROM pf_quality_work_item w
                 LEFT JOIN pf_quality_process_session s ON s.id=w.claimed_by_session_id AND s.product_id=w.product_id
                     AND s.active_product_id=w.product_id AND s.finished_at IS NULL
@@ -21,12 +21,17 @@ class EpicVerificationActivityService(private val jdbc: JdbcTemplate) {
                     AND w.source_id=? AND w.source_version=?
                 ORDER BY w.created_at DESC,w.id DESC LIMIT 1""",
             { rs, _ -> Work(rs.getString(1), rs.getString(2), rs.getString(3), rs.getTimestamp(4)?.toInstant(),
-                rs.getTimestamp(5).toInstant(), rs.getString(6), rs.getString(7)) },
+                rs.getTimestamp(5).toInstant(), rs.getString(6), rs.getString(7), rs.getString(8)) },
             epic.productId.value, epic.id.value, epic.version,
         ).singleOrNull()
         fun result(state: EpicActivityState, label: String, detail: String, next: String? = null) =
             EpicVerificationActivity(state, label, detail, next, work?.updatedAt ?: epic.updatedAt, work?.id)
 
+        if (work?.status == "PENDING" && work.errorCode == "WAITING_FOR_DEPLOYMENT") return result(
+            EpicActivityState.QUEUED, "Wacht op uitrol naar acceptatie",
+            work.reason?.takeIf { it.isNotBlank() } ?: "De opgeleverde wijzigingen staan nog niet op acceptatie.",
+            "De verificatie start automatisch zodra de opgeleverde wijzigingen op acceptatie staan. Er draait nu geen test.",
+        )
         if (work?.status in setOf("BLOCKED", "FAILED")) {
             val reason = work?.reason?.takeIf { it.isNotBlank() } ?: "De kwaliteitscontrole kan nog niet verder."
             return if (work?.retryAfter != null) result(
@@ -54,7 +59,7 @@ class EpicVerificationActivityService(private val jdbc: JdbcTemplate) {
     }
 
     private data class Work(val id: String, val status: String, val reason: String?, val retryAfter: Instant?,
-        val updatedAt: Instant, val sessionStatus: String?, val taskStatus: String?)
+        val updatedAt: Instant, val sessionStatus: String?, val taskStatus: String?, val errorCode: String?)
 }
 
 data class EpicVerificationActivity(

@@ -76,13 +76,13 @@ AI-uitvoering en vraagt zij een complete taak aan bij
 ## Verloop van één processessie
 
 ```text
-activeer verstreken retries en claim PENDING items van één product
+activeer verstreken retries en lees PENDING items van één product
                   │
                   ▼
-lees exacte doelen, oplevercommit en gedeployde productversie
+controleer doelen en of de deployment alle oplevercommits bevat
                   │
                   ▼
-queue één complete Tester-AiTask
+claim gereed werk, registreer de testpoging en queue één Tester-AiTask
                   │
                   ▼
 WAITING_FOR_AI · latere run hervat
@@ -102,22 +102,36 @@ atomair publiceren + vervolgcommands + QualitySnapshot
 Applicatiecode zet eerst `BLOCKED`- of `FAILED`-workitems van het opgegeven product waarvan een
 expliciete `retryAfter` is verstreken terug op `PENDING`. Alleen aantoonbaar tijdelijke technische
 storingen krijgen zo’n tijdstip. `retryable=true` betekent dat bewust handmatig hervatten is toegestaan;
-zonder `retryAfter` start er geen automatische herhaling. Daarna claimt of hervat zij de run voor dat product en
-alle `PENDING` workitems uit de vaste startmomentopname. Een ander product kan gelijktijdig een eigen
-kwaliteitssessie uitvoeren.
+zonder `retryAfter` start er geen automatische herhaling. Daarna claimt of hervat zij de run voor dat
+product en leest de gereedstaande `PENDING` workitems uit de vaste startmomentopname. Een ander
+product kan gelijktijdig een eigen kwaliteitssessie uitvoeren.
 Daarna leest zij per opdracht de exacte epic-, story-, bug-, opleverings- en signaalversies plus
 `TestableProductDetails` en het actuele geheugen van `TESTER_MVP`. De processessie legt de exacte
 bron- en geheugenversies vast.
 
-De Tester controleert bereikbaarheid, werkelijk gedeployde revision en accountgrenzen vóór
-inhoudelijk testen. De werkelijk gedeployde revision wordt vastgelegd naast de vereiste
-`Story.deliveredCommitSha`; een latere commit wordt niet uitsluitend op SHA-ongelijkheid geweigerd.
-Een onbereikbare omgeving of ontbrekende toegang krijgt een concrete blokkadereden en verhoogt
-`attemptCount`. Ontbrekende credentials, configuratie of een ongeldige revisionresponse worden
-handmatig hervatbaar `BLOCKED` zonder `retryAfter`. Alleen expliciete tijdelijke transportfouten
-(timeout/connect) of HTTP 408/429/502/503/504 krijgen back-off. HTTP 401/403/404 en ongeclassificeerd
-falen krijgen geen automatische nieuwe test. Een blokkade vóór werkelijk testwerk maakt geen
-productbug of `QualitySnapshot`.
+Applicatiecode controleert vóór de AI-taak en vóór het registreren van een testpoging dat de
+acceptatiedeployment alle vereiste oplevercommits bevat. Voor een epic zijn dat de commits van alle
+`DONE`-stories in die epic; geannuleerde stories tellen niet mee. Voor storyverificatie of een
+bugfixhertest geldt de eigen `Story.deliveredCommitSha`. Git-afstamming bepaalt dit: een latere
+revision die alle commits bevat is geldig, alleen ongelijke SHA's zijn geen afwijzingsreden.
+De gate en de AI-context gebruiken exact dezelfde bevroren stories en één bevroren deploymentrevision
+per omgeving, zodat een gelijktijdige oplevering hun bewijs niet ongemerkt kan veranderen.
+
+Een aantoonbaar achterlopende deployment houdt hetzelfde workitem `PENDING` met
+`WAITING_FOR_DEPLOYMENT` en een concrete reden. De factory controleert hoogstens eens per minuut
+opnieuw via `updated_at`, zonder AI-taak, `attemptCount`, nieuwe testpoging, bug of snapshot.
+`retryAfter` blijft leeg: dit is wachten op oplevering, geen herhaling van een mislukte test. Zodra
+de deployment gereed is start dezelfde opdracht automatisch en registreert zij pas haar testpoging.
+Iedere uitgevoerde wachtcontrole verhoogt de werkversie zodat de automatische verwerking de
+volgende controle kan oppakken. De wachttijd geldt ook bij een handmatig gestarte processessie.
+
+Onbekende Git-afstamming, een ontbrekende oplevercommit, ontbrekende credentials, configuratie of
+een ongeldige revisionresponse wordt handmatig hervatbaar `BLOCKED` zonder `retryAfter`. Zulke
+startblokkades maken geen testpoging en overschrijven nooit historische pogingen. Alleen expliciete
+tijdelijke transportfouten (timeout/connect) of HTTP 408/429/502/503/504 krijgen back-off. HTTP
+401/403/404 en ongeclassificeerd falen krijgen geen automatische nieuwe test. De Tester controleert
+daarna zelf ook bereikbaarheid, de werkelijk gedeployde revision en accountgrenzen vóór inhoudelijk
+testen; gewone code bewaakt dat deze revision gedurende de test gelijk blijft.
 
 ### Stap 2 — opdrachten ordenen
 
@@ -256,8 +270,8 @@ loopt mee in de complete feitelijke herbeoordeling van de epic.
 
 De MVP gebruikt `NOT_SUCCESSFUL` alleen wanneer alle afgesproken functionaliteit werkt en
 beschikbaar, herleidbaar bewijs een vooraf testbaar acceptatiecriterium over het beoogde
-productresultaat weerlegt. Ontbrekende gebruiksdata, een onbereikbare meetbron of een achterlopende
-deployment geven `BLOCKED`.
+productresultaat weerlegt. Ontbrekende gebruiksdata of een onbereikbare meetbron geven `BLOCKED`. Een vooraf bewezen
+achterlopende deployment blijft `PENDING` totdat de wijzigingen daadwerkelijk beschikbaar zijn.
 
 Na een werkelijk uitgevoerde niet-lege testsessie wordt uit de gevalideerde publieke gegevens
 precies één nieuwe `QualitySnapshot` voor het product van die sessie opgebouwd. Een no-op of
@@ -280,6 +294,8 @@ De publieke eisen aan bewijs, verificaties, bugs en epicoordelen blijven ongewij
 ## Fouten en hervatten
 
 - Een technische toolfout wordt geen productbevinding.
+- Een achterlopende deployment blijft `PENDING` met `WAITING_FOR_DEPLOYMENT`; iedere minuut volgt
+  een lichte versiecontrole totdat de vereiste oplevercommits beschikbaar zijn, zonder AI-testpoging.
 - Alleen expliciet tijdelijke technische storingen volgen 15 minuten, 1 uur, 4 uur en daarna
   maximaal 24 uur back-off zonder maximaal aantal domeinpogingen. `retryable=true` alleen is geen
   opdracht om opnieuw te proberen: `retryAfter` is daarvoor vereist.

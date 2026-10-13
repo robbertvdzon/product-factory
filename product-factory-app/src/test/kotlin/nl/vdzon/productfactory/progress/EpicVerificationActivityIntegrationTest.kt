@@ -46,6 +46,40 @@ class EpicVerificationActivityIntegrationTest @Autowired constructor(
     }
 
     @Test
+    fun `uitrol wacht automatisch zonder actieve tester of persoonlijke actie`() {
+        val id = insertWork("PENDING", reason = "Story hkh-348 is opgeleverd op abc123 maar acceptatie draait nog def456.")
+        jdbc.update("UPDATE pf_quality_work_item SET error_code='WAITING_FOR_DEPLOYMENT',attempt_count=0 WHERE id=?", id)
+
+        val result = activity.activity(epic)
+        val waiting = progress.progress(epic.id).waitingOn!!
+
+        assertThat(result.state).isEqualTo(EpicActivityState.QUEUED)
+        assertThat(result.label).isEqualTo("Wacht op uitrol naar acceptatie")
+        assertThat(result.detail).contains("hkh-348", "abc123", "def456")
+        assertThat(result.next).contains("start automatisch", "Er draait nu geen test")
+        assertThat(result.waitingRole).isNull()
+        assertThat(waiting.title).isEqualTo(result.label)
+        assertThat(waiting.detail).isEqualTo(result.detail)
+        assertThat(waiting.next).isEqualTo(result.next)
+        assertThat(waiting.reference).isEqualTo(id)
+    }
+
+    @Test
+    fun `uitrol van andere epicversie of product bepaalt huidige status niet`() {
+        val id = insertWork("PENDING", reason = "Oude uitrol", version = epic.version - 1)
+        jdbc.update("UPDATE pf_quality_work_item SET error_code='WAITING_FOR_DEPLOYMENT' WHERE id=?", id)
+        assertThat(activity.activity(epic).label).isEqualTo("Verificatie staat klaar")
+        jdbc.update("UPDATE pf_quality_work_item SET source_version=? WHERE id=?", epic.version + 1, id)
+        assertThat(activity.activity(epic).label).isEqualTo("Verificatie staat klaar")
+        jdbc.update("UPDATE pf_quality_work_item SET source_version=? WHERE id=?", epic.version, id)
+        assertThat(activity.activity(epic).label).isEqualTo("Wacht op uitrol naar acceptatie")
+        assertThat(activity.activity(epic.copy(productId = ProductId("ander-product"))).label).isEqualTo("Verificatie staat klaar")
+        assertThat(activity.activity(epic.copy(id = EpicId("andere-epic"))).label).isEqualTo("Verificatie staat klaar")
+        jdbc.update("UPDATE pf_quality_work_item SET status='BLOCKED' WHERE id=?", id)
+        assertThat(activity.activity(epic).label).isEqualTo("Verificatie geblokkeerd")
+    }
+
+    @Test
     fun `structurele blokkade toont herstel in activiteit en voortgang ondanks handmatige retry mogelijkheid`() {
         val id = insertWork("BLOCKED", reason = "De acceptatieroute voor de testscenario's geeft HTTP 404.")
         jdbc.update("UPDATE pf_quality_work_item SET retryable=TRUE,error_code='QUALITY_RESULT_BLOCKED' WHERE id=?", id)

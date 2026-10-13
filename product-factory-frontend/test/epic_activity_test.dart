@@ -51,6 +51,12 @@ void main() {
       'next': 'Herstel de testvoorwaarde en hervat de verificatie.',
     },
     {
+      'state': 'QUEUED',
+      'label': 'Wacht op uitrol naar acceptatie',
+      'detail': 'Story hkh-348 is opgeleverd; acceptatie draait nog de vorige versie.',
+      'next': 'De verificatie start automatisch zodra de opgeleverde wijzigingen op acceptatie staan. Er draait nu geen test.',
+    },
+    {
       'state': 'WAITING_FOR_HUMAN',
       'label': 'Wacht op antwoord van de architect',
       'waitingRole': 'ARCHITECT',
@@ -79,7 +85,8 @@ void main() {
               request.url.path.endsWith('/epic-activities')
                   ? {'epic-7': activity}
                   : request.url.path.endsWith('/epics') &&
-                        scenario['state'] == 'BLOCKED'
+                        (scenario['state'] == 'BLOCKED' ||
+                            scenario['label'] == 'Wacht op uitrol naar acceptatie')
                   ? [{...epic, 'status': 'VERIFYING'}]
                   : request.url.path.endsWith('/epics') &&
                         scenario['action'] == 'REVIEW'

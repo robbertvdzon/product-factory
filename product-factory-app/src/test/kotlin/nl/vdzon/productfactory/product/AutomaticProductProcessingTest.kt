@@ -67,6 +67,32 @@ class AutomaticProductProcessingTest @Autowired constructor(
         automatic.check(id.value,ScheduledProcess.PRODUCT_PLANNING)
         verify(planning,times(2)).runProcessSession(id)
     }
+    @Test fun `deploymentwachten controleert pas na een minuut en iedere gewijzigde wachtversie wordt opnieuw opgepakt`() {
+        val work = UUID.randomUUID().toString()
+        jdbc.update(
+            """INSERT INTO pf_quality_work_item(id,idempotency_key,request_fingerprint,product_id,type,source_type,source_id,
+               source_version,request_json,target_environment,priority,status,error_code,attempt_count,retryable,created_at,updated_at,version)
+               VALUES (?,?,?,?,'VERIFY_EPIC','EPIC',?,1,'{}','acceptance',80,'PENDING','WAITING_FOR_DEPLOYMENT',0,FALSE,?,?,1)""",
+            work, work, "f".repeat(64), id.value, UUID.randomUUID().toString(), clock.now, clock.now,
+        )
+        doAnswer {
+            jdbc.update("UPDATE pf_quality_work_item SET updated_at=?,version=version+1 WHERE id=?", clock.now, work)
+            null
+        }.`when`(quality).runProcessSession(id)
+        automatic.check(id.value, ScheduledProcess.QUALITY_ASSURANCE)
+        clock.now = clock.now.plusSeconds(59)
+        automatic.check(id.value, ScheduledProcess.QUALITY_ASSURANCE)
+        verifyNoInteractions(quality)
+        clock.now = clock.now.plusSeconds(1)
+        automatic.check(id.value, ScheduledProcess.QUALITY_ASSURANCE)
+        repeat(5) { automatic.check(id.value, ScheduledProcess.QUALITY_ASSURANCE) }
+        verify(quality, times(1)).runProcessSession(id)
+        clock.now = clock.now.plusSeconds(60)
+        automatic.check(id.value, ScheduledProcess.QUALITY_ASSURANCE)
+        verify(quality, times(2)).runProcessSession(id)
+        assertThat(jdbc.queryForObject("SELECT attempt_count FROM pf_quality_work_item WHERE id=?", Int::class.java, work)).isZero()
+        assertThat(jdbc.queryForObject("SELECT version FROM pf_quality_work_item WHERE id=?", Long::class.java, work)).isEqualTo(3L)
+    }
     @Test fun `inhoudelijke blokkade herhaalt geen AI zonder nieuwe input`() {
         val work = UUID.randomUUID().toString()
         jdbc.update("INSERT INTO pf_planning_work_item(id,idempotency_key,request_fingerprint,product_id,type,source_type,source_id,source_version,explanation,priority,status,created_at,updated_at,version) VALUES (?,?,?,?,'MANUAL_REPLAN','PRODUCT',?,1,'Nieuwe wens',1,'PENDING',?,?,1)",work,work,"f".repeat(64),id.value,id.value,clock.now,clock.now)

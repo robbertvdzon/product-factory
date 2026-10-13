@@ -143,7 +143,12 @@ class AutomaticProductProcessing(
             }
             ScheduledProcess.PRODUCT_PLANNING -> jdbc.queryForList("SELECT id,current_version FROM pf_epic WHERE product_id=? AND status IN ('AVAILABLE','IN_PLANNING') ORDER BY id", id) +
                 jdbc.queryForList("SELECT id,version FROM pf_planning_work_item WHERE product_id=? AND status='PENDING' ORDER BY id", id)
-            ScheduledProcess.QUALITY_ASSURANCE -> jdbc.queryForList("SELECT id,version,attempt_count FROM pf_quality_work_item WHERE product_id=? AND (status='PENDING' OR (status IN ('BLOCKED','FAILED') AND retryable=TRUE AND retry_after<=?)) ORDER BY id", id, clock.instant())
+            ScheduledProcess.QUALITY_ASSURANCE -> jdbc.queryForList(
+                """SELECT id,version,attempt_count FROM pf_quality_work_item WHERE product_id=? AND (
+                   (status='PENDING' AND (error_code IS NULL OR error_code<>'WAITING_FOR_DEPLOYMENT' OR updated_at<=?))
+                   OR (status IN ('BLOCKED','FAILED') AND retryable=TRUE AND retry_after<=?)) ORDER BY id""",
+                id, clock.instant().minusSeconds(60), clock.instant(),
+            )
             else -> emptyList()
         }
         return if (work.isEmpty()) null else hash(work)

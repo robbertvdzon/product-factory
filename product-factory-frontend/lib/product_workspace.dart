@@ -3494,41 +3494,49 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
     final verifications = [
       ...data.verifications,
     ]..sort((a, b) => _value(b['createdAt']).compareTo(_value(a['createdAt'])));
-    Widget workTile(Map<String, Object?> item) => ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        item['status'] == 'DONE'
-            ? Icons.check_circle_outline
-            : item['status'] == 'BLOCKED' || item['status'] == 'FAILED'
-            ? Icons.warning_amber_outlined
-            : Icons.hourglass_top,
-      ),
-      title: SelectableText(
-        '${item['type']} · ${item['status']}${item['attentionNeeded'] == true ? ' · Aandacht nodig' : ''}',
-      ),
-      subtitle: SelectableText(
-        '${item['blockedReason'] ?? item['result'] ?? 'Gericht testwerk staat klaar.'}\n'
-        'Poging ${item['attemptCount']}'
-        '${item['retryAfter'] != null
-            ? ' · volgende poging ${_shortDateTime(_parseInstant(item['retryAfter'])!)}'
-            : item['status'] == 'BLOCKED' || item['status'] == 'FAILED'
-            ? ' · Wacht op herstel · geen automatische herhaling'
-            : ''}',
-      ),
-      trailing: item['retryable'] == true
-          ? TextButton(
-              onPressed: () => _mutate(
-                () => widget.gateway.retryQualityWorkItem(_value(item['id'])),
-              ),
-              child: Text(
-                item['retryAfter'] == null
-                    ? 'Na herstel hervatten'
-                    : 'Nu opnieuw proberen',
-              ),
-            )
-          : null,
-      isThreeLine: true,
-    );
+    Widget workTile(Map<String, Object?> item) {
+      final waitingForDeployment = item['status'] == 'PENDING' &&
+          item['errorCode'] == 'WAITING_FOR_DEPLOYMENT';
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(
+          item['status'] == 'DONE'
+              ? Icons.check_circle_outline
+              : item['status'] == 'BLOCKED' || item['status'] == 'FAILED'
+              ? Icons.warning_amber_outlined
+              : Icons.hourglass_top,
+        ),
+        title: SelectableText(
+          '${item['type']} · ${waitingForDeployment ? 'Wacht op uitrol' : item['status']}${item['attentionNeeded'] == true ? ' · Aandacht nodig' : ''}',
+        ),
+        subtitle: SelectableText(
+          waitingForDeployment
+              ? '${item['blockedReason'] ?? 'De opgeleverde wijzigingen staan nog niet op acceptatie.'}\n'
+                    'De verificatie start automatisch na de uitrol. Er draait nu geen test.\n'
+                    '${(item['attemptCount'] as num? ?? 0) == 0 ? 'Nog geen testpoging.' : 'Eerdere testpogingen: ${item['attemptCount']}.'}'
+              : '${item['blockedReason'] ?? item['result'] ?? 'Gericht testwerk staat klaar.'}\n'
+                    'Poging ${item['attemptCount']}'
+                    '${item['retryAfter'] != null
+                        ? ' · volgende poging ${_shortDateTime(_parseInstant(item['retryAfter'])!)}'
+                        : item['status'] == 'BLOCKED' || item['status'] == 'FAILED'
+                        ? ' · Wacht op herstel · geen automatische herhaling'
+                        : ''}',
+        ),
+        trailing: !waitingForDeployment && item['retryable'] == true
+            ? TextButton(
+                onPressed: () => _mutate(
+                  () => widget.gateway.retryQualityWorkItem(_value(item['id'])),
+                ),
+                child: Text(
+                  item['retryAfter'] == null
+                      ? 'Na herstel hervatten'
+                      : 'Nu opnieuw proberen',
+                ),
+              )
+            : null,
+        isThreeLine: true,
+      );
+    }
     return _section('Kwaliteitsbewaking', Icons.verified_outlined, [
       Align(
         alignment: Alignment.centerRight,
