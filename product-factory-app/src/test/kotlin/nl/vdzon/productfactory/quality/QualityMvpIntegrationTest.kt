@@ -105,10 +105,11 @@ class QualityMvpIntegrationTest @Autowired constructor(
 
     @Test
     fun `tester schema begrenst de uitleg volgens het epic publicatiecontract`() {
-        quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "explanation-schema"))
+        val work = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "explanation-schema"))
         quality.runProcessSession(productId)
         ai.dispatchPending()
         val properties = runtime.requests.single().responseSchema!!.path("properties").path("results").path("items").path("properties")
+        assertThat(properties.path("workItemId").path("enum").map { it.asText() }).containsExactly(work.value)
         assertThat(properties.path("explanation").path("minLength").asInt()).isEqualTo(10)
         assertThat(properties.path("explanation").path("maxLength").asInt()).isEqualTo(2000)
         assertThat(properties.path("signalOutcome").path("maxLength").asInt()).isEqualTo(200)
@@ -116,9 +117,21 @@ class QualityMvpIntegrationTest @Autowired constructor(
             .containsExactlyInAnyOrder("INSUFFICIENT_TEST_EVIDENCE", "TEST_ACCESS_UNAVAILABLE", "TEST_CAPABILITY_UNAVAILABLE", "TEST_ENVIRONMENT_UNAVAILABLE", "TRANSIENT_TECHNICAL_FAILURE")
         assertThat(properties.path("implementationGaps").path("items").path("required").map { it.asText() })
             .contains("criterion", "observedBehaviour", "coverageExplanation", "reviewedStoryIds", "evidence")
-        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(6L)
+        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(7L)
         ai.deleteAllOwnedExecutionData()
         runtime.reset()
+    }
+
+    @Test
+    fun `tester schema staat precies de IDs van de volledige bevroren batch toe`() {
+        val first = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "batch-schema-first"))
+        val second = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 50, "batch-schema-second"))
+
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+
+        val allowed = runtime.requests.single().responseSchema!!.path("properties").path("results").path("items").path("properties").path("workItemId").path("enum")
+        assertThat(allowed.map { it.asText() }).containsExactlyInAnyOrder(first.value, second.value)
     }
 
     @Test
@@ -156,6 +169,8 @@ class QualityMvpIntegrationTest @Autowired constructor(
             .contains("TEST_CAPABILITY_UNAVAILABLE")
             .contains("lijst hun exacte namen en tel ze")
             .contains("overgeslagen nummers blijven overgeslagen")
+            .contains("Kopieer workItemId rechtstreeks uit workItems[].workItemId")
+            .contains("teken voor teken")
             .contains("https://acceptance.example.test")
             .doesNotContain("https://production.example.test")
         val artifacts = mapper.readTree(jdbc.queryForObject(
@@ -993,15 +1008,21 @@ class QualityMvpIntegrationTest @Autowired constructor(
         )
     }
 
-    @Test
-    fun `publicatieherstel publiceert dezelfde testpoging met immutable bron en controleerbare audit`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `publicatieherstel publiceert dezelfde testpoging met immutable bron en controleerbare audit`(repairWorkItemId: Boolean) {
         val bugId = BugId(UUID.randomUUID().toString())
         insertBug(bugId)
-        val fixture = failedPublication(resolvedBug = bugId)
+        val reportedId = if (repairWorkItemId) UUID.randomUUID().toString() else null
+        val fixture = failedPublication(resolvedBug = bugId, reportedWorkItemId = reportedId)
         val sourceBefore = jdbc.queryForMap("SELECT * FROM pf_quality_process_session WHERE id=?", fixture.command.failedSessionId.value)
         val resultBefore = jdbc.queryForMap("SELECT * FROM pf_ai_task_result WHERE task_id=?", fixture.command.sourceTaskId.value)
         val attemptsBefore = qualityQueries.findQualityWorkItems(productId).single().attempts
-        val command = mapper.readValue(mapper.writeValueAsString(fixture.command), RepairQualityPublicationCommand::class.java)
+        val reviewedCommand = if (reportedId == null) fixture.command else fixture.command.copy(
+            replaceReportedWorkItemId = reportedId,
+            reason = "Corrigeer de verzonnen workItemId $reportedId naar de ene bevroren opdracht ${fixture.work.value}; verwijder alleen het ontbrekende artifact.",
+        )
+        val command = mapper.readValue(mapper.writeValueAsString(reviewedCommand), RepairQualityPublicationCommand::class.java)
 
         val recovery = quality.repairQualityPublication(command)
 
@@ -1026,11 +1047,20 @@ class QualityMvpIntegrationTest @Autowired constructor(
         val audit = jdbc.queryForMap("SELECT * FROM pf_quality_publication_repair WHERE idempotency_key=?", command.idempotencyKey)
         val expected = mapper.readTree(resultBefore["response_json"] as String)
         (expected.path("results")[0].path("evidence").path("artifacts") as com.fasterxml.jackson.databind.node.ArrayNode).remove(0)
+        if (repairWorkItemId) (expected.path("results")[0] as ObjectNode).put("workItemId", fixture.work.value)
         assertThat(mapper.readTree(audit["corrected_response_json"] as String)).isEqualTo(expected)
         assertThat(audit["source_response_sha256"]).isEqualTo(command.expectedResponseSha256)
         assertThat(audit["source_manifest_sha256"]).isEqualTo(command.expectedManifestSha256)
         assertThat(audit["actor_id"]).isEqualTo(STAKEHOLDER.id)
         assertThat(audit["reason"]).isEqualTo(command.reason)
+        if (!repairWorkItemId) {
+            // Old commands did not serialize this field: their stored fingerprint must still replay.
+            val legacyCommand = mapper.valueToTree<ObjectNode>(command.copy(
+                expectedWorkItemVersions = command.expectedWorkItemVersions.toSortedMap(),
+                removeArtifactNames = command.removeArtifactNames.toSortedSet(),
+            )).apply { remove("replaceReportedWorkItemId") }
+            assertThat(audit["request_fingerprint"]).isEqualTo(hash(mapper.writeValueAsString(legacyCommand)))
+        }
 
         // A replay succeeds even though publication has legitimately changed the epic and work versions.
         assertThat(quality.repairQualityPublication(command)).isEqualTo(recovery)
@@ -1038,6 +1068,45 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_publication_repair", Long::class.java)).isEqualTo(1L)
         assertThatThrownBy { quality.repairQualityPublication(command.copy(reason = "Een andere herstelreden voor dezelfde sleutel.")) }
             .isInstanceOf(IdempotencyConflict::class.java)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["no-mapping", "wrong-source", "multiple-results", "multiple-claims", "multiple-frozen-items", "existing-work", "missing-reason", "already-correct"])
+    fun `werkitemcorrectie vereist expliciete en eenduidige koppeling aan precies een frozen epicopdracht`(change: String) {
+        val reportedId = UUID.randomUUID().toString()
+        val fixture = failedPublication(
+            reportedWorkItemId = reportedId.takeUnless { change == "already-correct" },
+            extraResult = change == "multiple-results",
+        )
+        var command = fixture.command.copy(
+            replaceReportedWorkItemId = reportedId,
+            reason = "Corrigeer uitsluitend de onjuiste rapport-ID $reportedId naar de geclaimde epic-test ${fixture.work.value}.",
+        )
+        when (change) {
+            "no-mapping" -> command = command.copy(replaceReportedWorkItemId = null)
+            "wrong-source" -> command = command.copy(replaceReportedWorkItemId = "another-incorrect-id")
+            "multiple-claims" -> jdbc.update(
+                "UPDATE pf_quality_process_session SET claimed_work_items_json=? WHERE id=?",
+                mapper.writeValueAsString(listOf(fixture.work, fixture.work)), command.failedSessionId.value,
+            )
+            "multiple-frozen-items" -> {
+                val frozen = mapper.readTree(jdbc.queryForObject("SELECT frozen_context_json FROM pf_quality_process_session WHERE id=?", String::class.java, command.failedSessionId.value))
+                (frozen.path("workItems") as com.fasterxml.jackson.databind.node.ArrayNode).add(frozen.path("workItems")[0].deepCopy<ObjectNode>())
+                val json = mapper.writeValueAsString(frozen)
+                jdbc.update("UPDATE pf_quality_process_session SET frozen_context_json=? WHERE id=?", json, command.failedSessionId.value)
+                command = command.copy(expectedFrozenContextSha256 = hash(json))
+            }
+            "existing-work" -> {
+                val otherWork = quality.requestStoryVerification(RequestStoryVerificationCommand(productId, storyId, 1, "acceptance", 10, "other-work"))
+                jdbc.update("UPDATE pf_quality_work_item SET id=? WHERE id=?", reportedId, otherWork.value)
+            }
+            "missing-reason" -> command = command.copy(reason = "Corrigeer het werkitem zonder de mapping te benoemen.")
+            "already-correct" -> command = command.copy(replaceReportedWorkItemId = fixture.work.value)
+        }
+
+        assertThatThrownBy { quality.repairQualityPublication(command) }.isInstanceOf(InvalidCommand::class.java)
+
+        assertRepairNotPublished(fixture)
     }
 
     @ParameterizedTest
@@ -1115,8 +1184,8 @@ class QualityMvpIntegrationTest @Autowired constructor(
         assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_publication_repair", Long::class.java)).isZero()
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_artifact_domain_reference", Long::class.java)).isZero()
-        assertThat(qualityQueries.findQualityWorkItems(productId).single().attemptCount).isEqualTo(3)
-        assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.FAILED)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single { it.id == fixture.work }.attemptCount).isEqualTo(3)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single { it.id == fixture.work }.status).isEqualTo(WorkItemStatus.FAILED)
         assertThat(qualityQueries.getProcessSession(fixture.command.failedSessionId).status).isEqualTo(ProcessSessionStatus.FAILED)
         assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.VERIFYING)
         assertThat(runtime.requests).hasSize(1)
@@ -1124,7 +1193,12 @@ class QualityMvpIntegrationTest @Autowired constructor(
 
     private data class FailedPublication(val work: QualityWorkItemId, val artifactId: String, val command: RepairQualityPublicationCommand)
 
-    private fun failedPublication(duplicate: Boolean = false, resolvedBug: BugId? = null): FailedPublication {
+    private fun failedPublication(
+        duplicate: Boolean = false,
+        resolvedBug: BugId? = null,
+        reportedWorkItemId: String? = null,
+        extraResult: Boolean = false,
+    ): FailedPublication {
         val work = epicVerification("repair-publication")
         jdbc.update("UPDATE pf_quality_work_item SET attempt_count=2 WHERE id=?", work.value)
         for (attempt in 1..2) jdbc.update(
@@ -1135,6 +1209,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
         ai.dispatchPending()
         val job = runtime.onlyJob()
         val output = result(work, "PASSED")
+        reportedWorkItemId?.let { (output.path("results")[0] as ObjectNode).put("workItemId", it) }
         resolvedBug?.let { (output.path("results")[0] as ObjectNode).putArray("resolvedBugIds").add(it.value) }
         val artifacts = output.path("results")[0].path("evidence").path("artifacts") as com.fasterxml.jackson.databind.node.ArrayNode
         fun reference(name: String) = artifacts.addObject().apply {
@@ -1143,6 +1218,11 @@ class QualityMvpIntegrationTest @Autowired constructor(
         reference("evidence-02") // Missing reference fails publication before validating the rest.
         reference("evidence-01")
         if (duplicate) reference("evidence-01")
+        if (extraResult) {
+            val extra = output.path("results")[0].deepCopy<ObjectNode>()
+            (extra.path("evidence").path("artifacts") as com.fasterxml.jackson.databind.node.ArrayNode).removeAll()
+            (output.path("results") as com.fasterxml.jackson.databind.node.ArrayNode).add(extra)
+        }
         val artifactId = UUID.randomUUID().toString()
         val bytes = "werkelijk bewaard bewijs".toByteArray()
         val sha = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))

@@ -83,6 +83,10 @@ verwijderen artifactnamen, actor, reden en idempotentiesleutel. Na bewijs- en ve
 publiceert een aparte herstelsessie via de normale domeincommands, zonder nieuwe AI-taak of
 testpoging. Het oorspronkelijke rapport en afgesloten pogingen blijven intact; zie
 [het herstelprotocol](mvp.md#herstel-van-bewijsverwijzingen-na-een-geslaagde-test).
+Bij exact één epicopdracht en één resultaat kan `replaceReportedWorkItemId` tevens een expliciet
+beoordeeld foutief opdracht-ID corrigeren naar de enige oorspronkelijke claim. De opgegeven oude
+ID moet exact in het bronrapport staan en mag geen ander bestaand workitem zijn. Een gemengde batch
+of inhoudelijke wijziging wordt geweigerd; de reden noemt beide IDs en de audit bewaart de correctie.
 
 De vier `request...`-commands starten geen test en geen agent. Zij valideren de bron en voegen alleen
 een idempotent `PENDING`-werkitem toe. `retryQualityWorkItem(...)` maakt alleen een retrybaar

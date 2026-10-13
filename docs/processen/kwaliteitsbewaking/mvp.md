@@ -197,7 +197,9 @@ ook als `testBlocker` of `implementationGap` gemeld. De gewone bugfixcyclus vraa
 
 Vanaf promptversie 6 controleert de Tester vóór het eindrapport de werkelijk gemaakte
 artifactbestanden. Het rapport noemt uitsluitend bestaande bestanden, ieder precies één keer;
-gaten in de nummerreeks worden niet aangevuld met veronderstelde screenshots.
+gaten in de nummerreeks worden niet aangevuld met veronderstelde screenshots. Vanaf promptversie 7
+vergelijkt hij ook alle letterlijk overgenomen `workItemId`-waarden met de bevroren opdrachten.
+Het resultaatschema begrenst die waarden per sessie met een `enum` van exact de geclaimde IDs.
 
 ### Stap 4 — reproduceren en classificeren
 
@@ -327,6 +329,13 @@ hersteld via `repairQualityPublication(...)`. Dit is een expliciete beheerhandel
 retry. Alleen de opgegeven ontbrekende verwijzingen worden verwijderd; checks, uitkomsten, bugs en
 `missingCoverage` blijven ongewijzigd. Ontbrekend noodzakelijk testbewijs vraagt aanvullende tests
 en mag niet langs deze route worden goedgekeurd.
+
+Een verkeerd gerapporteerd opdracht-ID kan alleen expliciet worden gecorrigeerd wanneer de
+bronsessie precies één epicverificatie claimde en het rapport precies één resultaat bevat.
+`replaceReportedWorkItemId` noemt exact de foutieve bronwaarde; het correcte ID komt uitsluitend uit
+de oorspronkelijke claim. De foutieve waarde mag geen bestaand ander workitem zijn. De herstelreden
+noemt beide IDs. Het onveranderde bronrapport en het gecorrigeerde rapport maken de mapping
+controleerbaar. Deze uitzondering mag nooit resultaten uit een gemengde batch herverdelen.
 
 Het command controleert de oorspronkelijke mislukte sessie, exacte werkversies en SHA-256 van het
 opgeslagen rapport, artifactmanifest en bevroren context. Epic, opgeleverde stories en deployment

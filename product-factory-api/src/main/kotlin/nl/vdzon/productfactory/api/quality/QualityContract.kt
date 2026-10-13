@@ -102,7 +102,8 @@ data class RequestEpicVerificationCommand(val productId: ProductId, val epicId: 
 data class RequestBugfixRetestCommand(val productId: ProductId, val bugId: BugId, val storyId: StoryId, val storyVersion: Long, val environment: String, val idempotencyKey: String)
 data class RequestSignalInvestigationCommand(val productId: ProductId, val signalId: UserSignalId, val signalVersion: Long, val environment: String, val idempotencyKey: String)
 
-/** Removes only nonexistent evidence references from an otherwise unchanged failed publication.
+/** Removes nonexistent evidence references from an otherwise unchanged failed publication.
+ * An explicitly reviewed wrong workItemId can also be corrected for a single-item epic test.
  * Hashes cover the exact stored UTF-8 JSON, not a parsed or reformatted representation.
  * This is an audited maintenance command; it neither reruns the tester nor creates a test attempt.
  */
@@ -117,6 +118,7 @@ data class RepairQualityPublicationCommand(
     val actor: ActorReference,
     val reason: String,
     val idempotencyKey: String,
+    val replaceReportedWorkItemId: String? = null,
 )
 
 interface QualityService {

@@ -52,10 +52,13 @@ class QualityMvpService(
     @Transactional(isolation = Isolation.SERIALIZABLE)
     override fun repairQualityPublication(command: RepairQualityPublicationCommand): ProcessSessionId {
         validateRepairCommand(command)
-        val requestFingerprint = fingerprint(command.copy(
+        val fingerprintInput = mapper.valueToTree<com.fasterxml.jackson.databind.node.ObjectNode>(command.copy(
             expectedWorkItemVersions = command.expectedWorkItemVersions.toSortedMap(),
             removeArtifactNames = command.removeArtifactNames.toSortedSet(),
         ))
+        // Preserve fingerprints of commands issued before optional work-item correction existed.
+        if (command.replaceReportedWorkItemId == null) fingerprintInput.remove("replaceReportedWorkItemId")
+        val requestFingerprint = fingerprint(fingerprintInput)
         jdbc.query(
             "SELECT request_fingerprint,recovery_session_id FROM pf_quality_publication_repair WHERE idempotency_key=?",
             { rs, _ -> rs.getString(1) to ProcessSessionId(rs.getString(2)) }, command.idempotencyKey,
@@ -91,7 +94,8 @@ class QualityMvpService(
         ) throw VersionConflict("Bronresultaat, artifactmanifest of bevroren context is gewijzigd.")
         lockRepairRows("SELECT id FROM pf_quality_work_item WHERE claimed_by_session_id=? FOR UPDATE", source.id.value)
         val items = workItemRows("WHERE claimed_by_session_id=?", source.id.value)
-        val claimed = readJson<List<QualityWorkItemId>>(sourceRow["claimed_work_items_json"] as String).map { it.value }.toSet()
+        val claimedIds = readJson<List<QualityWorkItemId>>(sourceRow["claimed_work_items_json"] as String)
+        val claimed = claimedIds.map { it.value }.toSet()
         if (items.isEmpty() || items.associate { it.id.value to it.version } != command.expectedWorkItemVersions ||
             claimed != command.expectedWorkItemVersions.keys || items.any {
                 it.productId != source.productId || it.status != WorkItemStatus.FAILED || it.type != QualityWorkItemType.VERIFY_EPIC ||
@@ -110,6 +114,7 @@ class QualityMvpService(
             }
         }
         val corrected = removeMissingEvidence(mapper.readTree(responseJson), manifest, command.removeArtifactNames)
+        repairReportedWorkItemId(corrected, command, items, frozen, claimedIds.size)
         val resolved = resolveEvidenceArtifacts(corrected, manifest)
         if (resolved.references.isEmpty()) throw InvalidCommand("Publicatieherstel vereist minstens één bestaand bewijsartifact.")
 
@@ -152,9 +157,39 @@ class QualityMvpService(
         if (command.idempotencyKey.length !in 1..200 || command.reason.trim().length !in 10..2000 || command.actor.id.trim().length !in 1..320 ||
             command.expectedWorkItemVersions.isEmpty() || command.expectedWorkItemVersions.any { it.key.isBlank() || it.value < 1 } ||
             command.removeArtifactNames.isEmpty() || command.removeArtifactNames.any { !EVIDENCE_NAME.matches(it) } ||
+            command.replaceReportedWorkItemId?.let { it.isBlank() || it.length > 80 } == true ||
             listOf(command.expectedResponseSha256, command.expectedManifestSha256, command.expectedFrozenContextSha256).any { !Regex("[0-9a-f]{64}").matches(it) }
         ) throw InvalidCommand("Publicatieherstel vereist een begrensde reden, actor, exacte versies, hashes en ontbrekende artifactnamen.")
         rejectSensitive(command.reason)
+    }
+
+    private fun repairReportedWorkItemId(
+        result: JsonNode,
+        command: RepairQualityPublicationCommand,
+        items: List<QualityWorkItemDetails>,
+        frozen: JsonNode,
+        claimedCount: Int,
+    ) {
+        val reportedId = command.replaceReportedWorkItemId ?: return
+        val results = result.path("results")
+        if (!results.isArray || results.size() != 1 || items.size != 1 || claimedCount != 1 ||
+            !frozen.path("workItems").isArray || frozen.path("workItems").size() != 1 ||
+            items.single().type != QualityWorkItemType.VERIFY_EPIC
+        ) throw InvalidCommand("Werkitemcorrectie vereist exact één resultaat en één bevroren, geclaimde epic-testopdracht.")
+        val node = results[0] as? com.fasterxml.jackson.databind.node.ObjectNode
+            ?: throw InvalidCommand("Het te corrigeren testresultaat is ongeldig.")
+        val targetId = items.single().id.value
+        if (!node.path("workItemId").isTextual || node.path("workItemId").asText() != reportedId || reportedId == targetId) {
+            throw InvalidCommand("De opgegeven verkeerde werkitem-ID moet exact overeenkomen met de oorspronkelijke resultaatwaarde.")
+        }
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_work_item WHERE id=?", Long::class.java, reportedId) != 0L) {
+            throw InvalidCommand("De gerapporteerde werkitem-ID bestaat al; deze koppeling is niet eenduidig te herstellen.")
+        }
+        if (!command.reason.contains(reportedId) || !command.reason.contains(targetId)) {
+            throw InvalidCommand("De herstelreden moet de oorspronkelijke en juiste werkitem-ID expliciet noemen.")
+        }
+        // The caller supplies only the incorrect source value. The target is always the verified claim.
+        node.put("workItemId", targetId)
     }
 
     private fun validateRepairDomain(productId: ProductId, items: List<QualityWorkItemDetails>, frozen: JsonNode) {
@@ -407,7 +442,7 @@ class QualityMvpService(
         val config = aiQueries.getAiJobConfiguration(JOB)
         val taskId = ai.requestAiTask(RequestAiTaskCommand(
             JOB, productId, "quality", sessionId, ROLE.value, config.execution, config.version, PROMPT_VERSION,
-            versionedTesterPrompt(contextJson), V3_RESULT_SCHEMA, RepositorySnapshot(gitUrl, gitSha),
+            versionedTesterPrompt(contextJson), testerResultSchema(contextJson), RepositorySnapshot(gitUrl, gitSha),
             outputArtifacts = EVIDENCE_ARTIFACTS,
             executionTimeout = Duration.ofMinutes(45), idempotencyKey = "quality-${sessionId.value}-attempt-1",
         ))
@@ -1176,7 +1211,17 @@ class QualityMvpService(
         Een beloofde en als DONE opgeleverde testvoorziening is zelf afgesproken productgedrag. Controleer de gedeployde acceptatierevisie en de login: als de juiste revision draait en de login werkt, maar de gedocumenteerde en toegestane scenarioroute reproduceerbaar 404 geeft of de beloofde fixture defect is, rapporteer NEEDS_WORK met een concrete bug in die bestaande story. Benoem de bestaande story-id, route, revision, verwachte voorziening en geobserveerde respons in het bugbewijs. Gebruik voor dezelfde oorzaak geen testBlocker en geen implementationGap; zet tests die daardoor niet konden worden uitgevoerd in missingCoverage. Dit vraagt één gerichte bugfix, geen nieuwe epicstories. Claim geen geslaagde schermtest voor niet uitgevoerde scenario's. Is niet bewezen dat de voorziening is opgeleverd of ontbreken toegang of capaciteit werkelijk, kies wel BLOCKED met de concrete testvoorwaarde.
         Bij testBlockers zijn implementationGaps, bugs en resolvedBugIds leeg. missingCoverage rapporteert uitsluitend ongeteste of resterende dekking en vraagt nooit productwerk aan. Alleen een werkelijk geobserveerd ontbrekend epiccriterium dat door geen enkele opgeleverde story wordt afgedekt mag in implementationGaps staan. Neem criterion letterlijk over uit detail.epic.acceptanceCriteria, vermeld observedBehaviour en evidence van de uitgevoerde test, vergelijk alle detail.stories (DONE) en neem hun exacte id's in reviewedStoryIds op. Leg in coverageExplanation uit waarom die opgeleverde stories dit gedrag niet al afdekken. Gedrag dat volgens een opgeleverde story hoort te werken maar reproduceerbaar faalt is een bug, geen nieuw implementatiegat. Een bewezen bug gaat in bugs met concrete werkelijke/verwachte uitkomst, reproduceerstappen en testbewijs. Als geen bewezen implementatiegat of reproduceerbare bug beschikbaar is, kies BLOCKED en benoem de testvoorwaarde. Een bugfixhertest mag met bewijs van dezelfde nog optredende bug FAILED teruggeven zonder die bug opnieuw aan te maken.
         """.trimIndent() + "\n" +
-        "Bewijs gebruikt expliciet type EXTERNAL_URL met veld url (artifactName null), of type RUNTIME_ARTIFACT met een vooraf gedeclareerd artifactName evidence-01 tot en met evidence-50 en mediaType image/png (url null). Verzin nooit een download-URL of bestandsnaam. Lees vóór het definitieve JSON-resultaat de werkelijk aanwezige bestanden in /job/output/artifacts, lijst hun exacte namen en tel ze. Verwijs uitsluitend naar daadwerkelijk gemaakte bestanden en koppel elk bestand precies één keer. Vul nooit automatisch een aaneengesloten nummerreeks in: overgeslagen nummers blijven overgeslagen. Controleer dat aantal en namen exact overeenkomen met je Runtime-artifactverwijzingen.\n" + testerPrompt(context)
+        "Bewijs gebruikt expliciet type EXTERNAL_URL met veld url (artifactName null), of type RUNTIME_ARTIFACT met een vooraf gedeclareerd artifactName evidence-01 tot en met evidence-50 en mediaType image/png (url null). Verzin nooit een download-URL of bestandsnaam. Lees vóór het definitieve JSON-resultaat de werkelijk aanwezige bestanden in /job/output/artifacts, lijst hun exacte namen en tel ze. Verwijs uitsluitend naar daadwerkelijk gemaakte bestanden en koppel elk bestand precies één keer. Vul nooit automatisch een aaneengesloten nummerreeks in: overgeslagen nummers blijven overgeslagen. Controleer dat aantal en namen exact overeenkomen met je Runtime-artifactverwijzingen. Kopieer workItemId rechtstreeks uit workItems[].workItemId; schrijf of reconstrueer deze waarde nooit uit het geheugen. Vergelijk vóór het definitieve JSON elke resultaat-ID teken voor teken met die oorspronkelijke lijst en controleer dat de lijsten exact overeenkomen, zonder ontbrekende of dubbele IDs.\n" + testerPrompt(context)
+
+    private fun testerResultSchema(context: String): String {
+        // Parse a fresh copy: allowed IDs are specific to this frozen batch, never shared across jobs.
+        val schema = mapper.readTree(V3_RESULT_SCHEMA)
+        val workItem = schema.path("properties").path("results").path("items").path("properties").path("workItemId") as com.fasterxml.jackson.databind.node.ObjectNode
+        val allowed = workItem.putArray("enum")
+        mapper.readTree(context).path("workItems").forEach { allowed.add(requiredText(it, "workItemId", 1, 80)) }
+        if (allowed.isEmpty) throw InvalidCommand("Testercontract mist geclaimde werkitem-IDs.")
+        return mapper.writeValueAsString(schema)
+    }
 
     private data class ClaimedSession(val session: ProcessSessionDetails, val created: Boolean)
     private data class Target(val type: VerificationTargetType, val id: String, val version: Long)
@@ -1187,7 +1232,7 @@ class QualityMvpService(
     companion object {
         private const val IMPLEMENTATION_ARTIFACT = "quality-impl-mvp"
         private const val IMPLEMENTATION_VARIANT = "single-tester"
-        private const val PROMPT_VERSION = 6L
+        private const val PROMPT_VERSION = 7L
         private const val MISSING_EVIDENCE_MESSAGE = "Kwaliteitsbewijs verwijst naar een onbekend Runtime-artifact."
         private const val STRUCTURED_TEST_RESULT_VERSION = 3L
         private val BROWSER_INSTRUCTIONS = """
