@@ -45,6 +45,9 @@ class ProductAndDecisionIntegrationTest(
             id, UserSignalCategory.FEEDBACK, UserSignalUrgency.NORMAL, "test", "Mag na de test verdwijnen", actor=STAKEHOLDER, idempotencyKey="delete-signal-${id.value}",
         ))
         decisions.createDecision(CreateDecisionCommand(id,"Testbesluit",DecisionOrigin.STAKEHOLDER,STAKEHOLDER,"delete-decision-${id.value}"))
+        insertPublicationRepair(id)
+        val retainedProduct = createProduct("product-retain")
+        insertPublicationRepair(retainedProduct)
 
         deletion.delete(id)
 
@@ -52,6 +55,33 @@ class ProductAndDecisionIntegrationTest(
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_product_assignment WHERE product_id=?",Long::class.java,id.value)).isZero()
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_user_signal WHERE product_id=?",Long::class.java,id.value)).isZero()
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_decision WHERE product_id=?",Long::class.java,id.value)).isZero()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_publication_repair WHERE idempotency_key=?", Long::class.java, "repair-${id.value}")).isZero()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_process_session WHERE product_id=?", Long::class.java, id.value)).isZero()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_publication_repair WHERE idempotency_key=?", Long::class.java, "repair-${retainedProduct.value}")).isEqualTo(1L)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_process_session WHERE product_id=?", Long::class.java, retainedProduct.value)).isEqualTo(2L)
+    }
+
+    private fun insertPublicationRepair(productId: ProductId) {
+        val source = "failed-${productId.value}"
+        val recovery = "recovery-${productId.value}"
+        for ((session, status) in listOf(source to "FAILED", recovery to "SUCCEEDED")) {
+            jdbc.update(
+                """INSERT INTO pf_quality_process_session(id,product_id,status,implementation_artifact,implementation_variant,
+                   implementation_version,implementation_revision,inputs_json,claimed_work_items_json,memory_version_ids_json,
+                   ai_task_ids_json,publications_json,started_at,updated_at)
+                   VALUES (?,?,?,'quality-impl-mvp','publication-repair','test','test','[]','[]','[]','[]','[]',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)""",
+                session, productId.value, status,
+            )
+        }
+        val hash = "0".repeat(64)
+        jdbc.update(
+            """INSERT INTO pf_quality_publication_repair(idempotency_key,request_fingerprint,failed_session_id,source_task_id,
+               recovery_session_id,source_response_sha256,source_manifest_sha256,source_context_sha256,
+               expected_work_item_versions_json,removed_artifact_names_json,corrected_response_json,corrected_response_sha256,
+               actor_type,actor_id,reason,created_at)
+               VALUES (?,?,?,?,?,?,?,?,'{}','[]','{}',?,'STAKEHOLDER',?,'Beoordeeld publicatieherstel',CURRENT_TIMESTAMP)""",
+            "repair-${productId.value}", hash, source, UUID.randomUUID().toString(), recovery, hash, hash, hash, hash, STAKEHOLDER.id,
+        )
     }
 
     @Test

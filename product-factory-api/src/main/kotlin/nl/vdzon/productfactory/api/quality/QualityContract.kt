@@ -102,6 +102,23 @@ data class RequestEpicVerificationCommand(val productId: ProductId, val epicId: 
 data class RequestBugfixRetestCommand(val productId: ProductId, val bugId: BugId, val storyId: StoryId, val storyVersion: Long, val environment: String, val idempotencyKey: String)
 data class RequestSignalInvestigationCommand(val productId: ProductId, val signalId: UserSignalId, val signalVersion: Long, val environment: String, val idempotencyKey: String)
 
+/** Removes only nonexistent evidence references from an otherwise unchanged failed publication.
+ * Hashes cover the exact stored UTF-8 JSON, not a parsed or reformatted representation.
+ * This is an audited maintenance command; it neither reruns the tester nor creates a test attempt.
+ */
+data class RepairQualityPublicationCommand(
+    val failedSessionId: ProcessSessionId,
+    val sourceTaskId: AiTaskId,
+    val expectedWorkItemVersions: Map<String, Long>,
+    val expectedResponseSha256: String,
+    val expectedManifestSha256: String,
+    val expectedFrozenContextSha256: String,
+    val removeArtifactNames: Set<String>,
+    val actor: ActorReference,
+    val reason: String,
+    val idempotencyKey: String,
+)
+
 interface QualityService {
     fun runProcessSession(productId: ProductId)
     fun requestStoryVerification(command: RequestStoryVerificationCommand): QualityWorkItemId
@@ -109,6 +126,7 @@ interface QualityService {
     fun requestBugfixRetest(command: RequestBugfixRetestCommand): QualityWorkItemId
     fun requestSignalInvestigation(command: RequestSignalInvestigationCommand): QualityWorkItemId
     fun retryQualityWorkItem(workItemId: QualityWorkItemId)
+    fun repairQualityPublication(command: RepairQualityPublicationCommand): ProcessSessionId
     fun linkBugfixStory(bugId: BugId, storyId: StoryId)
 }
 

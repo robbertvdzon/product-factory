@@ -195,6 +195,10 @@ Tests die daardoor niet uitvoerbaar waren staan in `missingCoverage`; dezelfde o
 ook als `testBlocker` of `implementationGap` gemeld. De gewone bugfixcyclus vraagt één gerichte
 `PLAN_BUGFIX` aan, zonder nieuwe epicstories te bedenken.
 
+Vanaf promptversie 6 controleert de Tester vóór het eindrapport de werkelijk gemaakte
+artifactbestanden. Het rapport noemt uitsluitend bestaande bestanden, ieder precies één keer;
+gaten in de nummerreeks worden niet aangevuld met veronderstelde screenshots.
+
 ### Stap 4 — reproduceren en classificeren
 
 Bij een mogelijke productafwijking herhaalt de Tester de relevante stappen binnen dezelfde sessie
@@ -315,6 +319,41 @@ De publieke eisen aan bewijs, verificaties, bugs en epicoordelen blijven ongewij
 - Een inhoudelijk ongeldig concept wordt niet gepubliceerd; er start geen tweede critic-agent.
 - Reeds geldige resultaten uit een batch kunnen worden gepubliceerd wanneer een ander workitem
   aantoonbaar geïsoleerd faalt.
+
+### Herstel van bewijsverwijzingen na een geslaagde test
+
+Een rapport met verwijzingen naar niet-bestaande extra artifacts mag na beoordeling worden
+hersteld via `repairQualityPublication(...)`. Dit is een expliciete beheerhandeling, geen automatische
+retry. Alleen de opgegeven ontbrekende verwijzingen worden verwijderd; checks, uitkomsten, bugs en
+`missingCoverage` blijven ongewijzigd. Ontbrekend noodzakelijk testbewijs vraagt aanvullende tests
+en mag niet langs deze route worden goedgekeurd.
+
+Het command controleert de oorspronkelijke mislukte sessie, exacte werkversies en SHA-256 van het
+opgeslagen rapport, artifactmanifest en bevroren context. Epic, opgeleverde stories en deployment
+moeten nog overeenkomen met de uitgevoerde test. Alle behouden artifacts moeten duurzaam aanwezig
+zijn, met de juiste inhoud, SHA-256 en MIME-type, en precies één keer in het rapport voorkomen.
+Daarna doorloopt het gecorrigeerde rapport de normale verificatie- en domeinpublicatie.
+
+Een aparte herstelsessie en auditregistratie bewaren bronverwijzingen, correctie, actor, reden en
+idempotentiesleutel. Het oorspronkelijke AI-rapport, de mislukte processessie en afgesloten
+testpogingen blijven intact. Het herstel start geen AI-taak en verhoogt het aantal testpogingen niet.
+Een gewijzigd rapport, gewijzigde deployment of domeinversie blokkeert herstel.
+
+De expliciete CLI-entrypoint is
+`nl.vdzon.productfactory.operations.QualityPublicationRepairMain`. Voer deze alleen na beoordeling
+uit in een eenmalige onderhoudsjob met dezelfde uitgerolde backendimage, configuratie en
+artifactopslag, en een gemount command-JSON-bestand:
+
+```sh
+java -Dloader.main=nl.vdzon.productfactory.operations.QualityPublicationRepairMain \
+  -cp /app/product-factory.jar org.springframework.boot.loader.launch.PropertiesLauncher \
+  /maintenance/command.json
+```
+
+Deze entrypoint schakelt alle drie achtergrondverwerkers en Flyway uit, bindt alleen lokaal op een
+willekeurige poort, voert één command uit en sluit daarna de applicatie. Er is geen HTTP-endpoint.
+Controleer daarna de audit, verificatie, bugstatus en epicstatus; een voltooid onderhoudsproces
+alleen bewijst niet dat de epic is afgerond.
 
 ## Wanneer de MVP voldoende is
 

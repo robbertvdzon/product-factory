@@ -72,8 +72,17 @@ QualityWorkItemId requestEpicVerification(RequestEpicVerificationCommand command
 QualityWorkItemId requestBugfixRetest(RequestBugfixRetestCommand command);
 QualityWorkItemId requestSignalInvestigation(RequestSignalInvestigationCommand command);
 void retryQualityWorkItem(QualityWorkItemId workItemId);
+ProcessSessionId repairQualityPublication(RepairQualityPublicationCommand command);
 void linkBugfixStory(BugId bugId, StoryId storyId);
 ```
+
+`repairQualityPublication(...)` herstelt na expliciete beoordeling uitsluitend ontbrekende
+artifactverwijzingen in een verder ongewijzigd epicrapport. Het command bevat de mislukte sessie,
+bron-AI-taak, verwachte werkversies, SHA-256 van rapport/manifest/bevroren context, exact te
+verwijderen artifactnamen, actor, reden en idempotentiesleutel. Na bewijs- en versievalidatie
+publiceert een aparte herstelsessie via de normale domeincommands, zonder nieuwe AI-taak of
+testpoging. Het oorspronkelijke rapport en afgesloten pogingen blijven intact; zie
+[het herstelprotocol](mvp.md#herstel-van-bewijsverwijzingen-na-een-geslaagde-test).
 
 De vier `request...`-commands starten geen test en geen agent. Zij valideren de bron en voegen alleen
 een idempotent `PENDING`-werkitem toe. `retryQualityWorkItem(...)` maakt alleen een retrybaar

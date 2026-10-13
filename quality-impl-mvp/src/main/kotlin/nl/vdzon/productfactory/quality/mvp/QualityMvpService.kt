@@ -17,6 +17,7 @@ import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.security.MessageDigest
@@ -47,6 +48,206 @@ class QualityMvpService(
     @Value("\${PF_GIT_REVISION:unknown}") private val sourceRevision: String,
 ) : QualityService, QualityQueryService {
     private val transactions = TransactionTemplate(transactionManager)
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    override fun repairQualityPublication(command: RepairQualityPublicationCommand): ProcessSessionId {
+        validateRepairCommand(command)
+        val requestFingerprint = fingerprint(command.copy(
+            expectedWorkItemVersions = command.expectedWorkItemVersions.toSortedMap(),
+            removeArtifactNames = command.removeArtifactNames.toSortedSet(),
+        ))
+        jdbc.query(
+            "SELECT request_fingerprint,recovery_session_id FROM pf_quality_publication_repair WHERE idempotency_key=?",
+            { rs, _ -> rs.getString(1) to ProcessSessionId(rs.getString(2)) }, command.idempotencyKey,
+        ).singleOrNull()?.let { (saved, recovery) ->
+            if (saved != requestFingerprint) throw IdempotencyConflict("Herstelsleutel is al voor een ander herstel gebruikt.")
+            return recovery
+        }
+        // Serialize repair with a retry and retain the failed session, result and attempts as history.
+        lockRepairRows("SELECT id FROM pf_quality_process_session WHERE id=? FOR UPDATE", command.failedSessionId.value)
+        val source = getProcessSession(command.failedSessionId)
+        if (source.status != ProcessSessionStatus.FAILED || source.errorCode != "QUALITY_RESULT_INVALID" ||
+            source.blockedReason != MISSING_EVIDENCE_MESSAGE
+        ) throw InvalidCommand("Alleen een mislukte publicatie met ontbrekende artifactverwijzingen kan worden hersteld.")
+        if (sessionRows("WHERE active_product_id=?", source.productId.value).isNotEmpty()) throw ProcessAlreadyRunning(source.productId)
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_publication_repair WHERE failed_session_id=?", Long::class.java, source.id.value) != 0L) {
+            throw InvalidCommand("Deze publicatie is al via een ander herstelcommando verwerkt.")
+        }
+        val sourceRow = jdbc.queryForMap(
+            "SELECT current_ai_task_id,frozen_context_json,claimed_work_items_json FROM pf_quality_process_session WHERE id=?", source.id.value,
+        )
+        if (sourceRow["current_ai_task_id"] != command.sourceTaskId.value) throw VersionConflict("AI-brontaak is gewijzigd.")
+        lockRepairRows("SELECT id FROM pf_ai_task WHERE id=? FOR UPDATE", command.sourceTaskId.value)
+        val task = aiQueries.getAiTask(command.sourceTaskId)
+        if (task.status != AiTaskStatus.SUCCEEDED || task.requesterCapability != "quality" ||
+            task.requesterSessionId != source.id || task.productId != source.productId || task.jobKey != JOB || task.agentRole != ROLE.value
+        ) throw InvalidCommand("Het herstel vereist de oorspronkelijke geslaagde Testertaak.")
+        val raw = jdbc.queryForMap("SELECT response_json,artifacts_json FROM pf_ai_task_result WHERE task_id=? AND status='SUCCEEDED' FOR UPDATE", task.id.value)
+        val responseJson = raw["response_json"] as? String ?: throw InvalidCommand("Oorspronkelijk testerresultaat ontbreekt.")
+        val manifestJson = raw["artifacts_json"] as? String ?: throw InvalidCommand("Oorspronkelijk artifactmanifest ontbreekt.")
+        val contextJson = sourceRow["frozen_context_json"] as? String ?: throw InvalidCommand("Oorspronkelijke testcontext ontbreekt.")
+        if (sha256(responseJson) != command.expectedResponseSha256 || sha256(manifestJson) != command.expectedManifestSha256 ||
+            sha256(contextJson) != command.expectedFrozenContextSha256
+        ) throw VersionConflict("Bronresultaat, artifactmanifest of bevroren context is gewijzigd.")
+        lockRepairRows("SELECT id FROM pf_quality_work_item WHERE claimed_by_session_id=? FOR UPDATE", source.id.value)
+        val items = workItemRows("WHERE claimed_by_session_id=?", source.id.value)
+        val claimed = readJson<List<QualityWorkItemId>>(sourceRow["claimed_work_items_json"] as String).map { it.value }.toSet()
+        if (items.isEmpty() || items.associate { it.id.value to it.version } != command.expectedWorkItemVersions ||
+            claimed != command.expectedWorkItemVersions.keys || items.any {
+                it.productId != source.productId || it.status != WorkItemStatus.FAILED || it.type != QualityWorkItemType.VERIFY_EPIC ||
+                    it.errorCode != "QUALITY_RESULT_INVALID" || it.blockedReason != MISSING_EVIDENCE_MESSAGE ||
+                    it.retryAfter != null || it.attemptCount < 1 || it.attempts.lastOrNull()?.status != WorkItemStatus.FAILED ||
+                    it.attempts.lastOrNull()?.attempt != it.attemptCount
+            }
+        ) throw VersionConflict("De oorspronkelijke mislukte epic-testpoging is niet meer actueel.")
+
+        val frozen = mapper.readTree(contextJson)
+        validateRepairDomain(source.productId, items, frozen)
+        val manifest = readJson<List<ArtifactReference>>(manifestJson)
+        command.removeArtifactNames.forEach { name ->
+            if (jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_artifact WHERE task_id=? AND logical_name=?", Long::class.java, task.id.value, name) != 0L) {
+                throw InvalidCommand("Een geregistreerd artifact mag niet als een verzonnen verwijzing worden verwijderd.")
+            }
+        }
+        val corrected = removeMissingEvidence(mapper.readTree(responseJson), manifest, command.removeArtifactNames)
+        val resolved = resolveEvidenceArtifacts(corrected, manifest)
+        if (resolved.references.isEmpty()) throw InvalidCommand("Publicatieherstel vereist minstens één bestaand bewijsartifact.")
+
+        val recoveryId = ProcessSessionId(UUID.randomUUID().toString())
+        val now = clock.instant()
+        // The active-product uniqueness constraint also excludes a scheduler that raced the initial check.
+        jdbc.update(
+            """INSERT INTO pf_quality_process_session(id,product_id,active_product_id,status,implementation_artifact,implementation_variant,
+               implementation_version,implementation_revision,inputs_json,claimed_work_items_json,memory_version_ids_json,ai_task_ids_json,
+               publications_json,frozen_context_json,git_url,git_commit_sha,deployed_revision,current_ai_task_id,started_at,updated_at)
+               SELECT ?,product_id,product_id,'RUNNING',?,?,?, ?,inputs_json,claimed_work_items_json,memory_version_ids_json,ai_task_ids_json,
+               '[]',frozen_context_json,git_url,git_commit_sha,deployed_revision,current_ai_task_id,?,? FROM pf_quality_process_session WHERE id=?""",
+            recoveryId.value, IMPLEMENTATION_ARTIFACT, "publication-repair", implementationVersion, sourceRevision, now, now, source.id.value,
+        )
+        validateRepairArtifacts(task.id, resolved.references)
+        ai.retainAiArtifacts(RetainAiArtifactsCommand(resolved.references, "QUALITY_SESSION", recoveryId.value, 1))
+        items.forEach { item ->
+            if (jdbc.update(
+                    """UPDATE pf_quality_work_item SET status='IN_PROGRESS',claimed_by_session_id=?,error_code=NULL,blocked_reason=NULL,
+                       retryable=FALSE,retry_after=NULL,updated_at=?,version=version+1 WHERE id=? AND version=? AND status='FAILED' AND claimed_by_session_id=?""",
+                    recoveryId.value, now, item.id.value, item.version, source.id.value,
+                ) != 1
+            ) throw VersionConflict("De testpoging is intussen gewijzigd.")
+        }
+        val correctedJson = mapper.writeValueAsString(corrected)
+        jdbc.update(
+            """INSERT INTO pf_quality_publication_repair(idempotency_key,request_fingerprint,failed_session_id,source_task_id,recovery_session_id,
+               source_response_sha256,source_manifest_sha256,source_context_sha256,expected_work_item_versions_json,removed_artifact_names_json,
+               corrected_response_json,corrected_response_sha256,actor_type,actor_id,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            command.idempotencyKey, requestFingerprint, source.id.value, task.id.value, recoveryId.value,
+            command.expectedResponseSha256, command.expectedManifestSha256, command.expectedFrozenContextSha256,
+            mapper.writeValueAsString(command.expectedWorkItemVersions.toSortedMap()), mapper.writeValueAsString(command.removeArtifactNames.sorted()),
+            correctedJson, sha256(correctedJson), command.actor.type.name, command.actor.id, command.reason, now,
+        )
+        publishResult(getProcessSession(recoveryId), resolved.result, task.promptTemplateVersion, failOnChangedDeployment = true)
+        return recoveryId
+    }
+
+    private fun validateRepairCommand(command: RepairQualityPublicationCommand) {
+        if (command.idempotencyKey.length !in 1..200 || command.reason.trim().length !in 10..2000 || command.actor.id.trim().length !in 1..320 ||
+            command.expectedWorkItemVersions.isEmpty() || command.expectedWorkItemVersions.any { it.key.isBlank() || it.value < 1 } ||
+            command.removeArtifactNames.isEmpty() || command.removeArtifactNames.any { !EVIDENCE_NAME.matches(it) } ||
+            listOf(command.expectedResponseSha256, command.expectedManifestSha256, command.expectedFrozenContextSha256).any { !Regex("[0-9a-f]{64}").matches(it) }
+        ) throw InvalidCommand("Publicatieherstel vereist een begrensde reden, actor, exacte versies, hashes en ontbrekende artifactnamen.")
+        rejectSensitive(command.reason)
+    }
+
+    private fun validateRepairDomain(productId: ProductId, items: List<QualityWorkItemDetails>, frozen: JsonNode) {
+        lockRepairRows("SELECT product_id FROM pf_product WHERE product_id=? FOR UPDATE", productId.value)
+        lockRepairRows("SELECT id FROM pf_epic WHERE product_id=? FOR UPDATE", productId.value)
+        lockRepairRows("SELECT id FROM pf_story WHERE product_id=? FOR UPDATE", productId.value)
+        lockRepairRows("SELECT id FROM pf_bug WHERE product_id=? FOR UPDATE", productId.value)
+        val configuration = products.getTestableProduct(productId).copy(production = null)
+        if (storedJsonTree(configuration) != frozen.path("testableProduct") ||
+            storedJsonTree(products.getProductAssignment(productId)) != frozen.path("assignment")
+        ) throw VersionConflict("Testconfiguratie of productopdracht is gewijzigd sinds de test.")
+        val details = frozen.path("workItems").associateBy { it.path("workItemId").asText() }
+        if (details.keys != items.map { it.id.value }.toSet()) throw VersionConflict("De bevroren testbatch wijkt af.")
+        items.forEach { item ->
+            val detail = details.getValue(item.id.value)
+            val epic = designQueries.getEpic(EpicId(item.source.id))
+            if (detail.path("type").asText() != item.type.name || epic.version != item.source.version || epic.status != EpicStatus.VERIFYING ||
+                storedJsonTree(frozenWork(item).detail) != detail.path("detail")
+            ) throw VersionConflict("Epic, opgeleverde stories, oplevercommits of open bugs zijn gewijzigd sinds de test.")
+            val target = environment(configuration, item.targetEnvironment)
+            val expected = frozen.path("deployedRevisions").path(item.targetEnvironment).asText()
+            if (expected.isBlank() || deployments.resolve(target.baseUrl, target.revisionEndpoint, target.revisionJsonPath) != expected) {
+                throw VersionConflict("De gedeployde testrevision is gewijzigd sinds de test.")
+            }
+        }
+    }
+
+    private fun removeMissingEvidence(result: JsonNode, manifest: List<ArtifactReference>, names: Set<String>): JsonNode {
+        if (manifest.isEmpty() || manifest.any { !EVIDENCE_NAME.matches(it.name) } || manifest.map { it.name }.toSet().size != manifest.size) {
+            throw InvalidCommand("Herstel vereist een uniek en volledig kwaliteitsartifactmanifest.")
+        }
+        val available = manifest.map { it.name }.toSet()
+        if (names.any { it in available }) throw InvalidCommand("Bestaand bewijs mag niet uit een herstelresultaat worden verwijderd.")
+        val corrected = result.deepCopy<JsonNode>()
+        val removed = mutableListOf<String>()
+        fun visit(node: JsonNode) {
+            if (node.isObject) {
+                val artifacts = node.path("artifacts")
+                if (artifacts is com.fasterxml.jackson.databind.node.ArrayNode) {
+                    for (index in artifacts.size() - 1 downTo 0) {
+                        val artifact = artifacts[index]
+                        if (artifact.path("type").asText() == "RUNTIME_ARTIFACT" && artifact.path("artifactName").asText() in names) {
+                            removed += artifact.path("artifactName").asText()
+                            artifacts.remove(index)
+                        }
+                    }
+                }
+                node.elements().forEachRemaining(::visit)
+            } else if (node.isArray) node.forEach(::visit)
+        }
+        visit(corrected)
+        if (removed.size != names.size || removed.toSet() != names) throw InvalidCommand("Herstel moet exact de eenmalig voorkomende ontbrekende verwijzingen verwijderen.")
+        // No checks, outcomes, coverage, bugs or descriptions are accepted from the maintenance caller.
+        return corrected
+    }
+
+    private fun validateRepairArtifacts(taskId: AiTaskId, references: List<ArtifactReference>) {
+        references.forEach { reference ->
+            val uri = Regex("/api/ai/tasks/([^/]+)/artifacts/([^/]+)").matchEntire(reference.uri)
+                ?: throw InvalidCommand("Herstel vereist duurzaam opgeslagen bewijs.")
+            if (uri.groupValues[1] != taskId.value || reference.mediaType != "image/png") throw InvalidCommand("Bewijs hoort niet bij de oorspronkelijke Testertaak.")
+            val artifactId = uri.groupValues[2]
+            val rows = jdbc.queryForList(
+                "SELECT id FROM pf_ai_artifact WHERE id=? AND task_id=? AND logical_name=? AND mime_type=? AND artifact_status='READY' FOR UPDATE",
+                String::class.java, artifactId, taskId.value, reference.name, reference.mediaType,
+            )
+            if (rows.size != 1) throw InvalidCommand("Bewijsartifact is niet duurzaam beschikbaar of wijkt af van het manifest.")
+            val content = aiQueries.openAiTaskArtifact(taskId, artifactId)
+            content.inputStream.use { input ->
+                if (content.mediaType != reference.mediaType || content.sizeBytes !in 1..5L * 1024 * 1024 || content.sha256 == null) {
+                    throw InvalidCommand("Bewijsartifact mist geldige inhoudsmetadata.")
+                }
+                val digest = MessageDigest.getInstance("SHA-256")
+                val buffer = ByteArray(64 * 1024)
+                var size = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    size += read
+                    if (size > content.sizeBytes) throw InvalidCommand("Bewijsartifact is groter dan zijn manifest.")
+                    digest.update(buffer, 0, read)
+                }
+                if (size != content.sizeBytes || HexFormat.of().formatHex(digest.digest()) != content.sha256) {
+                    throw InvalidCommand("Bewijsartifact wijkt af van zijn vastgelegde SHA-256 of grootte.")
+                }
+            }
+        }
+    }
+
+    private fun lockRepairRows(sql: String, id: String) { jdbc.queryForList(sql, String::class.java, id) }
+    // Use the same JSON roundtrip as the stored snapshot (including Jackson's numeric node types).
+    private fun storedJsonTree(value: Any): JsonNode = mapper.readTree(mapper.writeValueAsString(value))
+    private fun sha256(value: String) = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)))
 
     override fun runProcessSession(productId: ProductId) {
         val claim = transactions.execute { claimOrCreate(productId) } ?: error("Kwaliteitssessieclaim ontbreekt.")
@@ -248,11 +449,12 @@ class QualityMvpService(
         }
     }
 
-    private fun publishResult(session: ProcessSessionDetails, root: JsonNode, promptVersion: Long) {
+    private fun publishResult(session: ProcessSessionDetails, root: JsonNode, promptVersion: Long, failOnChangedDeployment: Boolean = false) {
         if (root.path("outcome").asText() != "PUBLISH_RESULTS") throw InvalidCommand("Testerresultaat is niet publiceerbaar.")
         val eligible = workItemRows("WHERE claimed_by_session_id=? AND status='IN_PROGRESS' ORDER BY priority DESC,created_at", session.id.value)
         val results = root.path("results").takeIf(JsonNode::isArray)?.associateBy { requiredText(it, "workItemId", 1, 80) }
             ?: throw InvalidCommand("Testerresultaat mist resultaten.")
+        if (root.path("results").size() != results.size) throw InvalidCommand("Testerresultaat bevat dubbele werkitemresultaten.")
         if (results.keys != eligible.map { it.id.value }.toSet()) throw InvalidCommand("Testerresultaat dekt niet exact de bevroren batch.")
         val frozen = jdbc.queryForObject("SELECT frozen_context_json FROM pf_quality_process_session WHERE id=?", String::class.java, session.id.value)
             ?.let(mapper::readTree) ?: throw InvalidCommand("Bevroren testomgeving ontbreekt.")
@@ -260,6 +462,7 @@ class QualityMvpService(
         val revisionCheck = runCatching { deployments.resolve(testEnvironment.baseUrl, testEnvironment.revisionEndpoint, testEnvironment.revisionJsonPath) }
         val currentRevision = revisionCheck.getOrNull()
         if (eligible.any { currentRevision == null || deployedRevision(session.id, it.targetEnvironment) != currentRevision }) {
+            if (failOnChangedDeployment) throw VersionConflict("De gedeployde testrevision wijzigde tijdens het publicatieherstel.")
             eligible.forEach { blockWorkItem(it.id, "TEST_ENVIRONMENT_CHANGED", "De testomgeving is tijdens de test gewijzigd of niet meer bereikbaar; het resultaat kan niet worden goedgekeurd.", revisionCheck.exceptionOrNull()?.let(::isTransientTechnicalFailure) == true) }
             finishSession(session.id, "Kwaliteitswerk wacht op een stabiele testomgeving.", emptyList())
             return
@@ -732,6 +935,7 @@ class QualityMvpService(
 
     @Transactional
     fun deleteAllOwnedData() {
+        jdbc.update("DELETE FROM pf_quality_publication_repair")
         jdbc.update("DELETE FROM pf_quality_command")
         jdbc.update("DELETE FROM pf_quality_snapshot")
         jdbc.update("DELETE FROM pf_bug_story")
@@ -838,7 +1042,7 @@ class QualityMvpService(
             "${outcome.name} · verificatie ${verificationId.value}", now, id.value,
         )
         jdbc.update(
-            "UPDATE pf_quality_attempt SET status='DONE',finished_at=? WHERE work_item_id=? AND attempt_number=?",
+            "UPDATE pf_quality_attempt SET status='DONE',finished_at=? WHERE work_item_id=? AND attempt_number=? AND status='IN_PROGRESS'",
             now, id.value, item.attemptCount,
         )
     }
@@ -926,11 +1130,11 @@ class QualityMvpService(
                         "RUNTIME_ARTIFACT" -> {
                             val artifactName = requiredText(artifact, "artifactName", 1, 100)
                             val stored = byName[artifactName]
-                                ?: throw InvalidCommand("Kwaliteitsbewijs verwijst naar een onbekend Runtime-artifact.")
+                                ?: throw InvalidCommand(MISSING_EVIDENCE_MESSAGE)
                             if (requiredText(artifact, "mediaType", 3, 120) != stored.mediaType) {
                                 throw InvalidCommand("Kwaliteitsbewijs heeft een ander MIME-type dan het artifactmanifest.")
                             }
-                            used += artifactName
+                            if (!used.add(artifactName)) throw InvalidCommand("Ieder geproduceerd kwaliteitsartifact moet exact één keer als bewijs zijn gekoppeld.")
                             stored.uri
                         }
                         else -> throw InvalidCommand("Kwaliteitsbewijs heeft een onbekend brontype.")
@@ -972,7 +1176,7 @@ class QualityMvpService(
         Een beloofde en als DONE opgeleverde testvoorziening is zelf afgesproken productgedrag. Controleer de gedeployde acceptatierevisie en de login: als de juiste revision draait en de login werkt, maar de gedocumenteerde en toegestane scenarioroute reproduceerbaar 404 geeft of de beloofde fixture defect is, rapporteer NEEDS_WORK met een concrete bug in die bestaande story. Benoem de bestaande story-id, route, revision, verwachte voorziening en geobserveerde respons in het bugbewijs. Gebruik voor dezelfde oorzaak geen testBlocker en geen implementationGap; zet tests die daardoor niet konden worden uitgevoerd in missingCoverage. Dit vraagt één gerichte bugfix, geen nieuwe epicstories. Claim geen geslaagde schermtest voor niet uitgevoerde scenario's. Is niet bewezen dat de voorziening is opgeleverd of ontbreken toegang of capaciteit werkelijk, kies wel BLOCKED met de concrete testvoorwaarde.
         Bij testBlockers zijn implementationGaps, bugs en resolvedBugIds leeg. missingCoverage rapporteert uitsluitend ongeteste of resterende dekking en vraagt nooit productwerk aan. Alleen een werkelijk geobserveerd ontbrekend epiccriterium dat door geen enkele opgeleverde story wordt afgedekt mag in implementationGaps staan. Neem criterion letterlijk over uit detail.epic.acceptanceCriteria, vermeld observedBehaviour en evidence van de uitgevoerde test, vergelijk alle detail.stories (DONE) en neem hun exacte id's in reviewedStoryIds op. Leg in coverageExplanation uit waarom die opgeleverde stories dit gedrag niet al afdekken. Gedrag dat volgens een opgeleverde story hoort te werken maar reproduceerbaar faalt is een bug, geen nieuw implementatiegat. Een bewezen bug gaat in bugs met concrete werkelijke/verwachte uitkomst, reproduceerstappen en testbewijs. Als geen bewezen implementatiegat of reproduceerbare bug beschikbaar is, kies BLOCKED en benoem de testvoorwaarde. Een bugfixhertest mag met bewijs van dezelfde nog optredende bug FAILED teruggeven zonder die bug opnieuw aan te maken.
         """.trimIndent() + "\n" +
-        "Bewijs gebruikt expliciet type EXTERNAL_URL met veld url (artifactName null), of type RUNTIME_ARTIFACT met een vooraf gedeclareerd artifactName evidence-01 tot en met evidence-50 en mediaType image/png (url null). Verzin nooit een download-URL of bestandsnaam.\n" + testerPrompt(context)
+        "Bewijs gebruikt expliciet type EXTERNAL_URL met veld url (artifactName null), of type RUNTIME_ARTIFACT met een vooraf gedeclareerd artifactName evidence-01 tot en met evidence-50 en mediaType image/png (url null). Verzin nooit een download-URL of bestandsnaam. Lees vóór het definitieve JSON-resultaat de werkelijk aanwezige bestanden in /job/output/artifacts, lijst hun exacte namen en tel ze. Verwijs uitsluitend naar daadwerkelijk gemaakte bestanden en koppel elk bestand precies één keer. Vul nooit automatisch een aaneengesloten nummerreeks in: overgeslagen nummers blijven overgeslagen. Controleer dat aantal en namen exact overeenkomen met je Runtime-artifactverwijzingen.\n" + testerPrompt(context)
 
     private data class ClaimedSession(val session: ProcessSessionDetails, val created: Boolean)
     private data class Target(val type: VerificationTargetType, val id: String, val version: Long)
@@ -983,7 +1187,8 @@ class QualityMvpService(
     companion object {
         private const val IMPLEMENTATION_ARTIFACT = "quality-impl-mvp"
         private const val IMPLEMENTATION_VARIANT = "single-tester"
-        private const val PROMPT_VERSION = 5L
+        private const val PROMPT_VERSION = 6L
+        private const val MISSING_EVIDENCE_MESSAGE = "Kwaliteitsbewijs verwijst naar een onbekend Runtime-artifact."
         private const val STRUCTURED_TEST_RESULT_VERSION = 3L
         private val BROWSER_INSTRUCTIONS = """
             Browserinstructies voor de Tester:

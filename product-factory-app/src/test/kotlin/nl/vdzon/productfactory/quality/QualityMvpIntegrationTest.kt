@@ -3,6 +3,8 @@ package nl.vdzon.productfactory.quality
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import nl.vdzon.productfactory.ai.AiExecutionApplicationService
+import nl.vdzon.productfactory.ai.AiArtifactStore
+import nl.vdzon.productfactory.ai.RuntimeArtifactView
 import nl.vdzon.productfactory.ai.FakeRuntime
 import nl.vdzon.productfactory.api.design.*
 import nl.vdzon.productfactory.api.foundation.DeploymentRevisionResolver
@@ -16,8 +18,12 @@ import nl.vdzon.productfactory.planning.mvp.ProductPlanningMvpService
 import nl.vdzon.productfactory.quality.mvp.QualityMvpService
 import nl.vdzon.productfactory.quality.mvp.TransientTestEnvironmentFailure
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -32,6 +38,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
+import java.security.MessageDigest
+import java.util.HexFormat
 
 @SpringBootTest(properties = ["PF_AUTH_REQUIRED=false"])
 @ActiveProfiles("test")
@@ -46,6 +54,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
     private val planningImpl: ProductPlanningMvpService,
     private val designQueries: ProductDesignQueryService,
     private val ai: AiExecutionApplicationService,
+    private val artifactStore: AiArtifactStore,
     private val runtime: FakeRuntime,
     private val revisions: FakeDeploymentRevisionResolver,
     private val gitRevisions: FakeGitRevisionResolver,
@@ -57,6 +66,13 @@ class QualityMvpIntegrationTest @Autowired constructor(
     private var productId = ProductId("not-initialized")
     private var epicId = EpicId("not-initialized")
     private var storyId = StoryId("not-initialized")
+    private val repairStorageKeys = mutableListOf<String>()
+
+    @AfterEach
+    fun deleteRepairEvidence() {
+        repairStorageKeys.forEach(artifactStore::delete)
+        repairStorageKeys.clear()
+    }
 
     @BeforeEach
     fun prepare() {
@@ -100,7 +116,7 @@ class QualityMvpIntegrationTest @Autowired constructor(
             .containsExactlyInAnyOrder("INSUFFICIENT_TEST_EVIDENCE", "TEST_ACCESS_UNAVAILABLE", "TEST_CAPABILITY_UNAVAILABLE", "TEST_ENVIRONMENT_UNAVAILABLE", "TRANSIENT_TECHNICAL_FAILURE")
         assertThat(properties.path("implementationGaps").path("items").path("required").map { it.asText() })
             .contains("criterion", "observedBehaviour", "coverageExplanation", "reviewedStoryIds", "evidence")
-        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(5L)
+        assertThat(jdbc.queryForObject("SELECT prompt_template_version FROM pf_ai_task WHERE product_id=?", Long::class.java, productId.value)).isEqualTo(6L)
         ai.deleteAllOwnedExecutionData()
         runtime.reset()
     }
@@ -138,6 +154,8 @@ class QualityMvpIntegrationTest @Autowired constructor(
             .contains("gebruik geen globale extraHTTPHeaders met de credential")
             .contains("path: '/job/output/artifacts/evidence-01', type: 'png'")
             .contains("TEST_CAPABILITY_UNAVAILABLE")
+            .contains("lijst hun exacte namen en tel ze")
+            .contains("overgeslagen nummers blijven overgeslagen")
             .contains("https://acceptance.example.test")
             .doesNotContain("https://production.example.test")
         val artifacts = mapper.readTree(jdbc.queryForObject(
@@ -974,6 +992,189 @@ class QualityMvpIntegrationTest @Autowired constructor(
             mapper.writeValueAsString(emptyList<String>()), now,
         )
     }
+
+    @Test
+    fun `publicatieherstel publiceert dezelfde testpoging met immutable bron en controleerbare audit`() {
+        val bugId = BugId(UUID.randomUUID().toString())
+        insertBug(bugId)
+        val fixture = failedPublication(resolvedBug = bugId)
+        val sourceBefore = jdbc.queryForMap("SELECT * FROM pf_quality_process_session WHERE id=?", fixture.command.failedSessionId.value)
+        val resultBefore = jdbc.queryForMap("SELECT * FROM pf_ai_task_result WHERE task_id=?", fixture.command.sourceTaskId.value)
+        val attemptsBefore = qualityQueries.findQualityWorkItems(productId).single().attempts
+        val command = mapper.readValue(mapper.writeValueAsString(fixture.command), RepairQualityPublicationCommand::class.java)
+
+        val recovery = quality.repairQualityPublication(command)
+
+        assertThat(qualityQueries.getProcessSession(recovery).status).isEqualTo(ProcessSessionStatus.SUCCEEDED)
+        assertThat(qualityQueries.getProcessSession(recovery).aiTaskIds).containsExactly(command.sourceTaskId)
+        assertThat(jdbc.queryForMap("SELECT * FROM pf_quality_process_session WHERE id=?", command.failedSessionId.value)).isEqualTo(sourceBefore)
+        assertThat(jdbc.queryForMap("SELECT * FROM pf_ai_task_result WHERE task_id=?", command.sourceTaskId.value)).isEqualTo(resultBefore)
+        val work = qualityQueries.findQualityWorkItems(productId).single()
+        assertThat(work.status).isEqualTo(WorkItemStatus.DONE)
+        assertThat(work.attemptCount).isEqualTo(3)
+        assertThat(work.attempts).isEqualTo(attemptsBefore)
+        assertThat(work.attempts.map { it.status }).containsOnly(WorkItemStatus.FAILED)
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.COMPLETED)
+        assertThat(qualityQueries.getBug(bugId).status).isEqualTo(BugStatus.RESOLVED)
+        assertThat(runtime.requests).hasSize(1)
+        val verification = qualityQueries.findVerifications(VerificationFilter(productId)).single()
+        assertThat(verification.outcome).isEqualTo(VerificationOutcome.PASSED)
+        assertThat(verification.evidence.artifacts).hasSize(1)
+        assertThat(verification.testedRevision).isEqualTo(SHA)
+        assertThat(qualityQueries.getCurrentQuality(productId)).isNotNull()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_artifact_domain_reference WHERE domain_id=?", Long::class.java, recovery.value)).isEqualTo(1L)
+        val audit = jdbc.queryForMap("SELECT * FROM pf_quality_publication_repair WHERE idempotency_key=?", command.idempotencyKey)
+        val expected = mapper.readTree(resultBefore["response_json"] as String)
+        (expected.path("results")[0].path("evidence").path("artifacts") as com.fasterxml.jackson.databind.node.ArrayNode).remove(0)
+        assertThat(mapper.readTree(audit["corrected_response_json"] as String)).isEqualTo(expected)
+        assertThat(audit["source_response_sha256"]).isEqualTo(command.expectedResponseSha256)
+        assertThat(audit["source_manifest_sha256"]).isEqualTo(command.expectedManifestSha256)
+        assertThat(audit["actor_id"]).isEqualTo(STAKEHOLDER.id)
+        assertThat(audit["reason"]).isEqualTo(command.reason)
+
+        // A replay succeeds even though publication has legitimately changed the epic and work versions.
+        assertThat(quality.repairQualityPublication(command)).isEqualTo(recovery)
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).hasSize(1)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_publication_repair", Long::class.java)).isEqualTo(1L)
+        assertThatThrownBy { quality.repairQualityPublication(command.copy(reason = "Een andere herstelreden voor dezelfde sleutel.")) }
+            .isInstanceOf(IdempotencyConflict::class.java)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["response", "manifest", "context", "work", "task", "claim", "source-error", "epic", "story-commit", "story-set", "open-bug", "configuration", "deployment", "deployment-during-repair", "active-session"])
+    fun `publicatieherstel vervalt bij gewijzigde bron of testvoorwaarden`(change: String) {
+        val fixture = failedPublication()
+        val command = fixture.command
+        when (change) {
+            "response" -> jdbc.update("UPDATE pf_ai_task_result SET response_json=response_json || ' ' WHERE task_id=?", command.sourceTaskId.value)
+            "manifest" -> jdbc.update("UPDATE pf_ai_task_result SET artifacts_json=artifacts_json || ' ' WHERE task_id=?", command.sourceTaskId.value)
+            "context" -> jdbc.update("UPDATE pf_quality_process_session SET frozen_context_json=frozen_context_json || ' ' WHERE id=?", command.failedSessionId.value)
+            "work" -> jdbc.update("UPDATE pf_quality_work_item SET version=version+1 WHERE id=?", fixture.work.value)
+            "task" -> jdbc.update("UPDATE pf_ai_task SET requester_session_id='another-session' WHERE id=?", command.sourceTaskId.value)
+            "claim" -> jdbc.update("UPDATE pf_quality_work_item SET claimed_by_session_id='another-session' WHERE id=?", fixture.work.value)
+            "source-error" -> jdbc.update("UPDATE pf_quality_process_session SET error_code='QUALITY_TASK_FAILED' WHERE id=?", command.failedSessionId.value)
+            "epic" -> jdbc.update("UPDATE pf_epic_version SET summary='Inhoud gewijzigd zonder herhaalde verificatie' WHERE epic_id=?", epicId.value)
+            "story-commit" -> jdbc.update("UPDATE pf_story SET delivered_commit_sha=? WHERE id=?", "b".repeat(40), storyId.value)
+            "story-set" -> insertStory(StoryId(UUID.randomUUID().toString()), StoryType.PRODUCT_STORY, null, null)
+            "open-bug" -> insertBug(BugId(UUID.randomUUID().toString()))
+            "configuration" -> {
+                val configuration = productQueries.getTestableProduct(productId)
+                productCommands.configureTestableProduct(ConfigureTestableProductCommand(
+                    productId, configuration.acceptance.copy(baseUrl = "https://changed.example.test"), null,
+                    configuration.version, STAKEHOLDER, "changed-configuration",
+                ))
+            }
+            "deployment" -> revisions.revision = "b".repeat(40)
+            "deployment-during-repair" -> revisions.afterResolve = { revisions.revision = "b".repeat(40) }
+            "active-session" -> jdbc.update(
+                """INSERT INTO pf_quality_process_session(id,product_id,active_product_id,status,implementation_artifact,implementation_variant,
+                   implementation_version,implementation_revision,inputs_json,claimed_work_items_json,memory_version_ids_json,ai_task_ids_json,
+                   publications_json,started_at,updated_at) SELECT 'other-session',product_id,product_id,'RUNNING',implementation_artifact,
+                   implementation_variant,implementation_version,implementation_revision,'[]','[]','[]','[]','[]',started_at,updated_at
+                   FROM pf_quality_process_session WHERE id=?""", command.failedSessionId.value,
+            )
+        }
+
+        assertThatThrownBy { quality.repairQualityPublication(command) }
+            .isInstanceOfAny(InvalidCommand::class.java, VersionConflict::class.java, ProcessAlreadyRunning::class.java)
+
+        assertRepairNotPublished(fixture)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["existing-removal", "extra-removal", "duplicate-link", "mime", "not-ready", "sha256", "size", "empty-manifest", "unlinked-artifact"])
+    fun `publicatieherstel vereist exact ontbrekende refs en intact eenmalig gekoppeld bewijs`(change: String) {
+        val fixture = failedPublication(duplicate = change == "duplicate-link")
+        var command = fixture.command
+        when (change) {
+            "existing-removal" -> command = command.copy(removeArtifactNames = setOf("evidence-01", "evidence-02"))
+            "extra-removal" -> command = command.copy(removeArtifactNames = setOf("evidence-02", "evidence-03"))
+            "mime" -> jdbc.update("UPDATE pf_ai_artifact SET mime_type='text/plain' WHERE id=?", fixture.artifactId)
+            "not-ready" -> jdbc.update("UPDATE pf_ai_artifact SET artifact_status='FAILED' WHERE id=?", fixture.artifactId)
+            "sha256" -> jdbc.update("UPDATE pf_ai_artifact SET sha256=? WHERE id=?", "0".repeat(64), fixture.artifactId)
+            "size" -> jdbc.update("UPDATE pf_ai_artifact SET size_bytes=size_bytes+1 WHERE id=?", fixture.artifactId)
+            "empty-manifest" -> {
+                jdbc.update("UPDATE pf_ai_task_result SET artifacts_json='[]' WHERE task_id=?", command.sourceTaskId.value)
+                command = command.copy(expectedManifestSha256 = hash("[]"), removeArtifactNames = setOf("evidence-01", "evidence-02"))
+            }
+            "unlinked-artifact" -> {
+                val manifest = mapper.readTree(jdbc.queryForObject("SELECT artifacts_json FROM pf_ai_task_result WHERE task_id=?", String::class.java, command.sourceTaskId.value)) as com.fasterxml.jackson.databind.node.ArrayNode
+                manifest.add(manifest[0].deepCopy<ObjectNode>().put("name", "evidence-03"))
+                val json = mapper.writeValueAsString(manifest)
+                jdbc.update("UPDATE pf_ai_task_result SET artifacts_json=? WHERE task_id=?", json, command.sourceTaskId.value)
+                command = command.copy(expectedManifestSha256 = hash(json))
+            }
+        }
+
+        assertThatThrownBy { quality.repairQualityPublication(command) }.isInstanceOf(InvalidCommand::class.java)
+
+        assertRepairNotPublished(fixture)
+    }
+
+    private fun assertRepairNotPublished(fixture: FailedPublication) {
+        assertThat(qualityQueries.findVerifications(VerificationFilter(productId))).isEmpty()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_quality_publication_repair", Long::class.java)).isZero()
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pf_ai_artifact_domain_reference", Long::class.java)).isZero()
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().attemptCount).isEqualTo(3)
+        assertThat(qualityQueries.findQualityWorkItems(productId).single().status).isEqualTo(WorkItemStatus.FAILED)
+        assertThat(qualityQueries.getProcessSession(fixture.command.failedSessionId).status).isEqualTo(ProcessSessionStatus.FAILED)
+        assertThat(designQueries.getEpic(epicId).status).isEqualTo(EpicStatus.VERIFYING)
+        assertThat(runtime.requests).hasSize(1)
+    }
+
+    private data class FailedPublication(val work: QualityWorkItemId, val artifactId: String, val command: RepairQualityPublicationCommand)
+
+    private fun failedPublication(duplicate: Boolean = false, resolvedBug: BugId? = null): FailedPublication {
+        val work = epicVerification("repair-publication")
+        jdbc.update("UPDATE pf_quality_work_item SET attempt_count=2 WHERE id=?", work.value)
+        for (attempt in 1..2) jdbc.update(
+            "INSERT INTO pf_quality_attempt(work_item_id,attempt_number,status,started_at,finished_at,reason) VALUES (?,?,'FAILED',?,?,?)",
+            work.value, attempt, clock.instant().minusSeconds(60), clock.instant().minusSeconds(30), "Eerdere poging $attempt blijft onveranderd.",
+        )
+        quality.runProcessSession(productId)
+        ai.dispatchPending()
+        val job = runtime.onlyJob()
+        val output = result(work, "PASSED")
+        resolvedBug?.let { (output.path("results")[0] as ObjectNode).putArray("resolvedBugIds").add(it.value) }
+        val artifacts = output.path("results")[0].path("evidence").path("artifacts") as com.fasterxml.jackson.databind.node.ArrayNode
+        fun reference(name: String) = artifacts.addObject().apply {
+            put("name", name); put("type", "RUNTIME_ARTIFACT"); put("artifactName", name); put("mediaType", "image/png"); putNull("url")
+        }
+        reference("evidence-02") // Missing reference fails publication before validating the rest.
+        reference("evidence-01")
+        if (duplicate) reference("evidence-01")
+        val artifactId = UUID.randomUUID().toString()
+        val bytes = "werkelijk bewaard bewijs".toByteArray()
+        val sha = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
+        runtime.results[job.id] = output
+        runtime.resultArtifacts[job.id] = listOf(RuntimeArtifactView(artifactId, job.id, "evidence-01", "image/png", bytes.size.toLong(), sha, clock.instant()))
+        runtime.jobs[job.id] = job.copy(status = "SUCCEEDED", phase = "COMPLETED", progressPercent = 100)
+        ai.reconcileActive()
+        quality.runProcessSession(productId)
+        val item = qualityQueries.findQualityWorkItems(productId).single()
+        val sessionId = item.claimedBySessionId!!
+        val taskId = qualityQueries.getProcessSession(sessionId).aiTaskIds.single()
+        // Construct durable v2 evidence while keeping the source result and its local URI untouched.
+        val storageKey = "quality-repair-test/$artifactId"
+        repairStorageKeys += storageKey
+        artifactStore.append(storageKey).use { it.write(bytes) }
+        artifactStore.verifyAndPromote(storageKey, bytes.size.toLong(), sha)
+        jdbc.update(
+            """INSERT INTO pf_ai_artifact(id,task_id,runtime_job_id,runtime_object_id,logical_name,filename,mime_type,size_bytes,sha256,storage_key,artifact_status,created_at,ready_at)
+               VALUES (?,?,?,?,'evidence-01','evidence-01','image/png',?,?,?,'READY',?,?)""",
+            artifactId, taskId.value, job.id, UUID.randomUUID().toString(), bytes.size, sha, storageKey, clock.instant(), clock.instant(),
+        )
+        jdbc.update("UPDATE pf_ai_runtime_outbox SET api_version='v2' WHERE task_id=?", taskId.value)
+        val response = jdbc.queryForObject("SELECT response_json FROM pf_ai_task_result WHERE task_id=?", String::class.java, taskId.value)!!
+        val manifest = jdbc.queryForObject("SELECT artifacts_json FROM pf_ai_task_result WHERE task_id=?", String::class.java, taskId.value)!!
+        val context = jdbc.queryForObject("SELECT frozen_context_json FROM pf_quality_process_session WHERE id=?", String::class.java, sessionId.value)!!
+        return FailedPublication(work, artifactId, RepairQualityPublicationCommand(
+            sessionId, taskId, mapOf(work.value to item.version), hash(response), hash(manifest), hash(context), setOf("evidence-02"),
+            STAKEHOLDER, "Verwijder uitsluitend de bewezen niet bestaande screenshotverwijzing.", "repair-${work.value}",
+        ))
+    }
+
+    private fun hash(value: String) = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)))
 
     private fun completeSession(result: ObjectNode, promptVersion: Long? = null) {
         quality.runProcessSession(productId)

@@ -45,6 +45,7 @@ class ProductDeletionService(private val jdbc: JdbcTemplate) {
         jdbc.update("DELETE FROM pf_verification WHERE product_id=?", id)
         jdbc.update("DELETE FROM pf_quality_snapshot WHERE product_id=?", id)
         jdbc.update("DELETE FROM pf_quality_work_item WHERE product_id=?", id)
+        jdbc.update("DELETE FROM pf_quality_publication_repair WHERE failed_session_id IN (SELECT id FROM pf_quality_process_session WHERE product_id=?)", id)
         jdbc.update("DELETE FROM pf_quality_process_session WHERE product_id=?", id)
         jdbc.update("DELETE FROM pf_story_version WHERE story_id IN (SELECT id FROM pf_story WHERE product_id=?)", id)
         jdbc.update("DELETE FROM pf_story WHERE product_id=?", id)
