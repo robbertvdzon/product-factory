@@ -1,4 +1,5 @@
 import 'epic_reference.dart';
+import 'epic_progress_state.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -2367,7 +2368,10 @@ class _ProductWorkspacePageState extends State<ProductWorkspacePage> {
               ),
               const SizedBox(height: 14),
               if (progress != null)
-                _JourneyView(steps: _asMaps(progress['steps']))
+                _JourneyView(
+                  key: ValueKey('epic-journey-${_value(progress['epicId'])}'),
+                  steps: _asMaps(progress['steps']),
+                )
               else ...[
                 SelectableText(
                   '$done van ${epicStories.length} stories opgeleverd',

@@ -201,6 +201,24 @@ gaten in de nummerreeks worden niet aangevuld met veronderstelde screenshots. Va
 vergelijkt hij ook alle letterlijk overgenomen `workItemId`-waarden met de bevroren opdrachten.
 Het resultaatschema begrenst die waarden per sessie met een `enum` van exact de geclaimde IDs.
 
+Vanaf promptversie 8 bewaart de Tester een minimale set onderscheidende screenshots, met een
+richtbudget van maximaal 10 per werkitem en zonder minimum. De 50 optionele artifactnamen zijn
+technische capaciteit, geen streefgetal. Meer screenshots mogen wanneer `evidence.description`
+concreet benoemt welke extra unieke schermtoestanden nodig zijn en waarom bestaand bewijs niet
+volstaat. Dit is geen harde publicatielimiet of reden voor `BLOCKED`: alle criteria, scenario's,
+vereiste viewports en relevante lege of fouttoestanden moeten getest blijven worden.
+
+Eén screenshot kan meerdere controles of bugs onderbouwen. Hun tekst noemt dezelfde artifactnaam;
+het bestand wordt slechts één keer gekoppeld in `evidence.artifacts`. Identieke tussenstappen of
+voor-/na-opnames voegen geen bewijs toe. Beide toestanden worden alleen opgeslagen als de zichtbare
+verandering zelf relevant bewijs is. Desktop- en mobiele screenshots zijn alleen beide nodig voor
+responsive gedrag; niet ieder functioneel scenario hoeft opnieuw in beide formaten vastgelegd.
+API- en backendcontroles krijgen tekstuele waarnemingen met criterium, handeling of toegestane route,
+verwachte uitkomst, werkelijke respons en geteste revision. Noteer alleen relevante waarnemingen,
+geen volledige responsepayloads of gevoelige gegevens. Screenshots van terminaluitvoer of
+API-responses zijn daarvoor niet nodig. Dat tekstbewijs vervangt geen vereiste
+schermtest of visueel bugbewijs. Bestaande testresultaten en hun artifacts blijven behouden.
+
 ### Stap 4 — reproduceren en classificeren
 
 Bij een mogelijke productafwijking herhaalt de Tester de relevante stappen binnen dezelfde sessie

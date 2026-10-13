@@ -265,7 +265,7 @@ class _ElapsedSinceState extends State<_ElapsedSince> {
 }
 
 class _JourneyView extends StatelessWidget {
-  const _JourneyView({required this.steps});
+  const _JourneyView({required this.steps, super.key});
 
   final List<Map<String, Object?>> steps;
 
@@ -274,18 +274,24 @@ class _JourneyView extends StatelessWidget {
     if (steps.isEmpty) return const SizedBox.shrink();
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth / steps.length;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        final columns =
+            (constraints.maxWidth / MediaQuery.textScalerOf(context).scale(110))
+                .floor()
+                .clamp(1, steps.length);
+        final width = constraints.maxWidth / columns;
+        return Wrap(
+          runSpacing: 16,
           children: [
             for (var i = 0; i < steps.length; i++)
               SizedBox(
                 width: width,
                 child: _JourneyStep(
                   step: steps[i],
-                  first: i == 0,
+                  first: i % columns == 0,
                   previousReached:
-                      i > 0 && _value(steps[i]['state']) != 'PENDING',
+                      i > 0 &&
+                      EpicProgressState.fromValue(steps[i]['state']) !=
+                          EpicProgressState.pending,
                 ),
               ),
           ],
@@ -308,38 +314,37 @@ class _JourneyStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = _value(step['state']);
-    final (fill, border, icon, iconColor) = switch (state) {
-      'DONE' => (
+    final state = EpicProgressState.fromValue(step['state']);
+    final (fill, border, iconColor) = switch (state) {
+      EpicProgressState.done => (
         ProductFactoryColors.primary,
         ProductFactoryColors.primary,
-        Icons.check,
         Colors.white,
       ),
-      'FAILED' => (
+      EpicProgressState.failed => (
         const Color(0xffb2432f),
         const Color(0xffb2432f),
-        Icons.close,
         Colors.white,
       ),
-      'CURRENT' => (
+      EpicProgressState.current => (
         Colors.white,
         ProductFactoryColors.mint,
-        Icons.circle,
         const Color(0xff0d6b52),
       ),
-      _ => (
+      EpicProgressState.pending => (
         Colors.white,
         ProductFactoryColors.outline,
-        null,
         ProductFactoryColors.muted,
       ),
     };
     final rawDetail = step['detail'];
     final parsed = _parseInstant(rawDetail);
-    final detail = parsed == null
+    final rawDisplayDetail = parsed == null
         ? _value(rawDetail)
         : '${_two(parsed.day)}-${_two(parsed.month)}';
+    final detail = rawDisplayDetail.isEmpty && state == EpicProgressState.pending
+        ? state.label
+        : rawDisplayDetail;
     return Column(
       children: [
         SizedBox(
@@ -362,26 +367,32 @@ class _JourneyStep extends StatelessWidget {
                     ),
                   ),
                 ),
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: fill,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: border, width: 2),
-                  boxShadow: state == 'CURRENT'
-                      ? const [
-                          BoxShadow(color: Color(0xffc9f3e5), spreadRadius: 4),
-                        ]
-                      : null,
+              Semantics(
+                label: state.label,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: fill,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: border, width: 2),
+                    boxShadow: state == EpicProgressState.current
+                        ? const [
+                            BoxShadow(
+                              color: Color(0xffc9f3e5),
+                              spreadRadius: 4,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: state.compactIcon == null
+                      ? null
+                      : Icon(
+                          state.compactIcon,
+                          size: state == EpicProgressState.current ? 9 : 14,
+                          color: iconColor,
+                        ),
                 ),
-                child: icon == null
-                    ? null
-                    : Icon(
-                        icon,
-                        size: state == 'CURRENT' ? 9 : 14,
-                        color: iconColor,
-                      ),
               ),
             ],
           ),
@@ -953,7 +964,10 @@ class _EpicDetailDialogState extends State<_EpicDetailDialog> {
                     if (_loading && progress == null)
                       const LinearProgressIndicator(),
                     if (progress != null) ...[
-                      _JourneyView(steps: _asMaps(progress['steps'])),
+                      _JourneyView(
+                        key: ValueKey('epic-journey-${_value(progress['epicId'])}'),
+                        steps: _asMaps(progress['steps']),
+                      ),
                       if (waiting != null) _WaitingCallout(waitingOn: waiting),
                       const SizedBox(height: 18),
                       _EpicTimelineAndStories(

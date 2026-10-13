@@ -156,7 +156,12 @@ class EpicProgressService(
                 else -> EpicProgressStepState.PENDING
             }
             if (key == "VERIFICATION" && context.hasBugfixLoop) state = EpicProgressStepState.FAILED
-            EpicProgressStep(key, STEP_LABELS.getValue(key), state, stepDetail(context, key, state))
+            val label = when {
+                key == "VERIFICATION" && context.hasBugfixLoop -> "Eerste verificatie afgekeurd"
+                key == "RETEST" && state == EpicProgressStepState.DONE && context.epicVerifications.any { it.outcome == VerificationOutcome.PASSED } -> "Hertest geslaagd"
+                else -> STEP_LABELS.getValue(key)
+            }
+            EpicProgressStep(key, label, state, stepDetail(context, key, state))
         }
         return steps to if (completed) "DONE" else keys[currentIndex]
     }

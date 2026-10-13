@@ -1,4 +1,5 @@
 import 'epic_reference.dart';
+import 'epic_progress_state.dart';
 import 'display_timestamp.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -2465,29 +2466,31 @@ class _EpicCollaborationPageState extends State<EpicCollaborationPage> {
       text(
         '${_map(progress['waitingOn'])['title']}\n${_text(_map(progress['waitingOn'])['detail'])}',
       ),
-    ..._maps(progress['steps']).map(
-      (step) => ListTile(
+    ..._maps(progress['steps']).map((step) {
+      final state = EpicProgressState.fromValue(step['state']);
+      final timestamp = displayTimestamp(step['detail']);
+      final detail = timestamp.isNotEmpty ? timestamp : _text(step['detail']);
+      return ListTile(
         contentPadding: EdgeInsets.zero,
         leading: Icon(
-          step['state'] == 'DONE'
-              ? Icons.check_circle_outline
-              : step['state'] == 'CURRENT'
-              ? Icons.play_circle_outline
-              : Icons.radio_button_unchecked,
-          color: step['state'] == 'CURRENT'
-              ? Theme.of(context).colorScheme.primary
-              : null,
+          state.icon,
+          semanticLabel: state.label,
+          color: switch (state) {
+            EpicProgressState.failed => Theme.of(context).colorScheme.error,
+            EpicProgressState.current => Theme.of(context).colorScheme.primary,
+            _ => null,
+          },
         ),
         title: Text(_text(step['label'])),
         subtitle: Text(
           step['key'] == 'BUILD'
               ? '${_maps(progress['stories']).where((s) => s['status'] == 'DONE').length} van ${_maps(progress['stories']).length} stories afgerond'
-              : displayTimestamp(step['detail']).isNotEmpty
-              ? displayTimestamp(step['detail'])
-              : _text(step['detail']),
+              : detail.isNotEmpty
+              ? detail
+              : state.label,
         ),
-      ),
-    ),
+      );
+    }),
     for (final entry in environment.entries.where(
       (e) =>
           ['production', 'acceptance'].contains(e.key) &&

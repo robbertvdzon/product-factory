@@ -255,6 +255,8 @@ class ProcessOverviewIntegrationTest @Autowired constructor(
         assertThat(json.path("steps").map { it.path("detail").takeUnless { d -> d.isNull }?.asText() }).containsExactly(
             history[0].updatedAt.toString(), "2 stories", "2 / 2", verification.toString(), "hkh-208", null, null,
         )
+        assertThat(json.path("steps")[3].path("label").asText()).isEqualTo("Eerste verificatie afgekeurd")
+        assertThat(json.path("steps")[5].path("label").asText()).isEqualTo("Hertest")
         val kinds = json.path("timeline").map { it.path("kind").asText() }
         assertThat(kinds).contains(
             "EPIC_CREATED", "EPIC_VERSION", "STORIES_CREATED", "STORY_DISPATCHED", "STORY_DELIVERED", "STORY_CANCELLED",
@@ -292,6 +294,41 @@ class ProcessOverviewIntegrationTest @Autowired constructor(
         val json = mapper.readTree(progress)
         assertThat(json.path("steps").map { it.path("state").asText() }).containsOnly("DONE")
         assertThat(json.path("timeline").map { it.path("kind").asText() }).contains("VERIFICATION_PASSED", "STORY_DELIVERED")
+    }
+
+    @Test
+    fun `afgeronde epic behoudt eerste afkeuring en benoemt geslaagde hertest`() {
+        val t = now.minus(Duration.ofDays(2))
+        val epicId = insertEpic(listOf(
+            EpicStatus.AVAILABLE, EpicStatus.IN_PLANNING, EpicStatus.ACTIVE, EpicStatus.VERIFYING,
+            EpicStatus.ACTIVE, EpicStatus.VERIFYING, EpicStatus.COMPLETED,
+        ), t)
+        insertStory(epicId, 1, "PRODUCT_STORY", "DONE", t.plus(Duration.ofHours(2)), commit = SHA)
+        val rejectedAt = insertVerification("EPIC", epicId, "NEEDS_WORK", t.plus(Duration.ofHours(3)), missingCoverage = "Het zoekscherm mist een lege toestand.")
+        val bugId = insertBug(epicId, rejectedAt)
+        insertStory(epicId, 2, "BUGFIX", "DONE", t.plus(Duration.ofHours(4)), commit = SHA, bugId = bugId)
+        jdbc.update("UPDATE pf_bug SET status='RESOLVED' WHERE id=?", bugId)
+        val passedAt = insertVerification("EPIC", epicId, "PASSED", t.plus(Duration.ofHours(6)))
+
+        val body = mockMvc.get("/api/epics/$epicId/progress").andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("COMPLETED") }
+            jsonPath("$.phase") { value("DONE") }
+            jsonPath("$.waitingOn") { value(null) }
+            jsonPath("$.openBugs.length()") { value(0) }
+        }.andReturn().response.contentAsString
+        val json = mapper.readTree(body)
+        assertThat(json.path("steps").map { it.path("key").asText() to it.path("state").asText() }).containsExactly(
+            "DESIGN" to "DONE", "PLANNING" to "DONE", "BUILD" to "DONE", "VERIFICATION" to "FAILED",
+            "BUGFIX" to "DONE", "RETEST" to "DONE", "DONE" to "DONE",
+        )
+        val firstVerification = json.path("steps")[3]
+        assertThat(firstVerification.path("label").asText()).isEqualTo("Eerste verificatie afgekeurd")
+        assertThat(firstVerification.path("detail").asText()).isEqualTo(rejectedAt.toString())
+        val retest = json.path("steps")[5]
+        assertThat(retest.path("label").asText()).isEqualTo("Hertest geslaagd")
+        assertThat(retest.path("detail").asText()).isEqualTo(passedAt.toString())
+        assertThat(json.path("timeline").map { it.path("kind").asText() }).contains("VERIFICATION_FAILED", "VERIFICATION_PASSED")
     }
 
     @Test

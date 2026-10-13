@@ -8,6 +8,45 @@ import 'package:product_factory_frontend/product_workspace.dart';
 
 void main() {
 
+  testWidgets('afgeronde epic toont eerdere afkeuring en geslaagde hertest', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final epic = {'id':'epic-9','productId':'pvdd','title':'Meerdere vergaderingen','status':'COMPLETED','version':10,'contentVersion':2,'review':{'blockers':[]}};
+    final responses = <String,Object>{
+      '/api/products':[{'id':'pvdd','name':'PvdD','status':'ACTIVE','dispatchingEnabled':true,'version':1}],
+      '/api/products/pvdd/epics':[epic],
+      '/api/epics/epic-9/progress':{'steps':[
+        {'key':'VERIFICATION','label':'Eerste verificatie afgekeurd','state':'FAILED','detail':'2026-10-13T08:00:00Z'},
+        {'key':'BUGFIX','label':'Bugfix','state':'DONE','detail':'1 / 1'},
+        {'key':'RETEST','label':'Hertest geslaagd','state':'DONE','detail':'2026-10-13T10:00:00Z'},
+        {'key':'DONE','label':'Afgerond','state':'DONE','detail':'2026-10-13T10:00:00Z'},
+      ],'stories':[]},
+    };
+    final client = MockClient((request) async => http.Response(jsonEncode(responses[request.url.path] ?? []),200,headers:{'content-type':'application/json'}));
+    await tester.pumpWidget(MaterialApp(home:Scaffold(body:EpicCollaborationPage(
+      products:HttpProductGateway(client:client),role:'PRODUCT_OWNER',initialProductId:'pvdd',api:CollaborationApi('csrf',client:client),
+    ))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Afgerond'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Meerdere vergaderingen'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Voortgang'));
+    await tester.tap(find.text('Voortgang'));
+    await tester.pumpAndSettle();
+    expect(find.text('Eerste verificatie afgekeurd'),findsOneWidget);
+    expect(find.text('Hertest geslaagd'),findsOneWidget);
+    final failed = find.ancestor(of:find.text('Eerste verificatie afgekeurd'),matching:find.byType(ListTile));
+    final retest = find.ancestor(of:find.text('Hertest geslaagd'),matching:find.byType(ListTile));
+    expect(find.descendant(of:failed,matching:find.byIcon(Icons.cancel_outlined)),findsOneWidget);
+    expect(find.descendant(of:retest,matching:find.byIcon(Icons.check_circle_outline)),findsOneWidget);
+    expect(find.byIcon(Icons.radio_button_unchecked),findsNothing);
+    expect(find.text('De epic is geverifieerd'),findsOneWidget);
+    expect(tester.widget<Icon>(find.descendant(of:failed,matching:find.byType(Icon))).semanticLabel,'Niet geslaagd');
+    expect(tester.takeException(),isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('wachtende epic behoudt het oorspronkelijke gesprek zonder dubbele voorbereiding', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1500, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -200,7 +239,12 @@ void main() {
           return http.Response('{}', 404);
         }
         if (path.endsWith('/history')) value = [epic];
-        if (path.endsWith('/progress')) value = {'steps': [], 'stories': [for (final status in ['IN_PROGRESS','DONE','TODO']) {'id':status,'title':'Story $status','status':status}]};
+        if (path.endsWith('/progress')) {
+          value = {'steps': [
+            {'key':'VERIFICATION','label':'Eerste verificatie afgekeurd','state':'FAILED'},
+            {'key':'RETEST','label':'Hertest','state':'PENDING'},
+          ], 'stories': [for (final status in ['IN_PROGRESS','DONE','TODO']) {'id':status,'title':'Story $status','status':status}]};
+        }
         return http.Response(
           jsonEncode(value),
           200,
@@ -259,6 +303,13 @@ void main() {
         expect(find.text('1 · In ontwikkeling'), findsOneWidget);
         expect(find.text('1 · Afgerond'), findsOneWidget);
         expect(find.text('1 · Nog niet opgepakt'), findsOneWidget);
+        expect(find.text('Eerste verificatie afgekeurd'), findsOneWidget);
+        expect(find.text('Nog niet uitgevoerd'), findsOneWidget);
+        final failedIcon = tester.widget<Icon>(find.byIcon(Icons.cancel_outlined));
+        final pendingIcon = tester.widget<Icon>(find.byIcon(Icons.radio_button_unchecked));
+        expect(failedIcon.semanticLabel, 'Niet geslaagd');
+        expect(pendingIcon.semanticLabel, 'Nog niet uitgevoerd');
+        expect(failedIcon.color, isNot(pendingIcon.color));
         expect(tester.takeException(), isNull);
         await tester.ensureVisible(find.text('Schermen'));
         await tester.tap(find.text('Schermen'));

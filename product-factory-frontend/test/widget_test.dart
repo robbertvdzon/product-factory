@@ -877,6 +877,11 @@ void main() {
     );
     expect(appText('Bugfix'), findsOneWidget);
     expect(appText('Hertest'), findsOneWidget);
+    expect(appText('Eerste verificatie afgekeurd'), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsOneWidget);
+    expect(appText('Nog niet uitgevoerd'), findsNWidgets(2));
+    expect(find.byWidgetPredicate((widget) => widget is Semantics && widget.properties.label == 'Niet geslaagd'), findsOneWidget);
+    expect(find.byWidgetPredicate((widget) => widget is Semantics && widget.properties.label == 'Nog niet uitgevoerd'), findsNWidgets(2));
     expect(appText('Wacht op Software Factory'), findsOneWidget);
     expect(
       appTextContaining('Bugfix-story #29 is als hkh-208 verstuurd'),
@@ -892,6 +897,16 @@ void main() {
       appTextContaining('1 met resultaat · 30 niets te doen'),
       findsOneWidget,
     );
+    final journey = tester.widget(find.byKey(const ValueKey('epic-journey-epic-onderwerp')));
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: MediaQuery(
+      data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+      child: journey,
+    ))));
+    await tester.pumpAndSettle();
+    expect(appText('Eerste verificatie afgekeurd'), findsOneWidget);
+    expect(appText('Nog niet uitgevoerd'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('operatie filtert sessies server-side en verbergt no-ops', (
@@ -1786,7 +1801,7 @@ class ProgressProductGateway extends ResearchProductGateway {
             {'key': 'DESIGN', 'label': 'Ontwerp', 'state': 'DONE'},
             {'key': 'PLANNING', 'label': 'Planning', 'state': 'DONE'},
             {'key': 'BUILD', 'label': 'Bouw', 'state': 'DONE'},
-            {'key': 'VERIFICATION', 'label': 'Verificatie', 'state': 'FAILED'},
+            {'key': 'VERIFICATION', 'label': 'Eerste verificatie afgekeurd', 'state': 'FAILED'},
             {'key': 'BUGFIX', 'label': 'Bugfix', 'state': 'CURRENT'},
             {'key': 'RETEST', 'label': 'Hertest', 'state': 'PENDING'},
             {'key': 'DONE', 'label': 'Afgerond', 'state': 'PENDING'},
